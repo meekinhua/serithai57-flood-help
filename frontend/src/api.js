@@ -19,6 +19,16 @@ export async function api(path, options = {}) {
 }
 
 // Small localStorage helpers; storage can be unavailable (private mode), so never throw.
+// Anonymous per-browser id for the "people viewing now" counter.
+export function viewerId() {
+  let id = load("viewerId", null);
+  if (!id) {
+    id = (window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`).replace(/[^A-Za-z0-9_-]/g, "");
+    save("viewerId", id);
+  }
+  return id;
+}
+
 export function load(key, fallback) {
   try {
     const v = localStorage.getItem(key);

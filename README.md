@@ -19,7 +19,7 @@
 - **ล็อกอินด้วยอีเมล/รหัสผ่าน:** ที่ `/admin` บัญชีแรกสร้างจาก `ADMIN_EMAIL` / `ADMIN_PASSWORD` (ดู `memory/test_credentials.md`) ควรเปลี่ยนรหัสผ่านที่แท็บ "บัญชี"
 - ผู้ดูแลทำได้: สร้าง / ปิด / ลบประกาศ, ปักหมุดหรือลบรายการใดก็ได้, ลบรายงานระดับน้ำ, เพิ่มหรือลบผู้ดูแลคนอื่น และดูประวัติการจัดการทั้งหมด
 - ระดับน้ำมี 7 ระดับ: ไม่ท่วม · ตาตุ่ม · ครึ่งแข้ง · เข่า · **ต้นขา (60–70 ซม.)** · เอว · อกขึ้นไป (ข้อมูลเก่าถูกแปลงให้อัตโนมัติ)
-- หน้าจอรีเฟรชข้อมูลเองทุก 20 วินาที
+- หน้าจอรีเฟรชข้อมูลเองทุก 20 วินาที และแสดง **"🟢 N คนกำลังดู"** (นับเครื่องที่เปิดหน้าอยู่ใน 60 วินาทีล่าสุด ไม่เก็บข้อมูลตัวตน)
 
 ## Stack (Emergent spec)
 - `frontend/`: React (CRA) + Tailwind + Leaflet/OSM tiles, yarn, port 3000
@@ -36,6 +36,7 @@
 | DELETE | /api/posts/{id} | ลบ (ต้องส่ง header `X-Edit-Key`) |
 | GET/POST | /api/water | รายงานระดับน้ำ |
 | GET | /api/announcements | ประกาศที่กำลังแสดง |
+| GET, POST | /api/presence, /api/presence/leave | จำนวนคนที่กำลังดู (ping ทุก 20 วินาที) |
 | POST, PUT, GET | /api/media, /api/media/{id}/chunk/{i}, /api/media/{id}/complete, /api/media/{id}/file, /api/media/{id}/thumb | อัปโหลดรูป/คลิปแบบแบ่งชิ้น (1 MB) และเปิดดูไฟล์ (เก็บใน MongoDB GridFS) |
 | POST | /api/auth/login, /api/auth/key, /api/auth/logout | เข้า/ออกโหมดผู้ดูแล (session cookie) |
 | * | /api/admin/... | ประกาศ, ปักหมุด/ลบรายการ, ลบระดับน้ำ, ผู้ดูแล, ประวัติ (ต้องเป็นผู้ดูแล) |

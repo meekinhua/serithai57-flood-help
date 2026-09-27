@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "./api";
+import { API, api, viewerId } from "./api";
 import { ANNOUNCEMENT_LEVELS, HOTLINE_GROUPS, KINDS, VILLAGE_NAME, WATER_LEVELS, categoryOf, osmLink, paymentBadge, timeAgo, waterOf } from "./config";
 import MapView from "./components/MapView";
 import Sheet from "./components/Sheet";
@@ -24,6 +24,7 @@ export default function App() {
   const [updatedAt, setUpdatedAt] = useState(null);
   const [toast, setToast] = useState("");
   const [announcements, setAnnouncements] = useState([]);
+  const [viewers, setViewers] = useState(null);
   const [admin, setAdmin] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -44,6 +45,12 @@ export default function App() {
   }
 
   const refresh = useCallback(async () => {
+    if (document.visibilityState === "visible") {
+      // Presence ping rides along with each refresh; hidden tabs stop pinging and drop off within 60 s.
+      api("/presence", { method: "POST", body: JSON.stringify({ id: viewerId() }) })
+        .then((r) => setViewers(r.online))
+        .catch(() => {});
+    }
     try {
       const [p, w, a] = await Promise.all([api(`/posts?include_done=${showDone}`), api("/water"), api("/announcements")]);
       setPosts(p);
@@ -66,6 +73,16 @@ export default function App() {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [refresh]);
+
+  useEffect(() => {
+    // Leaving the page: tell the server right away so the counter drops without waiting 60 s.
+    const leave = () => {
+      const body = new Blob([JSON.stringify({ id: viewerId() })], { type: "application/json" });
+      navigator.sendBeacon?.(`${API}/presence/leave`, body);
+    };
+    window.addEventListener("pagehide", leave);
+    return () => window.removeEventListener("pagehide", leave);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -156,6 +173,13 @@ export default function App() {
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-bold sm:text-xl">ช่วยกันน้ำท่วม เสรีไทย 57</h1>
             <p className="truncate text-xs text-neutral-400 sm:text-sm">
+              {online && viewers != null && (
+                <span className="mr-1 font-semibold text-emerald-400">
+                  <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle" aria-hidden="true" />
+                  {viewers.toLocaleString("th-TH")} คนกำลังดู
+                </span>
+              )}
+              {online && viewers != null && " · "}
               {online ? `อัปเดต ${updatedAt ? timeAgo(updatedAt) : "…"}` : "⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่"} · {VILLAGE_NAME}
             </p>
           </div>
