@@ -75,7 +75,7 @@ function SceneHelp({ playing }) {
       </div>
       <div className="g-float flex items-center justify-center gap-2 text-sm">
         <span className="rounded-lg border-2 border-black bg-white px-3 py-1 font-semibold">🤝 ฉันช่วยได้</span>
-        <span className="rounded-lg border-2 border-black bg-white px-3 py-1 font-semibold">💰 รับจ้าง</span>
+        <span className="rounded-lg border-2 border-black bg-white px-3 py-1 font-semibold">📇 ช่าง · รถ · รับจ้าง</span>
       </div>
     </div>
   );
@@ -158,7 +158,7 @@ function SceneAlerts() {
 
 const SLIDES = [
   { title: "🆘 ต้องการความช่วยเหลือ", text: "กดปุ่มดำ เลือกเรื่องที่ต้องการ ปักหมุดบ้านคุณ แนบรูปได้ แล้วกดส่ง ทุกคนในหมู่บ้านจะเห็นทันที", Scene: SceneNeed },
-  { title: "🤝 ช่วยได้ / รับจ้างได้", text: "เสนอเรือ รถยกสูง ที่พัก หรือรับจ้าง แล้วเปิดคำขอของเพื่อนบ้าน กด “ฉันจะไปช่วย” เมื่อเสร็จกด “ช่วยเสร็จแล้ว”", Scene: SceneHelp },
+  { title: "🤝 ช่วยได้ · 📇 หาช่าง/รถ/คนรับจ้าง", text: "หาช่างไฟ รถยกสูง คนขนของ ดูที่ “บอร์ดติดต่อ” ใต้ปุ่มหลัก กดโทรได้เลย ถ้าคุณรับจ้างได้ กด “ลงชื่อรับงาน” · เปิดคำขอของเพื่อนบ้านแล้วกด “ฉันจะไปช่วย”", Scene: SceneHelp },
   { title: "💧 แจ้งระดับน้ำ", text: "เลือกระดับน้ำเทียบกับร่างกาย จากตาตุ่มถึงอก ถ่ายรูปแนบได้ ยิ่งหลายคนแจ้ง แผนที่ยิ่งแม่น", Scene: SceneWater },
   { title: "🌊 ดูภาพรวมบนแผนที่", text: "สีบนแผนที่เกลี่ยจากรายงานของทุกคน เขียว = แห้ง แดง/ม่วง = ลึก แตะแผนที่ตรงไหนก็ได้เพื่อดูระดับน้ำโดยประมาณ", Scene: SceneMap },
   { title: "📢 ประกาศ และ ☎️ เบอร์ฉุกเฉิน", text: "ประกาศสำคัญจากผู้ดูแลอยู่บนสุดเสมอ เบอร์ รปภ. และสายด่วนอยู่ที่ปุ่มแดงมุมขวาบน อันตรายถึงชีวิตโทร 1669 / 199 ทันที", Scene: SceneAlerts },

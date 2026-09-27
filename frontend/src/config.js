@@ -83,6 +83,28 @@ export const STATUS = {
   done: { need: "ช่วยเสร็จแล้ว", offer: "ปิดแล้ว", info: "ไม่เป็นปัจจุบันแล้ว", cls: "border border-neutral-300 text-neutral-500" },
 };
 
+// Contact board categories. Keys must match SERVICE_CATEGORIES in backend/services.py
+export const SERVICE_CATEGORIES = {
+  electrician: ["⚡", "ช่างไฟ"],
+  plumber: ["🔧", "ช่างประปา / ปั๊มน้ำ"],
+  truck: ["🛻", "รถยกสูง / กระบะ"],
+  rental: ["🚗", "เช่ารถ / รับส่ง"],
+  boat: ["🚤", "เรือรับจ้าง"],
+  porter: ["💪", "จ้างขนของ / หิ้วของ"],
+  cleaning: ["🧹", "ล้างบ้าน / ทำความสะอาด"],
+  repair: ["🛠️", "ช่างซ่อม (แอร์ รถ เครื่องใช้)"],
+  food: ["🍱", "ส่งอาหาร / น้ำดื่ม"],
+  supplies: ["🛒", "ของใช้ / กระสอบทราย"],
+  pets: ["🐾", "รับฝากสัตว์เลี้ยง"],
+  other: ["📞", "อื่นๆ"],
+};
+
+export const PRICING = {
+  paid: { label: "มีค่าบริการ", badge: "💰" },
+  free: { label: "ฟรี / จิตอาสา", badge: "🆓" },
+  ask: { label: "สอบถามราคา", badge: "💬" },
+};
+
 // [number as displayed, label]; tel: links strip everything but digits.
 export const HOTLINE_GROUPS = [
   {

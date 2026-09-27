@@ -26,6 +26,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, field_validator
 
 import media
+import services
 import weather
 
 load_dotenv(Path(__file__).parent / ".env")
@@ -513,6 +514,7 @@ media_router, claim_media, delete_media, media_maintenance = media.build_router(
 app.include_router(api)
 app.include_router(media_router)
 app.include_router(weather.build_router())
+app.include_router(services.build_router(db, rate_limit, require_admin, audit, client_ip))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
@@ -527,6 +529,8 @@ async def startup():
     await db.sessions.create_index("expires_at", expireAfterSeconds=0)
     await db.announcements.create_index("created_at")
     await db.presence.create_index("last_seen", expireAfterSeconds=600)  # Mongo drops stale viewers itself
+    await db.services.create_index("id", unique=True)
+    await db.services.create_index([("category", 1), ("updated_at", -1)])
     await db.media.create_index("id", unique=True)
     await db.media.create_index([("attached_to", 1), ("created_at", 1)])
 

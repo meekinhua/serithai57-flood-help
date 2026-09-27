@@ -10,6 +10,7 @@ import AdminPanel, { AdminLogin } from "./components/AdminPanel";
 import { mediaUrl } from "./media";
 import Guide from "./components/Guide";
 import { WeatherAlerts, WeatherCard, WindyMap } from "./components/Weather";
+import { ServiceBoard, ServiceForm, ServiceStrip } from "./components/ServiceBoard";
 import { useCountUp } from "./motion";
 
 const REFRESH_MS = 20000;
@@ -40,6 +41,7 @@ export default function App() {
   const [announcements, setAnnouncements] = useState([]);
   const [viewers, setViewers] = useState(null);
   const [weather, setWeather] = useState(null);
+  const [services, setServices] = useState([]);
 
   useEffect(() => {
     const loadWeather = () => api("/weather").then(setWeather).catch(() => {});
@@ -74,7 +76,8 @@ export default function App() {
         .catch(() => {});
     }
     try {
-      const [p, w, a] = await Promise.all([api(`/posts?include_done=${showDone}`), api("/water"), api("/announcements")]);
+      const [p, w, a, sv] = await Promise.all([api(`/posts?include_done=${showDone}`), api("/water"), api("/announcements"), api("/services")]);
+      setServices(sv);
       setPosts(p);
       if (knownIds.current) {
         const fresh = p.filter((x) => !knownIds.current.has(x.id)).map((x) => x.id);
@@ -131,6 +134,8 @@ export default function App() {
     return c;
   }, [posts]);
 
+  const paidNeedCount = useMemo(() => posts.filter((p) => p.kind === "need" && p.payment === "paid" && p.status !== "done").length, [posts]);
+
   const selected = sheet?.type === "detail" ? posts.find((p) => p.id === sheet.id) : null;
   const openDetail = useCallback((id) => setSheet({ type: "detail", id }), []);
 
@@ -167,6 +172,7 @@ export default function App() {
       );
     });
     if (!open.length) lines.push("ยังไม่มีคำขอที่ค้างอยู่");
+    if (services.length) lines.push("", `📇 บอร์ดติดต่อ ช่าง/รถ/รับจ้าง: ${services.length} ราย (เปิดในแอป)`);
     lines.push("", `แจ้ง / อัปเดต: ${window.location.origin}`);
     await copyText(lines.join("\n"));
     setToast("คัดลอกสรุปแล้ว วางในกลุ่ม LINE ได้เลย");
@@ -280,6 +286,15 @@ export default function App() {
           <ActionButton color="border-2 border-black bg-white text-black active:bg-neutral-100" onClick={() => setSheet({ type: "form", kind: "info" })}>
             📍 แจ้งข้อมูล / ถนน
           </ActionButton>
+        </div>
+
+        <div className="mt-3">
+          <ServiceStrip
+            services={services}
+            paidNeeds={paidNeedCount}
+            onOpen={(opts) => setSheet({ type: "board", ...opts })}
+            onAdd={() => setSheet({ type: "serviceForm" })}
+          />
         </div>
 
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -432,6 +447,31 @@ export default function App() {
             onDeleted={(id) => {
               setPosts((prev) => prev.filter((p) => p.id !== id));
               setSheet(null);
+            }}
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "board" && (
+        <Sheet title="📇 บอร์ดติดต่อ: ช่าง · รถ · รับจ้าง" onClose={() => setSheet(null)}>
+          <ServiceBoard
+            key={`${sheet.tab}-${sheet.category}`}
+            services={services}
+            setServices={setServices}
+            posts={posts}
+            admin={admin}
+            initial={sheet}
+            onAdd={() => setSheet({ type: "serviceForm" })}
+            onOpenPost={openDetail}
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "serviceForm" && (
+        <Sheet title="📇 ลงชื่อรับงาน / ให้บริการ" onClose={() => setSheet(null)}>
+          <ServiceForm
+            onDone={(s) => {
+              setServices((prev) => [s, ...prev]);
+              setSheet({ type: "board", tab: "providers", category: s.category });
+              setToast("ลงชื่อแล้ว เพื่อนบ้านโทรหาคุณได้ทันที");
             }}
           />
         </Sheet>
