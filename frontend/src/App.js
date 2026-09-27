@@ -10,6 +10,7 @@ import AdminPanel, { AdminLogin } from "./components/AdminPanel";
 import { mediaUrl } from "./media";
 
 const REFRESH_MS = 20000;
+const WATER_STAT_HOURS = 6;
 const IS_ADMIN_PAGE = window.location.pathname.replace(/\/+$/, "") === "/admin";
 
 export default function App() {
@@ -163,7 +164,18 @@ export default function App() {
     }
   }
 
-  const latestWater = water[0];
+  // Village-wide picture: the deepest report in the last 6 h (newest wins a tie).
+  // Falls back to the latest report when nothing is that recent.
+  const waterStat = useMemo(() => {
+    const since = Date.now() - WATER_STAT_HOURS * 3600 * 1000;
+    const recent = water.filter((w) => new Date(w.created_at).getTime() >= since);
+    if (recent.length) {
+      const top = recent.reduce((a, b) => (b.level > a.level ? b : a));
+      return { report: top, label: `ระดับน้ำสูงสุด (${WATER_STAT_HOURS} ชม.)`, sub: `จาก ${recent.length} รายงาน · ${timeAgo(top.created_at)}` };
+    }
+    if (water.length) return { report: water[0], label: "ระดับน้ำล่าสุด", sub: `${timeAgo(water[0].created_at)} (เก่ากว่า ${WATER_STAT_HOURS} ชม.)` };
+    return null;
+  }, [water, updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps -- updatedAt re-evaluates the 6 h window on each poll
 
   return (
     <div className="min-h-screen bg-neutral-100 text-neutral-900">
@@ -239,10 +251,13 @@ export default function App() {
           <Stat value={counts.need} label="คำขอค้างอยู่" sub={counts.urgent ? `ด่วน ${counts.urgent}` : ""} color="text-black" />
           <Stat value={counts.offer} label="ผู้พร้อมช่วย" color="text-black" />
           <Stat
-            value={latestWater ? waterOf(latestWater.level).label : "–"}
-            label="ระดับน้ำล่าสุด"
-            sub={latestWater ? timeAgo(latestWater.created_at) : ""}
+            value={waterStat ? waterOf(waterStat.report.level).label : "–"}
+            label={waterStat ? waterStat.label : "ระดับน้ำ"}
+            sub={waterStat ? waterStat.sub : "ยังไม่มีรายงาน"}
             color="text-black"
+            dot={waterStat ? waterOf(waterStat.report.level).color : null}
+            onClick={waterStat ? () => showOnMap(waterStat.report) : null}
+            actionLabel="ดูจุดนี้บนแผนที่"
           />
         </div>
 
@@ -435,13 +450,23 @@ function ActionButton({ color, onClick, children }) {
   );
 }
 
-function Stat({ value, label, sub, color }) {
-  return (
-    <div className="rounded-xl bg-white p-2">
-      <div className={`text-xl font-bold sm:text-2xl ${color}`}>{value}</div>
+function Stat({ value, label, sub, color, dot, onClick, actionLabel }) {
+  const body = (
+    <>
+      <div className={`flex items-center justify-center gap-1.5 text-xl font-bold sm:text-2xl ${color}`}>
+        {dot && <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: dot }} aria-hidden="true" />}
+        {value}
+      </div>
       <div className="text-xs text-neutral-600 sm:text-sm">{label}</div>
       {sub && <div className="text-xs font-semibold text-red-600">{sub}</div>}
-    </div>
+    </>
+  );
+  return onClick ? (
+    <button onClick={onClick} aria-label={`${label}: ${value} — ${actionLabel}`} className="rounded-xl bg-white p-2 active:bg-neutral-100">
+      {body}
+    </button>
+  ) : (
+    <div className="rounded-xl bg-white p-2">{body}</div>
   );
 }
 
