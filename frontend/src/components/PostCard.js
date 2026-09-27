@@ -18,6 +18,7 @@ export function PostSummary({ post, onOpen }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
+            {post.pinned && <span className="rounded bg-black px-1.5 font-bold text-white">📌 ปักหมุด</span>}
             {post.urgent && post.status === "open" && <span className="rounded bg-red-600 px-1.5 font-bold text-white">ด่วน</span>}
             <span className="font-semibold" style={{ color: k.color }}>{catLabel}</span>
             <span className={`rounded px-1.5 ${STATUS[post.status].cls}`}>{STATUS[post.status][post.kind]}</span>
@@ -35,7 +36,7 @@ export function PostSummary({ post, onOpen }) {
   );
 }
 
-export function PostDetail({ post, onChanged, onDeleted, onShowOnMap }) {
+export function PostDetail({ post, admin, onChanged, onDeleted, onShowOnMap }) {
   const [emoji, catLabel] = categoryOf(post);
   const k = KINDS[post.kind];
   const [name, setName] = useState(() => load("contact", {}).name || "");
@@ -71,6 +72,24 @@ export function PostDetail({ post, onChanged, onDeleted, onShowOnMap }) {
     }
   }
 
+  async function adminPin() {
+    try {
+      onChanged(await api(`/admin/posts/${post.id}/pin`, { method: "POST", body: JSON.stringify({ pinned: !post.pinned }) }));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function adminDelete() {
+    if (!window.confirm("ลบรายการนี้ (สิทธิ์ผู้ดูแล)? ลบแล้วกู้คืนไม่ได้")) return;
+    try {
+      await api(`/admin/posts/${post.id}`, { method: "DELETE" });
+      onDeleted(post.id);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   const btn = "min-h-[48px] rounded-xl px-4 font-semibold disabled:opacity-60";
 
   return (
@@ -82,6 +101,7 @@ export function PostDetail({ post, onChanged, onDeleted, onShowOnMap }) {
             {k.emoji} {k.label} · {catLabel}
           </p>
           <div className="mt-1 flex flex-wrap gap-1.5 text-sm">
+            {post.pinned && <span className="rounded bg-black px-1.5 font-bold text-white">📌 ปักหมุด</span>}
             {post.urgent && <span className="rounded bg-red-600 px-1.5 font-bold text-white">ด่วนมาก</span>}
             <span className={`rounded px-1.5 ${STATUS[post.status].cls}`}>{STATUS[post.status][post.kind]}</span>
             {paymentBadge(post) && <span className="rounded border border-black px-1.5 font-semibold">{paymentBadge(post)}</span>}
@@ -160,6 +180,20 @@ export function PostDetail({ post, onChanged, onDeleted, onShowOnMap }) {
           ))}
         </ol>
       </section>
+
+      {admin && (
+        <section className="rounded-xl border-2 border-dashed border-black p-3">
+          <h3 className="mb-2 font-semibold">🛡️ ผู้ดูแล</h3>
+          <div className="grid gap-2 min-[400px]:grid-cols-2">
+            <button onClick={adminPin} className={`${btn} border-2 border-black bg-white`}>
+              {post.pinned ? "📌 เลิกปักหมุด" : "📌 ปักหมุดไว้บนสุด"}
+            </button>
+            <button onClick={adminDelete} className={`${btn} bg-red-600 text-white`}>
+              🗑 ลบรายการ
+            </button>
+          </div>
+        </section>
+      )}
 
       {editKey && (
         <button onClick={remove} className="min-h-[44px] text-red-700 underline">

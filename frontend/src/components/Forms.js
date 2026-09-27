@@ -206,7 +206,7 @@ export function WaterForm({ onDone }) {
     <form onSubmit={submit} className="space-y-4">
       <fieldset>
         <legend className={label}>ระดับน้ำตอนนี้ *</legend>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {WATER_LEVELS.map((w) => (
             <button
               type="button"

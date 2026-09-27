@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
-import { HOTLINES, KINDS, VILLAGE_NAME, WATER_LEVELS, categoryOf, osmLink, paymentBadge, timeAgo, waterOf } from "./config";
+import { ANNOUNCEMENT_LEVELS, HOTLINES, KINDS, VILLAGE_NAME, WATER_LEVELS, categoryOf, osmLink, paymentBadge, timeAgo, waterOf } from "./config";
 import MapView from "./components/MapView";
 import Sheet from "./components/Sheet";
 import { PostForm, WaterForm } from "./components/Forms";
 import { PostDetail, PostSummary } from "./components/PostCard";
+import Announcements from "./components/Announcements";
+import AdminPanel, { AdminLogin } from "./components/AdminPanel";
 
 const REFRESH_MS = 20000;
+const IS_ADMIN_PAGE = window.location.pathname.replace(/\/+$/, "") === "/admin";
 
 export default function App() {
   const [posts, setPosts] = useState([]);
@@ -19,12 +22,32 @@ export default function App() {
   const [online, setOnline] = useState(true);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [toast, setToast] = useState("");
+  const [announcements, setAnnouncements] = useState([]);
+  const [admin, setAdmin] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Admin session: secret link /admin#key=... logs in once, then the cookie carries it.
+  useEffect(() => {
+    const key = new URLSearchParams(window.location.hash.slice(1)).get("key");
+    if (key) window.history.replaceState(null, "", window.location.pathname); // don't leave the key in the URL bar/history
+    const check = key ? api("/auth/key", { method: "POST", body: JSON.stringify({ key }) }) : api("/auth/me");
+    check
+      .then(setAdmin)
+      .catch((err) => key && setToast(err.message))
+      .finally(() => setAuthChecked(true));
+  }, []);
+
+  async function logout() {
+    await api("/auth/logout", { method: "POST" }).catch(() => {});
+    setAdmin(null);
+  }
 
   const refresh = useCallback(async () => {
     try {
-      const [p, w] = await Promise.all([api(`/posts?include_done=${showDone}`), api("/water")]);
+      const [p, w, a] = await Promise.all([api(`/posts?include_done=${showDone}`), api("/water"), api("/announcements")]);
       setPosts(p);
       setWater(w);
+      setAnnouncements(a);
       setOnline(true);
       setUpdatedAt(new Date());
     } catch {
@@ -79,6 +102,11 @@ export default function App() {
   async function copySummary() {
     const open = posts.filter((p) => p.kind === "need" && p.status !== "done");
     const lines = [`🌊 สรุปคำขอความช่วยเหลือ ${VILLAGE_NAME}`, `ณ ${new Date().toLocaleString("th-TH")}`, ""];
+    if (announcements.length) {
+      lines.push("📢 ประกาศจากผู้ดูแลหมู่บ้าน");
+      announcements.forEach((a) => lines.push(`${ANNOUNCEMENT_LEVELS[a.level].icon} ${a.text}`));
+      lines.push("");
+    }
     open.forEach((p, i) => {
       const [emoji, cat] = categoryOf(p);
       lines.push(
@@ -107,6 +135,16 @@ export default function App() {
     setToast("คัดลอกลิงก์แล้ว");
   }
 
+  async function deleteWater(w) {
+    if (!window.confirm(`ลบรายงานระดับน้ำ "${waterOf(w.level).label}" นี้?`)) return;
+    try {
+      await api(`/admin/water/${w.id}`, { method: "DELETE" });
+      setWater((prev) => prev.filter((x) => x.id !== w.id));
+    } catch (err) {
+      setToast(err.message);
+    }
+  }
+
   const latestWater = water[0];
 
   return (
@@ -127,9 +165,36 @@ export default function App() {
             🔗
           </button>
         </div>
+        {admin && (
+          <div className="border-t border-white/20 bg-neutral-800">
+            <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 text-sm sm:px-4">
+              <span className="font-semibold">🛡️ โหมดผู้ดูแล · {admin.name}</span>
+              {IS_ADMIN_PAGE ? (
+                <a href="/" className="flex min-h-[40px] items-center underline">← หน้าหลัก (จัดการรายการ)</a>
+              ) : (
+                <a href="/admin" className="flex min-h-[40px] items-center underline">📢 ประกาศ / ตั้งค่า</a>
+              )}
+              <button onClick={logout} className="ml-auto min-h-[40px] underline">ออกจากโหมดผู้ดูแล</button>
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-7xl px-3 pb-10 pt-3 sm:px-4">
+        {IS_ADMIN_PAGE ? (
+          !authChecked ? (
+            <p className="p-6 text-center text-neutral-500">กำลังตรวจสอบ…</p>
+          ) : admin ? (
+            <AdminPanel admin={admin} onPublicChange={refresh} />
+          ) : (
+            <AdminLogin onLogin={setAdmin} />
+          )
+        ) : (
+        <>
+        <div className="mb-3 empty:hidden">
+          <Announcements items={announcements} />
+        </div>
+
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           <ActionButton color="bg-black text-white active:bg-neutral-800" onClick={() => setSheet({ type: "form", kind: "need" })}>
             🆘 ขอความช่วยเหลือ
@@ -222,6 +287,11 @@ export default function App() {
                         <button onClick={() => showOnMap(w)} className="ml-auto min-h-[44px] min-w-[44px] shrink-0 px-2 text-black underline">
                           ดู
                         </button>
+                        {admin && (
+                          <button onClick={() => deleteWater(w)} className="min-h-[44px] shrink-0 px-2 text-red-700 underline">
+                            ลบ
+                          </button>
+                        )}
                       </li>
                     );
                   })}
@@ -231,9 +301,17 @@ export default function App() {
           </section>
         </div>
 
+        </>
+        )}
+
         <footer className="mt-8 flex flex-col items-center gap-2 text-center text-xs text-neutral-500">
           <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Sahakorn Serithai 57" className="h-32 w-auto" />
           แผนที่ © ผู้ร่วมพัฒนา OpenStreetMap · ข้อมูลในหน้านี้มาจากชาวบ้านช่วยกันแจ้ง กรณีอันตรายถึงชีวิตโทร 1669 / 199 ทันที
+          {!admin && (
+            <a href="/admin" className="mt-1 inline-flex min-h-[44px] items-center text-neutral-400 underline">
+              สำหรับผู้ดูแล
+            </a>
+          )}
         </footer>
       </main>
 
@@ -264,6 +342,7 @@ export default function App() {
         <Sheet title="รายละเอียด" onClose={() => setSheet(null)}>
           <PostDetail
             post={selected}
+            admin={admin}
             onChanged={upsert}
             onShowOnMap={showOnMap}
             onDeleted={(id) => {

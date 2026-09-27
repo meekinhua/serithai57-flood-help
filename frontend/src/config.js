@@ -65,13 +65,16 @@ export function paymentBadge(post) {
   return `💰 ${PAYMENT[post.kind].badge}${post.price ? ` ${post.price}` : ""}`;
 }
 
+// Index = level stored in the DB (backend WATER_MAX_LEVEL = 6).
+// ต้นขา added between เข่า and เอว after residents asked for a 60-70 cm step.
 export const WATER_LEVELS = [
-  { level: 0, label: "ไม่ท่วม", cm: "0", color: "#16a34a" },
+  { level: 0, label: "ไม่ท่วม", cm: "0 ซม.", color: "#16a34a" },
   { level: 1, label: "ตาตุ่ม", cm: "~10 ซม.", color: "#84cc16" },
-  { level: 2, label: "ครึ่งแข้ง", cm: "~25 ซม.", color: "#eab308" },
-  { level: 3, label: "เข่า", cm: "~50 ซม.", color: "#f97316" },
-  { level: 4, label: "เอว", cm: "~80 ซม.", color: "#dc2626" },
-  { level: 5, label: "อกขึ้นไป", cm: "1 ม.+", color: "#7e22ce" },
+  { level: 2, label: "ครึ่งแข้ง", cm: "20–30 ซม.", color: "#eab308" },
+  { level: 3, label: "เข่า", cm: "40–50 ซม.", color: "#f59e0b" },
+  { level: 4, label: "ต้นขา", cm: "60–70 ซม.", color: "#ea580c" },
+  { level: 5, label: "เอว", cm: "80–90 ซม.", color: "#dc2626" },
+  { level: 6, label: "อกขึ้นไป", cm: "1 ม.+", color: "#7e22ce" },
 ];
 
 export const STATUS = {
@@ -94,8 +97,14 @@ export function categoryOf(post) {
 }
 
 export function waterOf(level) {
-  return WATER_LEVELS[level] || WATER_LEVELS[0];
+  return WATER_LEVELS[level] || WATER_LEVELS[WATER_LEVELS.length - 1];
 }
+
+export const ANNOUNCEMENT_LEVELS = {
+  danger: { label: "ด่วนมาก / อันตราย", icon: "🚨", cls: "bg-red-600 text-white border-red-800" },
+  warning: { label: "เตือน", icon: "⚠️", cls: "bg-yellow-300 text-black border-black" },
+  info: { label: "แจ้งทั่วไป", icon: "📢", cls: "bg-black text-white border-black" },
+};
 
 export function timeAgo(iso) {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;

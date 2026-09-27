@@ -3,6 +3,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export async function api(path, options = {}) {
   const res = await fetch(`${API}${path}`, {
+    credentials: "include", // admin session cookie
     ...options,
     headers: { "Content-Type": "application/json", ...options.headers },
   });
