@@ -43,11 +43,23 @@ export default function App() {
   const [weather, setWeather] = useState(null);
   const [services, setServices] = useState([]);
 
+  // Weather never disappears: on failure we keep the last data (or show a placeholder) and retry sooner.
   useEffect(() => {
-    const loadWeather = () => api("/weather").then(setWeather).catch(() => {});
+    let timer;
+    const loadWeather = async () => {
+      let next = WEATHER_REFRESH_MS;
+      try {
+        const w = await api("/weather");
+        setWeather((prev) => (w.unavailable && prev?.current ? { ...prev, stale: true } : w));
+        if (w.unavailable || w.stale) next = 60 * 1000;
+      } catch {
+        setWeather((prev) => (prev?.current ? { ...prev, stale: true } : { unavailable: true, alerts: [] }));
+        next = 60 * 1000;
+      }
+      timer = setTimeout(loadWeather, next);
+    };
     loadWeather();
-    const t = setInterval(loadWeather, WEATHER_REFRESH_MS);
-    return () => clearInterval(t);
+    return () => clearTimeout(timer);
   }, []);
   const [admin, setAdmin] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);

@@ -25,11 +25,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, field_validator
 
-import media
-import services
-import weather
-
+# Load .env BEFORE importing our own modules: they read settings (e.g. WEATHER_PROVIDERS) at import time.
 load_dotenv(Path(__file__).parent / ".env")
+
+import media  # noqa: E402
+import services  # noqa: E402
+import weather  # noqa: E402
 
 # tz_aware so datetimes go out as "+00:00" and browsers don't misread them as local time
 client = AsyncIOMotorClient(os.environ["MONGO_URL"], tz_aware=True)
@@ -513,7 +514,7 @@ media_router, claim_media, delete_media, media_maintenance = media.build_router(
 
 app.include_router(api)
 app.include_router(media_router)
-app.include_router(weather.build_router())
+app.include_router(weather.build_router(db))
 app.include_router(services.build_router(db, rate_limit, require_admin, audit, client_ip))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])

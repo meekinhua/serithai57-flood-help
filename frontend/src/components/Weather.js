@@ -103,6 +103,12 @@ export function WeatherAlerts({ weather, onOpenMap }) {
   );
 }
 
+function ageText(minutes) {
+  if (minutes == null) return "ก่อนหน้านี้";
+  if (minutes < 60) return `${minutes} นาทีที่แล้ว`;
+  return `${Math.round(minutes / 60)} ชม.ที่แล้ว`;
+}
+
 function rainColor(mm) {
   if (mm >= 10) return "#7e22ce";
   if (mm >= 5) return "#dc2626";
@@ -115,6 +121,17 @@ function rainColor(mm) {
 // One-line "now" strip for the sticky header; colour follows the worst active warning.
 export function WeatherTopBar({ weather, onOpen }) {
   if (!weather) return null;
+  if (!weather.current) {
+    return (
+      <button onClick={onOpen} className="block w-full border-t border-white/20 bg-neutral-800 text-left text-white">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 whitespace-nowrap px-3 py-1 text-sm sm:px-4">
+          <span aria-hidden="true">🌦️</span>
+          <span className="truncate">ข้อมูลอากาศไม่พร้อมชั่วคราว</span>
+          <span className="ml-auto shrink-0 underline">แผนที่ Windy ›</span>
+        </div>
+      </button>
+    );
+  }
   const c = weather.current;
   const alerts = weather.alerts || [];
   const level = alerts.some((a) => a.level === "danger") ? "danger" : alerts.length ? "warning" : "ok";
@@ -135,6 +152,7 @@ export function WeatherTopBar({ weather, onOpen }) {
         <span className="truncate">{c.text}</span>
         <span className="opacity-60">·</span>
         <span className="shrink-0">💨 {Math.round(c.wind)}{c.gust >= 30 ? `–${Math.round(c.gust)}` : ""} กม./ชม.</span>
+        {weather.stale && <span className="shrink-0 rounded bg-black/20 px-1 text-xs">ข้อมูล {ageText(weather.age_minutes)}</span>}
         <span className="hidden opacity-60 min-[400px]:inline">·</span>
         <span className="hidden shrink-0 min-[400px]:inline">☔ 6 ชม. {weather.rain_next_6h} มม.</span>
         {level !== "ok" && <span className="ml-auto shrink-0 rounded bg-black/20 px-1.5 text-xs font-bold">⚠️ {alerts.length}</span>}
@@ -148,6 +166,19 @@ export function WeatherTopBar({ weather, onOpen }) {
 
 export function WeatherCard({ weather, onOpenMap }) {
   if (!weather) return null;
+  if (!weather.current) {
+    return (
+      <section className="flex flex-wrap items-center gap-3 rounded-xl bg-white p-3" aria-label="สภาพอากาศ">
+        <span className="text-3xl" aria-hidden="true">🌦️</span>
+        <p className="min-w-0 flex-1 text-sm text-neutral-600">
+          ข้อมูลสภาพอากาศไม่พร้อมชั่วคราว ระบบกำลังลองใหม่อัตโนมัติ · ดูภาพฝน/ลมสดได้จากแผนที่ Windy
+        </p>
+        <button onClick={onOpenMap} className="min-h-[44px] w-full rounded-lg border-2 border-black px-3 text-sm font-semibold active:bg-neutral-100 sm:w-auto">
+          🌬️ แผนที่ลม/ฝน/เมฆ
+        </button>
+      </section>
+    );
+  }
   const c = weather.current;
   const hours = weather.hours || [];
   const max = Math.max(5, ...hours.map((h) => h.precip));
@@ -162,7 +193,7 @@ export function WeatherCard({ weather, onOpenMap }) {
             {c.text} · {Math.round(c.temp)}°C
           </p>
           <p className="text-sm text-neutral-600">
-            ลม{c.wind_dir} {Math.round(c.wind)} กม./ชม. (กระโชก {Math.round(c.gust)}) · ฝน 6 ชม.ข้างหน้า {weather.rain_next_6h} มม.
+            ลม{c.wind_dir} {Math.round(c.wind)} กม./ชม.{c.gust ? ` (กระโชก ${Math.round(c.gust)})` : ""} · ฝน 6 ชม.ข้างหน้า {weather.rain_next_6h} มม.
           </p>
         </div>
         <button onClick={onOpenMap} className="min-h-[44px] w-full rounded-lg border-2 border-black px-3 text-sm font-semibold active:bg-neutral-100 sm:w-auto">
@@ -192,7 +223,8 @@ export function WeatherCard({ weather, onOpenMap }) {
         </div>
       )}
       <p className="mt-1 text-[11px] text-neutral-400">
-        ปริมาณฝน (มม.) 12 ชม.ข้างหน้า · ข้อมูล Open-Meteo{weather.stale ? " (ข้อมูลเก่า เชื่อมต่อไม่ได้ชั่วคราว)" : ""}
+        ปริมาณฝน (มม.) 12 ชม.ข้างหน้า · ข้อมูล {weather.source === "MET Norway" ? "MET Norway (CC BY 4.0)" : weather.source}
+        {weather.stale ? ` · ข้อมูลเมื่อ ${ageText(weather.age_minutes)} ระบบกำลังลองดึงใหม่` : ""}
       </p>
     </section>
   );

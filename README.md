@@ -44,9 +44,17 @@
 | GET | /api/announcements | ประกาศที่กำลังแสดง |
 | GET, POST | /api/presence, /api/presence/leave | จำนวนคนที่กำลังดู (ping ทุก 20 วินาที) |
 | GET, POST, PATCH, DELETE | /api/services, /api/services/{id}, /api/services/{id}/report, /api/admin/services/{id} | บอร์ดติดต่อ (เจ้าของแก้ด้วย `X-Edit-Key`, ผู้ดูแลยืนยัน/ปักหมุด/ลบ) |
-| GET | /api/weather | สภาพอากาศปัจจุบัน + 12 ชม. + รายการเตือน (Open-Meteo, cache 10 นาที) |
+| GET | /api/weather, /api/weather/status | สภาพอากาศ + 12 ชม. + เตือน (Open-Meteo → สำรอง MET Norway, cache 10 นาที, เก็บค่าล่าสุดใน Mongo) · `/status` บอกว่าแหล่งไหนใช้ได้/กำลังพัก |
 | POST, PUT, GET | /api/media, /api/media/{id}/chunk/{i}, /api/media/{id}/complete, /api/media/{id}/file, /api/media/{id}/thumb | อัปโหลดรูป/คลิปแบบแบ่งชิ้น (1 MB) และเปิดดูไฟล์ (เก็บใน MongoDB GridFS) |
 | POST | /api/auth/login, /api/auth/key, /api/auth/logout | เข้า/ออกโหมดผู้ดูแล (session cookie) |
 | * | /api/admin/... | ประกาศ, ปักหมุด/ลบรายการ, ลบระดับน้ำ, ผู้ดูแล, ประวัติ (ต้องเป็นผู้ดูแล) |
 
 เอกสาร API แบบเต็มดูได้ที่ `/api/docs`
+
+## สภาพอากาศบนโฮสต์ที่ใช้ IP ร่วมกัน (เช่น Emergent pod)
+Open-Meteo ฟรีจำกัดจำนวนครั้ง**ต่อวันต่อ IP** บน pod ที่ออกเน็ตผ่าน IP เดียวกับแอปอื่น โควต้าอาจหมดโดยที่แอปเราแทบไม่ได้เรียก (ได้ `429 Daily API request limit exceeded`)
+- backend จะข้าม Open-Meteo ไปจนถึง 00:05 UTC ของวันถัดไปแล้วใช้ **MET Norway** แทนอัตโนมัติ (ฟรี ไม่มีโควต้ารายวันต่อ IP)
+- ค่าล่าสุดที่ดึงได้เก็บใน MongoDB (`weather_cache`) รีสตาร์ตแล้วยังมีข้อมูลแสดง (ข้อมูลเก่ากว่า 3 ชม. จะแสดงแต่ไม่ออกคำเตือน)
+- ถ้าไม่มีแหล่งไหนตอบเลย หน้าเว็บจะขึ้น "ข้อมูลอากาศไม่พร้อมชั่วคราว" + ปุ่มแผนที่ Windy (โหลดจากมือถือโดยตรง) แทนการหายไป
+- เลือก/เรียงแหล่งข้อมูลได้ด้วย `WEATHER_PROVIDERS` ใน `backend/.env` เช่น `WEATHER_PROVIDERS=met-norway` เพื่อไม่ใช้ Open-Meteo เลย
+- ดูสถานะได้ที่ `GET /api/weather/status`
