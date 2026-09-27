@@ -29,3 +29,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .pin-urgent, .announce-flash { animation: none; }
 }
+
+/* Let the browser smooth the low-res interpolated grid into a soft gradient */
+.water-field {
+  image-rendering: auto;
+}

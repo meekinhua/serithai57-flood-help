@@ -1,7 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { KINDS, VILLAGE_BOUNDARY, VILLAGE_CENTER, VILLAGE_ZOOM, categoryOf, timeAgo, waterOf } from "../config";
 import { mediaUrl } from "../media";
+import { WATER_LEVELS } from "../config";
+import { describeLevel, estimateAt, fieldBounds, renderField, toPoints } from "../waterField";
+import { load, save } from "../api";
 
 const OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
@@ -39,11 +42,25 @@ export default function MapView({ posts, water, onSelect, focus }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
+  const fieldRef = useRef(null);
+  const pointsRef = useRef([]);
+  const [showField, setShowField] = useState(() => load("showWaterField", true));
 
   useEffect(() => {
     const map = createBaseMap(elRef.current);
+    // Surface sits above the tiles but below report dots and pins.
+    map.createPane("waterField").style.zIndex = 350;
+    map.getPane("waterField").style.pointerEvents = "none";
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+    map.on("click", (e) => {
+      if (!fieldRef.current) return;
+      const est = estimateAt(e.latlng.lat, e.latlng.lng, pointsRef.current);
+      const html = est
+        ? `<b>ระดับน้ำโดยประมาณ: ${describeLevel(est.level).label}</b> (${describeLevel(est.level).cm})<br><span style="color:#555">คำนวณจากรายงานใกล้เคียง ${est.used} จุด · ใกล้สุด ${Math.round(est.nearest)} ม.</span>`
+        : `ยังไม่มีรายงานระดับน้ำในระยะ 300 ม. จากจุดนี้`;
+      L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
+    });
     // Map containers that start hidden (mobile tabs) need a size refresh when shown.
     const ro = new ResizeObserver(() => map.invalidateSize());
     ro.observe(elRef.current);
@@ -85,11 +102,61 @@ export default function MapView({ posts, water, onSelect, focus }) {
     }
   }, [posts, water, onSelect]);
 
+  // Interpolated water surface. Rebuilt only when the set of reports changes (not on every 20 s poll).
+  const fieldKey = useRef("");
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const key = `${showField}|${water.map((w) => w.id).join(",")}|${Math.floor(Date.now() / 600000)}`; // + 10-min bucket for time decay
+    if (key === fieldKey.current) return;
+    fieldKey.current = key;
+    if (fieldRef.current) {
+      map.removeLayer(fieldRef.current);
+      fieldRef.current = null;
+    }
+    pointsRef.current = toPoints(water);
+    if (!showField) return;
+    const canvas = renderField(pointsRef.current);
+    if (!canvas) return;
+    fieldRef.current = L.imageOverlay(canvas.toDataURL(), fieldBounds(), { pane: "waterField", interactive: false, className: "water-field" }).addTo(map);
+  }, [water, showField]);
+
   useEffect(() => {
     if (focus && mapRef.current) mapRef.current.setView([focus.lat, focus.lng], 18);
   }, [focus]);
 
-  return <div ref={elRef} className="h-full w-full" />;
+  const hasReports = water.length > 0;
+
+  return (
+    <div className="relative h-full w-full">
+      <div ref={elRef} className="h-full w-full" />
+      {hasReports && (
+        <div className="pointer-events-none absolute right-2 top-2 z-[500] flex max-w-[70%] flex-col items-end gap-1">
+          <button
+            onClick={() => {
+              setShowField((v) => !v);
+              save("showWaterField", !showField);
+            }}
+            aria-pressed={showField}
+            className={`pointer-events-auto min-h-[44px] rounded-lg border-2 border-black px-3 text-sm font-semibold shadow ${showField ? "bg-black text-white" : "bg-white text-black"}`}
+          >
+            🌊 ระบายสีระดับน้ำ {showField ? "เปิด" : "ปิด"}
+          </button>
+          {showField && (
+            <div className="rounded-lg bg-white/95 px-2 py-1 text-[11px] leading-tight shadow">
+              <div className="h-2 w-40 max-w-full rounded" style={{ background: `linear-gradient(to right, ${WATER_LEVELS.map((w) => w.color).join(",")})` }} />
+              <div className="mt-0.5 flex justify-between gap-2 text-neutral-700">
+                <span>{WATER_LEVELS[0].label}</span>
+                <span>{WATER_LEVELS[3].label}</span>
+                <span>{WATER_LEVELS[WATER_LEVELS.length - 1].label}</span>
+              </div>
+              <div className="text-neutral-500">ค่าประมาณจากรายงาน · แตะแผนที่เพื่อดูระดับ</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function escapeHtml(s) {
