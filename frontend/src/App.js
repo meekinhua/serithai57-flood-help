@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
-import { ANNOUNCEMENT_LEVELS, HOTLINES, KINDS, VILLAGE_NAME, WATER_LEVELS, categoryOf, osmLink, paymentBadge, timeAgo, waterOf } from "./config";
+import { ANNOUNCEMENT_LEVELS, HOTLINE_GROUPS, KINDS, VILLAGE_NAME, WATER_LEVELS, categoryOf, osmLink, paymentBadge, timeAgo, waterOf } from "./config";
 import MapView from "./components/MapView";
 import Sheet from "./components/Sheet";
 import { PostForm, WaterForm } from "./components/Forms";
@@ -354,16 +354,26 @@ export default function App() {
       )}
       {sheet?.type === "hotlines" && (
         <Sheet title="☎️ เบอร์ฉุกเฉิน" onClose={() => setSheet(null)}>
-          <ul className="space-y-2">
-            {HOTLINES.map(([num, text]) => (
-              <li key={num}>
-                <a href={`tel:${num}`} className="flex min-h-[56px] items-center gap-3 rounded-xl border border-neutral-200 px-4 active:bg-neutral-50">
-                  <span className="w-16 text-2xl font-bold text-red-700">{num}</span>
-                  <span>{text}</span>
-                </a>
-              </li>
+          <div className="space-y-4">
+            {HOTLINE_GROUPS.map((group) => (
+              <section key={group.title}>
+                <h3 className="mb-2 font-bold">{group.title}</h3>
+                <ul className="space-y-2">
+                  {group.items.map(([num, text]) => (
+                    <li key={num}>
+                      <a
+                        href={`tel:${num.replace(/\D/g, "")}`}
+                        className="flex min-h-[56px] flex-wrap items-center gap-x-3 rounded-xl border border-neutral-200 px-4 py-2 active:bg-neutral-50"
+                      >
+                        <span className="text-xl font-bold tabular-nums text-red-700 sm:text-2xl">📞 {num}</span>
+                        <span>{text}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
           <div className="mt-4 rounded-xl border-2 border-black p-3 text-sm">
             <b>ความปลอดภัย:</b> ตัดเบรกเกอร์ก่อนน้ำเข้าบ้าน · อย่าแตะปลั๊ก/สายไฟขณะตัวเปียก · ระวังสัตว์มีพิษ · อย่าเดินลุยน้ำที่มองไม่เห็นพื้น (ฝาท่อเปิด)
           </div>
