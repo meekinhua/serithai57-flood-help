@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { API, api, viewerId } from "./api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { API, api, load, save, viewerId } from "./api";
 import { ANNOUNCEMENT_LEVELS, HOTLINE_GROUPS, KINDS, VILLAGE_NAME, WATER_LEVELS, categoryOf, osmLink, paymentBadge, timeAgo, waterOf } from "./config";
 import MapView from "./components/MapView";
 import Sheet from "./components/Sheet";
@@ -8,6 +8,8 @@ import { PostDetail, PostSummary } from "./components/PostCard";
 import Announcements from "./components/Announcements";
 import AdminPanel, { AdminLogin } from "./components/AdminPanel";
 import { mediaUrl } from "./media";
+import Guide from "./components/Guide";
+import { useCountUp } from "./motion";
 
 const REFRESH_MS = 20000;
 const WATER_STAT_HOURS = 6;
@@ -24,6 +26,15 @@ export default function App() {
   const [online, setOnline] = useState(true);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [toast, setToast] = useState("");
+  // First visit: show the animated how-to once (never on the admin page)
+  const [showGuide, setShowGuide] = useState(() => !IS_ADMIN_PAGE && !load("guideSeen", false));
+  const closeGuide = useCallback(() => {
+    setShowGuide(false);
+    save("guideSeen", true);
+  }, []);
+  // Posts that arrived after the first load get a highlight flash
+  const knownIds = useRef(null);
+  const [freshIds, setFreshIds] = useState(() => new Set());
   const [announcements, setAnnouncements] = useState([]);
   const [viewers, setViewers] = useState(null);
   const [admin, setAdmin] = useState(null);
@@ -55,6 +66,11 @@ export default function App() {
     try {
       const [p, w, a] = await Promise.all([api(`/posts?include_done=${showDone}`), api("/water"), api("/announcements")]);
       setPosts(p);
+      if (knownIds.current) {
+        const fresh = p.filter((x) => !knownIds.current.has(x.id)).map((x) => x.id);
+        if (fresh.length) setFreshIds(new Set(fresh));
+      }
+      knownIds.current = new Set([...(knownIds.current || []), ...p.map((x) => x.id)]);
       setWater(w);
       setAnnouncements(a);
       setOnline(true);
@@ -198,6 +214,9 @@ export default function App() {
           <button onClick={() => setSheet({ type: "hotlines" })} className="min-h-[44px] shrink-0 rounded-lg bg-red-600 px-3 font-semibold active:bg-red-700">
             ☎️ <span className="hidden min-[400px]:inline">เบอร์ฉุกเฉิน</span>
           </button>
+          <button onClick={() => setShowGuide(true)} aria-label="เปิดวิธีใช้งาน" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 font-bold active:bg-white/20">
+            ❓
+          </button>
           <button onClick={share} aria-label="แชร์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">
             🔗
           </button>
@@ -302,9 +321,9 @@ export default function App() {
             </div>
 
             <ul className="space-y-2">
-              {visible.map((p) => (
-                <li key={p.id}>
-                  <PostSummary post={p} onOpen={openDetail} />
+              {visible.map((p, i) => (
+                <li key={p.id} className="anim-row" style={{ "--i": Math.min(i, 10) }}>
+                  <PostSummary post={p} onOpen={openDetail} fresh={freshIds.has(p.id)} />
                 </li>
               ))}
               {visible.length === 0 && <li className="rounded-xl bg-white p-6 text-center text-neutral-500">ยังไม่มีรายการ</li>}
@@ -425,8 +444,10 @@ export default function App() {
         </Sheet>
       )}
 
+      {showGuide && <Guide onClose={closeGuide} />}
+
       {toast && (
-        <div role="status" className="pointer-events-none fixed inset-x-3 top-16 z-[1100] mx-auto max-w-md rounded-xl bg-neutral-900 px-4 py-3 text-center text-white shadow-lg">
+        <div key={toast} role="status" className="anim-toast pointer-events-none fixed inset-x-3 top-16 z-[1100] mx-auto max-w-md rounded-xl bg-neutral-900 px-4 py-3 text-center text-white shadow-lg">
           {toast}
         </div>
       )}
@@ -444,18 +465,21 @@ function Logo() {
 
 function ActionButton({ color, onClick, children }) {
   return (
-    <button onClick={onClick} className={`min-h-[56px] rounded-xl px-2 text-base font-bold leading-tight shadow-sm sm:text-lg ${color}`}>
+    <button onClick={onClick} className={`min-h-[56px] rounded-xl px-2 text-base font-bold leading-tight shadow-sm transition-transform duration-100 active:scale-95 sm:text-lg ${color}`}>
       {children}
     </button>
   );
 }
 
 function Stat({ value, label, sub, color, dot, onClick, actionLabel }) {
+  const shown = useCountUp(value);
   const body = (
     <>
       <div className={`flex items-center justify-center gap-1.5 text-xl font-bold sm:text-2xl ${color}`}>
         {dot && <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: dot }} aria-hidden="true" />}
-        {value}
+        <span key={typeof value === "string" ? value : "n"} className={typeof value === "string" ? "anim-pop" : ""}>
+          {shown}
+        </span>
       </div>
       <div className="text-xs text-neutral-600 sm:text-sm">{label}</div>
       {sub && <div className="text-xs font-semibold text-red-600">{sub}</div>}

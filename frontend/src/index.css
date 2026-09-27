@@ -34,3 +34,75 @@ body {
 .water-field {
   image-rendering: auto;
 }
+
+/* ================= Motion =================
+   Transform/opacity only (cheap on low-end phones). Everything below is switched off
+   for people who ask their phone for reduced motion. */
+
+/* Sheets: backdrop fades, panel slides up */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+.anim-fade { animation: fade-in 0.18s ease-out both; }
+.anim-sheet { animation: sheet-up 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* Toast drops in from under the header */
+@keyframes toast-in { from { transform: translateY(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
+.anim-toast { animation: toast-in 0.25s ease-out both; }
+
+/* List rows: slide in with a stagger (set --i per row); brand-new rows flash */
+@keyframes row-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+.anim-row { animation: row-in 0.3s ease-out both; animation-delay: calc(var(--i, 0) * 40ms); }
+@keyframes fresh-flash {
+  0%, 30% { box-shadow: 0 0 0 3px #facc15; background-color: #fef9c3; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.anim-fresh { animation: fresh-flash 2.4s ease-out both; }
+
+/* New map pins drop in with a little bounce */
+@keyframes pin-drop {
+  0% { transform: translateY(-40px); opacity: 0; }
+  60% { transform: translateY(4px); opacity: 1; }
+  100% { transform: none; }
+}
+.pin-drop { animation: pin-drop 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+
+/* Small "pop" for things that just changed (status chips, stat numbers) */
+@keyframes pop { 0% { transform: scale(0.85); } 60% { transform: scale(1.08); } 100% { transform: none; } }
+.anim-pop { animation: pop 0.35s ease-out both; }
+
+/* ---------- Guide illustrations ---------- */
+@keyframes g-drop { 0%, 15% { transform: translateY(-60px); opacity: 0; } 35% { transform: translateY(0); opacity: 1; } 42% { transform: translateY(-6px); } 50%, 100% { transform: none; opacity: 1; } }
+@keyframes g-ripple { 0%, 45% { transform: scale(0.2); opacity: 0; } 50% { opacity: 0.7; } 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes g-press { 0%, 8% { transform: none; } 12% { transform: scale(0.92); } 18%, 100% { transform: none; } }
+@keyframes g-tap { 0%, 4% { transform: translate(30px, 30px); opacity: 0; } 9% { transform: none; opacity: 1; } 16% { transform: scale(0.85); } 22% { transform: none; opacity: 1; } 30%, 100% { opacity: 0; } }
+@keyframes g-banner { 0%, 10% { transform: translateY(-120%); } 22%, 88% { transform: none; } 100% { transform: translateY(-120%); } }
+@keyframes g-ring { 0%, 50%, 100% { transform: rotate(0); } 55%, 65%, 75% { transform: rotate(-14deg); } 60%, 70%, 80% { transform: rotate(14deg); } }
+@keyframes g-dot { 0% { transform: scale(0); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@keyframes g-blob { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 0.55; } }
+@keyframes g-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.g-drop { animation: g-drop 3s ease-out infinite; }
+.g-ripple { animation: g-ripple 3s ease-out infinite; transform-origin: center; transform-box: fill-box; }
+.g-press { animation: g-press 3s ease-out infinite; }
+.g-tap { animation: g-tap 3s ease-out infinite; }
+.g-banner { animation: g-banner 4s ease-in-out infinite; }
+.g-ring { animation: g-ring 2s ease-in-out infinite; transform-origin: 50% 20%; transform-box: fill-box; }
+.g-dot { animation: g-dot 0.4s ease-out both; transform-origin: center; transform-box: fill-box; }
+.g-blob { animation: g-blob 1.2s ease-out both; transform-origin: center; transform-box: fill-box; }
+.g-float { animation: g-float 2.4s ease-in-out infinite; }
+
+/* Water gauge: water height eases between levels */
+.gauge-water { transition: y 0.7s cubic-bezier(0.3, 1.2, 0.5, 1), height 0.7s cubic-bezier(0.3, 1.2, 0.5, 1), fill 0.5s; }
+@keyframes wave { from { transform: translateX(0); } to { transform: translateX(-40px); } }
+.gauge-wave { animation: wave 2s linear infinite; }
+
+/* Guide story progress bar */
+@keyframes story-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.story-fill { transform-origin: left; animation: story-fill linear both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade, .anim-sheet, .anim-toast, .anim-row, .anim-fresh, .pin-drop, .anim-pop,
+  .g-drop, .g-ripple, .g-press, .g-tap, .g-banner, .g-ring, .g-dot, .g-blob, .g-float, .gauge-wave {
+    animation: none !important;
+  }
+  .gauge-water { transition: none; }
+}

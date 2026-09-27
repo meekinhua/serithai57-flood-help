@@ -16,7 +16,7 @@ export function createBaseMap(el, { center = VILLAGE_CENTER, zoom = VILLAGE_ZOOM
   return map;
 }
 
-function postIcon(post) {
+function postIcon(post, isNew = false) {
   const [emoji] = categoryOf(post);
   const kind = KINDS[post.kind];
   // Monochrome pins: fill = kind, dashed ring = someone is helping, grey = done
@@ -26,7 +26,7 @@ function postIcon(post) {
     className: "",
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
-    html: `<div class="${post.urgent && post.status === "open" ? "pin-urgent" : ""}" style="width:${size}px;height:${size}px;border-radius:9999px;background:${
+    html: `<div class="${isNew ? "pin-drop " : ""}${post.urgent && post.status === "open" ? "pin-urgent" : ""}" style="width:${size}px;height:${size}px;border-radius:9999px;background:${
       post.status === "done" ? "#e5e5e5" : kind.pin
     };border:${border};box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;position:relative;font-size:${
       size / 2
@@ -44,6 +44,7 @@ export default function MapView({ posts, water, onSelect, focus }) {
   const layerRef = useRef(null);
   const fieldRef = useRef(null);
   const pointsRef = useRef([]);
+  const seenPins = useRef(new Set());
   const [showField, setShowField] = useState(() => load("showWaterField", true));
 
   useEffect(() => {
@@ -96,7 +97,9 @@ export default function MapView({ posts, water, onSelect, focus }) {
     }
 
     for (const p of posts) {
-      L.marker([p.lat, p.lng], { icon: postIcon(p), zIndexOffset: p.urgent ? 1000 : p.kind === "need" ? 500 : 0 })
+      const isNew = !seenPins.current.has(p.id);
+      seenPins.current.add(p.id);
+      L.marker([p.lat, p.lng], { icon: postIcon(p, isNew), zIndexOffset: p.urgent ? 1000 : p.kind === "need" ? 500 : 0 })
         .on("click", () => onSelect(p.id))
         .addTo(layer);
     }

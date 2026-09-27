@@ -3,13 +3,13 @@ import { KINDS, STATUS, categoryOf, osmLink, paymentBadge, timeAgo } from "../co
 import { api, load, save } from "../api";
 import MediaGallery, { MediaThumb } from "./MediaGallery";
 
-export function PostSummary({ post, onOpen }) {
+export function PostSummary({ post, onOpen, fresh = false }) {
   const [emoji, catLabel] = categoryOf(post);
   const k = KINDS[post.kind];
   return (
     <button
       onClick={() => onOpen(post.id)}
-      className={`w-full rounded-xl border bg-white p-3 text-left shadow-sm active:bg-neutral-50 ${
+      className={`w-full rounded-xl border bg-white p-3 text-left shadow-sm transition-transform duration-100 active:scale-[0.99] active:bg-neutral-50 ${fresh ? "anim-fresh " : ""}${
         post.urgent && post.status === "open" ? "border-red-500 ring-2 ring-red-200" : "border-neutral-200"
       }`}
     >

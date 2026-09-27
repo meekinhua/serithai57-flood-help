@@ -3,6 +3,7 @@ import { CATEGORIES, KINDS, PAYMENT, WATER_LEVELS } from "../config";
 import { api, load, save } from "../api";
 import LocationPicker from "./LocationPicker";
 import MediaPicker, { mediaState } from "./MediaPicker";
+import WaterGauge from "./WaterGauge";
 
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-neutral-600 focus:outline-none";
 const label = "mb-1 block font-medium";
@@ -219,6 +220,12 @@ export function WaterForm({ onDone }) {
     <form onSubmit={submit} className="space-y-4">
       <fieldset>
         <legend className={label}>ระดับน้ำตอนนี้ *</legend>
+        <div className="mb-2 flex items-center gap-3">
+          <WaterGauge level={level} className="h-40 w-auto shrink-0 rounded-xl border border-neutral-200" />
+          <p className="text-sm text-neutral-600">
+            {level == null ? "เลือกระดับด้านล่าง ดูเทียบกับตัวคนได้เลย" : "เทียบกับผู้ใหญ่ยืนในน้ำ ถ้าไม่แน่ใจ เลือกระดับที่ใกล้เคียงที่สุด"}
+          </p>
+        </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {WATER_LEVELS.map((w) => (
             <button
