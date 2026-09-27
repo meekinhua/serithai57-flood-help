@@ -9,9 +9,11 @@ import Announcements from "./components/Announcements";
 import AdminPanel, { AdminLogin } from "./components/AdminPanel";
 import { mediaUrl } from "./media";
 import Guide from "./components/Guide";
+import { WeatherAlerts, WeatherCard, WindyMap } from "./components/Weather";
 import { useCountUp } from "./motion";
 
 const REFRESH_MS = 20000;
+const WEATHER_REFRESH_MS = 10 * 60 * 1000; // server caches Open-Meteo for 10 min too
 const WATER_STAT_HOURS = 6;
 const IS_ADMIN_PAGE = window.location.pathname.replace(/\/+$/, "") === "/admin";
 
@@ -37,6 +39,14 @@ export default function App() {
   const [freshIds, setFreshIds] = useState(() => new Set());
   const [announcements, setAnnouncements] = useState([]);
   const [viewers, setViewers] = useState(null);
+  const [weather, setWeather] = useState(null);
+
+  useEffect(() => {
+    const loadWeather = () => api("/weather").then(setWeather).catch(() => {});
+    loadWeather();
+    const t = setInterval(loadWeather, WEATHER_REFRESH_MS);
+    return () => clearInterval(t);
+  }, []);
   const [admin, setAdmin] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -137,6 +147,11 @@ export default function App() {
   async function copySummary() {
     const open = posts.filter((p) => p.kind === "need" && p.status !== "done");
     const lines = [`🌊 สรุปคำขอความช่วยเหลือ ${VILLAGE_NAME}`, `ณ ${new Date().toLocaleString("th-TH")}`, ""];
+    if (weather?.alerts?.length) {
+      lines.push("🌦️ เตือนสภาพอากาศ");
+      weather.alerts.forEach((a) => lines.push(`${a.icon} ${a.title}`));
+      lines.push("");
+    }
     if (announcements.length) {
       lines.push("📢 ประกาศจากผู้ดูแลหมู่บ้าน");
       announcements.forEach((a) => lines.push(`${ANNOUNCEMENT_LEVELS[a.level].icon} ${a.text}`));
@@ -247,8 +262,9 @@ export default function App() {
           )
         ) : (
         <>
-        <div className="mb-3 empty:hidden">
+        <div className="mb-3 space-y-2 empty:hidden">
           <Announcements items={announcements} />
+          <WeatherAlerts weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
         </div>
 
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
@@ -278,6 +294,10 @@ export default function App() {
             onClick={waterStat ? () => showOnMap(waterStat.report) : null}
             actionLabel="ดูจุดนี้บนแผนที่"
           />
+        </div>
+
+        <div className="mt-3">
+          <WeatherCard weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
         </div>
 
         {/* Phone: tabs. Desktop: map and list side by side. */}
@@ -414,6 +434,11 @@ export default function App() {
               setSheet(null);
             }}
           />
+        </Sheet>
+      )}
+      {sheet?.type === "weather" && (
+        <Sheet title="🌦️ สภาพอากาศ (Windy)" onClose={() => setSheet(null)}>
+          <WindyMap />
         </Sheet>
       )}
       {sheet?.type === "hotlines" && (

@@ -99,7 +99,12 @@ body {
 @keyframes story-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .story-fill { transform-origin: left; animation: story-fill linear both; }
 
+/* Weather rain bars grow from the baseline */
+@keyframes bar-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.bar-grow { transform-origin: bottom; animation: bar-grow 0.5s ease-out both; }
+
 @media (prefers-reduced-motion: reduce) {
+  .bar-grow,
   .anim-fade, .anim-sheet, .anim-toast, .anim-row, .anim-fresh, .pin-drop, .anim-pop,
   .g-drop, .g-ripple, .g-press, .g-tap, .g-banner, .g-ring, .g-dot, .g-blob, .g-float, .gauge-wave {
     animation: none !important;
