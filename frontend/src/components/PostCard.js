@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { KINDS, STATUS, categoryOf, osmLink, paymentBadge, timeAgo } from "../config";
 import { api, load, save } from "../api";
+import MediaGallery, { MediaThumb } from "./MediaGallery";
 
 export function PostSummary({ post, onOpen }) {
   const [emoji, catLabel] = categoryOf(post);
@@ -31,6 +32,7 @@ export function PostSummary({ post, onOpen }) {
             {post.people != null && ` · ${post.people} คน`}
           </p>
         </div>
+        <MediaThumb media={post.media} />
       </div>
     </button>
   );
@@ -118,6 +120,8 @@ export function PostDetail({ post, admin, onChanged, onDeleted, onShowOnMap }) {
       )}
 
       <p className="whitespace-pre-wrap break-words text-lg">{post.detail}</p>
+
+      <MediaGallery media={post.media} />
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-neutral-700">
         {post.place && (<><dt className="text-neutral-500">ที่อยู่</dt><dd className="break-words">{post.place}</dd></>)}

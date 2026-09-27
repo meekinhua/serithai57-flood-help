@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CATEGORIES, KINDS, PAYMENT, WATER_LEVELS } from "../config";
 import { api, load, save } from "../api";
 import LocationPicker from "./LocationPicker";
+import MediaPicker, { mediaState } from "./MediaPicker";
 
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-neutral-600 focus:outline-none";
 const label = "mb-1 block font-medium";
@@ -35,13 +36,16 @@ export function PostForm({ kind, onDone }) {
   const [payment, setPayment] = useState("free");
   const [price, setPrice] = useState("");
   const [loc, setLoc] = useState(null);
+  const [media, setMedia] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const attached = mediaState(media);
 
   async function submit(e) {
     e.preventDefault();
     if (!category) return setError("กรุณาเลือกประเภท");
     if (!loc) return setError("กรุณาเลือกตำแหน่ง");
+    if (attached.busy) return setError("รอไฟล์แนบอัปโหลดให้เสร็จก่อน");
     setBusy(true);
     setError("");
     try {
@@ -58,6 +62,7 @@ export function PostForm({ kind, onDone }) {
           urgent,
           payment: kind === "info" ? "free" : payment,
           price: payment === "paid" ? price.trim() : "",
+          media_ids: attached.ids,
           ...loc,
         }),
       });
@@ -156,6 +161,11 @@ export function PostForm({ kind, onDone }) {
       </div>
 
       <div>
+        <span className={label}>รูป / คลิป (ไม่บังคับ)</span>
+        <MediaPicker items={media} setItems={setMedia} max={4} />
+      </div>
+
+      <div>
         <span className={label}>ตำแหน่ง *</span>
         <LocationPicker value={loc} onChange={setLoc} />
       </div>
@@ -174,7 +184,7 @@ export function PostForm({ kind, onDone }) {
 
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
       <Submit busy={busy} color="bg-black active:bg-neutral-800">
-        {k.emoji} ส่ง{k.label}
+        {attached.busy ? "⏳ รอไฟล์แนบ…" : `${k.emoji} ส่ง${k.label}`}
       </Submit>
     </form>
   );
@@ -185,16 +195,19 @@ export function WaterForm({ onDone }) {
   const [level, setLevel] = useState(null);
   const [note, setNote] = useState("");
   const [loc, setLoc] = useState(null);
+  const [media, setMedia] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const attached = mediaState(media);
 
   async function submit(e) {
     e.preventDefault();
     if (level == null) return setError("กรุณาเลือกระดับน้ำ");
+    if (attached.busy) return setError("รอรูปอัปโหลดให้เสร็จก่อน");
     setBusy(true);
     setError("");
     try {
-      const w = await api("/water", { method: "POST", body: JSON.stringify({ level, note: note.trim(), name: contact.name.trim(), ...loc }) });
+      const w = await api("/water", { method: "POST", body: JSON.stringify({ level, note: note.trim(), name: contact.name.trim(), media_ids: attached.ids, ...loc }) });
       onDone(w);
     } catch (err) {
       setError(err.message);
@@ -223,6 +236,10 @@ export function WaterForm({ onDone }) {
           ))}
         </div>
       </fieldset>
+      <div>
+        <span className={label}>รูประดับน้ำ (ไม่บังคับ)</span>
+        <MediaPicker items={media} setItems={setMedia} max={1} allowVideo={false} />
+      </div>
       <div>
         <span className={label}>ตำแหน่ง *</span>
         <LocationPicker value={loc} onChange={setLoc} />

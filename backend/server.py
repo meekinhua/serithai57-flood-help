@@ -7,6 +7,7 @@ anyone can move a post to "helping"/"done", and every change is logged.
 Admins (village committee) log in with email/password (session cookie) to
 moderate posts, pin important ones, and publish announcements.
 """
+import asyncio
 import hashlib
 import hmac
 import os
@@ -23,6 +24,8 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, R
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, field_validator
+
+import media
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -130,6 +133,7 @@ class PostCreate(Located):
     urgent: bool = False
     payment: Payment = "free"
     price: str = Field("", max_length=100)  # free text, e.g. "300 บาท" / "100 บาท/เที่ยว"
+    media_ids: list[str] = Field(default_factory=list, max_length=4)  # uploaded via /api/media
 
 
 class StatusUpdate(BaseModel):
@@ -142,6 +146,7 @@ class WaterCreate(Located):
     level: int = Field(ge=0, le=WATER_MAX_LEVEL)
     note: str = Field("", max_length=200)
     name: str = Field("", max_length=80)
+    media_ids: list[str] = Field(default_factory=list, max_length=1)  # one photo of the water
 
 
 class LoginBody(BaseModel):
@@ -309,9 +314,12 @@ async def create_post(body: PostCreate, request: Request):
         raise HTTPException(422, "หมวดหมู่ไม่ถูกต้อง")
     edit_key = secrets.token_urlsafe(18)
     t = now()
+    post_id = str(uuid.uuid4())
+    attachments = await claim_media(body.media_ids, f"post:{post_id}", {"image", "video"})
     doc = {
-        "id": str(uuid.uuid4()),
-        **body.model_dump(),
+        "id": post_id,
+        **body.model_dump(exclude={"media_ids"}),
+        "media": attachments,
         "urgent": body.urgent and body.kind == "need",
         "payment": "free" if body.kind == "info" else body.payment,
         "price": body.price.strip() if body.kind != "info" and body.payment == "paid" else "",
@@ -348,9 +356,10 @@ async def update_status(post_id: str, body: StatusUpdate, request: Request):
 
 @api.delete("/posts/{post_id}", status_code=204)
 async def delete_post(post_id: str, x_edit_key: str = Header(...)):
-    result = await db.posts.delete_one({"id": post_id, "edit_key_hash": hash_key(x_edit_key)})
-    if result.deleted_count == 0:
+    post = await db.posts.find_one_and_delete({"id": post_id, "edit_key_hash": hash_key(x_edit_key)})
+    if not post:
         raise HTTPException(403, "ลบได้เฉพาะผู้โพสต์ (จากเครื่องที่โพสต์)")
+    await delete_media([m["id"] for m in post.get("media", [])])
 
 
 @api.get("/water")
@@ -362,7 +371,9 @@ async def list_water(since_hours: int = Query(48, ge=1, le=24 * 30)):
 @api.post("/water", status_code=201)
 async def create_water(body: WaterCreate, request: Request):
     rate_limit(request, "water", limit=30, window_s=600)
-    doc = {"id": str(uuid.uuid4()), **body.model_dump(), "v": WATER_SCALE_VERSION, "created_at": now()}
+    water_id = str(uuid.uuid4())
+    attachments = await claim_media(body.media_ids, f"water:{water_id}", {"image"})
+    doc = {"id": water_id, **body.model_dump(exclude={"media_ids"}), "media": attachments, "v": WATER_SCALE_VERSION, "created_at": now()}
     await db.water.insert_one(dict(doc))
     return doc
 
@@ -373,6 +384,7 @@ async def admin_delete_post(post_id: str, admin: dict = Depends(require_admin)):
     post = await db.posts.find_one_and_delete({"id": post_id})
     if not post:
         raise HTTPException(404, "ไม่พบรายการ")
+    await delete_media([m["id"] for m in post.get("media", [])])
     await audit(admin, "delete_post", post_id, f"{post['kind']}/{post['category']}: {post['detail']}")
 
 
@@ -390,6 +402,7 @@ async def admin_delete_water(water_id: str, admin: dict = Depends(require_admin)
     doc = await db.water.find_one_and_delete({"id": water_id})
     if not doc:
         raise HTTPException(404, "ไม่พบรายงาน")
+    await delete_media([m["id"] for m in doc.get("media", [])])
     await audit(admin, "delete_water", water_id, f"level {doc['level']} {doc.get('note', '')}")
 
 
@@ -467,7 +480,10 @@ async def admin_audit(admin: dict = Depends(require_admin)):
     return await db.audit.find({}, {"_id": 0}).sort("at", -1).to_list(200)
 
 
+media_router, claim_media, delete_media, media_maintenance = media.build_router(db, rate_limit)
+
 app.include_router(api)
+app.include_router(media_router)
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
@@ -481,6 +497,20 @@ async def startup():
     await db.sessions.create_index("token_hash", unique=True)
     await db.sessions.create_index("expires_at", expireAfterSeconds=0)
     await db.announcements.create_index("created_at")
+    await db.media.create_index("id", unique=True)
+    await db.media.create_index([("attached_to", 1), ("created_at", 1)])
+
+    async def media_housekeeping():
+        first = True
+        while True:
+            try:
+                await media_maintenance(first_run=first)
+            except Exception:
+                pass
+            first = False
+            await asyncio.sleep(3600)
+
+    app.state.media_task = asyncio.create_task(media_housekeeping())
 
     # Water scale v1 -> v2 (inserted ต้นขา between เข่า and เอว). Idempotent: only touches unversioned docs.
     await db.water.update_many({"v": {"$exists": False}, "level": 5}, {"$set": {"level": 6, "v": WATER_SCALE_VERSION}})

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import { KINDS, VILLAGE_BOUNDARY, VILLAGE_CENTER, VILLAGE_ZOOM, categoryOf, timeAgo, waterOf } from "../config";
+import { mediaUrl } from "../media";
 
 const OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
@@ -68,6 +69,10 @@ export default function MapView({ posts, water, onSelect, focus }) {
         .bindPopup(
           `<b>💧 ระดับน้ำ: ${lv.label} (${lv.cm})</b><br>${timeAgo(w.created_at)}${w.name ? ` · ${escapeHtml(w.name)}` : ""}${
             w.note ? `<br>${escapeHtml(w.note)}` : ""
+          }${
+            w.media?.[0]
+              ? `<br><a href="${mediaUrl(w.media[0].id)}" target="_blank" rel="noreferrer"><img src="${mediaUrl(w.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
+              : ""
           }`
         )
         .addTo(layer);

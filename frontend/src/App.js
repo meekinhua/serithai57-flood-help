@@ -7,6 +7,7 @@ import { PostForm, WaterForm } from "./components/Forms";
 import { PostDetail, PostSummary } from "./components/PostCard";
 import Announcements from "./components/Announcements";
 import AdminPanel, { AdminLogin } from "./components/AdminPanel";
+import { mediaUrl } from "./media";
 
 const REFRESH_MS = 20000;
 const IS_ADMIN_PAGE = window.location.pathname.replace(/\/+$/, "") === "/admin";
@@ -284,7 +285,12 @@ export default function App() {
                           {timeAgo(w.created_at)}
                           {w.note && ` · ${w.note}`}
                         </span>
-                        <button onClick={() => showOnMap(w)} className="ml-auto min-h-[44px] min-w-[44px] shrink-0 px-2 text-black underline">
+                        {w.media?.[0] && (
+                          <a href={mediaUrl(w.media[0].id)} target="_blank" rel="noreferrer" aria-label="ดูรูประดับน้ำ" className="ml-auto flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center">
+                            <img src={mediaUrl(w.media[0].id, "thumb")} alt="" loading="lazy" className="h-9 w-9 rounded object-cover" />
+                          </a>
+                        )}
+                        <button onClick={() => showOnMap(w)} className={`${w.media?.[0] ? "" : "ml-auto "}min-h-[44px] min-w-[44px] shrink-0 px-2 text-black underline`}>
                           ดู
                         </button>
                         {admin && (
