@@ -9,7 +9,7 @@ import Announcements from "./components/Announcements";
 import AdminPanel, { AdminLogin } from "./components/AdminPanel";
 import { mediaUrl } from "./media";
 import Guide from "./components/Guide";
-import { WeatherAlerts, WeatherCard, WindyMap } from "./components/Weather";
+import { WeatherAlerts, WeatherCard, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm, ServiceStrip } from "./components/ServiceBoard";
 import { useCountUp } from "./motion";
 
@@ -242,6 +242,7 @@ export default function App() {
             🔗
           </button>
         </div>
+        {!IS_ADMIN_PAGE && <WeatherTopBar weather={weather} onOpen={() => setSheet({ type: "weather" })} />}
         {admin && (
           <div className="border-t border-white/20 bg-neutral-800">
             <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 text-sm sm:px-4">

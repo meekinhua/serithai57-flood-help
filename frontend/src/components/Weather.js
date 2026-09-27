@@ -112,6 +112,40 @@ function rainColor(mm) {
 }
 
 // Compact "now + next 12 hours" card with animated rain bars.
+// One-line "now" strip for the sticky header; colour follows the worst active warning.
+export function WeatherTopBar({ weather, onOpen }) {
+  if (!weather) return null;
+  const c = weather.current;
+  const alerts = weather.alerts || [];
+  const level = alerts.some((a) => a.level === "danger") ? "danger" : alerts.length ? "warning" : "ok";
+  const tone = {
+    danger: "bg-red-600 text-white",
+    warning: "bg-yellow-300 text-black",
+    ok: "bg-neutral-800 text-white",
+  }[level];
+  return (
+    <button
+      onClick={onOpen}
+      aria-label={`สภาพอากาศตอนนี้: ${c.text} ${Math.round(c.temp)} องศา${alerts.length ? ` มีคำเตือน ${alerts.length} รายการ` : ""} แตะเพื่อดูแผนที่ลมและฝน`}
+      className={`block w-full border-t border-white/20 text-left ${tone}`}
+    >
+      <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-hidden whitespace-nowrap px-3 py-1 text-sm sm:px-4">
+        <span aria-hidden="true">{c.icon}</span>
+        <b>{Math.round(c.temp)}°C</b>
+        <span className="truncate">{c.text}</span>
+        <span className="opacity-60">·</span>
+        <span className="shrink-0">💨 {Math.round(c.wind)}{c.gust >= 30 ? `–${Math.round(c.gust)}` : ""} กม./ชม.</span>
+        <span className="hidden opacity-60 min-[400px]:inline">·</span>
+        <span className="hidden shrink-0 min-[400px]:inline">☔ 6 ชม. {weather.rain_next_6h} มม.</span>
+        {level !== "ok" && <span className="ml-auto shrink-0 rounded bg-black/20 px-1.5 text-xs font-bold">⚠️ {alerts.length}</span>}
+        <span className={`${level === "ok" ? "ml-auto" : ""} shrink-0 opacity-70`} aria-hidden="true">
+          ›
+        </span>
+      </div>
+    </button>
+  );
+}
+
 export function WeatherCard({ weather, onOpenMap }) {
   if (!weather) return null;
   const c = weather.current;
