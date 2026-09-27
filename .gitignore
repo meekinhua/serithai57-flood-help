@@ -1,0 +1,10 @@
+node_modules/
+build/
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+# Real secrets go in .env.local (never committed). The .env files here hold only
+# non-secret defaults required by the Emergent spec, so they are committed.
+.env.local
+.env.*.local

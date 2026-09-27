@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "Sarabun", "Noto Sans Thai", "Leelawadee UI", system-ui, sans-serif;
+}
+
+.leaflet-container {
+  font: inherit;
+}
+
+@keyframes pin-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+  100% { box-shadow: 0 0 0 16px rgba(220, 38, 38, 0); }
+}
+.pin-urgent {
+  animation: pin-pulse 1.4s ease-out infinite;
+}
