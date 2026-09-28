@@ -5,7 +5,7 @@ import { categoryOf, osmLink, timeAgo } from "../config";
 import { createBaseMap } from "./MapView";
 import QRCode from "qrcode";
 import { DutyBar, TripPanel, useStaffLocation } from "./Trips";
-import { BrowserHowTo, InAppGate, detectInApp, openExternally, withExternal } from "./OpenInBrowser";
+import { BrowserHowTo, InAppGate, detectInApp, openExternally } from "./OpenInBrowser";
 import Guide, { STAFF_SLIDES } from "./Guide";
 
 const IN_APP = detectInApp();
@@ -32,7 +32,6 @@ const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white
 function Join({ onJoined }) {
   // ?invite= (survives LINE's "open in external browser") or the older #invite=
   const readToken = () => new URLSearchParams(window.location.search).get("invite") || new URLSearchParams(window.location.hash.slice(1)).get("invite");
-  const [stayInApp, setStayInApp] = useState(false);
   const [token, setToken] = useState(readToken);
   useEffect(() => {
     // tapping an invite link while /staff is already open only changes the hash
@@ -52,7 +51,6 @@ function Join({ onJoined }) {
       </div>
     );
   }
-  if (IN_APP.app && !stayInApp) return <InAppGate env={IN_APP} url={window.location.href} onContinue={() => setStayInApp(true)} />;
   async function join(e) {
     e.preventDefault();
     try {
@@ -555,7 +553,7 @@ function InviteShare() {
   useEffect(() => {
     api("/staff/invite")
       .then(async (i) => {
-        const url = withExternal(`${window.location.origin}/staff?invite=${i.token}`);
+        const url = `${window.location.origin}/staff?invite=${i.token}`;
         setInv({ ...i, url });
         setQr(await QRCode.toDataURL(url, { margin: 1, width: 280 }));
       })
@@ -565,9 +563,7 @@ function InviteShare() {
   if (!inv) return <p className="p-6 text-center text-neutral-500">กำลังโหลด…</p>;
   const text = `ชวนมาช่วยงานน้ำท่วม หมู่บ้านสหกรณ์เคหะสถาน 4 (เสรีไทย 57)
 กดลิงก์ ใส่ชื่อ ก็ใช้ได้เลย ไม่ต้องสมัคร:
-${inv.url}
-
-⚠️ ถ้าเปิดใน LINE/Messenger ให้กด ⋮ หรือ ⋯ มุมขวาบน → “เปิดในเบราว์เซอร์” (ไม่งั้น GPS จะหยุด)`;
+${inv.url}`;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
@@ -589,7 +585,7 @@ ${inv.url}
         <button onClick={copy} className={`${btn} border-2 border-black bg-white`}>คัดลอกลิงก์ + ข้อความ</button>
       </div>
       <details className="rounded-xl bg-neutral-50 p-3 text-left">
-        <summary className="min-h-[40px] cursor-pointer font-semibold">📖 สอนเปิดในเบราว์เซอร์ (ถ้าเขาเปิดใน LINE / Messenger)</summary>
+        <summary className="min-h-[40px] cursor-pointer font-semibold">📖 สอนเปิดในเบราว์เซอร์ (เผื่อ LINE / Messenger ในมือถือบางรุ่นเปิดจอค้างไม่ได้)</summary>
         <div className="mt-2">
           <BrowserHowTo />
         </div>
@@ -600,7 +596,7 @@ ${inv.url}
 }
 
 // Signed in inside LINE/Messenger: offer to move the session to Chrome/Safari
-function MoveToBrowser() {
+function MoveToBrowser({ live }) {
   const [url, setUrl] = useState("");
   const [err, setErr] = useState("");
   async function move() {
@@ -616,7 +612,7 @@ function MoveToBrowser() {
   return (
     <section className="mb-3 rounded-xl border-2 border-yellow-400 bg-yellow-50 p-3">
       <p className="text-sm">
-        ⚠️ เปิดอยู่ในแอปแชต — <b>GPS จะหยุดทุกครั้งที่ปิดแชต</b>
+        ⚠️ {live.awake === "denied" ? <>แอปแชตนี้<b>สั่งให้จอเปิดค้างไม่ได้</b> จอดับเมื่อไหร่ GPS หยุด</> : <>แอปแชตนี้<b>ไม่ให้ใช้ GPS</b></>} — ใช้ Safari/Chrome แทนดีกว่า
       </p>
       <button onClick={move} className={`${btn} mt-2 w-full bg-blue-600 text-white`}>🌐 ย้ายไป{IN_APP.os === "ios" ? " Safari" : " Chrome"} (ไม่ต้องใส่ชื่อใหม่)</button>
       {err && <p className="mt-1 text-sm text-red-700">{err}</p>}
@@ -712,7 +708,7 @@ export default function StaffApp() {
         ) : (
           <>
             {toast && <p className="mb-3 rounded-lg bg-emerald-100 p-3 font-semibold">{toast}</p>}
-            {IN_APP.app && <MoveToBrowser />}
+            {IN_APP.app && (live.awake === "denied" || ["denied", "error"].includes(live.gps.state)) && <MoveToBrowser live={live} />}
             {tab !== "invite" && <DutyBar live={live} onTrip={!!trip} />}
             {tab === "tasks" && (
               <Tasks

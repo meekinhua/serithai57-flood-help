@@ -1,10 +1,31 @@
 import { useEffect, useRef, useState } from "react";
 import { api, load, save } from "../api";
 import { MISSIONS, PHASES, VEHICLES, timeAgo } from "../config";
+import noSleepMedia from "nosleep.js/src/media";
 
 const btn = "min-h-[48px] rounded-xl px-3 font-semibold disabled:opacity-50";
 const SEND_EVERY_MS = 25000; // at least this often
 const SEND_EVERY_M = 20; // or whenever we moved this far
+
+// Fallback for browsers without the Wake Lock API (many LINE / Messenger in-app browsers):
+// a muted, inline, looping 1-second video keeps the screen from sleeping. Needs a tap to start.
+let noSleepVideo = null;
+function playNoSleepVideo() {
+  if (!noSleepVideo) {
+    noSleepVideo = document.createElement("video");
+    noSleepVideo.setAttribute("playsinline", "");
+    noSleepVideo.setAttribute("muted", "");
+    noSleepVideo.muted = true;
+    noSleepVideo.loop = true;
+    for (const type of ["webm", "mp4"]) {
+      const src = document.createElement("source");
+      src.src = noSleepMedia[type];
+      src.type = `video/${type}`;
+      noSleepVideo.appendChild(src);
+    }
+  }
+  return noSleepVideo.play();
+}
 
 const metres = (a, b) => Math.hypot((a.lat - b.lat) * 110540, (a.lng - b.lng) * 108000);
 
@@ -17,7 +38,7 @@ export function useStaffLocation(user, onTrip) {
   const [lastSent, setLastSent] = useState(null);
   const [where, setWhere] = useState(null); // last reply: { soi, km, far }
   const [error, setError] = useState("");
-  const [awake, setAwake] = useState("off"); // on | unsupported | off: is the screen kept from sleeping
+  const [awake, setAwake] = useState("off"); // on | off (waiting for a tap) | denied (tried, this browser can't)
   const lastRef = useRef(null);
   const active = !!user && (sharing || onTrip); // a trip always shares
 
@@ -40,19 +61,28 @@ export function useStaffLocation(user, onTrip) {
     let wake = null;
     // A web page gets no GPS while the screen is off or the browser is in the background, so while
     // sharing keep the screen on. Some browsers only grant it after a tap: retry on the next touch.
-    const keepAwake = async () => {
-      if (!("wakeLock" in navigator)) return setAwake("unsupported");
-      if (document.visibilityState !== "visible" || (wake && !wake.released)) return;
+    let video = false;
+    const keepAwake = async (tapped = false) => {
+      if (document.visibilityState !== "visible" || (wake && !wake.released) || (video && !noSleepVideo?.paused)) return;
+      if ("wakeLock" in navigator) {
+        try {
+          wake = await navigator.wakeLock.request("screen");
+          setAwake("on");
+          wake.addEventListener("release", () => !stopped && setAwake("off"));
+          return;
+        } catch {} // in-app browsers often have the API but refuse: try the video
+      }
       try {
-        wake = await navigator.wakeLock.request("screen");
+        await playNoSleepVideo();
+        video = true;
         setAwake("on");
-        wake.addEventListener("release", () => !stopped && setAwake("off"));
       } catch {
-        setAwake("off");
+        // autoplay needs a tap; only a failure after a real tap means this browser can't do it
+        setAwake(tapped ? "denied" : "off");
       }
     };
     keepAwake();
-    const onTouch = () => keepAwake();
+    const onTouch = () => keepAwake(true);
     document.addEventListener("pointerdown", onTouch);
     const onVis = () => {
       if (document.visibilityState !== "visible") return;
@@ -98,6 +128,7 @@ export function useStaffLocation(user, onTrip) {
       document.removeEventListener("visibilitychange", onVis);
       document.removeEventListener("pointerdown", onTouch);
       wake?.release?.().catch(() => {});
+      if (video) noSleepVideo?.pause();
       setAwake("off");
     };
   }, [active, user]);
@@ -175,7 +206,7 @@ export function DutyBar({ live, onTrip }) {
       {on && live.awake === "on" && <p className="mt-2 text-xs text-neutral-600">🔆 ระบบเปิดจอค้างไว้ให้ GPS ทำงานต่อ · อย่ากดปิดจอ/สลับแอปนาน · ต่อที่ชาร์จหรือพาวเวอร์แบงก์ถ้าทำได้</p>}
       {on && live.awake !== "on" && (
         <p className="mt-2 rounded-lg bg-yellow-50 p-2 text-xs">
-          ⚠️ {live.awake === "unsupported" ? "เบราว์เซอร์นี้สั่งให้จอเปิดค้างไม่ได้" : "จอยังอาจดับเอง (แตะหน้าจอ 1 ครั้งเพื่อเปิดค้าง)"} — ถ้าจอดับ ตำแหน่งจะหยุดส่ง
+          ⚠️ {live.awake === "denied" ? "เบราว์เซอร์นี้สั่งให้จอเปิดค้างไม่ได้" : "แตะหน้าจอ 1 ครั้ง เพื่อให้จอเปิดค้าง"} — ถ้าจอดับ ตำแหน่งจะหยุดส่ง
           <br />
           ตั้งค่ามือถือ: iPhone → การแสดงผลและความสว่าง → ล็อกอัตโนมัติ = <b>ไม่เลย</b> · Android → จอแสดงผล → ระยะหมดเวลาหน้าจอ = <b>นานสุด</b>
         </p>
