@@ -225,7 +225,7 @@ class PinBody(BaseModel):
 
 # ---------------- admin auth ----------------
 def public_admin(a: dict) -> dict:
-    return {"id": a["id"], "email": a["email"], "name": a["name"], "role": a.get("role", "admin"), "importer": bool(a.get("importer")), "created_at": a.get("created_at")}
+    return {"id": a["id"], "email": a["email"], "name": a["name"], "role": a.get("role", "admin"), "importer": bool(a.get("importer")), "team": a.get("team", ""), "created_at": a.get("created_at")}
 
 
 async def current_admin(request: Request) -> Optional[dict]:
@@ -619,6 +619,7 @@ async def startup():
     await db.staff_invites.create_index("token", unique=True)
     await db.trips.create_index([("status", 1), ("updated_at", -1)])
     await db.trips.create_index("staff_id")
+    await db.trips.create_index([("staff_id", 1), ("presence", 1)])
     await db.services.create_index([("category", 1), ("updated_at", -1)])
     await db.media.create_index("id", unique=True)
     await db.media.create_index([("attached_to", 1), ("created_at", 1)])

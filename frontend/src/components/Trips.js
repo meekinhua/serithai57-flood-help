@@ -3,40 +3,43 @@ import { api, load, save } from "../api";
 import { MISSIONS, PHASES, VEHICLES, timeAgo } from "../config";
 
 const btn = "min-h-[48px] rounded-xl px-3 font-semibold disabled:opacity-50";
-const SEND_EVERY_MS = 25000; // at least this often while the trip is active
+const SEND_EVERY_MS = 25000; // at least this often
 const SEND_EVERY_M = 20; // or whenever we moved this far
 
 const metres = (a, b) => Math.hypot((a.lat - b.lat) * 110540, (a.lng - b.lng) * 108000);
 
-// ---------------- staff side: start a trip, share GPS, tap the phase ----------------
-export function TripPanel({ user }) {
-  const [trip, setTrip] = useState(undefined); // undefined = loading, null = none
-  const [vehicle, setVehicle] = useState(() => load("tripVehicle", "boat"));
-  const [mission, setMission] = useState("food");
-  const [label, setLabel] = useState("");
-  const [note, setNote] = useState("");
-  const [gps, setGps] = useState({ state: "idle" }); // idle | waiting | ok | denied | error
+// ---------------- staff side: one GPS watcher for the whole /staff console ----------------
+// Anyone with /staff open shows up on the public map ("online"); on a trip the same position
+// moves their boat/truck instead. Lives in StaffApp so switching tabs doesn't stop it.
+export function useStaffLocation(user, onTrip) {
+  const [sharing, setSharingState] = useState(() => load("shareLocation", true));
+  const [gps, setGps] = useState({ state: "idle" }); // idle | waiting | ok | denied | error | off
   const [lastSent, setLastSent] = useState(null);
-  const [soi, setSoi] = useState(null);
+  const [where, setWhere] = useState(null); // last reply: { soi, km, far }
   const [error, setError] = useState("");
   const lastRef = useRef(null);
-  const wakeRef = useRef(null);
+  const active = !!user && (sharing || onTrip); // a trip always shares
+
+  const setSharing = (on) => {
+    save("shareLocation", on);
+    setSharingState(on);
+    if (!on && !onTrip) api("/staff/presence", { method: "DELETE" }).catch(() => {});
+  };
 
   useEffect(() => {
-    api("/staff/trips/mine").then((t) => setTrip(t || null)).catch(() => setTrip(null));
-  }, []);
-
-  // While a trip is active: watch GPS, keep the screen awake, send positions.
-  useEffect(() => {
-    if (!trip?.id) return;
+    if (!active) {
+      setGps({ state: user ? "off" : "idle" });
+      return;
+    }
     if (!navigator.geolocation) {
       setGps({ state: "error", msg: "เครื่องนี้ไม่มี GPS" });
       return;
     }
     let stopped = false;
+    let wake = null;
     const keepAwake = async () => {
       try {
-        if ("wakeLock" in navigator && document.visibilityState === "visible") wakeRef.current = await navigator.wakeLock.request("screen");
+        if (onTrip && "wakeLock" in navigator && document.visibilityState === "visible") wake = await navigator.wakeLock.request("screen");
       } catch {}
     };
     keepAwake();
@@ -50,10 +53,11 @@ export function TripPanel({ user }) {
       if (!force && last && Date.now() - last.at < SEND_EVERY_MS && metres(last, here) < SEND_EVERY_M) return;
       lastRef.current = { ...here, at: Date.now() };
       try {
-        const r = await api(`/staff/trips/${trip.id}/ping`, { method: "POST", body: JSON.stringify({ ...here, accuracy: pos.coords.accuracy }) });
+        const r = await api("/staff/presence", { method: "POST", body: JSON.stringify({ ...here, accuracy: pos.coords.accuracy }) });
         if (!stopped && !r.throttled) {
           setLastSent(new Date());
-          setSoi(r.soi);
+          setWhere(r);
+          setError("");
         }
       } catch (err) {
         if (!stopped) setError(err.message);
@@ -69,16 +73,99 @@ export function TripPanel({ user }) {
       (err) => setGps({ state: err.code === 1 ? "denied" : "error", msg: err.message }),
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 }
     );
-    // standing still still needs a heartbeat, or the public map hides us after 15 min
+    // standing still still needs a heartbeat, or the public map drops us
     const beat = setInterval(() => latest && send(latest, true), SEND_EVERY_MS * 2);
     return () => {
       stopped = true;
       navigator.geolocation.clearWatch(watch);
       clearInterval(beat);
       document.removeEventListener("visibilitychange", onVis);
-      wakeRef.current?.release?.().catch(() => {});
+      wake?.release?.().catch(() => {});
     };
-  }, [trip?.id]);
+  }, [active, onTrip, user]);
+
+  return { gps, lastSent, where, error, sharing, setSharing };
+}
+
+function GpsLine({ live }) {
+  const { gps, lastSent, where, error } = live;
+  const tone = gps.state === "ok" ? "bg-emerald-50 text-emerald-800" : gps.state === "waiting" ? "bg-yellow-50" : gps.state === "off" ? "bg-neutral-100 text-neutral-600" : "bg-red-50 text-red-700";
+  return (
+    <div className={`rounded-lg p-2 text-sm font-semibold ${tone}`}>
+      {gps.state === "ok" && `📡 GPS ใช้ได้ (แม่นยำ ~${gps.accuracy} ม.)`}
+      {gps.state === "waiting" && "📡 กำลังหาสัญญาณ GPS… (ถ้ามือถือถาม ให้กด “อนุญาต”)"}
+      {gps.state === "off" && "⏸ ปิดแชร์ตำแหน่งอยู่ ชาวบ้านไม่เห็นคุณบนแผนที่"}
+      {gps.state === "denied" && "⚠️ ไม่ได้อนุญาตตำแหน่ง — เปิดสิทธิ์ตำแหน่งให้เว็บนี้ในตั้งค่าเบราว์เซอร์ แล้วรีเฟรช"}
+      {gps.state === "error" && `⚠️ GPS มีปัญหา: ${gps.msg || ""}`}
+      {lastSent && (
+        <span className="block font-normal">
+          ส่งตำแหน่งล่าสุด {timeAgo(lastSent)}
+          {where?.soi ? ` · ใกล้ซอย ${where.soi}` : where?.km > 3 ? ` · ห่างหมู่บ้าน ${where.km} กม.` : " · นอกซอยในหมู่บ้าน"}
+        </span>
+      )}
+      {gps.accuracy > 500 && <span className="block">⚠️ ตำแหน่งยังหยาบ (~{gps.accuracy} ม.) เปิด GPS/ตำแหน่งแม่นยำสูงในมือถือ หรือออกไปที่โล่ง</span>}
+      {where?.far && <span className="block">⚠️ ตอนนี้อยู่ห่างหมู่บ้าน {where.km} กม. ชาวบ้านจะเห็นแค่ชื่อ ยังไม่ขึ้นบนแผนที่</span>}
+      {error && <span className="block text-red-700">ส่งตำแหน่งไม่สำเร็จ: {error}</span>}
+    </div>
+  );
+}
+
+// Always-visible bar on /staff: am I on the map, and what am I about to do (residents see this).
+export function DutyBar({ live, onTrip }) {
+  const [note, setNote] = useState("");
+  const [saved, setSaved] = useState("");
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    api("/staff/presence/note").then((r) => {
+      setNote(r.note || "");
+      setSaved(r.note || "");
+    }).catch(() => {});
+  }, []);
+  async function saveNote(e) {
+    e.preventDefault();
+    const r = await api("/staff/presence/note", { method: "PUT", body: JSON.stringify({ note }) }).catch(() => null);
+    if (r) {
+      setSaved(r.note);
+      setOpen(false);
+    }
+  }
+  const on = live.sharing || onTrip;
+  return (
+    <section className="mb-3 rounded-xl bg-white p-3 shadow">
+      <div className="flex items-center gap-2">
+        <span className={`h-3 w-3 shrink-0 rounded-full ${on && live.gps.state === "ok" ? "bg-emerald-500" : on ? "bg-yellow-400" : "bg-neutral-400"}`} />
+        <p className="min-w-0 flex-1 text-sm">
+          {onTrip ? <b>กำลังออกงาน · ชาวบ้านเห็นรถ/เรือของคุณ</b> : on ? <b>คุณอยู่บนแผนที่หน้าแรก (เจ้าหน้าที่ออนไลน์)</b> : <b>ไม่แชร์ตำแหน่ง</b>}
+          <span className="block truncate text-neutral-600">{saved ? `บอกชาวบ้านว่า: ${saved}` : "ยังไม่ได้บอกว่ากำลังจะทำอะไร"}</span>
+        </p>
+        {!onTrip && (
+          <button onClick={() => live.setSharing(!live.sharing)} className="min-h-[44px] shrink-0 rounded-lg border-2 border-neutral-300 px-2 text-sm font-semibold">
+            {live.sharing ? "⏸ หยุดแชร์" : "▶️ แชร์"}
+          </button>
+        )}
+      </div>
+      {open ? (
+        <form onSubmit={saveNote} className="mt-2 grid grid-cols-[1fr_auto] gap-2">
+          <input autoFocus value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className="min-h-[44px] rounded-lg border border-neutral-300 px-3" placeholder="เช่น กำลังจะไปแจกข้าวซอย 30 / รับคนป่วยซอย 12" />
+          <button className="min-h-[44px] rounded-lg bg-black px-3 font-semibold text-white">บันทึก</button>
+        </form>
+      ) : (
+        <button onClick={() => setOpen(true)} className="mt-2 min-h-[44px] w-full rounded-lg bg-neutral-100 text-sm font-semibold">
+          ✏️ {saved ? "แก้ข้อความ" : "บอกชาวบ้านว่ากำลังจะทำอะไร"}
+        </button>
+      )}
+      {on && live.gps.state !== "ok" && <div className="mt-2"><GpsLine live={live} /></div>}
+    </section>
+  );
+}
+
+// ---------------- staff side: start a trip, tap the phase ----------------
+export function TripPanel({ user, live, trip, setTrip }) {
+  const [vehicle, setVehicle] = useState(() => load("tripVehicle", "boat"));
+  const [mission, setMission] = useState("food");
+  const [label, setLabel] = useState("");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
 
   async function start() {
     setError("");
@@ -88,7 +175,6 @@ export function TripPanel({ user }) {
         method: "POST",
         body: JSON.stringify({ vehicle, mission, label: label.trim() || `${VEHICLES[vehicle][1]} ${user.name}`, note: note.trim() }),
       });
-      lastRef.current = null;
       setTrip(t);
     } catch (err) {
       setError(err.message);
@@ -104,12 +190,9 @@ export function TripPanel({ user }) {
   }
 
   async function end() {
-    if (!window.confirm("จบงานและหยุดแชร์ตำแหน่ง?")) return;
+    if (!window.confirm("จบงาน? (ยังแชร์ตำแหน่งแบบเจ้าหน้าที่ออนไลน์ต่อ ถ้าเปิดแชร์ไว้)")) return;
     await api(`/staff/trips/${trip.id}/end`, { method: "POST" }).catch(() => {});
     setTrip(null);
-    setLastSent(null);
-    setSoi(null);
-    setGps({ state: "idle" });
   }
 
   if (trip === undefined) return <p className="p-6 text-center text-neutral-500">กำลังโหลด…</p>;
@@ -118,7 +201,7 @@ export function TripPanel({ user }) {
     return (
       <div className="space-y-4">
         <p className="rounded-xl bg-white p-3 text-sm">
-          เริ่มงานแล้ว <b>ชาวบ้านจะเห็นรถ/เรือของคุณบนหน้าแรก</b> ว่ามาทำอะไร อยู่ซอยไหน · ระหว่างออกงานให้เปิดหน้านี้ค้างไว้ (ระบบกันจอดับให้) ถ้าจอดับหรือสลับแอป ตำแหน่งจะหยุดอัปเดต
+          ออกไปแจกของ/รับคน กด <b>เริ่มออกงาน</b> ชาวบ้านจะเห็นรถ/เรือของคุณบนหน้าแรก ว่ามาทำอะไร อยู่ซอยไหน · ระหว่างออกงานให้เปิดหน้านี้ค้างไว้ (ระบบกันจอดับให้)
         </p>
         <fieldset>
           <legend className="mb-1 font-medium">ยานพาหนะ</legend>
@@ -134,11 +217,13 @@ export function TripPanel({ user }) {
         <fieldset>
           <legend className="mb-1 font-medium">ภารกิจ</legend>
           <div className="grid grid-cols-2 gap-2">
-            {Object.entries(MISSIONS).map(([k, [e, t]]) => (
-              <button key={k} type="button" onClick={() => setMission(k)} aria-pressed={mission === k} className={`${btn} text-left ${mission === k ? "bg-black text-white" : "border-2 border-neutral-200 bg-white"}`}>
-                {e} {t}
-              </button>
-            ))}
+            {Object.entries(MISSIONS)
+              .filter(([k]) => k !== "standby")
+              .map(([k, [e, t]]) => (
+                <button key={k} type="button" onClick={() => setMission(k)} aria-pressed={mission === k} className={`${btn} text-left ${mission === k ? "bg-black text-white" : "border-2 border-neutral-200 bg-white"}`}>
+                  {e} {t}
+                </button>
+              ))}
           </div>
         </fieldset>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -147,17 +232,17 @@ export function TripPanel({ user }) {
         </div>
         {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
         <button onClick={start} className={`${btn} w-full bg-blue-600 text-lg text-white`}>
-          ▶️ เริ่มออกงาน และแชร์ตำแหน่ง
+          ▶️ เริ่มออกงาน
         </button>
       </div>
     );
   }
 
-  const [ve] = VEHICLES[trip.vehicle];
-  const [me, mt] = MISSIONS[trip.mission];
+  const [ve] = VEHICLES[trip.vehicle] || ["🚗"];
+  const [me, mt] = MISSIONS[trip.mission] || ["🤝", ""];
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-white p-4 shadow">
+      <div className="space-y-2 rounded-2xl bg-white p-4 shadow">
         <p className="text-sm text-neutral-500">กำลังออกงาน · เริ่ม {timeAgo(trip.started_at)}</p>
         <p className="text-xl font-bold">
           {ve} {trip.label}
@@ -165,22 +250,18 @@ export function TripPanel({ user }) {
         <p>
           {me} {mt} {trip.note && `· ${trip.note}`}
         </p>
-        <p className={`mt-2 rounded-lg p-2 text-sm font-semibold ${gps.state === "ok" ? "bg-emerald-50 text-emerald-800" : gps.state === "waiting" ? "bg-yellow-50" : "bg-red-50 text-red-700"}`}>
-          {gps.state === "ok" && `📡 GPS ใช้ได้ (แม่นยำ ~${gps.accuracy} ม.)`}
-          {gps.state === "waiting" && "📡 กำลังหาสัญญาณ GPS…"}
-          {gps.state === "denied" && "⚠️ ไม่ได้อนุญาตตำแหน่ง — เปิดสิทธิ์ตำแหน่งให้เว็บนี้ในตั้งค่าเบราว์เซอร์"}
-          {gps.state === "error" && `⚠️ GPS มีปัญหา: ${gps.msg || ""}`}
-          {lastSent && <span className="block font-normal">ส่งตำแหน่งล่าสุด {timeAgo(lastSent)}{soi ? ` · ใกล้ซอย ${soi}` : " · นอกซอยในหมู่บ้าน"}</span>}
-        </p>
+        <GpsLine live={live} />
       </div>
       <fieldset>
         <legend className="mb-1 font-medium">ตอนนี้กำลัง… (ชาวบ้านเห็นทันที)</legend>
         <div className="grid grid-cols-2 gap-2">
-          {Object.entries(PHASES).map(([k, [e, t, cls]]) => (
-            <button key={k} onClick={() => phase(k)} aria-pressed={trip.phase === k} className={`${btn} min-h-[64px] text-left ${trip.phase === k ? `${cls} ring-4 ring-black` : "border-2 border-neutral-300 bg-white"}`}>
-              {e} {t}
-            </button>
-          ))}
+          {Object.entries(PHASES)
+            .filter(([k]) => k !== "standby")
+            .map(([k, [e, t, cls]]) => (
+              <button key={k} onClick={() => phase(k)} aria-pressed={trip.phase === k} className={`${btn} min-h-[64px] text-left ${trip.phase === k ? `${cls} ring-4 ring-black` : "border-2 border-neutral-300 bg-white"}`}>
+                {e} {t}
+              </button>
+            ))}
         </div>
       </fieldset>
       <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -188,13 +269,20 @@ export function TripPanel({ user }) {
         <button onClick={() => phase(trip.phase)} className={`${btn} border-2 border-black bg-white`}>ส่ง</button>
       </div>
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
-      <button onClick={end} className={`${btn} w-full bg-red-600 text-white`}>⏹ จบงาน / หยุดแชร์ตำแหน่ง</button>
+      <button onClick={end} className={`${btn} w-full bg-red-600 text-white`}>⏹ จบงาน</button>
     </div>
   );
 }
 
-// ---------------- public side: what's moving in the village right now ----------------
+// ---------------- public side: what's moving in the village, and who is on duty ----------------
+export const tripWhere = (t) =>
+  !t.has_fix ? "📡 กำลังหาตำแหน่ง" : t.far ? `อยู่นอกพื้นที่ (${t.km} กม.)` : t.soi ? `อยู่ซอย ${t.soi}` : t.km > 3 ? `ห่างหมู่บ้าน ${t.km} กม.` : "นอกซอย/ถนนใหญ่";
+
+export const tripClaims = (t) => (t.claimed ? `รับงานไว้ ${t.claimed} หลัง${t.claimed_sois?.length ? ` (ซ.${t.claimed_sois.join(", ")})` : ""}` : "");
+
 export function TripsStrip({ trips, onFocus }) {
+  const moving = trips.filter((t) => !t.presence);
+  const online = trips.filter((t) => t.presence);
   if (!trips.length) return null;
   return (
     <section aria-label="กำลังให้บริการตอนนี้" className="rounded-xl border-2 border-blue-600 bg-white p-3">
@@ -203,16 +291,17 @@ export function TripsStrip({ trips, onFocus }) {
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75" />
           <span className="relative inline-flex h-3 w-3 rounded-full bg-blue-600" />
         </span>
-        🚚 กำลังให้บริการตอนนี้ ({trips.length})
+        {moving.length ? `🚚 กำลังให้บริการตอนนี้ (${moving.length})` : "👷 เจ้าหน้าที่ออนไลน์"}
+        {moving.length > 0 && online.length > 0 && <span className="text-sm font-normal text-neutral-600">· เจ้าหน้าที่ออนไลน์ {online.length}</span>}
       </h2>
       <div className="-mx-3 overflow-x-auto px-3">
         <div className="flex w-max gap-2">
-          {trips.map((t) => {
+          {moving.map((t) => {
             const [ve] = VEHICLES[t.vehicle] || ["🚗"];
             const [me, mt] = MISSIONS[t.mission] || ["🤝", ""];
             const [pe, pt, pcls] = PHASES[t.phase] || PHASES.enroute;
             return (
-              <button key={t.id} onClick={() => onFocus(t)} className="w-64 shrink-0 rounded-xl border border-neutral-200 p-2 text-left active:bg-neutral-50">
+              <button key={t.id} onClick={() => t.lat != null && onFocus(t)} className="w-64 shrink-0 rounded-xl border border-neutral-200 p-2 text-left active:bg-neutral-50">
                 <p className="truncate font-bold">
                   {ve} {t.label}
                 </p>
@@ -223,13 +312,23 @@ export function TripsStrip({ trips, onFocus }) {
                   <span className={`rounded px-1.5 py-0.5 font-semibold ${pcls}`}>
                     {pe} {pt}
                   </span>
-                  <span className="text-neutral-600">{t.soi ? `อยู่ซอย ${t.soi}` : "นอกซอย/ถนนใหญ่"}</span>
+                  <span className="text-neutral-600">{tripWhere(t)}</span>
                 </p>
                 {t.note && <p className="mt-0.5 truncate text-xs text-neutral-600">{t.note}</p>}
-                <p className="text-xs text-neutral-400">อัปเดต {timeAgo(t.updated_at)} · แตะดูบนแผนที่</p>
+                <p className="text-xs text-neutral-400">อัปเดต {timeAgo(t.updated_at)}{t.lat != null ? " · แตะดูบนแผนที่" : ""}</p>
               </button>
             );
           })}
+          {online.map((t) => (
+            <button key={t.id} onClick={() => t.lat != null && onFocus(t)} className="w-56 shrink-0 rounded-xl border border-emerald-300 bg-emerald-50/50 p-2 text-left active:bg-emerald-50">
+              <p className="truncate font-bold">👷 {t.label}</p>
+              <p className="line-clamp-2 text-sm">{t.note || <span className="text-neutral-500">ออนไลน์ พร้อมช่วย</span>}</p>
+              <p className="truncate text-xs text-neutral-600">
+                {tripWhere(t)}
+                {t.claimed ? ` · ${tripClaims(t)}` : ""}
+              </p>
+            </button>
+          ))}
         </div>
       </div>
     </section>

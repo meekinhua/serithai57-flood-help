@@ -340,12 +340,14 @@ function StaffAdmin() {
     <div className="space-y-4">
       <div className="space-y-2 rounded-2xl bg-white p-4 shadow">
         <h3 className="text-lg font-bold">👷 เชิญเจ้าหน้าที่ / อาสา</h3>
-        <p className="text-sm text-neutral-600">เจ้าหน้าที่เปิดลิงก์ ใส่ชื่อ แล้วใช้หน้า /staff ได้ทันที (รับงาน แบ่งซอย ออกงาน ตั้งตำแหน่งบ้าน · งานจาก LINE ส่วนกลางนำเข้าให้) — จัดการผู้ดูแล/ประกาศไม่ได้</p>
+        <p className="text-sm text-neutral-600">เจ้าหน้าที่เปิดลิงก์ ใส่ชื่อ แล้วใช้หน้า /staff ได้ทันที (รับงาน แบ่งซอย ออกงาน ตั้งตำแหน่งบ้าน · งานจาก LINE ส่วนกลางนำเข้าให้) — จัดการผู้ดูแล/ประกาศไม่ได้ · เจ้าหน้าที่ทุกคนส่งลิงก์ต่อ/โชว์ QR ได้เองที่แท็บ “👥 ชวนทีม” (ใช้ลิงก์ที่หมดอายุช้าสุด) ยกเลิกลิงก์ = หยุดรับคนใหม่ทันที</p>
+        <a href="/staff#share" className="inline-block min-h-[44px] rounded-lg border-2 border-black px-3 py-2 font-semibold">📱 เปิด QR ชวนทีม</a>
         <div className="flex flex-wrap gap-2">
           <select value={hours} onChange={(e) => setHours(e.target.value)} className={input + " w-auto"}>
             <option value="24">ลิงก์ใช้ได้ 24 ชม.</option>
             <option value="72">ลิงก์ใช้ได้ 3 วัน</option>
             <option value="168">ลิงก์ใช้ได้ 7 วัน</option>
+            <option value="720">ลิงก์ใช้ได้ 30 วัน</option>
           </select>
           <button onClick={create} className={btnPrimary}>สร้างลิงก์เชิญ</button>
         </div>

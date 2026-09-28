@@ -87,6 +87,7 @@ def needs_of(text: str) -> tuple[str, bool]:
 class JoinBody(BaseModel):
     token: str = Field(min_length=10, max_length=100)
     name: str = Field(min_length=1, max_length=60)
+    team: str = Field("", max_length=40)  # where they came from: มูลนิธิ / เขต / บริษัท ... (staff come from many groups)
 
 
 class InviteCreate(BaseModel):
@@ -170,11 +171,21 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         inv = await db.staff_invites.find_one({"token": body.token, "active": True, "expires_at": {"$gt": now()}})
         if not inv:
             raise HTTPException(401, "ลิงก์เชิญหมดอายุหรือถูกยกเลิกแล้ว ขอลิงก์ใหม่จากผู้ดูแล")
-        user = {"id": str(uuid.uuid4()), "email": f"staff-{uuid.uuid4().hex[:8]}@staff.local", "name": body.name.strip(), "role": "staff",
+        user = {"id": str(uuid.uuid4()), "email": f"staff-{uuid.uuid4().hex[:8]}@staff.local", "name": body.name.strip(), "team": body.team.strip(), "role": "staff",
                 "password_hash": "!", "created_at": now(), "created_by": f"invite:{inv['created_by']}", "importer": bool(inv.get("importer"))}
         await db.admins.insert_one(dict(user))
         await db.staff_invites.update_one({"token": body.token}, {"$inc": {"joined": 1}})
         return await start_session(user, request, response)
+
+    @router.get("/staff/invite")
+    async def share_invite(user: dict = Depends(require_staff)):
+        """The team link any staff member can pass on (QR / LINE): the longest-lived open admin invite.
+        The admin can revoke it at any time, which stops new joins for everyone."""
+        inv = await db.staff_invites.find_one({"active": True, "expires_at": {"$gt": now()}, "importer": {"$ne": True}}, {"_id": 0, "token": 1, "expires_at": 1},
+                                             sort=[("expires_at", -1)])
+        if not inv:
+            raise HTTPException(404, "ตอนนี้ไม่มีลิงก์เชิญที่เปิดอยู่ ขอให้ผู้ดูแลสร้างลิงก์ใหม่")
+        return inv
 
     # ---------- address book / locating a house ----------
     async def known_sois() -> list[tuple[int, str]]:

@@ -138,3 +138,9 @@ body {
   padding: 1px 6px;
   border: 2px solid #2563eb;
 }
+
+/* Label above a staff member on duty (not on a trip) */
+.staff-label {
+  border-color: #059669;
+  font-size: 11px;
+}

@@ -3,7 +3,8 @@ import L from "leaflet";
 import { api, load, save } from "../api";
 import { categoryOf, osmLink, timeAgo } from "../config";
 import { createBaseMap } from "./MapView";
-import { TripPanel } from "./Trips";
+import QRCode from "qrcode";
+import { DutyBar, TripPanel, useStaffLocation } from "./Trips";
 import Guide, { STAFF_SLIDES } from "./Guide";
 
 // Field-staff console: split the work by soi, claim a house (nobody else can take it), finish it,
@@ -26,8 +27,16 @@ const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white
 
 // ---------------- join / login ----------------
 function Join({ onJoined }) {
-  const token = new URLSearchParams(window.location.hash.slice(1)).get("invite");
+  const readToken = () => new URLSearchParams(window.location.hash.slice(1)).get("invite");
+  const [token, setToken] = useState(readToken);
+  useEffect(() => {
+    // tapping an invite link while /staff is already open only changes the hash
+    const onHash = () => setToken(readToken());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
   const [name, setName] = useState(() => load("contact", {}).name || "");
+  const [team, setTeam] = useState(() => load("staffTeam", ""));
   const [error, setError] = useState("");
   if (!token) {
     return (
@@ -41,8 +50,9 @@ function Join({ onJoined }) {
   async function join(e) {
     e.preventDefault();
     try {
-      const who = await api("/auth/staff-join", { method: "POST", body: JSON.stringify({ token, name: name.trim() }) });
+      const who = await api("/auth/staff-join", { method: "POST", body: JSON.stringify({ token, name: name.trim(), team: team.trim() }) });
       save("contact", { ...load("contact", {}), name: name.trim() });
+      save("staffTeam", team.trim());
       window.history.replaceState(null, "", "/staff");
       onJoined(who);
     } catch (err) {
@@ -53,7 +63,10 @@ function Join({ onJoined }) {
     <form onSubmit={join} className="mx-auto max-w-sm space-y-3 rounded-2xl bg-white p-5 shadow">
       <h2 className="text-xl font-bold">👷 เข้าร่วมทีมเจ้าหน้าที่</h2>
       <label className="block font-medium" htmlFor="staff-name">ชื่อที่ทีมจะเห็น</label>
-      <input id="staff-name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} className={input} placeholder="เช่น ต้น (ทีมเรือ)" />
+      <input id="staff-name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} className={input} placeholder="เช่น ต้น" />
+      <label className="block font-medium" htmlFor="staff-team">มาจากหน่วยไหน <span className="font-normal text-neutral-500">(ไม่ใส่ก็ได้)</span></label>
+      <input id="staff-team" maxLength={40} value={team} onChange={(e) => setTeam(e.target.value)} className={input} placeholder="เช่น มูลนิธิ… / เขตบึงกุ่ม / อาสาในหมู่บ้าน" />
+      <p className="text-sm text-neutral-600">กดเริ่มแล้ว มือถือจะถามขอตำแหน่ง ให้กด “อนุญาต” ชาวบ้านจะเห็นว่ามีเจ้าหน้าที่อยู่ใกล้ (หยุดแชร์ได้ตลอด)</p>
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
       <button type="submit" className={`${btn} w-full bg-black text-white`}>เริ่มทำงาน</button>
     </form>
@@ -528,6 +541,50 @@ function Lookup() {
   );
 }
 
+// ---------------- invite teammates: one link / QR anyone on the team can pass on ----------------
+function InviteShare() {
+  const [inv, setInv] = useState(null);
+  const [qr, setQr] = useState("");
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    api("/staff/invite")
+      .then(async (i) => {
+        const url = `${window.location.origin}/staff#invite=${i.token}`;
+        setInv({ ...i, url });
+        setQr(await QRCode.toDataURL(url, { margin: 1, width: 280 }));
+      })
+      .catch((e) => setMsg(e.message));
+  }, []);
+  if (msg) return <p className="rounded-xl bg-white p-4">{msg}</p>;
+  if (!inv) return <p className="p-6 text-center text-neutral-500">กำลังโหลด…</p>;
+  const text = `ชวนมาช่วยงานน้ำท่วม หมู่บ้านสหกรณ์เคหะสถาน 4 (เสรีไทย 57)
+กดลิงก์ ใส่ชื่อ ก็ใช้ได้เลย ไม่ต้องสมัคร:
+${inv.url}`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setMsg("");
+      alert("คัดลอกแล้ว เอาไปวางในแชตได้เลย");
+    } catch {
+      prompt("คัดลอกข้อความนี้", text);
+    }
+  };
+  return (
+    <div className="space-y-3 rounded-2xl bg-white p-4 text-center shadow">
+      <h2 className="text-xl font-bold">👥 ชวนคนมาช่วย</h2>
+      <p className="text-sm">ให้อีกคน <b>สแกน QR</b> ด้วยกล้องมือถือ หรือส่งลิงก์ทาง LINE · เปิดแล้วใส่ชื่อ ใช้งานได้ทันที</p>
+      {qr && <img src={qr} alt="QR เข้าร่วมทีม" className="mx-auto w-64 max-w-full rounded-lg border" />}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <a href={`https://line.me/R/share?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer" className={`${btn} flex items-center justify-center bg-[#06C755] text-white`}>
+          ส่งทาง LINE
+        </a>
+        <button onClick={copy} className={`${btn} border-2 border-black bg-white`}>คัดลอกลิงก์ + ข้อความ</button>
+      </div>
+      <p className="text-xs text-neutral-500">ลิงก์ใช้ได้ถึง {new Date(inv.expires_at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })} · ผู้ดูแลยกเลิกได้ทุกเมื่อ · อย่าโพสต์ในที่สาธารณะ</p>
+    </div>
+  );
+}
+
 // ---------------- shell ----------------
 // LINE import runs centrally; the tab is only for admins / the import account.
 const IMPORT_TAB = ["import", "📥 นำเข้า LINE"];
@@ -537,12 +594,15 @@ const TABS = [
   ["map", "🗺️ แผนที่"],
   ["addresses", "🏠 ที่อยู่"],
   ["lookup", "🔎 ค้นเลขที่"],
+  ["invite", "👥 ชวนทีม"],
 ];
 
 export default function StaffApp() {
   const [user, setUser] = useState(null);
   const [checked, setChecked] = useState(false);
-  const [tab, setTab] = useState("tasks");
+  const [tab, setTab] = useState(() => (window.location.hash === "#share" ? "invite" : "tasks"));
+  const [trip, setTrip] = useState(undefined); // undefined = loading, null = not on a trip
+  const live = useStaffLocation(user, !!trip);
   const [tasks, setTasks] = useState([]);
   const [sois, setSois] = useState(null);
   const [locateTarget, setLocateTarget] = useState(null);
@@ -558,6 +618,9 @@ export default function StaffApp() {
     api("/sois").then((d) => setSois(d.sois));
   }, []);
   const reload = useCallback(() => api("/staff/tasks?include_done=true").then(setTasks).catch(() => {}), []);
+  useEffect(() => {
+    if (user) api("/staff/trips/mine").then((t) => setTrip(t || null)).catch(() => setTrip(null));
+  }, [user]);
   useEffect(() => {
     if (!user) return;
     reload();
@@ -602,6 +665,7 @@ export default function StaffApp() {
         ) : (
           <>
             {toast && <p className="mb-3 rounded-lg bg-emerald-100 p-3 font-semibold">{toast}</p>}
+            {tab !== "invite" && <DutyBar live={live} onTrip={!!trip} />}
             {tab === "tasks" && (
               <Tasks
                 user={user}
@@ -615,7 +679,8 @@ export default function StaffApp() {
               />
             )}
             {tab === "map" && <TaskMap user={user} tasks={tasks} sois={sois} />}
-            {tab === "trip" && <TripPanel user={user} />}
+            {tab === "trip" && <TripPanel user={user} live={live} trip={trip} setTrip={setTrip} />}
+            {tab === "invite" && <InviteShare />}
             {tab === "import" && (
               <Import
                 onDone={(m) => {

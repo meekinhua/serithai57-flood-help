@@ -99,12 +99,14 @@ export const MISSIONS = {
   cargo: ["📦", "ขนของ"],
   survey: ["🔍", "สำรวจพื้นที่"],
   other: ["🤝", "อื่นๆ"],
+  standby: ["👷", "เจ้าหน้าที่ออนไลน์"], // /staff open, not on a trip
 };
 export const PHASES = {
   enroute: ["🚀", "กำลังไป", "bg-sky-600 text-white"],
   serving: ["📍", "ถึงแล้ว / กำลังให้บริการ", "bg-emerald-600 text-white"],
   out_of_stock: ["⛔", "ของหมดแล้ว", "bg-neutral-500 text-white"],
   returning: ["↩️", "กำลังกลับฐาน", "bg-neutral-700 text-white"],
+  standby: ["🟢", "ออนไลน์", "bg-emerald-100 text-emerald-900"],
 };
 
 // Contact board categories. Keys must match SERVICE_CATEGORIES in backend/services.py
