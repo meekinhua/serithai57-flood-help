@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { KINDS, VILLAGE_BOUNDARY, VILLAGE_CENTER, VILLAGE_ZOOM, categoryOf, timeAgo, waterOf } from "../config";
 import { mediaUrl } from "../media";
-import { WATER_LEVELS } from "../config";
+import { WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
 import { describeLevel, estimateAt, fieldBounds, renderField, toPoints } from "../waterField";
 import { load, save } from "../api";
 
@@ -85,7 +85,9 @@ export default function MapView({ posts, water, onSelect, focus }) {
       const lv = waterOf(w.level);
       L.circleMarker([w.lat, w.lng], { radius: 11, color: "#fff", weight: 2, fillColor: lv.color, fillOpacity: 0.85 })
         .bindPopup(
-          `<b>💧 ระดับน้ำ: ${lv.label} (${lv.cm})</b><br>${timeAgo(w.created_at)}${w.name ? ` · ${escapeHtml(w.name)}` : ""}${
+          `<b>💧 ระดับน้ำ: ${lv.label} (${w.cm != null ? `${w.cm} ซม.` : lv.cm})</b>${w.trend ? ` ${WATER_TREND[w.trend][0]} ${WATER_TREND[w.trend][1]}` : ""}${
+            w.where ? `<br>${WATER_WHERE[w.where][0]} วัด${WATER_WHERE[w.where][1]}` : ""
+          }<br>${timeAgo(w.created_at)}${w.name ? ` · ${escapeHtml(w.name)}` : ""}${
             w.note ? `<br>${escapeHtml(w.note)}` : ""
           }${
             w.media?.[0]
@@ -97,6 +99,7 @@ export default function MapView({ posts, water, onSelect, focus }) {
     }
 
     for (const p of posts) {
+      if (p.general) continue; // "ทั้งหมู่บ้าน" posts are listed, not pinned
       const isNew = !seenPins.current.has(p.id);
       seenPins.current.add(p.id);
       L.marker([p.lat, p.lng], { icon: postIcon(p, isNew), zIndexOffset: p.urgent ? 1000 : p.kind === "need" ? 500 : 0 })

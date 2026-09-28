@@ -48,7 +48,7 @@ AnnouncementLevel = Literal["info", "warning", "danger"]
 CATEGORIES = {
     "need": ["evacuate", "medical", "vulnerable", "food", "medicine", "power", "move_items", "pets", "other"],
     "offer": ["boat", "truck", "food", "shelter", "parking", "labor", "power", "other"],
-    "info": ["road_ok", "road_blocked", "danger", "shelter_point", "supply_point", "other"],
+    "info": ["road_ok", "road_partial", "road_blocked", "danger", "shelter_point", "supply_point", "other"],
 }
 
 # Water levels 0..6: ไม่ท่วม, ตาตุ่ม, ครึ่งแข้ง, เข่า, ต้นขา (60-70 ซม.), เอว, อกขึ้นไป
@@ -68,6 +68,21 @@ SESSION_DAYS = 7
 
 def now():
     return datetime.now(timezone.utc)
+
+
+def public_post(p: dict) -> dict:
+    """Post as shown to everyone: phone replaced by has_phone (see /posts/{id}/contact)."""
+    out = {k: v for k, v in p.items() if k not in ("phone", "_id", "edit_key_hash")}
+    out["has_phone"] = bool(p.get("phone"))
+    return out
+
+
+def level_from_cm(cm: int) -> int:
+    """Measured depth -> body level (ไม่ท่วม, ตาตุ่ม, ครึ่งแข้ง, เข่า, ต้นขา, เอว, อก+)."""
+    for level, upper in enumerate((0, 15, 35, 55, 75, 99)):
+        if cm <= upper:
+            return level
+    return 6
 
 
 def hash_key(key: str) -> str:
@@ -136,6 +151,7 @@ class PostCreate(Located):
     phone: str = Field("", max_length=40)
     people: Optional[int] = Field(None, ge=0, le=500)
     urgent: bool = False
+    general: bool = False  # village-wide info/offer with no specific spot (not allowed for requests)
     payment: Payment = "free"
     price: str = Field("", max_length=100)  # free text, e.g. "300 บาท" / "100 บาท/เที่ยว"
     media_ids: list[str] = Field(default_factory=list, max_length=4)  # uploaded via /api/media
@@ -148,7 +164,10 @@ class StatusUpdate(BaseModel):
 
 
 class WaterCreate(Located):
-    level: int = Field(ge=0, le=WATER_MAX_LEVEL)
+    level: Optional[int] = Field(None, ge=0, le=WATER_MAX_LEVEL)
+    cm: Optional[int] = Field(None, ge=0, le=300)  # measured depth; when given it decides the level
+    trend: Optional[Literal["up", "steady", "down"]] = None
+    where: Optional[Literal["street", "house"]] = None
     note: str = Field("", max_length=200)
     name: str = Field("", max_length=80)
     media_ids: list[str] = Field(default_factory=list, max_length=1)  # one photo of the water
@@ -189,6 +208,12 @@ class AnnouncementUpdate(BaseModel):
     active: Optional[bool] = None
     text: Optional[str] = Field(None, min_length=1, max_length=500)
     level: Optional[AnnouncementLevel] = None
+
+
+class PostAdminUpdate(BaseModel):
+    kind: Optional[Kind] = None
+    category: Optional[str] = None
+    urgent: Optional[bool] = None
 
 
 class PinBody(BaseModel):
@@ -334,7 +359,18 @@ async def list_posts(
     if not include_done:
         q["status"] = {"$ne": "done"}
     cursor = db.posts.find(q, HIDDEN).sort([("pinned", -1), ("urgent", -1), ("created_at", -1)])
-    return await cursor.to_list(1000)
+    return [public_post(p) for p in await cursor.to_list(1000)]
+
+
+@api.get("/posts/{post_id}/contact")
+async def post_contact(post_id: str, request: Request):
+    """Phone numbers are shown one post at a time, so nobody can harvest every household's number
+    (and who lives alone) from the list in one request."""
+    rate_limit(request, "contact", limit=40, window_s=600)
+    doc = await db.posts.find_one({"id": post_id}, {"_id": 0, "phone": 1})
+    if not doc:
+        raise HTTPException(404, "ไม่พบรายการ")
+    return {"phone": doc.get("phone", "")}
 
 
 @api.post("/posts", status_code=201)
@@ -351,6 +387,7 @@ async def create_post(body: PostCreate, request: Request):
         **body.model_dump(exclude={"media_ids"}),
         "media": attachments,
         "urgent": body.urgent and body.kind == "need",
+        "general": body.general and body.kind != "need",
         "payment": "free" if body.kind == "info" else body.payment,
         "price": body.price.strip() if body.kind != "info" and body.payment == "paid" else "",
         "pinned": False,
@@ -361,8 +398,7 @@ async def create_post(body: PostCreate, request: Request):
         "edit_key_hash": hash_key(edit_key),
     }
     await db.posts.insert_one(dict(doc))
-    doc.pop("edit_key_hash")
-    return {**doc, "edit_key": edit_key}
+    return {**public_post(doc), "edit_key": edit_key}
 
 
 @api.post("/posts/{post_id}/status")
@@ -381,7 +417,7 @@ async def update_status(post_id: str, body: StatusUpdate, request: Request):
         raise HTTPException(404, "ไม่พบรายการ")
     if admin:
         await audit(admin, "post_status", post_id, body.status)
-    return doc
+    return public_post(doc)
 
 
 @api.delete("/posts/{post_id}", status_code=204)
@@ -401,9 +437,12 @@ async def list_water(since_hours: int = Query(48, ge=1, le=24 * 30)):
 @api.post("/water", status_code=201)
 async def create_water(body: WaterCreate, request: Request):
     rate_limit(request, "water", limit=30, window_s=600)
+    level = level_from_cm(body.cm) if body.cm is not None else body.level
+    if level is None:
+        raise HTTPException(422, "กรุณาเลือกระดับน้ำหรือใส่ความสูงเป็นเซนติเมตร")
     water_id = str(uuid.uuid4())
     attachments = await claim_media(body.media_ids, f"water:{water_id}", {"image"})
-    doc = {"id": water_id, **body.model_dump(exclude={"media_ids"}), "media": attachments, "v": WATER_SCALE_VERSION, "created_at": now()}
+    doc = {"id": water_id, **body.model_dump(exclude={"media_ids"}), "level": level, "media": attachments, "v": WATER_SCALE_VERSION, "created_at": now()}
     await db.water.insert_one(dict(doc))
     return doc
 
@@ -424,7 +463,32 @@ async def admin_pin_post(post_id: str, body: PinBody, admin: dict = Depends(requ
     if not doc:
         raise HTTPException(404, "ไม่พบรายการ")
     await audit(admin, "pin_post" if body.pinned else "unpin_post", post_id, doc["detail"])
-    return doc
+    return public_post(doc)
+
+
+@api.patch("/admin/posts/{post_id}")
+async def admin_update_post(post_id: str, body: PostAdminUpdate, admin: dict = Depends(require_admin)):
+    """Fix posts filed under the wrong type, e.g. a bedridden resident posted as 'info'."""
+    post = await db.posts.find_one({"id": post_id})
+    if not post:
+        raise HTTPException(404, "ไม่พบรายการ")
+    kind = body.kind or post["kind"]
+    category = body.category or (post["category"] if post["category"] in CATEGORIES[kind] else "other")
+    if category not in CATEGORIES[kind]:
+        raise HTTPException(422, "หมวดหมู่ไม่ตรงกับประเภท")
+    urgent = body.urgent if body.urgent is not None else post.get("urgent", False)
+    changes = {"kind": kind, "category": category, "urgent": urgent and kind == "need", "updated_at": now()}
+    if kind == "need":
+        changes["general"] = False
+    note = f"ผู้ดูแลแก้ประเภทเป็น {kind}/{category}" + (" (ด่วน)" if changes["urgent"] else "")
+    doc = await db.posts.find_one_and_update(
+        {"id": post_id},
+        {"$set": changes, "$push": {"history": {"at": now(), "status": post["status"], "name": admin["name"], "note": note, "admin": True}}},
+        projection=HIDDEN,
+        return_document=True,
+    )
+    await audit(admin, "update_post", post_id, f"{post['kind']}/{post['category']} -> {kind}/{category} urgent={changes['urgent']}")
+    return public_post(doc)
 
 
 @api.delete("/admin/water/{water_id}", status_code=204)

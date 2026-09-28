@@ -1,11 +1,18 @@
 import { useState } from "react";
-import { KINDS, STATUS, categoryOf, osmLink, paymentBadge, timeAgo } from "../config";
+import { CATEGORIES, KINDS, STATUS, categoryOf, osmLink, paymentBadge, timeAgo } from "../config";
 import { api, load, save } from "../api";
 import MediaGallery, { MediaThumb } from "./MediaGallery";
+
+// Hours an open request has had no "helping"/"done" update -- surfaced so nobody is forgotten.
+export function waitingHours(post) {
+  if (post.kind !== "need" || post.status !== "open") return 0;
+  return (Date.now() - new Date(post.updated_at || post.created_at).getTime()) / 3.6e6;
+}
 
 export function PostSummary({ post, onOpen, fresh = false }) {
   const [emoji, catLabel] = categoryOf(post);
   const k = KINDS[post.kind];
+  const waited = waitingHours(post);
   return (
     <button
       onClick={() => onOpen(post.id)}
@@ -23,6 +30,8 @@ export function PostSummary({ post, onOpen, fresh = false }) {
             {post.urgent && post.status === "open" && <span className="rounded bg-red-600 px-1.5 font-bold text-white">ด่วน</span>}
             <span className="font-semibold" style={{ color: k.color }}>{catLabel}</span>
             <span className={`rounded px-1.5 ${STATUS[post.status].cls}`}>{STATUS[post.status][post.kind]}</span>
+            {waited >= 3 && <span className="rounded bg-yellow-300 px-1.5 font-bold text-black">⏳ รอมา {Math.floor(waited)} ชม.</span>}
+            {post.general && <span className="rounded bg-neutral-100 px-1.5">🏘️ ทั้งหมู่บ้าน</span>}
             {paymentBadge(post) && <span className="rounded border border-black px-1.5 font-semibold">{paymentBadge(post)}</span>}
           </div>
           <p className="mt-0.5 line-clamp-2 break-words">{post.detail}</p>
@@ -46,6 +55,30 @@ export function PostDetail({ post, admin, onChanged, onDeleted, onShowOnMap }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const editKey = load("editKeys", {})[post.id];
+  const [phone, setPhone] = useState(null);
+  const [fix, setFix] = useState({ kind: post.kind, category: post.category, urgent: Boolean(post.urgent) });
+
+  // Numbers are fetched per post (not in the public list), so they can't be harvested in bulk.
+  async function revealPhone() {
+    try {
+      setPhone((await api(`/posts/${post.id}/contact`)).phone || "");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function sendNote() {
+    if (!note.trim()) return setError("พิมพ์ข้อความที่จะอัปเดตก่อน เช่น ติดต่อไม่ได้ / ได้ของแล้วบางส่วน");
+    await setStatus(post.status);
+  }
+
+  async function adminRefile() {
+    try {
+      onChanged(await api(`/admin/posts/${post.id}`, { method: "PATCH", body: JSON.stringify(fix) }));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
   async function setStatus(status) {
     if (!name.trim()) return setError("กรุณาใส่ชื่อของคุณก่อน เพื่อให้คนอื่นรู้ว่าใครรับเรื่อง");
@@ -55,6 +88,11 @@ export function PostDetail({ post, admin, onChanged, onDeleted, onShowOnMap }) {
       save("contact", { ...load("contact", {}), name: name.trim() });
       onChanged(await api(`/posts/${post.id}/status`, { method: "POST", body: JSON.stringify({ status, name: name.trim(), note: note.trim() }) }));
       setNote("");
+      // Remember what I took on, so the app can ask later whether it's done.
+      const mine = load("myHelping", {});
+      if (status === "helping") mine[post.id] = Date.now();
+      else if (status !== post.status) delete mine[post.id];
+      save("myHelping", mine);
     } catch (err) {
       setError(err.message);
     }
@@ -133,25 +171,36 @@ export function PostDetail({ post, admin, onChanged, onDeleted, onShowOnMap }) {
       </dl>
 
       <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
-        {post.phone && (
-          <a href={`tel:${post.phone.replace(/[^\d+]/g, "")}`} className={`${btn} flex items-center justify-center bg-black text-white`}>
-            📞 โทร {post.phone}
-          </a>
+        {post.has_phone &&
+          (phone ? (
+            <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className={`${btn} flex items-center justify-center bg-black text-white`}>
+              📞 โทร {phone}
+            </a>
+          ) : (
+            <button onClick={revealPhone} className={`${btn} bg-black text-white`}>
+              📞 แสดงเบอร์โทร
+            </button>
+          ))}
+        {post.general ? (
+          <p className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-600">🏘️ ข่าวทั้งหมู่บ้าน ไม่ได้ระบุจุด</p>
+        ) : (
+          <>
+            <button onClick={() => onShowOnMap(post)} className={`${btn} border border-neutral-300 bg-white`}>🗺️ ดูบนแผนที่</button>
+            <a href={osmLink(post.lat, post.lng)} target="_blank" rel="noreferrer" className={`${btn} flex items-center justify-center border border-neutral-300 bg-white`}>
+              🧭 เปิดใน OpenStreetMap
+            </a>
+            <a href={`geo:${post.lat},${post.lng}?q=${post.lat},${post.lng}`} className={`${btn} flex items-center justify-center border border-neutral-300 bg-white`}>
+              📱 เปิดแอปแผนที่
+            </a>
+          </>
         )}
-        <button onClick={() => onShowOnMap(post)} className={`${btn} border border-neutral-300 bg-white`}>🗺️ ดูบนแผนที่</button>
-        <a href={osmLink(post.lat, post.lng)} target="_blank" rel="noreferrer" className={`${btn} flex items-center justify-center border border-neutral-300 bg-white`}>
-          🧭 เปิดใน OpenStreetMap
-        </a>
-        <a href={`geo:${post.lat},${post.lng}?q=${post.lat},${post.lng}`} className={`${btn} flex items-center justify-center border border-neutral-300 bg-white`}>
-          📱 เปิดแอปแผนที่
-        </a>
       </div>
 
       <section className="rounded-xl bg-neutral-50 p-3">
         <h3 className="mb-2 font-semibold">อัปเดตสถานะ</h3>
         <div className="grid gap-2 sm:grid-cols-2">
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="ชื่อของคุณ *" className="min-h-[44px] rounded-lg border border-neutral-300 px-3" />
-          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="หมายเหตุ (ไม่บังคับ)" className="min-h-[44px] rounded-lg border border-neutral-300 px-3" />
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="ข้อความ เช่น ติดต่อไม่ได้ / ได้ของแล้ว" className="min-h-[44px] rounded-lg border border-neutral-300 px-3" />
         </div>
         <div className="mt-2 grid gap-2 min-[400px]:grid-cols-2">
           {post.status !== "helping" && (
@@ -169,6 +218,9 @@ export function PostDetail({ post, admin, onChanged, onDeleted, onShowOnMap }) {
               ↩️ {post.kind === "need" ? "ยังต้องการความช่วยเหลือ" : "เปิดอีกครั้ง"}
             </button>
           )}
+          <button disabled={busy} onClick={sendNote} className={`${btn} border border-neutral-300 bg-white`}>
+            💬 ส่งข้อความอัปเดต (ไม่เปลี่ยนสถานะ)
+          </button>
         </div>
         {error && <p className="mt-2 rounded-lg bg-red-50 p-2 text-red-700">{error}</p>}
       </section>
@@ -194,6 +246,38 @@ export function PostDetail({ post, admin, onChanged, onDeleted, onShowOnMap }) {
             </button>
             <button onClick={adminDelete} className={`${btn} bg-red-600 text-white`}>
               🗑 ลบรายการ
+            </button>
+          </div>
+          <div className="mt-3 space-y-2">
+            <p className="text-sm font-semibold">แก้ประเภท (กรณีลงผิด เช่น ผู้ป่วยติดเตียงลงเป็น “แจ้งข้อมูล”)</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <select
+                value={fix.kind}
+                onChange={(e) => setFix({ kind: e.target.value, category: "other", urgent: e.target.value === "need" && fix.urgent })}
+                className="min-h-[44px] rounded-lg border border-neutral-300 px-2"
+              >
+                {Object.entries(KINDS).map(([key, kk]) => (
+                  <option key={key} value={key}>
+                    {kk.emoji} {kk.label}
+                  </option>
+                ))}
+              </select>
+              <select value={fix.category} onChange={(e) => setFix({ ...fix, category: e.target.value })} className="min-h-[44px] rounded-lg border border-neutral-300 px-2">
+                {Object.entries(CATEGORIES[fix.kind]).map(([key, [em, text]]) => (
+                  <option key={key} value={key}>
+                    {em} {text}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {fix.kind === "need" && (
+              <label className="flex min-h-[44px] items-center gap-2">
+                <input type="checkbox" checked={fix.urgent} onChange={(e) => setFix({ ...fix, urgent: e.target.checked })} className="h-5 w-5" />
+                ด่วนมาก
+              </label>
+            )}
+            <button onClick={adminRefile} className={`${btn} w-full border-2 border-black bg-white`}>
+              บันทึกประเภทใหม่
             </button>
           </div>
         </section>

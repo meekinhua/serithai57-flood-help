@@ -8,10 +8,10 @@ const btnPrimary = "min-h-[48px] rounded-xl bg-black px-5 font-semibold text-whi
 const btnGhost = "min-h-[44px] rounded-lg border-2 border-black bg-white px-3 font-semibold active:bg-neutral-100 disabled:opacity-60";
 
 const EXPIRY = [
-  ["", "ไม่หมดอายุ (จนกว่าจะปิด)"],
   ["6", "6 ชั่วโมง"],
-  ["24", "24 ชั่วโมง"],
+  ["24", "24 ชั่วโมง (แนะนำ)"],
   ["72", "3 วัน"],
+  ["", "ไม่หมดอายุ (ต้องกดปิดเอง)"],
 ];
 
 const ACTIONS = {
@@ -70,7 +70,7 @@ function AnnouncementsAdmin({ admin, onPublicChange }) {
   const [items, setItems] = useState([]);
   const [text, setText] = useState("");
   const [level, setLevel] = useState("warning");
-  const [expires, setExpires] = useState("");
+  const [expires, setExpires] = useState("24"); // old "food at 9:00" notices were lingering for hours
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 

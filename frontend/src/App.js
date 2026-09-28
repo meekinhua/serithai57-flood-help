@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API, api, load, save, viewerId } from "./api";
-import { ANNOUNCEMENT_LEVELS, HOTLINE_GROUPS, KINDS, VILLAGE_NAME, WATER_LEVELS, categoryOf, osmLink, paymentBadge, timeAgo, waterOf } from "./config";
+import { ANNOUNCEMENT_LEVELS, HOTLINE_GROUPS, KINDS, WATER_TREND, WATER_WHERE, VILLAGE_NAME, WATER_LEVELS, categoryOf, osmLink, paymentBadge, timeAgo, waterOf } from "./config";
 import MapView from "./components/MapView";
 import Sheet from "./components/Sheet";
 import { PostForm, WaterForm } from "./components/Forms";
-import { PostDetail, PostSummary } from "./components/PostCard";
+import { PostDetail, PostSummary, waitingHours } from "./components/PostCard";
 import Announcements from "./components/Announcements";
 import AdminPanel, { AdminLogin } from "./components/AdminPanel";
 import { mediaUrl } from "./media";
@@ -132,10 +132,24 @@ export default function App() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const visible = useMemo(
-    () => posts.filter((p) => filter === "all" || (filter === "paid" ? p.payment === "paid" : p.kind === filter)),
-    [posts, filter]
-  );
+  // Requests first (helpers scan top-down), then offers, then info; info older than 12 h is folded away.
+  const KIND_ORDER = { need: 0, offer: 1, info: 2 };
+  const [showOldInfo, setShowOldInfo] = useState(false);
+  const { visible, oldInfo } = useMemo(() => {
+    const list = posts
+      .filter((p) => filter === "all" || (filter === "paid" ? p.payment === "paid" : p.kind === filter))
+      .sort(
+        (a, b) =>
+          KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+          (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
+          (b.urgent && b.status === "open" ? 1 : 0) - (a.urgent && a.status === "open" ? 1 : 0) ||
+          (a.status === "open" ? 0 : 1) - (b.status === "open" ? 0 : 1) ||
+          b.created_at.localeCompare(a.created_at)
+      );
+    const cutoff = Date.now() - 12 * 3600 * 1000;
+    const isOld = (p) => p.kind === "info" && !p.pinned && new Date(p.created_at).getTime() < cutoff;
+    return { visible: list.filter((p) => !isOld(p)), oldInfo: list.filter(isOld) };
+  }, [posts, filter]); // eslint-disable-line react-hooks/exhaustive-deps
   const counts = useMemo(() => {
     const c = { need: 0, urgent: 0, offer: 0, info: 0 };
     for (const p of posts) {
@@ -145,6 +159,45 @@ export default function App() {
     }
     return c;
   }, [posts]);
+
+  // The four big buttons may scroll off (long announcements, warnings): keep an SOS button reachable.
+  const actionsRef = useRef(null);
+  const [showFab, setShowFab] = useState(false);
+  useEffect(() => {
+    const el = actionsRef.current;
+    if (!el || !("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver(([entry]) => setShowFab(!entry.isIntersecting), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [authChecked]);
+
+  // "You said you'd help 2 h ago -- done?" so requests don't stay "helping" forever.
+  const [snoozeTick, setSnoozeTick] = useState(0);
+  const reminder = useMemo(() => {
+    const mine = load("myHelping", {});
+    const snoozed = load("helpingSnooze", {});
+    return posts.find(
+      (p) => p.status === "helping" && mine[p.id] && Date.now() - mine[p.id] > 2 * 3600 * 1000 && !(snoozed[p.id] > Date.now())
+    );
+  }, [posts, snoozeTick]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function finishHelping(p) {
+    const who = load("contact", {}).name || "ผู้ช่วย";
+    try {
+      upsert(await api(`/posts/${p.id}/status`, { method: "POST", body: JSON.stringify({ status: "done", name: who, note: "ช่วยเสร็จแล้ว" }) }));
+      const mine = load("myHelping", {});
+      delete mine[p.id];
+      save("myHelping", mine);
+      setToast("ขอบคุณที่ช่วยเหลือ 🙏");
+    } catch (err) {
+      setToast(err.message);
+    }
+  }
+
+  function snoozeHelping(p) {
+    save("helpingSnooze", { ...load("helpingSnooze", {}), [p.id]: Date.now() + 3600 * 1000 });
+    setSnoozeTick((t) => t + 1);
+  }
 
   const paidNeedCount = useMemo(() => posts.filter((p) => p.kind === "need" && p.payment === "paid" && p.status !== "done").length, [posts]);
 
@@ -179,7 +232,7 @@ export default function App() {
       lines.push(
         `${i + 1}. ${p.urgent ? "🔴ด่วน " : ""}${emoji} ${cat}${paymentBadge(p) ? ` [${paymentBadge(p)}]` : ""}${p.status === "helping" ? " (มีคนไปแล้ว)" : ""}`,
         `   ${p.detail}`,
-        `   ${[p.place, p.people != null && `${p.people} คน`, `${p.name} ${p.phone}`.trim()].filter(Boolean).join(" · ")}`,
+        `   ${[p.place, p.people != null && `${p.people} คน`, p.name, p.has_phone && "เบอร์ดูในแอป", waitingHours(p) >= 3 && `รอมา ${Math.floor(waitingHours(p))} ชม.`].filter(Boolean).join(" · ")}`,
         `   ${osmLink(p.lat, p.lng)}`
       );
     });
@@ -286,7 +339,23 @@ export default function App() {
           <WeatherAlerts weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
         </div>
 
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {reminder && (
+          <div role="status" className="anim-pop mb-3 rounded-xl border-2 border-black bg-yellow-100 p-3">
+            <p className="font-bold">
+              🙋 คุณรับช่วย “{categoryOf(reminder)[1]}”{reminder.place && ` (${reminder.place})`} ไว้ {Math.floor((Date.now() - load("myHelping", {})[reminder.id]) / 3.6e6)} ชม.แล้ว — เสร็จหรือยัง?
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button onClick={() => finishHelping(reminder)} className="min-h-[48px] rounded-lg bg-black font-semibold text-white">
+                ✅ ช่วยเสร็จแล้ว
+              </button>
+              <button onClick={() => snoozeHelping(reminder)} className="min-h-[48px] rounded-lg border-2 border-black bg-white font-semibold">
+                ยังไม่เสร็จ
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div ref={actionsRef} className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           <ActionButton color="bg-black text-white active:bg-neutral-800" onClick={() => setSheet({ type: "form", kind: "need" })}>
             🆘 ขอความช่วยเหลือ
           </ActionButton>
@@ -374,8 +443,24 @@ export default function App() {
                   <PostSummary post={p} onOpen={openDetail} fresh={freshIds.has(p.id)} />
                 </li>
               ))}
-              {visible.length === 0 && <li className="rounded-xl bg-white p-6 text-center text-neutral-500">ยังไม่มีรายการ</li>}
+              {visible.length === 0 && oldInfo.length === 0 && <li className="rounded-xl bg-white p-6 text-center text-neutral-500">ยังไม่มีรายการ</li>}
             </ul>
+            {oldInfo.length > 0 && (
+              <div className="mt-2">
+                <button onClick={() => setShowOldInfo((v) => !v)} className="min-h-[44px] w-full rounded-xl border border-neutral-300 bg-white text-sm font-semibold text-neutral-600">
+                  {showOldInfo ? "ซ่อน" : "แสดง"}ข้อมูลเก่ากว่า 12 ชม. ({oldInfo.length}) {showOldInfo ? "▴" : "▾"}
+                </button>
+                {showOldInfo && (
+                  <ul className="mt-2 space-y-2 opacity-80">
+                    {oldInfo.map((p) => (
+                      <li key={p.id}>
+                        <PostSummary post={p} onOpen={openDetail} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             {water.length > 0 && (
               <div className="mt-4 rounded-xl bg-white p-3">
@@ -387,7 +472,10 @@ export default function App() {
                       <li key={w.id} className="flex items-center gap-2">
                         <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: lv.color }} />
                         <b>{lv.label}</b>
+                        {w.trend && <span title={WATER_TREND[w.trend][1]}>{WATER_TREND[w.trend][0]}</span>}
                         <span className="min-w-0 truncate text-neutral-600">
+                          {w.cm != null && `${w.cm} ซม. · `}
+                          {w.where && `${WATER_WHERE[w.where][1]} · `}
                           {timeAgo(w.created_at)}
                           {w.note && ` · ${w.note}`}
                         </span>
@@ -429,10 +517,19 @@ export default function App() {
 
       {sheet?.type === "form" && (
         <Sheet title={`${KINDS[sheet.kind].emoji} ${KINDS[sheet.kind].label}`} onClose={() => setSheet(null)}>
+          {sheet.reason && <p className="mb-3 rounded-xl border-2 border-red-600 bg-red-50 p-3 text-sm font-semibold">{sheet.reason}</p>}
           <PostForm
             kind={sheet.kind}
-            onDone={(p) => {
+            posts={posts}
+            prefill={sheet.prefill}
+            onOpenExisting={openDetail}
+            onDone={(p, extra = {}) => {
               upsert(p);
+              if (extra.suggestBoard) {
+                setSheet({ type: "serviceForm", prefill: { detail: p.detail, price: extra.price, category: "other" } });
+                setToast("ส่งแล้ว · ลงชื่อในบอร์ดติดต่อด้วย จะมีคนเห็นง่ายขึ้น");
+                return;
+              }
               setSheet({ type: "detail", id: p.id });
               setToast("ส่งแล้ว ทุกคนเห็นรายการนี้แล้ว");
             }}
@@ -442,8 +539,18 @@ export default function App() {
       {sheet?.type === "water" && (
         <Sheet title="💧 แจ้งระดับน้ำ" onClose={() => setSheet(null)}>
           <WaterForm
-            onDone={(w) => {
+            onDone={(w, extra = {}) => {
               setWater((prev) => [w, ...prev]);
+              if (extra.needHint) {
+                // A request hidden in a water note never reaches helpers: offer to file it properly.
+                setSheet({
+                  type: "form",
+                  kind: "need",
+                  prefill: { detail: extra.needHint, loc: { lat: w.lat, lng: w.lng } },
+                  reason: "บันทึกระดับน้ำแล้ว · หมายเหตุของคุณดูเหมือนต้องการความช่วยเหลือ ส่งเป็นคำขอด้านล่าง จะมีคนเห็นและติดต่อกลับ",
+                });
+                return;
+              }
               setSheet(null);
               setToast("ขอบคุณที่แจ้งระดับน้ำ");
             }}
@@ -481,6 +588,7 @@ export default function App() {
       {sheet?.type === "serviceForm" && (
         <Sheet title="📇 ลงชื่อรับงาน / ให้บริการ" onClose={() => setSheet(null)}>
           <ServiceForm
+            prefill={sheet.prefill}
             onDone={(s) => {
               setServices((prev) => [s, ...prev]);
               setSheet({ type: "board", tab: "providers", category: s.category });
@@ -520,6 +628,15 @@ export default function App() {
             <b>ความปลอดภัย:</b> ตัดเบรกเกอร์ก่อนน้ำเข้าบ้าน · อย่าแตะปลั๊ก/สายไฟขณะตัวเปียก · ระวังสัตว์มีพิษ · อย่าเดินลุยน้ำที่มองไม่เห็นพื้น (ฝาท่อเปิด)
           </div>
         </Sheet>
+      )}
+
+      {!IS_ADMIN_PAGE && !sheet && !showGuide && showFab && (
+        <button
+          onClick={() => setSheet({ type: "form", kind: "need" })}
+          className="anim-pop fixed bottom-4 right-4 z-[950] flex min-h-[56px] items-center gap-2 rounded-full bg-black px-5 text-lg font-bold text-white shadow-lg ring-4 ring-white active:scale-95 lg:hidden"
+        >
+          🆘 ขอความช่วยเหลือ
+        </button>
       )}
 
       {showGuide && <Guide onClose={closeGuide} />}

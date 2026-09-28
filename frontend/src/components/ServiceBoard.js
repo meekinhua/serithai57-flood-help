@@ -282,9 +282,18 @@ function PostRow({ post, onOpen }) {
 }
 
 // ---------- "List yourself" form ----------
-export function ServiceForm({ onDone }) {
+export function ServiceForm({ onDone, prefill = {} }) {
   const saved = load("contact", { name: "", phone: "" });
-  const [form, setForm] = useState({ category: "", name: saved.name || "", phone: saved.phone || "", line_id: "", detail: "", pricing: "paid", price: "", area: "ในหมู่บ้าน" });
+  const [form, setForm] = useState({
+    category: prefill.category || "",
+    name: saved.name || "",
+    phone: saved.phone || "",
+    line_id: "",
+    detail: prefill.detail || "",
+    pricing: "paid",
+    price: prefill.price || "",
+    area: "ในหมู่บ้าน",
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));

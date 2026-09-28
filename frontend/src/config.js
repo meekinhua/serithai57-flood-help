@@ -46,6 +46,7 @@ export const CATEGORIES = {
   },
   info: {
     road_ok: ["✅", "ถนนผ่านได้"],
+    road_partial: ["⚠️", "ผ่านได้บางส่วน / มีสิ่งกีดขวาง (ต้นไม้ล้ม รถเสีย)"],
     road_blocked: ["⛔", "ถนนผ่านไม่ได้"],
     danger: ["⚡", "จุดอันตราย (ไฟรั่ว / ท่อ / สัตว์มีพิษ)"],
     shelter_point: ["🏫", "ศูนย์พักพิง"],
@@ -128,6 +129,49 @@ export const HOTLINE_GROUPS = [
     ],
   },
 ];
+
+// Categories where life/health is at stake: the urgent switch turns on by itself (can be turned off).
+export const URGENT_CATEGORIES = ["evacuate", "medical", "vulnerable"];
+
+// Words that mean "someone needs help" -- used to catch requests filed as info/offer or hidden in water notes.
+export const NEED_WORDS =
+  /ผู้สูงอายุ|คนแก่|ยาย|ตา(?=\s|$|ย)|ติดเตียง|ผู้ป่วย|ป่วย|คนพิการ|พิการ|เด็กเล็ก|เด็ก|ทารก|ตั้งครรภ์|ต้องการ|ขอความช่วยเหลือ|ช่วยด้วย|ขอ(?:อาหาร|น้ำ|ยา|เรือ|ความช่วย)|ไม่มีไฟ|ไฟดับ|ไม่มีอาหาร|ไม่มีน้ำ|ไม่เคยได้รับ|ติดอยู่|ออกไม่ได้|อพยพ|หิว|ยาหมด|ติดต่อไม่ได้/;
+
+// Best guess of the request category from free text, for the "file this as a request?" prompt.
+export function guessNeedCategory(text) {
+  if (/ติดเตียง|ผู้สูงอายุ|คนแก่|ยาย|พิการ|เด็กเล็ก|ทารก|ตั้งครรภ์/.test(text)) return "vulnerable";
+  if (/ป่วย|เจ็บ|บาดเจ็บ|หายใจ|ไม่สบาย/.test(text)) return "medical";
+  if (/อพยพ|ติดอยู่|ออกไม่ได้|เรือ/.test(text)) return "evacuate";
+  if (/ไฟ|ชาร์จ|แบต/.test(text)) return "power";
+  if (/ยา/.test(text)) return "medicine";
+  if (/อาหาร|น้ำดื่ม|ข้าว|หิว|ขนม/.test(text)) return "food";
+  if (/ยก|ขน|ย้าย/.test(text)) return "move_items";
+  if (/หมา|แมว|สัตว์/.test(text)) return "pets";
+  return "other";
+}
+
+// "ผู้สูงอายุ 2 คน เด็ก 3 คน" -> 5 (null when no count is written)
+export function peopleInText(text) {
+  const nums = [...text.matchAll(/(\d+)\s*คน/g)].map((m) => Number(m[1]));
+  return nums.length ? nums.reduce((a, b) => a + b, 0) : null;
+}
+
+// Same thresholds as backend level_from_cm()
+export function levelFromCm(cm) {
+  const bounds = [0, 15, 35, 55, 75, 99];
+  const i = bounds.findIndex((b) => cm <= b);
+  return i === -1 ? 6 : i;
+}
+
+export const WATER_TREND = {
+  up: ["⬆️", "กำลังขึ้น"],
+  steady: ["➡️", "ทรงตัว"],
+  down: ["⬇️", "กำลังลด"],
+};
+export const WATER_WHERE = {
+  street: ["🛣️", "บนถนน"],
+  house: ["🏠", "ในบ้าน"],
+};
 
 export function categoryOf(post) {
   return CATEGORIES[post.kind]?.[post.category] || ["❓", post.category];

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createBaseMap } from "./MapView";
 
 // Pan the map so the centre pin sits on the spot. Easier with a thumb than tapping a tiny target.
-export default function LocationPicker({ value, onChange }) {
+export default function LocationPicker({ value, onChange, onTouched = () => {} }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const [gps, setGps] = useState("");
@@ -14,6 +14,7 @@ export default function LocationPicker({ value, onChange }) {
       onChange({ lat: +c.lat.toFixed(6), lng: +c.lng.toFixed(6) });
     };
     map.on("moveend", emit);
+    map.on("dragstart", () => onTouched()); // the user actually moved the pin
     emit();
     mapRef.current = map;
     return () => map.remove();
@@ -26,6 +27,7 @@ export default function LocationPicker({ value, onChange }) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 18);
+        onTouched();
         setGps(`ได้ตำแหน่งแล้ว (แม่นยำ ~${Math.round(pos.coords.accuracy)} ม.) เลื่อนแผนที่ปรับได้`);
       },
       () => setGps("หาตำแหน่งไม่ได้ กรุณาเลื่อนแผนที่เอง"),
