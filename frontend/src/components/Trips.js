@@ -164,12 +164,21 @@ export function DutyBar({ live, onTrip }) {
   const [note, setNote] = useState("");
   const [saved, setSaved] = useState("");
   const [open, setOpen] = useState(false);
+  const [vehicle, setVehicle] = useState(() => load("tripVehicle", "walk"));
   useEffect(() => {
-    api("/staff/presence/note").then((r) => {
-      setNote(r.note || "");
-      setSaved(r.note || "");
-    }).catch(() => {});
+    api("/staff/presence/note")
+      .then((r) => {
+        setNote(r.note || "");
+        setSaved(r.note || "");
+        if (r.vehicle) setVehicle(r.vehicle);
+      })
+      .catch(() => {});
   }, []);
+  async function pickVehicle(v) {
+    setVehicle(v);
+    save("tripVehicle", v); // also the default when starting a trip
+    await api("/staff/presence/note", { method: "PUT", body: JSON.stringify({ vehicle: v }) }).catch(() => {});
+  }
   async function saveNote(e) {
     e.preventDefault();
     const r = await api("/staff/presence/note", { method: "PUT", body: JSON.stringify({ note }) }).catch(() => null);
@@ -193,6 +202,18 @@ export function DutyBar({ live, onTrip }) {
           </button>
         )}
       </div>
+      {!onTrip && (
+        <div className="-mx-1 mt-2 overflow-x-auto px-1">
+          <div className="flex w-max gap-1" role="group" aria-label="ไอคอนของคุณบนแผนที่">
+            {Object.entries(VEHICLES).map(([k, [e, t]]) => (
+              <button key={k} type="button" onClick={() => pickVehicle(k)} aria-pressed={vehicle === k} title={t} className={`flex min-h-[44px] items-center gap-1 rounded-full px-3 text-sm font-semibold ${vehicle === k ? "bg-emerald-600 text-white" : "bg-neutral-100"}`}>
+                <span className="text-lg">{k === "walk" ? "👷" : e}</span>
+                {t.split(" /")[0]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {open ? (
         <form onSubmit={saveNote} className="mt-2 grid grid-cols-[1fr_auto] gap-2">
           <input autoFocus value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className="min-h-[44px] rounded-lg border border-neutral-300 px-3" placeholder="เช่น กำลังจะไปแจกข้าวซอย 30 / รับคนป่วยซอย 12" />
@@ -262,7 +283,7 @@ export function TripPanel({ user, live, trip, setTrip }) {
         </p>
         <fieldset>
           <legend className="mb-1 font-medium">ยานพาหนะ</legend>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {Object.entries(VEHICLES).map(([k, [e, t]]) => (
               <button key={k} type="button" onClick={() => setVehicle(k)} aria-pressed={vehicle === k} className={`${btn} flex flex-col items-center justify-center py-2 text-sm ${vehicle === k ? "bg-black text-white" : "border-2 border-neutral-200 bg-white"}`}>
                 <span className="text-2xl">{e}</span>

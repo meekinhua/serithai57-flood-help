@@ -14,7 +14,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-Vehicle = Literal["boat", "truck", "car", "walk"]
+Vehicle = Literal["boat", "bigtruck", "truck", "car", "motorbike", "walk"]
 Mission = Literal["food", "water", "evacuate", "medical", "cargo", "survey", "other"]
 Phase = Literal["enroute", "serving", "out_of_stock", "returning"]
 
@@ -49,7 +49,8 @@ def km_from_village(lat: float, lng: float) -> float:
 
 
 class NoteBody(BaseModel):
-    note: str = Field("", max_length=200)
+    note: Optional[str] = Field(None, max_length=200)
+    vehicle: Optional[Vehicle] = None  # what they're on while "online", shown as their map icon
 
 
 class PhaseBody(BaseModel):
@@ -140,17 +141,22 @@ def build_router(db, require_staff, sois: dict) -> APIRouter:
     @router.put("/staff/presence/note")
     async def presence_note(body: NoteBody, user: dict = Depends(require_staff)):
         """'What I'm about to do', shown to residents when they tap this person on the map."""
-        note = body.note.strip()
+        changes = {"label": user["name"], "team": user.get("team", ""), "staff_name": user["name"]}
+        if body.note is not None:
+            changes["note"] = body.note.strip()
+        if body.vehicle:
+            changes["vehicle"] = body.vehicle
+        insert = {"id": str(uuid.uuid4()), "vehicle": "walk", "note": "", "mission": "standby", "phase": "standby", "status": "ended",
+                  "started_at": now(), "updated_at": now(), "lat": None, "lng": None, "soi": None, "path": []}
         await db.trips.update_one({"staff_id": user["id"], "presence": True},
-                                  {"$set": {"note": note, "label": user["name"], "team": user.get("team", ""), "staff_name": user["name"]},
-                                   "$setOnInsert": {"id": str(uuid.uuid4()), "vehicle": "walk", "mission": "standby", "phase": "standby", "status": "ended",
-                                                    "started_at": now(), "updated_at": now(), "lat": None, "lng": None, "soi": None, "path": []}}, upsert=True)
-        return {"note": note}
+                                  {"$set": changes, "$setOnInsert": {k: v for k, v in insert.items() if k not in changes}}, upsert=True)
+        doc = await db.trips.find_one({"staff_id": user["id"], "presence": True}, {"note": 1, "vehicle": 1})
+        return {"note": doc.get("note", ""), "vehicle": doc.get("vehicle", "walk")}
 
     @router.get("/staff/presence/note")
     async def get_presence_note(user: dict = Depends(require_staff)):
-        doc = await db.trips.find_one({"staff_id": user["id"], "presence": True}, {"note": 1})
-        return {"note": (doc or {}).get("note", "")}
+        doc = await db.trips.find_one({"staff_id": user["id"], "presence": True}, {"note": 1, "vehicle": 1}) or {}
+        return {"note": doc.get("note", ""), "vehicle": doc.get("vehicle", "walk")}
 
     @router.delete("/staff/presence", status_code=204)
     async def stop_presence(user: dict = Depends(require_staff)):

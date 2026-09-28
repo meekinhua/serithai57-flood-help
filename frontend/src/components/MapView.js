@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { KINDS, VILLAGE_BOUNDARY, VILLAGE_CENTER, VILLAGE_ZOOM, categoryOf, timeAgo, waterOf } from "../config";
 import { mediaUrl } from "../media";
-import { isQuiet, tripClaims, tripWhere } from "./Trips";
-import { MISSIONS, PHASES, VEHICLES, WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
+import { drawStaff } from "./staffMarkers";
+import { WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
 import { describeLevel, estimateAt, fieldBounds, renderField, toPoints } from "../waterField";
 import { load, save } from "../api";
 
@@ -112,51 +112,9 @@ export default function MapView({ posts, water, trips = [], onSelect, focus }) {
     }
   }, [posts, water, onSelect]);
 
-  // Staff boats / trucks: icon + label, dashed trail of where they've been
+  // Staff boats / trucks / people on duty: big, pulsing, always above residents' pins
   useEffect(() => {
-    const layer = tripsRef.current;
-    if (!layer) return;
-    layer.clearLayers();
-    for (const t of trips) {
-      if (t.lat == null) continue; // no GPS fix yet / outside the area: listed in the strip only
-      const claims = tripClaims(t);
-      if (t.presence) {
-        // staff on duty, not on a trip: small green dot; tap to see what they're about to do
-        L.marker([t.lat, t.lng], {
-          pane: "trips",
-          icon: L.divIcon({
-            className: "",
-            iconSize: [34, 34],
-            iconAnchor: [17, 17],
-            html: `<div style="opacity:${isQuiet(t) ? 0.5 : 1};width:34px;height:34px;border-radius:9999px;background:#fff;border:3px solid ${isQuiet(t) ? "#737373" : "#059669"};box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:18px">👷</div>`,
-          }),
-        })
-          .bindTooltip(escapeHtml(t.label), { permanent: true, direction: "top", offset: [0, -18], className: "trip-label staff-label" })
-          .bindPopup(
-            `<b>👷 ${escapeHtml(t.label)}</b><br>${t.note ? `📝 ${escapeHtml(t.note)}` : '<span style="color:#666">ออนไลน์ พร้อมช่วย (ยังไม่ได้เขียนว่ากำลังจะทำอะไร)</span>'}${claims ? `<br>📋 ${escapeHtml(claims)}` : ""}<br>${escapeHtml(tripWhere(t))}<br><span style="color:#666">${isQuiet(t) ? "ตำแหน่งล่าสุด" : "อัปเดต"} ${timeAgo(t.updated_at)}</span>`
-          )
-          .addTo(layer);
-        continue;
-      }
-      const [ve] = VEHICLES[t.vehicle] || ["🚗"];
-      const [me, mt] = MISSIONS[t.mission] || ["🤝", ""];
-      const [pe, pt] = PHASES[t.phase] || PHASES.enroute;
-      if (t.path?.length > 1) L.polyline(t.path, { pane: "trips", color: "#2563eb", weight: 3, opacity: 0.6, dashArray: "6 6", interactive: false }).addTo(layer);
-      L.marker([t.lat, t.lng], {
-        pane: "trips",
-        icon: L.divIcon({
-          className: "",
-          iconSize: [44, 44],
-          iconAnchor: [22, 22],
-          html: `<div style="width:44px;height:44px;border-radius:9999px;background:#fff;border:4px solid #2563eb;box-shadow:0 2px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:22px;position:relative">${ve}<span style="position:absolute;bottom:-6px;right:-8px;font-size:14px;background:#fff;border-radius:9999px;border:1.5px solid #2563eb;padding:1px">${me}</span></div>`,
-        }),
-      })
-        .bindTooltip(escapeHtml(t.label), { permanent: true, direction: "top", offset: [0, -24], className: "trip-label" })
-        .bindPopup(
-          `<b>${ve} ${escapeHtml(t.label)}</b><br>${me} ${mt}<br>${pe} ${pt}${t.soi ? ` · ซอย ${escapeHtml(t.soi)}` : ""}${t.note ? `<br>📝 ${escapeHtml(t.note)}` : ""}${claims ? `<br>📋 ${escapeHtml(claims)}` : ""}<br><span style="color:#666">อัปเดต ${timeAgo(t.updated_at)}</span>`
-        )
-        .addTo(layer);
-    }
+    if (tripsRef.current) drawStaff(tripsRef.current, trips, "trips");
   }, [trips]);
 
   // Interpolated water surface. Rebuilt only when the set of reports changes (not on every 20 s poll).

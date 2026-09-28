@@ -3,6 +3,7 @@ import L from "leaflet";
 import { api, load, save } from "../api";
 import { categoryOf, osmLink, timeAgo } from "../config";
 import { createBaseMap } from "./MapView";
+import { drawStaff } from "./staffMarkers";
 import QRCode from "qrcode";
 import { DutyBar, TripPanel, useStaffLocation } from "./Trips";
 import { BrowserHowTo, InAppGate, detectInApp, openExternally } from "./OpenInBrowser";
@@ -271,6 +272,15 @@ function Tasks({ user, tasks, reload, setTasks, onLocate }) {
 function TaskMap({ user, tasks, sois }) {
   const el = useRef(null);
   const layer = useRef(null);
+  const staffLayer = useRef(null);
+  const [team, setTeam] = useState([]);
+  // teammates (boats, trucks, people on duty) on the same map, refreshed like the public page
+  useEffect(() => {
+    const load = () => document.visibilityState === "visible" && api("/trips").then(setTeam).catch(() => {});
+    load();
+    const t = setInterval(load, 10000);
+    return () => clearInterval(t);
+  }, []);
   useEffect(() => {
     const map = createBaseMap(el.current, { zoom: 16 });
     const soiLayer = L.layerGroup().addTo(map);
@@ -279,6 +289,8 @@ function TaskMap({ user, tasks, sois }) {
       L.marker(s.center, { interactive: false, icon: L.divIcon({ className: "", html: `<span style="font:600 10px sans-serif;background:#fff;border:1px solid #94a3b8;border-radius:4px;padding:0 3px;white-space:nowrap">ซ.${name}</span>` }) }).addTo(soiLayer);
     }
     layer.current = L.layerGroup().addTo(map);
+    map.createPane("staff").style.zIndex = 650;
+    staffLayer.current = L.layerGroup().addTo(map);
     const ro = new ResizeObserver(() => map.invalidateSize());
     ro.observe(el.current);
     return () => {
@@ -301,10 +313,13 @@ function TaskMap({ user, tasks, sois }) {
         .addTo(layer.current);
     }
   }, [tasks, user.id]);
+  useEffect(() => {
+    if (staffLayer.current) drawStaff(staffLayer.current, team, "staff");
+  }, [team, sois]);
   return (
     <div>
       <div ref={el} className="h-[70vh] w-full overflow-hidden rounded-xl border border-neutral-300" />
-      <p className="mt-2 text-xs text-neutral-600">🔴 ด่วนยังไม่มีคนรับ · 🟠 ยังไม่มีคนรับ · 🔵 งานของคุณ · ⚫ คนอื่นรับแล้ว · วงประ = ตำแหน่งโดยประมาณ (ต้นซอย) · เส้นเทา = ซอยจาก OpenStreetMap</p>
+      <p className="mt-2 text-xs text-neutral-600">🔴 ด่วนยังไม่มีคนรับ · 🟠 ยังไม่มีคนรับ · 🔵 งานของคุณ · ⚫ คนอื่นรับแล้ว · วงประ = ตำแหน่งโดยประมาณ (ต้นซอย) · เส้นเทา = ซอยจาก OpenStreetMap · วงใหญ่ = ทีม (🔵 กำลังออกงาน 🟢 ออนไลน์ ⚪ ไม่มีสัญญาณเกิน 3 นาที)</p>
     </div>
   );
 }

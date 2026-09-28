@@ -87,8 +87,10 @@ export const STATUS = {
 // Live staff trips (keys must match backend/trips.py)
 export const VEHICLES = {
   boat: ["🚤", "เรือ"],
-  truck: ["🛻", "รถยกสูง"],
-  car: ["🚗", "รถ"],
+  bigtruck: ["🚛", "รถใหญ่ / รถทหาร"],
+  truck: ["🛻", "กระบะ / รถยกสูง"],
+  car: ["🚗", "รถเก๋ง"],
+  motorbike: ["🏍️", "มอเตอร์ไซค์"],
   walk: ["🚶", "เดินเท้า"],
 };
 export const MISSIONS = {
