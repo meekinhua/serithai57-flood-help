@@ -8,10 +8,14 @@ import { createBaseMap } from "./MapView";
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 // /zones?poster=1 — the same page without buttons, for a printable image / LINE post
-const POSTER = new URLSearchParams(window.location.search).has("poster");
+const QS = new URLSearchParams(window.location.search);
+const POSTER = QS.has("poster");
+const FOCUS = (QS.get("zone") || "").toUpperCase() || null; // /zones?zone=D — one zone per sheet
 const navUrl = (d) => `https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}`;
 
-export function drawZones(map, data, { houses = true, labels = true, pane } = {}) {
+const GREY = "#9ca3af";
+
+export function drawZones(map, data, { houses = true, labels = true, pane, focus } = {}) {
   const group = L.layerGroup().addTo(map);
   const P = pane ? { pane } : {}; // Leaflet breaks on pane: undefined
   // main road: the only road trucks can use
@@ -19,14 +23,23 @@ export function drawZones(map, data, { houses = true, labels = true, pane } = {}
   L.polyline(data.main_road, { color: "#facc15", weight: 5, opacity: 0.95, interactive: false, ...P }).addTo(group);
   if (houses) {
     for (const [lat, lng, zi] of data.houses) {
-      L.circleMarker([lat, lng], { ...P, radius: 3, stroke: false, fillColor: data.zones[zi].color, fillOpacity: 0.85, interactive: false }).addTo(group);
+      const mine = !focus || data.zones[zi].id === focus; // single-zone sheet: other zones greyed out
+      L.circleMarker([lat, lng], { ...P, radius: mine ? (focus ? 4 : 3) : 2.5, stroke: false, fillColor: mine ? data.zones[zi].color : GREY, fillOpacity: mine ? 0.9 : 0.5, interactive: false }).addTo(group);
     }
   }
   for (const z of data.zones) {
+    const mine = !focus || z.id === focus;
     for (const s of z.sois) {
-      for (const line of data.soiLines?.[s] || []) L.polyline(line, { color: z.color, weight: 4, opacity: 0.9, interactive: false, ...P }).addTo(group);
+      const lines = data.soiLines?.[s] || [];
+      for (const line of lines) L.polyline(line, { color: mine ? z.color : GREY, weight: mine ? (focus ? 6 : 4) : 3, opacity: mine ? 0.9 : 0.5, interactive: false, ...P }).addTo(group);
+      if (focus && mine && lines.length) {
+        // soi number on the soi itself, for printed sheets
+        const longest = lines.reduce((a, b) => (b.length > a.length ? b : a));
+        const mid = longest[Math.floor(longest.length / 2)];
+        L.marker(mid, { ...P, interactive: false, icon: L.divIcon({ className: "", iconSize: [60, 26], iconAnchor: [30, 13], html: `<div class="soi-tag" style="--c:${z.color}">ซ.${esc(s)}</div>` }) }).addTo(group);
+      }
     }
-    if (labels) {
+    if (labels && (!focus || mine)) {
       L.marker(z.center, {
         ...P,
         interactive: false,
@@ -35,8 +48,8 @@ export function drawZones(map, data, { houses = true, labels = true, pane } = {}
     }
     L.marker([z.drop.lat, z.drop.lng], {
       ...P,
-      zIndexOffset: 2000,
-      icon: L.divIcon({ className: "", iconSize: [64, 40], iconAnchor: [32, 20], html: `<div class="drop-pin" style="--c:${z.color}">🚚 ${z.id}</div>` }),
+      zIndexOffset: mine ? 2000 : 1000,
+      icon: L.divIcon({ className: "", iconSize: [64, 40], iconAnchor: [32, 20], html: `<div class="drop-pin${mine ? "" : " faded"}" style="--c:${mine ? z.color : GREY}">🚚 ${z.id}</div>` }),
     })
       .bindPopup(
         `<b>🚚 ${esc(z.drop.label)}</b><br>โซน ${z.id} · ${z.houses} หลัง · ซอย ${esc(z.sois.join(", "))}<br>รถใหญ่จอดริมถนนหลัก แล้วทีมโซน ${z.id} ขนเข้าซอย<br><a href="${navUrl(z.drop)}" target="_blank" rel="noreferrer">🧭 นำทางไปจุดนี้</a>`
@@ -66,9 +79,20 @@ export default function ZonesPage() {
     if (!data || !el.current) return;
     const map = createBaseMap(el.current, { zoom: 16 });
     map.options.zoomSnap = 0.25; // the village is a long strip: whole-number zooms leave it tiny
+    if (POSTER) {
+      // printed/shared images: never request z19 tiles (they often don't arrive in time for a headless render)
+      map.eachLayer((l) => l instanceof L.TileLayer && map.removeLayer(l));
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        maxNativeZoom: 18,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
+    }
     mapRef.current = map;
-    drawZones(map, data);
-    const bounds = L.latLngBounds(data.houses.map((h) => [h[0], h[1]])).pad(0.03);
+    drawZones(map, data, { focus: FOCUS });
+    const fz = FOCUS && data.zones.findIndex((z) => z.id === FOCUS);
+    const pts = data.houses.filter((h) => !FOCUS || h[2] === fz).map((h) => [h[0], h[1]]);
+    const bounds = L.latLngBounds(pts.length ? pts : data.houses.map((h) => [h[0], h[1]])).pad(FOCUS ? Number(QS.get("pad")) || 0.08 : 0.03); // &pad= widens a sheet's view
     // keep the whole village in view while the page lays out (a background tab starts at 0×0),
     // until the person touches the map
     let touched = false;
@@ -105,6 +129,38 @@ export default function ZonesPage() {
     }
     return out;
   }, [data, posts]);
+
+  // one printable sheet per zone: /zones?zone=D (&poster=1 hides buttons)
+  const fzone = FOCUS && data?.zones.find((z) => z.id === FOCUS);
+  if (FOCUS) {
+    return (
+      <div className={`zone-sheet flex h-screen flex-col bg-white${POSTER ? " poster" : ""}`}>
+        <header className="flex items-center gap-4 px-6 py-4 text-white" style={{ background: fzone?.color || "#111" }}>
+          <span className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-white text-6xl font-black" style={{ color: fzone?.color }}>
+            {FOCUS}
+          </span>
+          <div className="min-w-0">
+            <p className="text-4xl font-black">โซน {FOCUS}{fzone ? ` · ~${fzone.houses} หลัง` : ""}</p>
+            <p className="text-2xl font-semibold">ซอย {fzone?.sois.join(", ")}</p>
+            <p className="text-lg opacity-90">หมู่บ้านสหกรณ์เคหะสถาน 4 · เสรีไทย 57</p>
+          </div>
+        </header>
+        <div className="grid grid-cols-2 gap-3 px-6 py-3 text-lg">
+          <div className="rounded-xl border-4 border-yellow-400 bg-yellow-50 p-3">
+            <p className="text-2xl font-black">🚚 จุดลงของ: ปากซอย {fzone?.drop.soi}</p>
+            <p>รถใหญ่จอด<b>ริมถนนหลัก (เส้นเหลือง)</b> ที่ป้าย 🚚 {FOCUS} เข้าซอยเล็กไม่ได้</p>
+          </div>
+          <div className="rounded-xl border-4 p-3" style={{ borderColor: fzone?.color }}>
+            <p className="text-2xl font-black">👷 ทีมโซน {FOCUS}</p>
+            <p>ขนของจากจุดลงของเข้าซอย · รับงาน/กดเสร็จที่ <b>serithai57.com/staff</b> เลือก “โซน {FOCUS}”</p>
+          </div>
+        </div>
+        {error && <p className="mx-6 rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
+        <div ref={el} className="zones-map mx-6 min-h-0 flex-1 overflow-hidden rounded-xl border-2 border-neutral-300" />
+        <p className="px-6 py-3 text-center text-lg font-bold">ดูแผนที่ออนไลน์ + นำทาง: serithai57.com/zones · สีเทา = โซนอื่น</p>
+      </div>
+    );
+  }
 
   const focus = (z) => {
     mapRef.current?.setView([z.drop.lat, z.drop.lng], 18, { animate: false });
@@ -165,6 +221,9 @@ export default function ZonesPage() {
                     <button onClick={() => focus(z)} className="min-h-[44px] rounded-lg border-2 border-black text-sm font-semibold">📍 ดูบนแผนที่</button>
                     <a href={navUrl(z.drop)} target="_blank" rel="noreferrer" className="flex min-h-[44px] items-center justify-center rounded-lg bg-black text-sm font-semibold text-white">
                       🧭 นำทาง
+                    </a>
+                    <a href={`/zones?zone=${z.id}`} className="col-span-2 flex min-h-[40px] items-center justify-center rounded-lg border border-neutral-300 text-sm">
+                      🖨️ แผ่นแผนที่โซน {z.id} (พิมพ์แจก)
                     </a>
                   </div>
                 </div>

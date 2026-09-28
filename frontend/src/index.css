@@ -195,3 +195,10 @@ body {
   .zone-card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
   .leaflet-control-zoom { display: none; }
 }
+
+/* single-zone sheets (/zones?zone=D) */
+.soi-tag { display: inline-block; white-space: nowrap; background: #fff; color: var(--c); border: 2px solid var(--c); border-radius: 8px; padding: 1px 6px; font: 800 14px/1.2 sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.drop-pin.faded { opacity: 0.45; }
+/* posters are screenshotted: no tile fade-in (headless renders can stop mid-transition, leaving tiles invisible) */
+.poster .leaflet-tile { opacity: 1 !important; transition: none !important; }
+.poster .leaflet-zoom-anim .leaflet-zoom-animated { transition: none !important; }

@@ -96,9 +96,28 @@ def main():
     # group, not soi by soi: keep each such block together in its majority zone instead of splitting
     # it between the zones of whichever soi happens to be nearest.
     zone_i = {n: i for i, names in enumerate(zones) for n in names}
-    # zone boundaries as cut points along the main road (by position along the axis)
-    cuts = [(max(along(mouths[n]) for n in zones[i]) + min(along(mouths[n]) for n in zones[i + 1])) / 2 for i in range(len(zones) - 1)]
-    band = lambda p: sum(1 for c in cuts if along(p) > c)  # noqa: E731
+    # zone boundaries as cut points on the main road itself: position = distance along the (curved)
+    # road to the nearest point of it. A straight axis misplaces houses far from a bend.
+    rxy = [xy(p) for p in smooth]
+    cum = [0.0]
+    for i in range(len(rxy) - 1):
+        cum.append(cum[-1] + math.hypot(rxy[i + 1][0] - rxy[i][0], rxy[i + 1][1] - rxy[i][1]))
+
+    def arc(p):
+        px, py = xy(p)
+        best = (float("inf"), 0.0)
+        for i in range(len(rxy) - 1):
+            (ax, ay), (bx, by) = rxy[i], rxy[i + 1]
+            dx, dy = bx - ax, by - ay
+            L2 = dx * dx + dy * dy
+            t = 0 if L2 == 0 else max(0, min(1, ((px - ax) * dx + (py - ay) * dy) / L2))
+            d = math.hypot(px - ax - t * dx, py - ay - t * dy)
+            if d < best[0]:
+                best = (d, cum[i] + t * math.sqrt(L2))
+        return best[1]
+
+    cuts = [(max(arc(mouths[n]) for n in zones[i]) + min(arc(mouths[n]) for n in zones[i + 1])) / 2 for i in range(len(zones) - 1)]
+    band = lambda p: sum(1 for c in cuts if arc(p) > c)  # noqa: E731
     hz = [zone_i[n] for _, n in home]
     far = [k for k, (b, n) in enumerate(home) if min(seg_dist(b, s[1], s[2]) for s in segs if s[0] == n) > FAR_M]
     parent = {k: k for k in far}
