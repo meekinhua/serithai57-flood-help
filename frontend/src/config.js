@@ -101,7 +101,7 @@ export const MISSIONS = {
   cargo: ["📦", "ขนของ"],
   survey: ["🔍", "สำรวจพื้นที่"],
   other: ["🤝", "อื่นๆ"],
-  standby: ["👷", "เจ้าหน้าที่ออนไลน์"], // /staff open, not on a trip
+  standby: ["👷", "ทีมช่วยเหลือ/อาสา"], // /staff open, not on a trip
 };
 export const PHASES = {
   enroute: ["🚀", "กำลังไป", "bg-sky-600 text-white"],

@@ -193,7 +193,7 @@ export function DutyBar({ live, onTrip }) {
       <div className="flex items-center gap-2">
         <span className={`h-3 w-3 shrink-0 rounded-full ${on && live.gps.state === "ok" ? "bg-emerald-500" : on ? "bg-yellow-400" : "bg-neutral-400"}`} />
         <p className="min-w-0 flex-1 text-sm">
-          {onTrip ? <b>กำลังออกงาน · ชาวบ้านเห็นรถ/เรือของคุณ</b> : on ? <b>คุณอยู่บนแผนที่หน้าแรก (เจ้าหน้าที่ออนไลน์)</b> : <b>ไม่แชร์ตำแหน่ง</b>}
+          {onTrip ? <b>กำลังออกงาน · ชาวบ้านเห็นรถ/เรือของคุณ</b> : on ? <b>คุณอยู่บนแผนที่หน้าแรก (ทีมช่วยเหลือ/อาสา)</b> : <b>ไม่แชร์ตำแหน่ง</b>}
           <span className="block truncate text-neutral-600">{saved ? `บอกชาวบ้านว่า: ${saved}` : "ยังไม่ได้บอกว่ากำลังจะทำอะไร"}</span>
         </p>
         {!onTrip && (
@@ -268,7 +268,7 @@ export function TripPanel({ user, live, trip, setTrip }) {
   }
 
   async function end() {
-    if (!window.confirm("จบงาน? (ยังแชร์ตำแหน่งแบบเจ้าหน้าที่ออนไลน์ต่อ ถ้าเปิดแชร์ไว้)")) return;
+    if (!window.confirm("จบงาน? (ยังแชร์ตำแหน่งแบบทีมช่วยเหลือ/อาสาต่อ ถ้าเปิดแชร์ไว้)")) return;
     await api(`/staff/trips/${trip.id}/end`, { method: "POST" }).catch(() => {});
     setTrip(null);
   }
@@ -372,8 +372,8 @@ export function TripsStrip({ trips, onFocus }) {
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-75" />
           <span className="relative inline-flex h-3 w-3 rounded-full bg-blue-600" />
         </span>
-        {moving.length ? `🚚 กำลังให้บริการตอนนี้ (${moving.length})` : "👷 เจ้าหน้าที่ออนไลน์"}
-        {moving.length > 0 && online.length > 0 && <span className="text-sm font-normal text-neutral-600">· เจ้าหน้าที่ออนไลน์ {online.length}</span>}
+        {moving.length ? `🚚 กำลังให้บริการตอนนี้ (${moving.length})` : "👷 ทีมช่วยเหลือ/อาสา"}
+        {moving.length > 0 && online.length > 0 && <span className="text-sm font-normal text-neutral-600">· ทีมช่วยเหลือ/อาสา {online.length}</span>}
       </h2>
       <div className="-mx-3 overflow-x-auto px-3">
         <div className="flex w-max gap-2">

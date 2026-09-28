@@ -22,7 +22,7 @@ function pinHtml(t) {
     ${quiet ? "" : '<span class="staff-pin-ring"></span>'}
     <span class="staff-pin-body">${icon}</span>
     ${badge ? `<span class="staff-pin-badge">${badge}</span>` : ""}
-    <span class="staff-pin-tag">${onTrip ? "ออกงาน" : "จนท."}</span>
+    <span class="staff-pin-tag">${onTrip ? "ออกงาน" : "ทีมช่วยเหลือ"}</span>
   </div>`;
 }
 
