@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import L from "leaflet";
+import L from "../leafletGlobal";
+import "leaflet.markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
 import { KINDS, VILLAGE_BOUNDARY, VILLAGE_CENTER, VILLAGE_ZOOM, categoryOf, timeAgo, waterOf } from "../config";
 import { mediaUrl } from "../media";
 import { drawStaff } from "./staffMarkers";
@@ -39,15 +41,41 @@ function postIcon(post, isNew = false) {
   });
 }
 
-export default function MapView({ posts, water, trips = [], onSelect, focus }) {
+// What the map shows. Busy days put 100+ requests and dozens of water readings on the same streets,
+// so by default: requests (urgent ones always as their own pin, the rest grouped when zoomed out),
+// staff, and the water colour surface. Water report dots, offers and info are one tap away.
+const LAYER_DEFAULTS = { need: true, water: false, offer: false, info: false };
+
+// Group bubble: how many requests, and a red badge when there are ones nobody is helping yet.
+function clusterIcon(cluster) {
+  const kids = cluster.getAllChildMarkers();
+  const n = kids.length;
+  const open = kids.filter((m) => m.options.post?.kind === "need" && m.options.post?.status === "open").length;
+  const size = n < 10 ? 40 : n < 50 ? 48 : 56;
+  return L.divIcon({
+    className: "",
+    iconSize: [size, size],
+    html: `<div class="map-cluster" style="width:${size}px;height:${size}px">${n}${open ? `<span class="map-cluster-open">${open}</span>` : ""}</div>`,
+  });
+}
+
+export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all" }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
+  const clusterRef = useRef(null);
   const fieldRef = useRef(null);
   const tripsRef = useRef(null);
   const pointsRef = useRef([]);
   const seenPins = useRef(new Set());
   const [showField, setShowField] = useState(() => load("showWaterField", true));
+  const [layers, setLayers] = useState(() => ({ ...LAYER_DEFAULTS, ...load("mapLayers", {}) }));
+  const toggle = (k) =>
+    setLayers((l) => {
+      const next = { ...l, [k]: !l[k] };
+      save("mapLayers", next);
+      return next;
+    });
 
   useEffect(() => {
     const map = createBaseMap(elRef.current);
@@ -55,6 +83,13 @@ export default function MapView({ posts, water, trips = [], onSelect, focus }) {
     map.createPane("waterField").style.zIndex = 350;
     map.getPane("waterField").style.pointerEvents = "none";
     layerRef.current = L.layerGroup().addTo(map);
+    clusterRef.current = L.markerClusterGroup({
+      maxClusterRadius: 42,
+      disableClusteringAtZoom: 18, // street level: every house on its own
+      showCoverageOnHover: false,
+      spiderfyOnMaxZoom: true,
+      iconCreateFunction: clusterIcon,
+    }).addTo(map);
     map.createPane("trips").style.zIndex = 650; // moving vehicles above every other pin
     tripsRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
@@ -77,12 +112,14 @@ export default function MapView({ posts, water, trips = [], onSelect, focus }) {
 
   useEffect(() => {
     const layer = layerRef.current;
+    const cluster = clusterRef.current;
     if (!layer) return;
     layer.clearLayers();
+    cluster.clearLayers();
 
     // Latest report per ~30 m cell, so old readings at the same spot don't pile up.
     const seen = new Set();
-    for (const w of water) {
+    for (const w of layers.water ? water : []) {
       const cell = `${w.lat.toFixed(4)},${w.lng.toFixed(4)}`;
       if (seen.has(cell)) continue;
       seen.add(cell);
@@ -102,15 +139,20 @@ export default function MapView({ posts, water, trips = [], onSelect, focus }) {
         .addTo(layer);
     }
 
+    const pinned = []; // urgent open requests: never hidden inside a group
+    const grouped = [];
     for (const p of posts) {
       if (p.general) continue; // "ทั้งหมู่บ้าน" posts are listed, not pinned
+      // a specific filter chosen above the map wins over the layer switches
+      if (filter === "all" && !layers[p.kind]) continue;
       const isNew = !seenPins.current.has(p.id);
       seenPins.current.add(p.id);
-      L.marker([p.lat, p.lng], { icon: postIcon(p, isNew), zIndexOffset: p.urgent ? 1000 : p.kind === "need" ? 500 : 0 })
-        .on("click", () => onSelect(p.id))
-        .addTo(layer);
+      const m = L.marker([p.lat, p.lng], { icon: postIcon(p, isNew), post: p, zIndexOffset: p.urgent ? 1000 : p.kind === "need" ? 500 : 0 }).on("click", () => onSelect(p.id));
+      (p.urgent && p.status === "open" ? pinned : grouped).push(m);
     }
-  }, [posts, water, onSelect]);
+    pinned.forEach((m) => m.addTo(layer));
+    cluster.addLayers(grouped);
+  }, [posts, water, onSelect, layers, filter]);
 
   // Staff boats / trucks / people on duty: big, pulsing, always above residents' pins
   useEffect(() => {
@@ -141,10 +183,37 @@ export default function MapView({ posts, water, trips = [], onSelect, focus }) {
   }, [focus]);
 
   const hasReports = water.length > 0;
+  const count = (k) => posts.filter((p) => p.kind === k && !p.general).length;
+  const chips = [
+    ["need", "🆘 ขอช่วย", count("need")],
+    ["water", "💧 จุดวัดน้ำ", water.length],
+    ["offer", "🤝 ช่วยได้", count("offer")],
+    ["info", "📍 ข้อมูล", count("info")],
+  ].filter(([k, , n]) => n > 0 || k === "need");
 
   return (
     <div className="relative h-full w-full">
       <div ref={elRef} className="h-full w-full" />
+      {/* layer switches: main things on, the rest one tap away */}
+      <div className="pointer-events-none absolute bottom-6 left-2 z-[500] flex max-w-[85%] flex-wrap gap-1">
+        {chips.map(([k, label, n]) => {
+          const on = filter === "all" ? layers[k] : k === "water" ? layers.water : filter === k || (filter === "paid" && k === "need");
+          const locked = filter !== "all" && k !== "water";
+          return (
+            <button
+              key={k}
+              type="button"
+              disabled={locked}
+              onClick={() => toggle(k)}
+              aria-pressed={on}
+              className={`pointer-events-auto min-h-[36px] rounded-full border-2 px-2.5 text-xs font-semibold shadow ${on ? "border-black bg-black text-white" : "border-neutral-300 bg-white/95 text-neutral-700"} ${locked ? "opacity-60" : ""}`}
+            >
+              {on ? "✓ " : ""}
+              {label} {n}
+            </button>
+          );
+        })}
+      </div>
       {hasReports && (
         <div className="pointer-events-none absolute right-2 top-2 z-[500] flex max-w-[70%] flex-col items-end gap-1">
           <button

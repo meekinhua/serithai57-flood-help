@@ -425,7 +425,7 @@ export default function App() {
         <div className="mt-3 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-4">
           <section className={`${tab === "map" ? "block" : "hidden"} lg:block`}>
             <div className="relative h-[65vh] overflow-hidden rounded-xl border border-neutral-300 bg-white lg:sticky lg:top-20 lg:h-[calc(100vh-7rem)]">
-              <MapView posts={visible} water={water} trips={trips} onSelect={openDetail} focus={focus} />
+              <MapView posts={visible} water={water} trips={trips} onSelect={openDetail} focus={focus} filter={filter} />
             </div>
             <Legend />
           </section>
@@ -741,6 +741,7 @@ function Legend() {
         </span>
       ))}
       <span>· เส้นประ = ขอบเขตหมู่บ้าน</span>
+      <span>· ⚫ตัวเลข = กลุ่มคำขอ แตะเพื่อซูม (🔴 = ยังไม่มีคนช่วย) · คำขอด่วนแสดงแยกเสมอ · ปุ่มมุมซ้ายล่างของแผนที่ = เปิด/ปิด จุดวัดน้ำ ช่วยได้ ข้อมูล</span>
     </div>
   );
 }

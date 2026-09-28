@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { api, load, save } from "../api";
-import { categoryOf, osmLink, timeAgo } from "../config";
+import { CATEGORIES, categoryOf, osmLink, timeAgo } from "../config";
 import { createBaseMap } from "./MapView";
 import { drawStaff } from "./staffMarkers";
 import QRCode from "qrcode";
@@ -79,10 +79,53 @@ function Join({ onJoined }) {
 }
 
 // ---------------- one task ----------------
+// ✏️ quick edit: what they need, how many, urgent, details — big buttons, no typing needed for most
+function TaskEditForm({ t, onSaved, onCancel }) {
+  const [category, setCategory] = useState(t.category);
+  const [people, setPeople] = useState(t.people || 0);
+  const [urgent, setUrgent] = useState(!!t.urgent);
+  const [detail, setDetail] = useState(t.detail || "");
+  const [error, setError] = useState("");
+  async function save() {
+    try {
+      onSaved(await api(`/staff/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ category, people, urgent, detail }) }));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  return (
+    <div className="mt-2 space-y-3 rounded-xl bg-neutral-50 p-3">
+      <div className="flex flex-wrap gap-1.5">
+        {Object.entries(CATEGORIES.need).map(([k, [e, label]]) => (
+          <button key={k} type="button" onClick={() => setCategory(k)} aria-pressed={category === k} className={`min-h-[40px] rounded-full px-3 text-sm ${category === k ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}>
+            {e} {label.split(" /")[0]}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium">จำนวน (ที่/คน)</span>
+        <button type="button" onClick={() => setPeople((n) => Math.max(0, n - 1))} className={`${btn} min-w-[44px] border border-neutral-300 bg-white`} aria-label="ลด">−</button>
+        <input type="number" inputMode="numeric" min={0} max={500} value={people} onChange={(e) => setPeople(Math.max(0, Math.min(500, Number(e.target.value) || 0)))} className="min-h-[44px] w-20 rounded-lg border border-neutral-300 text-center text-lg" />
+        <button type="button" onClick={() => setPeople((n) => Math.min(500, n + 1))} className={`${btn} min-w-[44px] border border-neutral-300 bg-white`} aria-label="เพิ่ม">+</button>
+      </div>
+      <button type="button" onClick={() => setUrgent((u) => !u)} aria-pressed={urgent} className={`${btn} w-full ${urgent ? "bg-red-600 text-white" : "border-2 border-red-600 bg-white text-red-700"}`}>
+        {urgent ? "🚨 ด่วน (แตะเพื่อยกเลิก)" : "ตั้งเป็นงานด่วน"}
+      </button>
+      <textarea value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={1000} rows={3} className={`${input} py-2`} placeholder="รายละเอียด" />
+      {error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={save} className={`${btn} bg-black text-white`}>💾 บันทึก</button>
+        <button type="button" onClick={onCancel} className={`${btn} border border-neutral-300 bg-white`}>ยกเลิก</button>
+      </div>
+    </div>
+  );
+}
+
 function TaskCard({ t, user, onUpdate, onLocate }) {
   const [emoji, cat] = categoryOf(t);
   const [note, setNote] = useState("");
   const [finishing, setFinishing] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
   const mine = t.assignee?.id === user.id;
   const taken = t.assignee && !mine;
@@ -127,11 +170,14 @@ function TaskCard({ t, user, onUpdate, onLocate }) {
             🙋 รับงานนี้
           </button>
         )}
-        {mine && t.status !== "done" && !finishing && (
+        {!taken && t.status !== "done" && !finishing && !editing && (
           <>
-            <button onClick={() => setFinishing(true)} className={`${btn} bg-emerald-600 text-white`}>✅ เสร็จแล้ว</button>
-            <button onClick={() => act("release")} className={`${btn} border-2 border-black bg-white`}>↩️ ปล่อยงาน</button>
+            <button onClick={() => setFinishing(true)} className={`${btn} bg-emerald-600 text-white`}>{mine ? "✅ เสร็จแล้ว" : "✅ เคลียร์ (ช่วยแล้ว)"}</button>
+            <button onClick={() => setEditing(true)} className={`${btn} border-2 border-black bg-white`}>✏️ แก้ไข</button>
           </>
+        )}
+        {mine && t.status !== "done" && !finishing && !editing && (
+          <button onClick={() => act("release")} className={`${btn} col-span-2 border border-neutral-300 bg-white text-sm`}>↩️ ปล่อยงาน (ให้คนอื่นรับ)</button>
         )}
         {t.phone && (
           <a href={`tel:${t.phone.replace(/[^\d+]/g, "")}`} className={`${btn} flex items-center justify-center border border-neutral-300 bg-white`}>
@@ -149,6 +195,16 @@ function TaskCard({ t, user, onUpdate, onLocate }) {
           </button>
         )}
       </div>
+      {editing && (
+        <TaskEditForm
+          t={t}
+          onSaved={(x) => {
+            setEditing(false);
+            onUpdate(x);
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
       {finishing && (
         <div className="mt-2 space-y-2">
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className={input} placeholder="บันทึก เช่น ส่งข้าว 5 กล่อง น้ำ 1 แพ็ค" />
@@ -269,8 +325,11 @@ function Tasks({ user, tasks, reload, setTasks, onLocate }) {
 }
 
 // ---------------- map of all tasks ----------------
-function TaskMap({ user, tasks, sois }) {
+function TaskMap({ user, tasks, sois, onUpdate, onLocate }) {
   const el = useRef(null);
+  const cardRef = useRef(null);
+  const [sel, setSel] = useState(null); // tapped task id → its card under the map
+  const selected = tasks.find((t) => t.id === sel && t.status !== "done");
   const layer = useRef(null);
   const staffLayer = useRef(null);
   const [team, setTeam] = useState([]);
@@ -308,17 +367,38 @@ function TaskMap({ user, tasks, sois }) {
       const n = (seen[k] = (seen[k] || 0) + 1) - 1;
       const [lat, lng] = t.precision === "house" ? [t.lat, t.lng] : [t.lat + Math.sin(n * 2.4) * 0.00006 * Math.sqrt(n), t.lng + Math.cos(n * 2.4) * 0.00006 * Math.sqrt(n)];
       const color = t.assignee?.id === user.id ? "#2563eb" : t.assignee ? "#737373" : t.urgent ? "#dc2626" : "#f97316";
-      L.circleMarker([lat, lng], { radius: 8, color: t.precision === "house" ? "#fff" : color, weight: 2, dashArray: t.precision === "house" ? null : "3 3", fillColor: color, fillOpacity: t.precision === "house" ? 0.95 : 0.5 })
-        .bindPopup(`<b>${t.house || "ไม่ระบุเลขที่"}</b> ${t.soi ? `ซ.${t.soi}` : ""}<br>${categoryOf(t)[1]}${t.people ? ` · ${t.people} ที่` : ""}<br>${t.assignee ? `👷 ${t.assignee.name}` : "ยังไม่มีคนรับ"}`)
+      const picked = t.id === sel;
+      L.circleMarker([lat, lng], {
+        radius: picked ? 14 : 10, // big enough to tap with a wet finger
+        color: picked ? "#000" : t.precision === "house" ? "#fff" : color,
+        weight: picked ? 4 : 2,
+        dashArray: picked || t.precision === "house" ? null : "3 3",
+        fillColor: color,
+        fillOpacity: t.precision === "house" || picked ? 0.95 : 0.55,
+      })
+        .bindTooltip(`${t.house || "?"}${t.urgent ? " 🚨" : ""}`, { direction: "top", offset: [0, -8] })
+        .on("click", () => {
+          setSel(t.id);
+          setTimeout(() => cardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+        })
         .addTo(layer.current);
     }
-  }, [tasks, user.id]);
+  }, [tasks, user.id, sel]);
   useEffect(() => {
     if (staffLayer.current) drawStaff(staffLayer.current, team, "staff");
   }, [team, sois]);
   return (
     <div>
-      <div ref={el} className="h-[70vh] w-full overflow-hidden rounded-xl border border-neutral-300" />
+      <div ref={el} className="h-[58vh] w-full overflow-hidden rounded-xl border border-neutral-300" />
+      <div ref={cardRef} className="mt-2">
+        {selected ? (
+          <ul>
+            <TaskCard key={selected.id} t={selected} user={user} onUpdate={onUpdate} onLocate={onLocate} />
+          </ul>
+        ) : (
+          <p className="rounded-xl bg-white p-3 text-center font-semibold shadow">👆 แตะจุดบนแผนที่ เพื่อ รับงาน · เคลียร์ · แก้ไข</p>
+        )}
+      </div>
       <p className="mt-2 text-xs text-neutral-600">🔴 ด่วนยังไม่มีคนรับ · 🟠 ยังไม่มีคนรับ · 🔵 งานของคุณ · ⚫ คนอื่นรับแล้ว · วงประ = ตำแหน่งโดยประมาณ (ต้นซอย) · เส้นเทา = ซอยจาก OpenStreetMap · วงใหญ่ = ทีม (🔵 กำลังออกงาน 🟢 ออนไลน์ ⚪ ไม่มีสัญญาณเกิน 3 นาที)</p>
     </div>
   );
@@ -639,9 +719,9 @@ function MoveToBrowser({ live }) {
 // LINE import runs centrally; the tab is only for admins / the import account.
 const IMPORT_TAB = ["import", "📥 นำเข้า LINE"];
 const TABS = [
-  ["trip", "🚤 ออกงาน"],
-  ["tasks", "📋 งาน"],
   ["map", "🗺️ แผนที่"],
+  ["tasks", "📋 รายการงาน"],
+  ["trip", "🚤 ออกงาน"],
   ["addresses", "🏠 ที่อยู่"],
   ["lookup", "🔎 ค้นเลขที่"],
   ["invite", "👥 ชวนทีม"],
@@ -650,7 +730,7 @@ const TABS = [
 export default function StaffApp() {
   const [user, setUser] = useState(null);
   const [checked, setChecked] = useState(false);
-  const [tab, setTab] = useState(() => (window.location.hash === "#share" ? "invite" : "tasks"));
+  const [tab, setTab] = useState(() => (window.location.hash === "#share" ? "invite" : "map")); // map first: see where the work is
   const [trip, setTrip] = useState(undefined); // undefined = loading, null = not on a trip
   const live = useStaffLocation(user, !!trip);
   const [tasks, setTasks] = useState([]);
@@ -737,7 +817,18 @@ export default function StaffApp() {
                 }}
               />
             )}
-            {tab === "map" && <TaskMap user={user} tasks={tasks} sois={sois} />}
+            {tab === "map" && (
+              <TaskMap
+                user={user}
+                tasks={tasks}
+                sois={sois}
+                onUpdate={(t) => (t ? setTasks((prev) => prev.map((x) => (x.id === t.id ? t : x))) : reload())}
+                onLocate={(house, soi) => {
+                  setLocateTarget({ house, soi });
+                  setTab("addresses");
+                }}
+              />
+            )}
             {tab === "trip" && <TripPanel user={user} live={live} trip={trip} setTrip={setTrip} />}
             {tab === "invite" && <InviteShare />}
             {tab === "import" && (

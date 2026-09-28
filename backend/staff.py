@@ -107,6 +107,17 @@ class AddressSet(BaseModel):
     building_id: Optional[int] = None
 
 
+NeedCategory = Literal["evacuate", "medical", "vulnerable", "food", "medicine", "power", "move_items", "pets", "other"]  # = CATEGORIES["need"] in server.py
+
+
+class TaskEdit(BaseModel):
+    """Quick fix-ups from the field: what they really need, how many, urgent or not."""
+    category: Optional[NeedCategory] = None
+    people: Optional[int] = Field(None, ge=0, le=500)
+    urgent: Optional[bool] = None
+    detail: Optional[str] = Field(None, max_length=1000)
+
+
 class DoneBody(BaseModel):
     note: str = Field("", max_length=300)
 
@@ -348,6 +359,23 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
             raise HTTPException(403, "ปล่อยได้เฉพาะงานของคุณ")
         await history(post_id, user, "open", "ปล่อยงานคืน (ยังไม่มีคนรับ)")
         return task_view(doc)
+
+    @router.patch("/staff/tasks/{post_id}")
+    async def edit_task(post_id: str, body: TaskEdit, user: dict = Depends(require_staff)):
+        post = await db.posts.find_one({"id": post_id, "kind": "need"}, {"_id": 0})
+        if not post:
+            raise HTTPException(404, "ไม่พบงาน")
+        if post.get("assignee") and post["assignee"]["id"] != user["id"] and user.get("role", "admin") != "admin":
+            raise HTTPException(409, f"{post['assignee']['name']} รับงานนี้อยู่ ให้คนที่รับแก้ หรือขอให้ปล่อยงานก่อน")
+        changes = {k: v for k, v in body.model_dump().items() if v is not None and v != post.get(k)}
+        if "detail" in changes:
+            changes["detail"] = changes["detail"].strip() or post.get("detail", "")
+        if not changes:
+            return task_view(post)
+        await db.posts.update_one({"id": post_id}, {"$set": {**changes, "updated_at": now()}})
+        labels = {"category": "ประเภท", "people": "จำนวน", "urgent": "ด่วน", "detail": "รายละเอียด"}
+        await history(post_id, user, post["status"], "แก้ไข " + ", ".join(labels[k] for k in changes))
+        return task_view(await db.posts.find_one({"id": post_id}, {"_id": 0}))
 
     @router.post("/staff/tasks/{post_id}/done")
     async def done(post_id: str, body: DoneBody, user: dict = Depends(require_staff)):
