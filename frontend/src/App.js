@@ -24,7 +24,7 @@ export default function App() {
   const [water, setWater] = useState([]);
   const [showDone, setShowDone] = useState(false);
   const [filter, setFilter] = useState("all");
-  const [tab, setTab] = useState("list"); // phones: list | map
+  const [tab, setTab] = useState("map"); // phones: map | list — the map with requests on it is what people need first
   const [sheet, setSheet] = useState(null); // {type: "form"|"water"|"detail"|"hotlines", ...}
   const [focus, setFocus] = useState(null);
   const [online, setOnline] = useState(true);
@@ -399,15 +399,6 @@ export default function App() {
           </div>
         )}
 
-        <div className="mt-3">
-          <ServiceStrip
-            services={services}
-            paidNeeds={paidNeedCount}
-            onOpen={(opts) => setSheet({ type: "board", ...opts })}
-            onAdd={() => setSheet({ type: "serviceForm" })}
-          />
-        </div>
-
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
           <Stat value={counts.need} label="คำขอค้างอยู่" sub={counts.urgent ? `ด่วน ${counts.urgent}` : ""} color="text-black" />
           <Stat value={counts.offer} label="ผู้พร้อมช่วย" color="text-black" />
@@ -422,13 +413,9 @@ export default function App() {
           />
         </div>
 
-        <div className="mt-3">
-          <WeatherCard weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
-        </div>
-
         {/* Phone: tabs. Desktop: map and list side by side. */}
         <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 lg:hidden" role="tablist">
-          {[["list", "📋 รายการ"], ["map", "🗺️ แผนที่"]].map(([key, text]) => (
+          {[["map", "🗺️ แผนที่"], ["list", `🆘 คำขอ / รายการ${counts.need ? ` (${counts.need})` : ""}`]].map(([key, text]) => (
             <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`min-h-[44px] rounded-lg font-semibold ${tab === key ? "bg-white shadow" : "text-neutral-600"}`}>
               {text}
             </button>
@@ -528,6 +515,19 @@ export default function App() {
               </div>
             )}
           </section>
+        </div>
+
+        {/* Lower priority: weather detail (current weather is already in the header bar) and paid services */}
+        <div className="mt-6">
+          <WeatherCard weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
+        </div>
+        <div className="mt-3">
+          <ServiceStrip
+            services={services}
+            paidNeeds={paidNeedCount}
+            onOpen={(opts) => setSheet({ type: "board", ...opts })}
+            onAdd={() => setSheet({ type: "serviceForm" })}
+          />
         </div>
 
         </>
