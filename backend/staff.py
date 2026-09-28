@@ -39,7 +39,14 @@ SOI_RE = re.compile(r"(?:แยก|ซอย|ซ\.)\s*(\d{1,3}(?:\s*/\s*\d{1,2})
 PHONE_RE = re.compile(r"0\d[\d\- ]{7,11}\d")
 MSG_START = re.compile(r"^(\d{1,2}:\d{2}) (.*)$")
 DATE_LINE = re.compile(r"^\d{4}\.\d{2}\.\d{2} ")
-RECEIVED_RE = re.compile(r"ได้รับ(?:แล้ว|เรียบร้อย|ข้าว|ของ|อาหาร)|ได้แล้ว|ได้ข้าวแล้ว|รับแล้ว")
+# "got it" / "delivered" — closes the house's open job on import. Never after ไม่ ("ยังไม่ได้รับข้าว").
+RECEIVED_RE = re.compile(
+    r"(?<!ไม่)(?:ได้รับ(?:ความช่วยเหลือ|การช่วยเหลือ|ของ|ข้าว|อาหาร|น้ำ)?\s*(?:แล้ว|เรียบร้อย|ครบ)"
+    r"|ได้รับ(?:ข้าว|ของ|อาหาร)"
+    r"|ได้(?:ข้าว|ของ|อาหาร|น้ำ)แล้ว|(?<!ได้)รับแล้ว|(?:ส่ง|แจก)(?:ข้าว|ของ|อาหาร)?(?:ให้)?(?:เรียบร้อย)?แล้ว"
+    r"|เคลียร์แล้ว|ไม่ต้องแล้ว|✅|☑️|✔️?)"
+)
+NOT_RECEIVED_RE = re.compile(r"ยังไม่ได้|ไม่ได้รับ|ยังไม่มี|ยังไม่ถึง|ยังรอ|รออยู่")
 SOURCE_RANK = {"staff": 3, "resident": 2, "text": 1}
 RECENT_DONE = timedelta(hours=24)
 # Messages that are selling/pre-ordering things. Their "1. 4/688 ..." sign-up lists look exactly like
@@ -134,6 +141,7 @@ class ImportRow(BaseModel):
     phone: str = Field("", max_length=40)
     portions: Optional[int] = Field(None, ge=0, le=500)
     force: bool = False  # create even if this house was helped in the last 24 h
+    received: bool = False  # the chat says they got help: close the open job, never create one
 
 
 class ImportCommit(BaseModel):
@@ -409,7 +417,8 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
             if SALE_RE.search(body):  # not staff work: selling / pre-orders
                 skipped += 1
                 continue
-            confirm = RECEIVED_RE.search(body) and len(body) < 200
+            # a short "got it" message about one house counts even if the words are on another line
+            confirm = bool(RECEIVED_RE.search(body)) and not NOT_RECEIVED_RE.search(body) and len(body) < 200 and len(set(HOUSE_RE.findall(body))) == 1
             lines = list(msg["lines"])
             # Many display names carry the poster's house ("Sara 4/1552"), so every message they send
             # "mentions" it. Count that house only when the message asks for help for it alone.
@@ -432,8 +441,14 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
                     ph = PHONE_RE.search(clean)
                     if ph:
                         rec["phone"] = re.sub(r"[\s-]", "", ph.group(0))
-                    if RECEIVED_RE.search(line) or confirm:
+                    # "got it" sticks: copied lists keep repeating old requests. Only an explicit
+                    # "ยังไม่ได้ / ยังรอ" about the house reopens it.
+                    if (RECEIVED_RE.search(line) and not NOT_RECEIVED_RE.search(line)) or confirm:
                         rec["received"] = True
+                        rec["received_text"] = (body if confirm else clean)[:300].replace("
+", " / ")
+                    elif NOT_RECEIVED_RE.search(line):
+                        rec["received"] = False
         return len(msgs), houses, skipped
 
     @router.post("/staff/import/preview")
@@ -462,6 +477,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
             "new": sum(1 for r in rows if not r["existing_post"] and not r["recently_done"] and not r.get("received")),
             "already_open": sum(1 for r in rows if r["existing_post"]),
             "recently_done": sum(1 for r in rows if r["recently_done"]),
+            "to_clear": sum(1 for r in rows if r.get("received") and r["existing_post"]),
         }
 
     @router.post("/staff/import/commit")
@@ -473,9 +489,17 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
                 await learn(row.house, soi=row.soi, source="text", by=user["name"])
         # ...so pass 2 can estimate the soi of the houses that didn't say it
         pairs = await known_sois()
+        cleared, cleared_houses = 0, []
         for row in body.rows:
             soi = row.soi if row.soi in SOIS and row.soi_from_text else None
             existing = await db.posts.find_one({"kind": "need", "status": {"$ne": "done"}, "house": row.house})
+            if row.received:
+                if existing:
+                    await db.posts.update_one({"id": existing["id"]}, {"$set": {"status": "done", "done_by": me(user), "updated_at": now()}})
+                    await history(existing["id"], user, "done", f"แจ้งใน LINE ว่าได้รับแล้ว: {row.text[:200]}")
+                    cleared += 1
+                    cleared_houses.append(row.house)
+                continue
             if existing:  # same house already has an open request: add the new wording, don't duplicate
                 note = f"จาก LINE: {row.text[:200]}"
                 if not any(h.get("note") == note for h in existing.get("history", [])):  # re-imports repeat the same lines
@@ -502,8 +526,8 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
             }
             await db.posts.insert_one(doc)
             created += 1
-        await audit(user, "import_line", "", f"created {created}, merged {updated}, skipped recently done {skipped_done}")
-        return {"created": created, "merged_into_existing": updated, "skipped_recently_done": skipped_done}
+        await audit(user, "import_line", "", f"created {created}, merged {updated}, cleared {cleared}, skipped recently done {skipped_done}")
+        return {"created": created, "merged_into_existing": updated, "cleared": cleared, "cleared_houses": cleared_houses, "skipped_recently_done": skipped_done}
 
     # ---------- lookup by house number (for announcements) ----------
     @router.post("/staff/houses/lookup")
