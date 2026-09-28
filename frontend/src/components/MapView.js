@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { KINDS, VILLAGE_BOUNDARY, VILLAGE_CENTER, VILLAGE_ZOOM, categoryOf, timeAgo, waterOf } from "../config";
 import { mediaUrl } from "../media";
-import { tripClaims, tripWhere } from "./Trips";
+import { isQuiet, tripClaims, tripWhere } from "./Trips";
 import { MISSIONS, PHASES, VEHICLES, WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
 import { describeLevel, estimateAt, fieldBounds, renderField, toPoints } from "../waterField";
 import { load, save } from "../api";
@@ -128,12 +128,12 @@ export default function MapView({ posts, water, trips = [], onSelect, focus }) {
             className: "",
             iconSize: [34, 34],
             iconAnchor: [17, 17],
-            html: `<div style="width:34px;height:34px;border-radius:9999px;background:#fff;border:3px solid #059669;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:18px">👷</div>`,
+            html: `<div style="opacity:${isQuiet(t) ? 0.5 : 1};width:34px;height:34px;border-radius:9999px;background:#fff;border:3px solid ${isQuiet(t) ? "#737373" : "#059669"};box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:18px">👷</div>`,
           }),
         })
           .bindTooltip(escapeHtml(t.label), { permanent: true, direction: "top", offset: [0, -18], className: "trip-label staff-label" })
           .bindPopup(
-            `<b>👷 ${escapeHtml(t.label)}</b><br>${t.note ? `📝 ${escapeHtml(t.note)}` : '<span style="color:#666">ออนไลน์ พร้อมช่วย (ยังไม่ได้เขียนว่ากำลังจะทำอะไร)</span>'}${claims ? `<br>📋 ${escapeHtml(claims)}` : ""}<br>${escapeHtml(tripWhere(t))}<br><span style="color:#666">อัปเดต ${timeAgo(t.updated_at)}</span>`
+            `<b>👷 ${escapeHtml(t.label)}</b><br>${t.note ? `📝 ${escapeHtml(t.note)}` : '<span style="color:#666">ออนไลน์ พร้อมช่วย (ยังไม่ได้เขียนว่ากำลังจะทำอะไร)</span>'}${claims ? `<br>📋 ${escapeHtml(claims)}` : ""}<br>${escapeHtml(tripWhere(t))}<br><span style="color:#666">${isQuiet(t) ? "ตำแหน่งล่าสุด" : "อัปเดต"} ${timeAgo(t.updated_at)}</span>`
           )
           .addTo(layer);
         continue;

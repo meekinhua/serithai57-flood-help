@@ -17,6 +17,7 @@ export function useStaffLocation(user, onTrip) {
   const [lastSent, setLastSent] = useState(null);
   const [where, setWhere] = useState(null); // last reply: { soi, km, far }
   const [error, setError] = useState("");
+  const [awake, setAwake] = useState("off"); // on | unsupported | off: is the screen kept from sleeping
   const lastRef = useRef(null);
   const active = !!user && (sharing || onTrip); // a trip always shares
 
@@ -37,13 +38,28 @@ export function useStaffLocation(user, onTrip) {
     }
     let stopped = false;
     let wake = null;
+    // A web page gets no GPS while the screen is off or the browser is in the background, so while
+    // sharing keep the screen on. Some browsers only grant it after a tap: retry on the next touch.
     const keepAwake = async () => {
+      if (!("wakeLock" in navigator)) return setAwake("unsupported");
+      if (document.visibilityState !== "visible" || (wake && !wake.released)) return;
       try {
-        if (onTrip && "wakeLock" in navigator && document.visibilityState === "visible") wake = await navigator.wakeLock.request("screen");
-      } catch {}
+        wake = await navigator.wakeLock.request("screen");
+        setAwake("on");
+        wake.addEventListener("release", () => !stopped && setAwake("off"));
+      } catch {
+        setAwake("off");
+      }
     };
     keepAwake();
-    const onVis = () => document.visibilityState === "visible" && keepAwake();
+    const onTouch = () => keepAwake();
+    document.addEventListener("pointerdown", onTouch);
+    const onVis = () => {
+      if (document.visibilityState !== "visible") return;
+      keepAwake();
+      // back from a locked screen: report where we are now instead of waiting for the next fix
+      navigator.geolocation.getCurrentPosition((pos) => send(pos, true), () => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    };
     document.addEventListener("visibilitychange", onVis);
 
     setGps({ state: "waiting" });
@@ -80,11 +96,13 @@ export function useStaffLocation(user, onTrip) {
       navigator.geolocation.clearWatch(watch);
       clearInterval(beat);
       document.removeEventListener("visibilitychange", onVis);
+      document.removeEventListener("pointerdown", onTouch);
       wake?.release?.().catch(() => {});
+      setAwake("off");
     };
-  }, [active, onTrip, user]);
+  }, [active, user]);
 
-  return { gps, lastSent, where, error, sharing, setSharing };
+  return { gps, lastSent, where, error, sharing, setSharing, awake };
 }
 
 function GpsLine({ live }) {
@@ -153,6 +171,14 @@ export function DutyBar({ live, onTrip }) {
         <button onClick={() => setOpen(true)} className="mt-2 min-h-[44px] w-full rounded-lg bg-neutral-100 text-sm font-semibold">
           ✏️ {saved ? "แก้ข้อความ" : "บอกชาวบ้านว่ากำลังจะทำอะไร"}
         </button>
+      )}
+      {on && live.awake === "on" && <p className="mt-2 text-xs text-neutral-600">🔆 ระบบเปิดจอค้างไว้ให้ GPS ทำงานต่อ · อย่ากดปิดจอ/สลับแอปนาน · ต่อที่ชาร์จหรือพาวเวอร์แบงก์ถ้าทำได้</p>}
+      {on && live.awake !== "on" && (
+        <p className="mt-2 rounded-lg bg-yellow-50 p-2 text-xs">
+          ⚠️ {live.awake === "unsupported" ? "เบราว์เซอร์นี้สั่งให้จอเปิดค้างไม่ได้" : "จอยังอาจดับเอง (แตะหน้าจอ 1 ครั้งเพื่อเปิดค้าง)"} — ถ้าจอดับ ตำแหน่งจะหยุดส่ง
+          <br />
+          ตั้งค่ามือถือ: iPhone → การแสดงผลและความสว่าง → ล็อกอัตโนมัติ = <b>ไม่เลย</b> · Android → จอแสดงผล → ระยะหมดเวลาหน้าจอ = <b>นานสุด</b>
+        </p>
       )}
       {on && live.gps.state !== "ok" && <div className="mt-2"><GpsLine live={live} /></div>}
     </section>
@@ -278,6 +304,9 @@ export function TripPanel({ user, live, trip, setTrip }) {
 export const tripWhere = (t) =>
   !t.has_fix ? "📡 กำลังหาตำแหน่ง" : t.far ? `อยู่นอกพื้นที่ (${t.km} กม.)` : t.soi ? `อยู่ซอย ${t.soi}` : t.km > 3 ? `ห่างหมู่บ้าน ${t.km} กม.` : "นอกซอย/ถนนใหญ่";
 
+// no update for a few minutes: phone screen off / page closed; show the last known place, greyed
+export const isQuiet = (t) => Date.now() - new Date(t.updated_at).getTime() > 3 * 60000;
+
 export const tripClaims = (t) => (t.claimed ? `รับงานไว้ ${t.claimed} หลัง${t.claimed_sois?.length ? ` (ซ.${t.claimed_sois.join(", ")})` : ""}` : "");
 
 export function TripsStrip({ trips, onFocus }) {
@@ -320,13 +349,14 @@ export function TripsStrip({ trips, onFocus }) {
             );
           })}
           {online.map((t) => (
-            <button key={t.id} onClick={() => t.lat != null && onFocus(t)} className="w-56 shrink-0 rounded-xl border border-emerald-300 bg-emerald-50/50 p-2 text-left active:bg-emerald-50">
+            <button key={t.id} onClick={() => t.lat != null && onFocus(t)} className={`w-56 shrink-0 rounded-xl border p-2 text-left ${isQuiet(t) ? "border-neutral-300 opacity-60" : "border-emerald-300 bg-emerald-50/50 active:bg-emerald-50"}`}>
               <p className="truncate font-bold">👷 {t.label}</p>
               <p className="line-clamp-2 text-sm">{t.note || <span className="text-neutral-500">ออนไลน์ พร้อมช่วย</span>}</p>
               <p className="truncate text-xs text-neutral-600">
                 {tripWhere(t)}
                 {t.claimed ? ` · ${tripClaims(t)}` : ""}
               </p>
+              {isQuiet(t) && <p className="text-xs text-neutral-500">ตำแหน่งล่าสุด {timeAgo(t.updated_at)}</p>}
             </button>
           ))}
         </div>

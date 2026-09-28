@@ -19,7 +19,7 @@ Mission = Literal["food", "water", "evacuate", "medical", "cargo", "survey", "ot
 Phase = Literal["enroute", "serving", "out_of_stock", "returning"]
 
 STALE = timedelta(minutes=15)  # hide a trip that stopped reporting (phone off, no signal)
-PRESENCE_STALE = timedelta(minutes=3)  # "staff online" dot: gone soon after /staff is closed
+PRESENCE_STALE = timedelta(minutes=15)  # "staff online" dot: kept (greyed on the page) while the phone screen is off for a while
 MAX_PATH = 300  # points kept per trip (a few hours at one point per ~30 m)
 MIN_PING_S = 3
 VILLAGE = (13.8020, 100.6670)  # centre of สหกรณ์เคหะสถาน 4
