@@ -445,8 +445,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
                     # "ยังไม่ได้ / ยังรอ" about the house reopens it.
                     if (RECEIVED_RE.search(line) and not NOT_RECEIVED_RE.search(line)) or confirm:
                         rec["received"] = True
-                        rec["received_text"] = (body if confirm else clean)[:300].replace("
-", " / ")
+                        rec["received_text"] = (body if confirm else clean)[:300].replace("\n", " / ")
                     elif NOT_RECEIVED_RE.search(line):
                         rec["received"] = False
         return len(msgs), houses, skipped
