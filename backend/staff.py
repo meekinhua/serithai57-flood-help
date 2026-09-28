@@ -30,6 +30,8 @@ from pydantic import BaseModel, Field
 
 SOI_DATA = json.loads((Path(__file__).parent / "data" / "sois.json").read_text(encoding="utf-8"))
 SOIS: dict = SOI_DATA["sois"]
+# Relief zones A, B, C… and truck drop points on the main road (data/make_zones.py)
+ZONES = json.loads((Path(__file__).parent / "data" / "zones.json").read_text(encoding="utf-8"))
 # 1,5xx building centres inside the village (OSM has footprints but no house numbers): staff tap one
 # to say "this building is 4/xxx".
 BUILDINGS = json.loads((Path(__file__).parent / "data" / "buildings.json").read_text(encoding="utf-8"))
@@ -282,6 +284,11 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
     async def sois():
         return {"source": SOI_DATA["source"], "sois": SOIS}
 
+    @router.get("/zones")
+    async def zones():
+        """Public: zones, the drop points on the main road, and every house coloured by zone."""
+        return ZONES
+
     @router.get("/staff/buildings")
     async def buildings(user: dict = Depends(require_staff)):
         taken = {a["building_id"]: a["house"] async for a in db.addresses.find({"building_id": {"$ne": None}}, {"building_id": 1, "house": 1})}
@@ -317,6 +324,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
     def task_view(p: dict) -> dict:
         out = public_post(p)
         out["phone"] = p.get("phone", "")  # staff need to call
+        out["zone"] = ZONES["soi_zone"].get(p.get("soi") or "")
         return out
 
     @router.get("/staff/tasks")

@@ -176,3 +176,22 @@ body {
   position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 9999px;
   background: #dc2626; color: #fff; font: 800 11px/20px sans-serif; text-align: center; border: 2px solid #fff;
 }
+
+/* Zones map (components/ZonesPage.js) */
+.zone-label {
+  width: 58px; height: 58px; border-radius: 9999px; display: flex; align-items: center; justify-content: center;
+  background: #fff; color: var(--c); border: 5px solid var(--c); font: 900 32px/1 sans-serif; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.drop-pin {
+  width: 64px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 2px;
+  background: #111; color: #fff; border: 4px solid var(--c); font: 800 17px/1 sans-serif; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+/* poster mode (?poster=1) = print look on screen */
+.poster button, .poster .print\:hidden, .poster .leaflet-control-zoom { display: none !important; }
+.poster header { background: #fff; color: #000; }
+.poster header p { color: #444; }
+@media print {
+  .zones-page { background: #fff; }
+  .zone-card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
+  .leaflet-control-zoom { display: none; }
+}

@@ -4,6 +4,7 @@ import { api, load, save } from "../api";
 import { CATEGORIES, categoryOf, osmLink, timeAgo } from "../config";
 import { createBaseMap } from "./MapView";
 import { drawStaff } from "./staffMarkers";
+import { drawZones } from "./ZonesPage";
 import QRCode from "qrcode";
 import { DutyBar, TripPanel, useStaffLocation } from "./Trips";
 import { BrowserHowTo, InAppGate, detectInApp, openExternally } from "./OpenInBrowser";
@@ -223,6 +224,12 @@ function TaskCard({ t, user, onUpdate, onLocate }) {
 function Tasks({ user, tasks, reload, setTasks, onLocate }) {
   const [view, setView] = useState("free");
   const [soi, setSoi] = useState("all");
+  const [zone, setZoneState] = useState(() => load("myZone", "all")); // the zone this team looks after
+  const setZone = (z) => {
+    save("myZone", z);
+    setZoneState(z);
+    setSoi("all");
+  };
   const [msg, setMsg] = useState("");
 
   const counts = useMemo(
@@ -240,8 +247,14 @@ function Tasks({ user, tasks, reload, setTasks, onLocate }) {
     if (view === "all" && t.status === "done") return false;
     if (view === "urgent" && (t.status === "done" || !t.urgent)) return false;
     if (view === "done" && t.status !== "done") return false;
+    if (zone !== "all" && t.zone !== zone) return false;
     return soi === "all" || (t.soi || "none") === soi;
   });
+  const zones = useMemo(() => {
+    const c = {};
+    for (const t of tasks) if (t.status !== "done" && t.zone) c[t.zone] = (c[t.zone] || 0) + 1;
+    return Object.entries(c).sort();
+  }, [tasks]);
   const groups = useMemo(() => {
     const g = {};
     for (const t of shown) (g[t.soi || "none"] ||= []).push(t);
@@ -285,6 +298,18 @@ function Tasks({ user, tasks, reload, setTasks, onLocate }) {
               {text} {n != null && <span className="ml-1 rounded-full bg-white/20 px-1.5">{n}</span>}
             </button>
           ))}
+        </div>
+      </div>
+      <div className="-mx-3 overflow-x-auto px-3">
+        <div className="flex w-max items-center gap-1.5">
+          <span className="text-sm font-semibold">โซน</span>
+          {[["all", null], ...zones].map(([z, n]) => (
+            <button key={z} onClick={() => setZone(z)} aria-pressed={zone === z} className={`min-h-[40px] min-w-[40px] rounded-full px-3 text-sm font-bold ${zone === z ? "bg-black text-white" : "border border-neutral-300 bg-white"}`}>
+              {z === "all" ? "ทุกโซน" : z}
+              {n != null && <span className="ml-1 text-xs font-normal opacity-70">{n}</span>}
+            </button>
+          ))}
+          <a href="/zones" className="ml-1 text-sm underline">🗺️ แผนที่โซน</a>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -349,6 +374,10 @@ function TaskMap({ user, tasks, sois, onUpdate, onLocate }) {
     }
     layer.current = L.layerGroup().addTo(map);
     map.createPane("staff").style.zIndex = 650;
+    // zones A, B, C… and truck drop points underneath the jobs
+    api("/zones")
+      .then((z) => map._loaded && drawZones(map, { ...z, soiLines: {} }, { houses: false }))
+      .catch(() => {});
     staffLayer.current = L.layerGroup().addTo(map);
     const ro = new ResizeObserver(() => map.invalidateSize());
     ro.observe(el.current);
