@@ -340,7 +340,7 @@ function StaffAdmin() {
     <div className="space-y-4">
       <div className="space-y-2 rounded-2xl bg-white p-4 shadow">
         <h3 className="text-lg font-bold">👷 เชิญเจ้าหน้าที่ / อาสา</h3>
-        <p className="text-sm text-neutral-600">เจ้าหน้าที่เปิดลิงก์ ใส่ชื่อ แล้วใช้หน้า /staff ได้ทันที (รับงาน แบ่งซอย นำเข้า LINE ตั้งตำแหน่งบ้าน) — จัดการผู้ดูแล/ประกาศไม่ได้</p>
+        <p className="text-sm text-neutral-600">เจ้าหน้าที่เปิดลิงก์ ใส่ชื่อ แล้วใช้หน้า /staff ได้ทันที (รับงาน แบ่งซอย ออกงาน ตั้งตำแหน่งบ้าน · งานจาก LINE ส่วนกลางนำเข้าให้) — จัดการผู้ดูแล/ประกาศไม่ได้</p>
         <div className="flex flex-wrap gap-2">
           <select value={hours} onChange={(e) => setHours(e.target.value)} className={input + " w-auto"}>
             <option value="24">ลิงก์ใช้ได้ 24 ชม.</option>

@@ -225,7 +225,7 @@ class PinBody(BaseModel):
 
 # ---------------- admin auth ----------------
 def public_admin(a: dict) -> dict:
-    return {"id": a["id"], "email": a["email"], "name": a["name"], "role": a.get("role", "admin"), "created_at": a.get("created_at")}
+    return {"id": a["id"], "email": a["email"], "name": a["name"], "role": a.get("role", "admin"), "importer": bool(a.get("importer")), "created_at": a.get("created_at")}
 
 
 async def current_admin(request: Request) -> Optional[dict]:

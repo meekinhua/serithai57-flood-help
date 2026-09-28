@@ -529,11 +529,12 @@ function Lookup() {
 }
 
 // ---------------- shell ----------------
+// LINE import runs centrally; the tab is only for admins / the import account.
+const IMPORT_TAB = ["import", "📥 นำเข้า LINE"];
 const TABS = [
   ["trip", "🚤 ออกงาน"],
   ["tasks", "📋 งาน"],
   ["map", "🗺️ แผนที่"],
-  ["import", "📥 นำเข้า LINE"],
   ["addresses", "🏠 ที่อยู่"],
   ["lookup", "🔎 ค้นเลขที่"],
 ];
@@ -582,7 +583,7 @@ export default function StaffApp() {
         {user && (
           <div className="mx-auto max-w-3xl overflow-x-auto px-2 pb-2">
             <div className="flex w-max gap-1">
-              {TABS.map(([k, text]) => (
+              {(user?.role === "admin" || user?.importer ? [...TABS, IMPORT_TAB] : TABS).map(([k, text]) => (
                 <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className={`min-h-[40px] whitespace-nowrap rounded-lg px-3 text-sm font-semibold ${tab === k ? "bg-white text-black" : "bg-white/10"}`}>
                   {text}
                 </button>

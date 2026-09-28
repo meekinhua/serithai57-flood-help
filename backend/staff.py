@@ -91,6 +91,7 @@ class JoinBody(BaseModel):
 
 class InviteCreate(BaseModel):
     expires_hours: int = Field(72, ge=1, le=24 * 30)
+    importer: bool = False  # account for the central LINE import (tools/push_line.py), not for people
 
 
 class AddressSet(BaseModel):
@@ -135,6 +136,13 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
             raise HTTPException(401, "ต้องเข้าสู่ระบบเจ้าหน้าที่")
         return who
 
+    async def require_importer(request: Request) -> dict:
+        """LINE import is done centrally (admin or the import account), not by field staff."""
+        who = await require_staff(request)
+        if who.get("role", "admin") != "admin" and not who.get("importer"):
+            raise HTTPException(403, "การนำเข้า LINE ทำจากส่วนกลาง เจ้าหน้าที่ไม่ต้องทำ")
+        return who
+
     def me(user: dict) -> dict:
         return {"id": user["id"], "name": user["name"]}
 
@@ -142,7 +150,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
     @router.post("/admin/staff-invites", status_code=201)
     async def create_invite(body: InviteCreate, admin: dict = Depends(require_admin)):
         token = secrets.token_urlsafe(18)
-        doc = {"token": token, "created_by": admin["name"], "created_at": now(), "expires_at": now() + timedelta(hours=body.expires_hours), "active": True, "joined": 0}
+        doc = {"token": token, "created_by": admin["name"], "created_at": now(), "expires_at": now() + timedelta(hours=body.expires_hours), "active": True, "joined": 0, "importer": body.importer}
         await db.staff_invites.insert_one(dict(doc))
         await audit(admin, "create_staff_invite", token[:6])
         return {k: v for k, v in doc.items() if k != "_id"}
@@ -163,7 +171,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         if not inv:
             raise HTTPException(401, "ลิงก์เชิญหมดอายุหรือถูกยกเลิกแล้ว ขอลิงก์ใหม่จากผู้ดูแล")
         user = {"id": str(uuid.uuid4()), "email": f"staff-{uuid.uuid4().hex[:8]}@staff.local", "name": body.name.strip(), "role": "staff",
-                "password_hash": "!", "created_at": now(), "created_by": f"invite:{inv['created_by']}"}
+                "password_hash": "!", "created_at": now(), "created_by": f"invite:{inv['created_by']}", "importer": bool(inv.get("importer"))}
         await db.admins.insert_one(dict(user))
         await db.staff_invites.update_one({"token": body.token}, {"$inc": {"joined": 1}})
         return await start_session(user, request, response)
@@ -365,7 +373,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         return len(msgs), houses, skipped
 
     @router.post("/staff/import/preview")
-    async def import_preview(body: ImportPreview, user: dict = Depends(require_staff)):
+    async def import_preview(body: ImportPreview, user: dict = Depends(require_importer)):
         n_msgs, houses, skipped = parse_line_export(body.text)
         pairs = await known_sois()
         pairs += [(house_num(h), r["soi"]) for h, r in houses.items() if r.get("soi")]
@@ -392,7 +400,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         }
 
     @router.post("/staff/import/commit")
-    async def import_commit(body: ImportCommit, request: Request, user: dict = Depends(require_staff)):
+    async def import_commit(body: ImportCommit, request: Request, user: dict = Depends(require_importer)):
         created, updated, skipped_done = 0, 0, 0
         # pass 1: what the chat itself says (house -> soi) goes into the address book first...
         for row in body.rows:
