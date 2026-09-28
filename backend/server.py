@@ -620,6 +620,7 @@ async def startup():
     await db.trips.create_index([("status", 1), ("updated_at", -1)])
     await db.trips.create_index("staff_id")
     await db.trips.create_index([("staff_id", 1), ("presence", 1)])
+    await db.handoffs.create_index("expires_at", expireAfterSeconds=0)
     await db.services.create_index([("category", 1), ("updated_at", -1)])
     await db.media.create_index("id", unique=True)
     await db.media.create_index([("attached_to", 1), ("created_at", 1)])

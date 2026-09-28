@@ -16,6 +16,7 @@
 - House lookup: "4/100-4/250, 4/1782" -> which sois, which houses we know, open requests.
 """
 import bisect
+import hashlib
 import json
 import re
 import secrets
@@ -88,6 +89,10 @@ class JoinBody(BaseModel):
     token: str = Field(min_length=10, max_length=100)
     name: str = Field(min_length=1, max_length=60)
     team: str = Field("", max_length=40)  # where they came from: มูลนิธิ / เขต / บริษัท ... (staff come from many groups)
+
+
+class HandoffBody(BaseModel):
+    token: str = Field(min_length=10, max_length=100)
 
 
 class InviteCreate(BaseModel):
@@ -175,6 +180,26 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
                 "password_hash": "!", "created_at": now(), "created_by": f"invite:{inv['created_by']}", "importer": bool(inv.get("importer"))}
         await db.admins.insert_one(dict(user))
         await db.staff_invites.update_one({"token": body.token}, {"$inc": {"joined": 1}})
+        return await start_session(user, request, response)
+
+    # ---------- move a signed-in staff member from the LINE/Messenger in-app browser to Chrome/Safari ----------
+    # Links shared in chats open inside the chat app, where GPS stops and the login is stuck. A one-time,
+    # 10-minute token carries the session over so they don't have to join again.
+    @router.post("/staff/handoff")
+    async def make_handoff(user: dict = Depends(require_staff)):
+        token = secrets.token_urlsafe(24)
+        await db.handoffs.insert_one({"hash": hashlib.sha256(token.encode()).hexdigest(), "admin_id": user["id"], "used": False,
+                                      "expires_at": now() + timedelta(minutes=10)})
+        return {"token": token}
+
+    @router.post("/auth/staff-handoff")
+    async def use_handoff(body: HandoffBody, request: Request, response: Response):
+        rate_limit(request, "login", limit=10, window_s=600)
+        h = await db.handoffs.find_one_and_update(
+            {"hash": hashlib.sha256(body.token.encode()).hexdigest(), "used": False, "expires_at": {"$gt": now()}}, {"$set": {"used": True}})
+        user = h and await db.admins.find_one({"id": h["admin_id"]}, {"_id": 0})
+        if not user:
+            raise HTTPException(401, "ลิงก์ย้ายเบราว์เซอร์หมดอายุหรือถูกใช้ไปแล้ว กด “ย้ายไปเบราว์เซอร์” ใหม่อีกครั้ง")
         return await start_session(user, request, response)
 
     @router.get("/staff/invite")
