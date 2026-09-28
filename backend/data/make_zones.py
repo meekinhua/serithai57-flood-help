@@ -14,7 +14,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 TARGET_PER_ZONE = 170  # houses; ~one team-day of door-to-door
-FAR_M = 45  # a house farther than this from its soi is "off the sois" (a separate block)
+FAR_M = 30  # a house farther than this from its soi is "off the sois" (on an unmapped lane / a separate block)
 LINK_M = 90  # off-soi houses closer than this belong to the same block (the NE block has 60–90 m gaps)
 COLORS = ["#e11d48", "#2563eb", "#16a34a", "#f59e0b", "#9333ea", "#0891b2", "#ea580c", "#4f46e5", "#65a30d", "#db2777", "#0d9488", "#b45309"]
 
@@ -96,6 +96,9 @@ def main():
     # group, not soi by soi: keep each such block together in its majority zone instead of splitting
     # it between the zones of whichever soi happens to be nearest.
     zone_i = {n: i for i, names in enumerate(zones) for n in names}
+    # zone boundaries as cut points along the main road (by position along the axis)
+    cuts = [(max(along(mouths[n]) for n in zones[i]) + min(along(mouths[n]) for n in zones[i + 1])) / 2 for i in range(len(zones) - 1)]
+    band = lambda p: sum(1 for c in cuts if along(p) > c)  # noqa: E731
     hz = [zone_i[n] for _, n in home]
     far = [k for k, (b, n) in enumerate(home) if min(seg_dist(b, s[1], s[2]) for s in segs if s[0] == n) > FAR_M]
     parent = {k: k for k in far}
@@ -115,7 +118,9 @@ def main():
     for k in far:
         blocks.setdefault(root(k), []).append(k)
     for ks in blocks.values():
-        if len(ks) < 5:
+        if len(ks) < 5:  # a few stray houses: the zone of the stretch of main road they face
+            for k in ks:
+                hz[k] = band(home[k][0])
             continue
         votes = {}
         for k in ks:

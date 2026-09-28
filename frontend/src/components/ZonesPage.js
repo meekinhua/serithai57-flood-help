@@ -77,7 +77,8 @@ export default function ZonesPage() {
     el.current.addEventListener("wheel", stop);
     const fit = () => {
       map.invalidateSize();
-      if (!touched && map.getSize().x > 50) map.fitBounds(bounds);
+      // no animation: a refit or unmount mid-zoom crashes Leaflet (_leaflet_pos of undefined)
+      if (!touched && map.getSize().x > 50) map.fitBounds(bounds, { animate: false });
     };
     fit();
     const t = setTimeout(fit, 300);
@@ -106,7 +107,7 @@ export default function ZonesPage() {
   }, [data, posts]);
 
   const focus = (z) => {
-    mapRef.current?.setView([z.drop.lat, z.drop.lng], 18);
+    mapRef.current?.setView([z.drop.lat, z.drop.lng], 18, { animate: false });
     el.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
