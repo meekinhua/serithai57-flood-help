@@ -394,6 +394,18 @@ export default function App() {
           </ActionButton>
         </div>
 
+        {/* zones A–I + truck drop points: for donors with trucks and for relief teams */}
+        <a
+          href="/zones"
+          className="mt-2 flex min-h-[52px] items-center justify-center gap-2 rounded-xl border-4 border-yellow-400 bg-yellow-50 px-3 text-center font-bold text-black"
+        >
+          <span className="text-xl">🗺️</span>
+          <span>
+            แผนที่โซน A–I · 🚚 จุดลงของสำหรับรถใหญ่
+            <span className="block text-xs font-normal text-neutral-600">ทีมช่วยเหลือเลือกโซน · คนนำของมาบริจาคดูจุดจอดริมถนนหลัก</span>
+          </span>
+        </a>
+
         {trips.length > 0 && (
           <div className="mt-3">
             <TripsStrip trips={trips} onFocus={showOnMap} />
