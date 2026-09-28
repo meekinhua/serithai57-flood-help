@@ -308,7 +308,7 @@ function Import({ onDone }) {
     try {
       const p = await api("/staff/import/preview", { method: "POST", body: JSON.stringify({ text }) });
       setPreview(p);
-      setPicked(Object.fromEntries(p.rows.filter((r) => !r.received).map((r) => [r.house, true])));
+      setPicked(Object.fromEntries(p.rows.filter((r) => !r.received && !r.recently_done).map((r) => [r.house, true])));
     } catch (err) {
       setError(err.message);
     }
@@ -317,9 +317,9 @@ function Import({ onDone }) {
   async function commit() {
     setBusy(true);
     try {
-      const rows = preview.rows.filter((r) => picked[r.house]).map((r) => ({ house: r.house, soi: r.soi, soi_from_text: r.soi_from_text, text: r.text, phone: r.phone || "", portions: r.portions }));
+      const rows = preview.rows.filter((r) => picked[r.house]).map((r) => ({ house: r.house, soi: r.soi, soi_from_text: r.soi_from_text, text: r.text, phone: r.phone || "", portions: r.portions, force: !!r.recently_done }));
       const res = await api("/staff/import/commit", { method: "POST", body: JSON.stringify({ rows }) });
-      onDone(`สร้างงานใหม่ ${res.created} หลัง · รวมเข้ากับงานเดิม ${res.merged_into_existing} หลัง`);
+      onDone(`สร้างงานใหม่ ${res.created} หลัง · รวมเข้ากับงานเดิม ${res.merged_into_existing} หลัง${res.skipped_recently_done ? ` · ข้ามบ้านที่เพิ่งช่วยเสร็จ ${res.skipped_recently_done}` : ""}`);
       setPreview(null);
       setText("");
     } catch (err) {
@@ -343,6 +343,7 @@ function Import({ onDone }) {
         <div className="space-y-2">
           <p className="rounded-lg bg-yellow-100 p-3 text-sm">
             อ่าน {preview.messages} ข้อความ · ข้ามโพสต์ขายของ {preview.skipped_sales} · เลขที่บ้านถูกพูดถึง {preview.mentions} ครั้ง → <b>{preview.houses} หลังจริง</b>
+            <br />ใหม่ {preview.new} · มีงานอยู่แล้ว {preview.already_open} · เพิ่งช่วยเสร็จ (ไม่เลือกไว้) {preview.recently_done}
           </p>
           <ul className="max-h-[50vh] space-y-1 overflow-y-auto">
             {preview.rows.map((r) => (
@@ -352,6 +353,7 @@ function Import({ onDone }) {
                   <b>{r.house}</b> {r.soi ? `ซ.${r.soi}` : ""} <span className={`rounded px-1 ${precisionOf(r).cls}`}>{precisionOf(r).text}</span>
                   {r.existing_post && <span className="ml-1 rounded bg-neutral-200 px-1">มีงานอยู่แล้ว → รวม</span>}
                   {r.received && <span className="ml-1 rounded bg-emerald-100 px-1">แจ้งว่าได้รับแล้ว</span>}
+                  {r.recently_done && <span className="ml-1 rounded bg-emerald-100 px-1">✅ เพิ่งช่วยเสร็จ{r.done_by ? ` (${r.done_by})` : ""} — ติ๊กถ้าขอใหม่จริง</span>}
                   <p className="break-words text-neutral-600">{r.text}</p>
                 </div>
               </li>

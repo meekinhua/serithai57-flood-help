@@ -40,6 +40,7 @@ MSG_START = re.compile(r"^(\d{1,2}:\d{2}) (.*)$")
 DATE_LINE = re.compile(r"^\d{4}\.\d{2}\.\d{2} ")
 RECEIVED_RE = re.compile(r"ได้รับ(?:แล้ว|เรียบร้อย|ข้าว|ของ|อาหาร)|ได้แล้ว|ได้ข้าวแล้ว|รับแล้ว")
 SOURCE_RANK = {"staff": 3, "resident": 2, "text": 1}
+RECENT_DONE = timedelta(hours=24)
 # Messages that are selling/pre-ordering things. Their "1. 4/688 ..." sign-up lists look exactly like
 # help lists, so without this the buyers of waterproof suits became "requests" for staff.
 # "Name 4/123 ..." at the start of a message: the house is part of the sender's LINE display name.
@@ -114,6 +115,7 @@ class ImportRow(BaseModel):
     text: str = Field("", max_length=1000)
     phone: str = Field("", max_length=40)
     portions: Optional[int] = Field(None, ge=0, le=500)
+    force: bool = False  # create even if this house was helped in the last 24 h
 
 
 class ImportCommit(BaseModel):
@@ -369,19 +371,29 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         pairs += [(house_num(h), r["soi"]) for h, r in houses.items() if r.get("soi")]
         pairs.sort()
         open_posts = {p["house"]: p async for p in db.posts.find({"kind": "need", "status": {"$ne": "done"}, "house": {"$in": list(houses)}}, {"_id": 0, "id": 1, "house": 1, "status": 1})}
+        # Copy-and-extend lists keep re-posting houses that were already helped: flag them.
+        recent_done = {p["house"]: p async for p in db.posts.find(
+            {"kind": "need", "status": "done", "house": {"$in": list(houses)}, "updated_at": {"$gte": now() - RECENT_DONE}}, {"_id": 0, "house": 1, "updated_at": 1, "done_by": 1})}
         rows = []
         for h, r in sorted(houses.items(), key=lambda kv: house_num(kv[0])):
             loc = await locate(h, r.get("soi"), pairs)
             category, vulnerable = needs_of(r["text"])
             portions = sum(int(x) for x in re.findall(r"(\d+)\s*(?:ที่|คน|กล่อง)", r["text"])) or None
             rows.append({**r, "soi": loc["soi"], "soi_from_text": bool(r.get("soi")), "precision": loc["precision"], "category": category, "vulnerable": vulnerable,
-                         "portions": portions, "existing_post": (open_posts.get(h) or {}).get("id")})
+                         "portions": portions, "existing_post": (open_posts.get(h) or {}).get("id"),
+                         "recently_done": h in recent_done and h not in open_posts,
+                         "done_by": ((recent_done.get(h) or {}).get("done_by") or {}).get("name")})
         mentions = sum(r["mentions"] for r in houses.values())
-        return {"messages": n_msgs, "skipped_sales": skipped, "mentions": mentions, "houses": len(rows), "rows": rows}
+        return {
+            "messages": n_msgs, "skipped_sales": skipped, "mentions": mentions, "houses": len(rows), "rows": rows,
+            "new": sum(1 for r in rows if not r["existing_post"] and not r["recently_done"] and not r.get("received")),
+            "already_open": sum(1 for r in rows if r["existing_post"]),
+            "recently_done": sum(1 for r in rows if r["recently_done"]),
+        }
 
     @router.post("/staff/import/commit")
     async def import_commit(body: ImportCommit, request: Request, user: dict = Depends(require_staff)):
-        created, updated = 0, 0
+        created, updated, skipped_done = 0, 0, 0
         # pass 1: what the chat itself says (house -> soi) goes into the address book first...
         for row in body.rows:
             if row.soi in SOIS and row.soi_from_text:
@@ -392,8 +404,13 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
             soi = row.soi if row.soi in SOIS and row.soi_from_text else None
             existing = await db.posts.find_one({"kind": "need", "status": {"$ne": "done"}, "house": row.house})
             if existing:  # same house already has an open request: add the new wording, don't duplicate
-                await history(existing["id"], user, existing["status"], f"จาก LINE: {row.text[:200]}")
+                note = f"จาก LINE: {row.text[:200]}"
+                if not any(h.get("note") == note for h in existing.get("history", [])):  # re-imports repeat the same lines
+                    await history(existing["id"], user, existing["status"], note)
                 updated += 1
+                continue
+            if not row.force and await db.posts.find_one({"kind": "need", "status": "done", "house": row.house, "updated_at": {"$gte": now() - RECENT_DONE}}):
+                skipped_done += 1  # helped recently; the chat is just repeating an old list
                 continue
             loc = await locate(row.house, soi, pairs)
             category, vulnerable = needs_of(row.text)
@@ -410,8 +427,8 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
             }
             await db.posts.insert_one(doc)
             created += 1
-        await audit(user, "import_line", "", f"created {created}, merged {updated}")
-        return {"created": created, "merged_into_existing": updated}
+        await audit(user, "import_line", "", f"created {created}, merged {updated}, skipped recently done {skipped_done}")
+        return {"created": created, "merged_into_existing": updated, "skipped_recently_done": skipped_done}
 
     # ---------- lookup by house number (for announcements) ----------
     @router.post("/staff/houses/lookup")
