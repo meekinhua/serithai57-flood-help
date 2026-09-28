@@ -73,7 +73,7 @@ def house_num(house: str) -> int:
 
 def needs_of(text: str) -> tuple[str, bool]:
     """Best-guess request category from free text, and whether it involves vulnerable people."""
-    vulnerable = bool(re.search(r"ผู้สูงอายุ|คนแก่|ติดเตียง|ป่วย|เด็ก|ทารก|พิการ|ตั้งครรภ์", text))
+    vulnerable = bool(re.search(r"ผู้สูงอายุ|คนแก่|ชรา|ติดเตียง|ป่วย|เด็ก|ทารก|พิการ|ตั้งครรภ์|ยาย|คนท้อง", text))
     if re.search(r"อพยพ|เรือ|ออกจากบ้าน|ติดอยู่", text):
         return "evacuate", vulnerable
     if vulnerable and not re.search(r"อาหาร|ข้าว|กล่อง|ที่", text):
@@ -422,7 +422,8 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         for h, r in sorted(houses.items(), key=lambda kv: house_num(kv[0])):
             loc = await locate(h, r.get("soi"), pairs)
             category, vulnerable = needs_of(r["text"])
-            portions = sum(int(x) for x in re.findall(r"(\d+)\s*(?:ที่|คน|กล่อง)", r["text"])) or None
+            # "3 ที่", "2 กล่อง" — not a house number ("4/705 คนชรา" is not 705 people)
+            portions = sum(n for n in (int(x) for x in re.findall(r"(?<![\d/])(\d{1,3})\s*(?:ที่|กล่อง|ชุด|คน(?!ชรา|แก่|ป่วย))", r["text"])) if n <= 100) or None
             rows.append({**r, "soi": loc["soi"], "soi_from_text": bool(r.get("soi")), "precision": loc["precision"], "category": category, "vulnerable": vulnerable,
                          "portions": portions, "existing_post": (open_posts.get(h) or {}).get("id"),
                          "recently_done": h in recent_done and h not in open_posts,
