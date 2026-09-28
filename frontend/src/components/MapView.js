@@ -44,7 +44,14 @@ function postIcon(post, isNew = false) {
 // What the map shows. Busy days put 100+ requests and dozens of water readings on the same streets,
 // so by default: requests (urgent ones always as their own pin, the rest grouped when zoomed out),
 // staff, and the water colour surface. Water report dots, offers and info are one tap away.
-const LAYER_DEFAULTS = { need: true, water: false, offer: false, info: false };
+const LAYER_DEFAULTS = { need: true, offer: false, info: false };
+
+function levelHtml(lat, lng, points) {
+  const est = estimateAt(lat, lng, points);
+  return est
+    ? `<b>ระดับน้ำโดยประมาณ: ${describeLevel(est.level).label}</b> (${describeLevel(est.level).cm})<br><span style="color:#555">คำนวณจากรายงานใกล้เคียง ${est.used} จุด · ใกล้สุด ${Math.round(est.nearest)} ม.</span>`
+    : `ยังไม่มีรายงานระดับน้ำในระยะ 300 ม. จากจุดนี้`;
+}
 
 // Group bubble: how many requests, and a red badge when there are ones nobody is helping yet.
 function clusterIcon(cluster) {
@@ -70,6 +77,15 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
   const seenPins = useRef(new Set());
   const [showField, setShowField] = useState(() => load("showWaterField", true));
   const [layers, setLayers] = useState(() => ({ ...LAYER_DEFAULTS, ...load("mapLayers", {}) }));
+  // Two clear views instead of everything at once: 🆘 requests, or 💧 water level (colours + report dots only)
+  const [mode, setModeState] = useState("need"); // always open on the main view
+  const setMode = (m) => {
+    setModeState(m);
+    mapRef.current?.closePopup();
+  };
+  const waterMode = mode === "water";
+  const fieldOn = waterMode || showField;
+  const [hint, setHint] = useState("");
   const toggle = (k) =>
     setLayers((l) => {
       const next = { ...l, [k]: !l[k] };
@@ -95,11 +111,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
     mapRef.current = map;
     map.on("click", (e) => {
       if (!fieldRef.current) return;
-      const est = estimateAt(e.latlng.lat, e.latlng.lng, pointsRef.current);
-      const html = est
-        ? `<b>ระดับน้ำโดยประมาณ: ${describeLevel(est.level).label}</b> (${describeLevel(est.level).cm})<br><span style="color:#555">คำนวณจากรายงานใกล้เคียง ${est.used} จุด · ใกล้สุด ${Math.round(est.nearest)} ม.</span>`
-        : `ยังไม่มีรายงานระดับน้ำในระยะ 300 ม. จากจุดนี้`;
-      L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
+      L.popup().setLatLng(e.latlng).setContent(levelHtml(e.latlng.lat, e.latlng.lng, pointsRef.current)).openOn(map);
     });
     // Map containers that start hidden (mobile tabs) need a size refresh when shown.
     const ro = new ResizeObserver(() => map.invalidateSize());
@@ -119,12 +131,12 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
 
     // Latest report per ~30 m cell, so old readings at the same spot don't pile up.
     const seen = new Set();
-    for (const w of layers.water ? water : []) {
+    for (const w of waterMode ? water : []) {
       const cell = `${w.lat.toFixed(4)},${w.lng.toFixed(4)}`;
       if (seen.has(cell)) continue;
       seen.add(cell);
       const lv = waterOf(w.level);
-      L.circleMarker([w.lat, w.lng], { radius: 11, color: "#fff", weight: 2, fillColor: lv.color, fillOpacity: 0.85 })
+      L.circleMarker([w.lat, w.lng], { radius: 11, color: "#fff", weight: 2, fillColor: lv.color, fillOpacity: 0.85, bubblingMouseEvents: false }) // its own popup, not the map's estimate
         .bindPopup(
           `<b>💧 ระดับน้ำ: ${lv.label} (${w.cm != null ? `${w.cm} ซม.` : lv.cm})</b>${w.trend ? ` ${WATER_TREND[w.trend][0]} ${WATER_TREND[w.trend][1]}` : ""}${
             w.where ? `<br>${WATER_WHERE[w.where][0]} วัด${WATER_WHERE[w.where][1]}` : ""
@@ -141,7 +153,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
 
     const pinned = []; // urgent open requests: never hidden inside a group
     const grouped = [];
-    for (const p of posts) {
+    for (const p of waterMode ? [] : posts) {
       if (p.general) continue; // "ทั้งหมู่บ้าน" posts are listed, not pinned
       // a specific filter chosen above the map wins over the layer switches
       if (filter === "all" && !layers[p.kind]) continue;
@@ -152,7 +164,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
     }
     pinned.forEach((m) => m.addTo(layer));
     cluster.addLayers(grouped);
-  }, [posts, water, onSelect, layers, filter]);
+  }, [posts, water, onSelect, layers, filter, waterMode]);
 
   // Staff boats / trucks / people on duty: big, pulsing, always above residents' pins
   useEffect(() => {
@@ -164,7 +176,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const key = `${showField}|${water.map((w) => w.id).join(",")}|${Math.floor(Date.now() / 600000)}`; // + 10-min bucket for time decay
+    const key = `${fieldOn}|${water.map((w) => w.id).join(",")}|${Math.floor(Date.now() / 600000)}`; // + 10-min bucket for time decay
     if (key === fieldKey.current) return;
     fieldKey.current = key;
     if (fieldRef.current) {
@@ -172,71 +184,104 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
       fieldRef.current = null;
     }
     pointsRef.current = toPoints(water);
-    if (!showField) return;
+    if (!fieldOn) return;
     const canvas = renderField(pointsRef.current);
     if (!canvas) return;
     fieldRef.current = L.imageOverlay(canvas.toDataURL(), fieldBounds(), { pane: "waterField", interactive: false, className: "water-field" }).addTo(map);
-  }, [water, showField]);
+  }, [water, fieldOn]);
 
   useEffect(() => {
-    if (focus && mapRef.current) mapRef.current.setView([focus.lat, focus.lng], 18);
+    if (!focus || !mapRef.current) return;
+    if (focus.water) setModeState("water");
+    mapRef.current.setView([focus.lat, focus.lng], 18);
   }, [focus]);
 
-  const hasReports = water.length > 0;
+  function hereLevel() {
+    if (!navigator.geolocation) return setHint("เครื่องนี้หาตำแหน่งไม่ได้ — แตะบนแผนที่แทน");
+    setHint("กำลังหาตำแหน่ง…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setHint("");
+        mapRef.current.setView([lat, lng], 17);
+        L.popup().setLatLng([lat, lng]).setContent(`<b>📍 ตรงที่คุณอยู่</b><br>${levelHtml(lat, lng, pointsRef.current)}`).openOn(mapRef.current);
+      },
+      () => setHint("ไม่ได้อนุญาตตำแหน่ง — แตะบนแผนที่ตรงบ้านคุณแทน"),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  }
+
   const count = (k) => posts.filter((p) => p.kind === k && !p.general).length;
   const chips = [
-    ["need", "🆘 ขอช่วย", count("need")],
-    ["water", "💧 จุดวัดน้ำ", water.length],
     ["offer", "🤝 ช่วยได้", count("offer")],
     ["info", "📍 ข้อมูล", count("info")],
-  ].filter(([k, , n]) => n > 0 || k === "need");
+  ].filter(([, , n]) => n > 0);
+  const tabCls = (on) => `pointer-events-auto min-h-[44px] flex-1 rounded-full px-3 text-sm font-bold ${on ? "bg-black text-white" : "text-neutral-800"}`;
 
   return (
     <div className="relative h-full w-full">
       <div ref={elRef} className="h-full w-full" />
-      {/* layer switches: main things on, the rest one tap away */}
-      <div className="pointer-events-none absolute bottom-6 left-2 z-[500] flex max-w-[85%] flex-wrap gap-1">
-        {chips.map(([k, label, n]) => {
-          const on = filter === "all" ? layers[k] : k === "water" ? layers.water : filter === k || (filter === "paid" && k === "need");
-          const locked = filter !== "all" && k !== "water";
-          return (
-            <button
-              key={k}
-              type="button"
-              disabled={locked}
-              onClick={() => toggle(k)}
-              aria-pressed={on}
-              className={`pointer-events-auto min-h-[36px] rounded-full border-2 px-2.5 text-xs font-semibold shadow ${on ? "border-black bg-black text-white" : "border-neutral-300 bg-white/95 text-neutral-700"} ${locked ? "opacity-60" : ""}`}
-            >
-              {on ? "✓ " : ""}
-              {label} {n}
-            </button>
-          );
-        })}
-      </div>
-      {hasReports && (
-        <div className="pointer-events-none absolute right-2 top-2 z-[500] flex max-w-[70%] flex-col items-end gap-1">
-          <button
-            onClick={() => {
-              setShowField((v) => !v);
-              save("showWaterField", !showField);
-            }}
-            aria-pressed={showField}
-            className={`pointer-events-auto min-h-[44px] rounded-lg border-2 border-black px-3 text-sm font-semibold shadow ${showField ? "bg-black text-white" : "bg-white text-black"}`}
-          >
-            🌊 ระบายสีระดับน้ำ {showField ? "เปิด" : "ปิด"}
+      {/* one big switch: what am I looking at */}
+      <div className="pointer-events-none absolute inset-x-0 top-2 z-[600] flex justify-center px-12">
+        <div className="pointer-events-auto flex w-full max-w-xs rounded-full border-2 border-black bg-white/95 p-0.5 shadow-lg" role="tablist" aria-label="ดูบนแผนที่">
+          <button type="button" role="tab" aria-selected={!waterMode} onClick={() => setMode("need")} className={tabCls(!waterMode)}>
+            🆘 คำขอช่วย
           </button>
-          {showField && (
-            <div className="rounded-lg bg-white/95 px-2 py-1 text-[11px] leading-tight shadow">
-              <div className="h-2 w-40 max-w-full rounded" style={{ background: `linear-gradient(to right, ${WATER_LEVELS.map((w) => w.color).join(",")})` }} />
-              <div className="mt-0.5 flex justify-between gap-2 text-neutral-700">
-                <span>{WATER_LEVELS[0].label}</span>
-                <span>{WATER_LEVELS[3].label}</span>
-                <span>{WATER_LEVELS[WATER_LEVELS.length - 1].label}</span>
-              </div>
-              <div className="text-neutral-500">ค่าประมาณจากรายงาน · แตะแผนที่เพื่อดูระดับ</div>
+          <button type="button" role="tab" aria-selected={waterMode} onClick={() => setMode("water")} className={tabCls(waterMode)}>
+            💧 ระดับน้ำ
+          </button>
+        </div>
+      </div>
+
+      {waterMode ? (
+        <div className="pointer-events-none absolute inset-x-2 bottom-6 z-[500] flex flex-col items-start gap-1">
+          <div className="pointer-events-auto rounded-lg bg-white/95 px-2 py-1.5 text-xs leading-tight shadow">
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+              {WATER_LEVELS.map((w) => (
+                <span key={w.label} className="flex items-center gap-1">
+                  <span className="inline-block h-3 w-3 rounded-full border border-white" style={{ background: w.color }} />
+                  {w.label}
+                </span>
+              ))}
             </div>
+            <p className="mt-1 font-semibold">👆 แตะที่ไหนก็ได้บนแผนที่ เพื่อดูระดับน้ำตรงนั้น · จุดสี = รายงานจริง ({water.length})</p>
+            {hint && <p className="text-neutral-600">{hint}</p>}
+          </div>
+          <button type="button" onClick={hereLevel} className="pointer-events-auto min-h-[44px] rounded-full border-2 border-black bg-white px-3 text-sm font-bold shadow">
+            📍 น้ำตรงที่ฉันอยู่
+          </button>
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute bottom-6 left-2 z-[500] flex max-w-[85%] flex-wrap gap-1">
+          {water.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowField((v) => !v);
+                save("showWaterField", !showField);
+              }}
+              aria-pressed={showField}
+              className={`pointer-events-auto min-h-[36px] rounded-full border-2 px-2.5 text-xs font-semibold shadow ${showField ? "border-black bg-black text-white" : "border-neutral-300 bg-white/95 text-neutral-700"}`}
+            >
+              {showField ? "✓ " : ""}🌊 สีน้ำ
+            </button>
           )}
+          {chips.map(([k, label, n]) => {
+            const on = filter === "all" ? layers[k] : filter === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                disabled={filter !== "all"}
+                onClick={() => toggle(k)}
+                aria-pressed={on}
+                className={`pointer-events-auto min-h-[36px] rounded-full border-2 px-2.5 text-xs font-semibold shadow ${on ? "border-black bg-black text-white" : "border-neutral-300 bg-white/95 text-neutral-700"} ${filter !== "all" ? "opacity-60" : ""}`}
+              >
+                {on ? "✓ " : ""}
+                {label} {n}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

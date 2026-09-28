@@ -226,7 +226,8 @@ export default function App() {
   function showOnMap(p) {
     setSheet(null);
     setTab("map");
-    setFocus({ lat: p.lat, lng: p.lng, t: Date.now() });
+    // water reports have a level: open the map in water mode so the dot is visible
+    setFocus({ lat: p.lat, lng: p.lng, t: Date.now(), water: p.level != null });
   }
 
   async function copySummary() {
@@ -741,7 +742,7 @@ function Legend() {
         </span>
       ))}
       <span>· เส้นประ = ขอบเขตหมู่บ้าน</span>
-      <span>· ⚫ตัวเลข = กลุ่มคำขอ แตะเพื่อซูม (🔴 = ยังไม่มีคนช่วย) · คำขอด่วนแสดงแยกเสมอ · ปุ่มมุมซ้ายล่างของแผนที่ = เปิด/ปิด จุดวัดน้ำ ช่วยได้ ข้อมูล</span>
+      <span>· ⚫ตัวเลข = กลุ่มคำขอ แตะเพื่อซูม (🔴 = ยังไม่มีคนช่วย) · คำขอด่วนแสดงแยกเสมอ · ดูระดับน้ำ: กด “💧 ระดับน้ำ” บนแผนที่ · ปุ่มมุมซ้ายล่าง = เปิด/ปิด สีน้ำ ช่วยได้ ข้อมูล</span>
     </div>
   );
 }
