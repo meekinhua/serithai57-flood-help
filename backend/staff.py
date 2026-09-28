@@ -73,7 +73,7 @@ def house_num(house: str) -> int:
 
 def needs_of(text: str) -> tuple[str, bool]:
     """Best-guess request category from free text, and whether it involves vulnerable people."""
-    vulnerable = bool(re.search(r"ผู้สูงอายุ|คนแก่|ชรา|ติดเตียง|ป่วย|เด็ก|ทารก|พิการ|ตั้งครรภ์|ยาย|คนท้อง", text))
+    vulnerable = bool(re.search(r"ผู้สูงอายุ|สูงวัย|คนแก่|ชรา|ติดเตียง|ป่วย|เด็ก|ทารก|พิการ|ตั้งครรภ์|ยาย|คนท้อง", text))
     if re.search(r"อพยพ|เรือ|ออกจากบ้าน|ติดอยู่", text):
         return "evacuate", vulnerable
     if vulnerable and not re.search(r"อาหาร|ข้าว|กล่อง|ที่", text):
