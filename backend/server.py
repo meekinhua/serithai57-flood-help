@@ -30,6 +30,7 @@ load_dotenv(Path(__file__).parent / ".env")
 
 import media  # noqa: E402
 import services  # noqa: E402
+import staff  # noqa: E402
 import weather  # noqa: E402
 
 # tz_aware so datetimes go out as "+00:00" and browsers don't misread them as local time
@@ -152,6 +153,7 @@ class PostCreate(Located):
     people: Optional[int] = Field(None, ge=0, le=500)
     urgent: bool = False
     general: bool = False  # village-wide info/offer with no specific spot (not allowed for requests)
+    pin_confirmed: bool = False  # the user moved the map / used GPS, so lat/lng is really their spot
     payment: Payment = "free"
     price: str = Field("", max_length=100)  # free text, e.g. "300 บาท" / "100 บาท/เที่ยว"
     media_ids: list[str] = Field(default_factory=list, max_length=4)  # uploaded via /api/media
@@ -222,7 +224,7 @@ class PinBody(BaseModel):
 
 # ---------------- admin auth ----------------
 def public_admin(a: dict) -> dict:
-    return {"id": a["id"], "email": a["email"], "name": a["name"], "created_at": a.get("created_at")}
+    return {"id": a["id"], "email": a["email"], "name": a["name"], "role": a.get("role", "admin"), "created_at": a.get("created_at")}
 
 
 async def current_admin(request: Request) -> Optional[dict]:
@@ -239,6 +241,8 @@ async def require_admin(request: Request) -> dict:
     admin = await current_admin(request)
     if not admin:
         raise HTTPException(401, "ต้องเข้าสู่ระบบผู้ดูแล")
+    if admin.get("role", "admin") != "admin":  # staff accounts can't use admin tools
+        raise HTTPException(403, "สำหรับผู้ดูแลเท่านั้น")
     return admin
 
 
@@ -381,13 +385,21 @@ async def create_post(body: PostCreate, request: Request):
     edit_key = secrets.token_urlsafe(18)
     t = now()
     post_id = str(uuid.uuid4())
+    house = staff.house_of(body.place) or staff.house_of(body.detail)
+    soi = staff.soi_of(f"{body.place} {body.detail}")
+    if house and body.pin_confirmed and not body.general:
+        await learn_address(house, soi=soi, lat=body.lat, lng=body.lng, source="resident", by=body.name)  # residents build the address book
     attachments = await claim_media(body.media_ids, f"post:{post_id}", {"image", "video"})
     doc = {
         "id": post_id,
-        **body.model_dump(exclude={"media_ids"}),
+        **body.model_dump(exclude={"media_ids", "pin_confirmed"}),
         "media": attachments,
         "urgent": body.urgent and body.kind == "need",
         "general": body.general and body.kind != "need",
+        "house": house,
+        "soi": soi,
+        "precision": "house" if body.pin_confirmed else "unconfirmed",
+        "assignee": None,
         "payment": "free" if body.kind == "info" else body.payment,
         "price": body.price.strip() if body.kind != "info" and body.payment == "paid" else "",
         "pinned": False,
@@ -580,6 +592,11 @@ app.include_router(api)
 app.include_router(media_router)
 app.include_router(weather.build_router(db))
 app.include_router(services.build_router(db, rate_limit, require_admin, audit, client_ip))
+VILLAGE_CENTER = (13.7958, 100.67)
+staff_router, locate_house, learn_address, require_staff = staff.build_router(
+    db, rate_limit, current_admin, require_admin, start_session, audit, public_post, VILLAGE_CENTER
+)
+app.include_router(staff_router)
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
@@ -595,6 +612,9 @@ async def startup():
     await db.announcements.create_index("created_at")
     await db.presence.create_index("last_seen", expireAfterSeconds=600)  # Mongo drops stale viewers itself
     await db.services.create_index("id", unique=True)
+    await db.addresses.create_index("house", unique=True)
+    await db.posts.create_index([("house", 1), ("status", 1)])
+    await db.staff_invites.create_index("token", unique=True)
     await db.services.create_index([("category", 1), ("updated_at", -1)])
     await db.media.create_index("id", unique=True)
     await db.media.create_index([("attached_to", 1), ("created_at", 1)])

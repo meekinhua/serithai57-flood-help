@@ -507,11 +507,16 @@ export default function App() {
         <footer className="mt-8 flex flex-col items-center gap-2 text-center text-xs text-neutral-500">
           <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Sahakorn Serithai 57" className="h-32 w-auto" />
           แผนที่ © ผู้ร่วมพัฒนา OpenStreetMap · ข้อมูลในหน้านี้มาจากชาวบ้านช่วยกันแจ้ง กรณีอันตรายถึงชีวิตโทร 1669 / 199 ทันที
-          {!admin && (
-            <a href="/admin" className="mt-1 inline-flex min-h-[44px] items-center text-neutral-400 underline">
-              สำหรับผู้ดูแล
+          <span className="flex gap-4">
+            <a href="/staff" className="mt-1 inline-flex min-h-[44px] items-center text-neutral-400 underline">
+              สำหรับเจ้าหน้าที่
             </a>
-          )}
+            {!admin && (
+              <a href="/admin" className="mt-1 inline-flex min-h-[44px] items-center text-neutral-400 underline">
+                สำหรับผู้ดูแล
+              </a>
+            )}
+          </span>
         </footer>
       </main>
 

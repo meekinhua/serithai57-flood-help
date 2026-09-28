@@ -157,6 +157,7 @@ export function PostForm({ kind: initialKind, posts = [], prefill = {}, onDone, 
           people: people === "" ? null : Number(people),
           urgent: kind === "need" && urgent,
           general: kind !== "need" && general,
+          pin_confirmed: pinTouched, // lets the app learn where house "4/xxx" really is
           payment: kind === "info" ? "free" : payment,
           price: payment === "paid" ? price.trim() : "",
           media_ids: attached.ids,

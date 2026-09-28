@@ -313,8 +313,80 @@ function AccountAdmin() {
   );
 }
 
+function StaffAdmin() {
+  const [invites, setInvites] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [hours, setHours] = useState("72");
+  const [msg, setMsg] = useState("");
+  const reload = useCallback(async () => {
+    setInvites(await api("/admin/staff-invites"));
+    setStaff((await api("/admin/admins")).filter((a) => a.role === "staff"));
+  }, []);
+  useEffect(() => {
+    reload().catch((e) => setMsg(e.message));
+  }, [reload]);
+  const link = (t) => `${window.location.origin}/staff#invite=${t}`;
+  async function create() {
+    const inv = await api("/admin/staff-invites", { method: "POST", body: JSON.stringify({ expires_hours: Number(hours) }) });
+    try {
+      await navigator.clipboard.writeText(link(inv.token));
+      setMsg("สร้างลิงก์เชิญแล้ว และคัดลอกให้แล้ว ส่งให้เจ้าหน้าที่ทางแชตส่วนตัว");
+    } catch {
+      setMsg(link(inv.token));
+    }
+    reload();
+  }
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2 rounded-2xl bg-white p-4 shadow">
+        <h3 className="text-lg font-bold">👷 เชิญเจ้าหน้าที่ / อาสา</h3>
+        <p className="text-sm text-neutral-600">เจ้าหน้าที่เปิดลิงก์ ใส่ชื่อ แล้วใช้หน้า /staff ได้ทันที (รับงาน แบ่งซอย นำเข้า LINE ตั้งตำแหน่งบ้าน) — จัดการผู้ดูแล/ประกาศไม่ได้</p>
+        <div className="flex flex-wrap gap-2">
+          <select value={hours} onChange={(e) => setHours(e.target.value)} className={input + " w-auto"}>
+            <option value="24">ลิงก์ใช้ได้ 24 ชม.</option>
+            <option value="72">ลิงก์ใช้ได้ 3 วัน</option>
+            <option value="168">ลิงก์ใช้ได้ 7 วัน</option>
+          </select>
+          <button onClick={create} className={btnPrimary}>สร้างลิงก์เชิญ</button>
+        </div>
+        {msg && <p className="break-all rounded-lg bg-neutral-100 p-3 text-sm">{msg}</p>}
+      </div>
+      <ul className="space-y-2">
+        {invites.map((i) => (
+          <li key={i.token} className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 text-sm shadow-sm">
+            <span className="min-w-0 flex-1">
+              {i.active && new Date(i.expires_at) > new Date() ? "🟢 ใช้ได้" : "⚪ ปิดแล้ว"} · เข้าร่วม {i.joined} คน · หมดอายุ {timeAgo(i.expires_at).replace("ที่แล้ว", "")}
+            </span>
+            {i.active && (
+              <>
+                <button onClick={() => navigator.clipboard?.writeText(link(i.token)).then(() => setMsg("คัดลอกลิงก์แล้ว"))} className={btnGhost}>คัดลอกลิงก์</button>
+                <button onClick={() => api(`/admin/staff-invites/${i.token}`, { method: "DELETE" }).then(reload)} className="min-h-[44px] px-2 text-red-700 underline">ยกเลิกลิงก์</button>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      <section className="rounded-2xl bg-white p-4 shadow">
+        <h3 className="mb-2 font-bold">เจ้าหน้าที่ในระบบ ({staff.length})</h3>
+        <ul className="space-y-1 text-sm">
+          {staff.map((s) => (
+            <li key={s.id} className="flex items-center gap-2">
+              <span className="flex-1">👷 {s.name}</span>
+              <button onClick={() => window.confirm(`ถอน ${s.name} ออกจากทีม?`) && api(`/admin/admins/${s.id}`, { method: "DELETE" }).then(reload)} className="min-h-[40px] px-2 text-red-700 underline">
+                ถอนสิทธิ์
+              </button>
+            </li>
+          ))}
+          {staff.length === 0 && <li className="text-neutral-500">ยังไม่มี</li>}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
 const TABS = [
   ["announcements", "📢 ประกาศ"],
+  ["staff", "👷 เจ้าหน้าที่"],
   ["admins", "🛡️ ผู้ดูแล"],
   ["audit", "📜 ประวัติ"],
   ["account", "🔑 บัญชี"],
@@ -327,7 +399,7 @@ export default function AdminPanel({ admin, onPublicChange }) {
       <p className="mb-3 rounded-xl bg-white p-3 text-sm shadow-sm">
         การลบ / ปักหมุดรายการ และลบรายงานระดับน้ำ ทำได้ที่<a href="/" className="font-semibold underline">หน้าหลัก</a> (ปุ่มผู้ดูแลจะแสดงในหน้ารายละเอียดของแต่ละรายการ)
       </p>
-      <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 sm:grid-cols-4" role="tablist">
+      <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 sm:grid-cols-5" role="tablist">
         {TABS.map(([key, text]) => (
           <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`min-h-[44px] rounded-lg font-semibold ${tab === key ? "bg-white shadow" : "text-neutral-600"}`}>
             {text}
@@ -335,6 +407,7 @@ export default function AdminPanel({ admin, onPublicChange }) {
         ))}
       </div>
       {tab === "announcements" && <AnnouncementsAdmin admin={admin} onPublicChange={onPublicChange} />}
+      {tab === "staff" && <StaffAdmin />}
       {tab === "admins" && <AdminsAdmin admin={admin} />}
       {tab === "audit" && <AuditAdmin />}
       {tab === "account" && <AccountAdmin />}
