@@ -84,6 +84,29 @@ export const STATUS = {
   done: { need: "ช่วยเสร็จแล้ว", offer: "ปิดแล้ว", info: "ไม่เป็นปัจจุบันแล้ว", cls: "border border-neutral-300 text-neutral-500" },
 };
 
+// Live staff trips (keys must match backend/trips.py)
+export const VEHICLES = {
+  boat: ["🚤", "เรือ"],
+  truck: ["🛻", "รถยกสูง"],
+  car: ["🚗", "รถ"],
+  walk: ["🚶", "เดินเท้า"],
+};
+export const MISSIONS = {
+  food: ["🍱", "แจกข้าว / อาหาร"],
+  water: ["💧", "แจกน้ำดื่ม"],
+  evacuate: ["🚣", "รับคน / อพยพ"],
+  medical: ["🏥", "รับส่งผู้ป่วย"],
+  cargo: ["📦", "ขนของ"],
+  survey: ["🔍", "สำรวจพื้นที่"],
+  other: ["🤝", "อื่นๆ"],
+};
+export const PHASES = {
+  enroute: ["🚀", "กำลังไป", "bg-sky-600 text-white"],
+  serving: ["📍", "ถึงแล้ว / กำลังให้บริการ", "bg-emerald-600 text-white"],
+  out_of_stock: ["⛔", "ของหมดแล้ว", "bg-neutral-500 text-white"],
+  returning: ["↩️", "กำลังกลับฐาน", "bg-neutral-700 text-white"],
+};
+
 // Contact board categories. Keys must match SERVICE_CATEGORIES in backend/services.py
 export const SERVICE_CATEGORIES = {
   electrician: ["⚡", "ช่างไฟ"],

@@ -11,6 +11,7 @@ import { mediaUrl } from "./media";
 import Guide from "./components/Guide";
 import { WeatherAlerts, WeatherCard, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm, ServiceStrip } from "./components/ServiceBoard";
+import { TripsStrip } from "./components/Trips";
 import { useCountUp } from "./motion";
 
 const REFRESH_MS = 20000;
@@ -42,6 +43,19 @@ export default function App() {
   const [viewers, setViewers] = useState(null);
   const [weather, setWeather] = useState(null);
   const [services, setServices] = useState([]);
+  const [trips, setTrips] = useState([]);
+
+  // Boats/trucks move: poll their positions more often than the rest, only while the page is visible.
+  useEffect(() => {
+    const loadTrips = () => document.visibilityState === "visible" && api("/trips").then(setTrips).catch(() => {});
+    loadTrips();
+    const t = setInterval(loadTrips, 10000);
+    document.addEventListener("visibilitychange", loadTrips);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", loadTrips);
+    };
+  }, []);
 
   // Weather never disappears: on failure we keep the last data (or show a placeholder) and retry sooner.
   useEffect(() => {
@@ -62,6 +76,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
   const [admin, setAdmin] = useState(null);
+  const [staffUser, setStaffUser] = useState(null); // staff share the login system but not admin powers
   const [authChecked, setAuthChecked] = useState(false);
 
   // Admin session: secret link /admin#key=... logs in once, then the cookie carries it.
@@ -70,7 +85,7 @@ export default function App() {
     if (key) window.history.replaceState(null, "", window.location.pathname); // don't leave the key in the URL bar/history
     const check = key ? api("/auth/key", { method: "POST", body: JSON.stringify({ key }) }) : api("/auth/me");
     check
-      .then(setAdmin)
+      .then((u) => (u.role === "staff" ? setStaffUser(u) : setAdmin(u)))
       .catch((err) => key && setToast(err.message))
       .finally(() => setAuthChecked(true));
   }, []);
@@ -308,6 +323,14 @@ export default function App() {
           </button>
         </div>
         {!IS_ADMIN_PAGE && <WeatherTopBar weather={weather} onOpen={() => setSheet({ type: "weather" })} />}
+        {staffUser && !admin && (
+          <div className="border-t border-white/20 bg-blue-900">
+            <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-1 text-sm sm:px-4">
+              <span className="font-semibold">👷 เจ้าหน้าที่ · {staffUser.name}</span>
+              <a href="/staff" className="ml-auto flex min-h-[40px] items-center underline">ไปหน้าเจ้าหน้าที่ ›</a>
+            </div>
+          </div>
+        )}
         {admin && (
           <div className="border-t border-white/20 bg-neutral-800">
             <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 text-sm sm:px-4">
@@ -370,6 +393,12 @@ export default function App() {
           </ActionButton>
         </div>
 
+        {trips.length > 0 && (
+          <div className="mt-3">
+            <TripsStrip trips={trips} onFocus={showOnMap} />
+          </div>
+        )}
+
         <div className="mt-3">
           <ServiceStrip
             services={services}
@@ -409,7 +438,7 @@ export default function App() {
         <div className="mt-3 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-4">
           <section className={`${tab === "map" ? "block" : "hidden"} lg:block`}>
             <div className="relative h-[65vh] overflow-hidden rounded-xl border border-neutral-300 bg-white lg:sticky lg:top-20 lg:h-[calc(100vh-7rem)]">
-              <MapView posts={visible} water={water} onSelect={openDetail} focus={focus} />
+              <MapView posts={visible} water={water} trips={trips} onSelect={openDetail} focus={focus} />
             </div>
             <Legend />
           </section>

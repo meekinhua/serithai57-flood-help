@@ -3,6 +3,8 @@ import L from "leaflet";
 import { api, load, save } from "../api";
 import { categoryOf, osmLink, timeAgo } from "../config";
 import { createBaseMap } from "./MapView";
+import { TripPanel } from "./Trips";
+import Guide, { STAFF_SLIDES } from "./Guide";
 
 // Field-staff console: split the work by soi, claim a house (nobody else can take it), finish it,
 // import the LINE OpenChat, and build the village address book as you go.
@@ -528,6 +530,7 @@ function Lookup() {
 
 // ---------------- shell ----------------
 const TABS = [
+  ["trip", "🚤 ออกงาน"],
   ["tasks", "📋 งาน"],
   ["map", "🗺️ แผนที่"],
   ["import", "📥 นำเข้า LINE"],
@@ -543,6 +546,11 @@ export default function StaffApp() {
   const [sois, setSois] = useState(null);
   const [locateTarget, setLocateTarget] = useState(null);
   const [toast, setToast] = useState("");
+  const [showGuide, setShowGuide] = useState(false);
+
+  useEffect(() => {
+    if (user && !load("staffGuideSeen", false)) setShowGuide(true); // first time on the staff console
+  }, [user]);
 
   useEffect(() => {
     api("/auth/me").then(setUser).catch(() => {}).finally(() => setChecked(true));
@@ -564,6 +572,11 @@ export default function StaffApp() {
             <h1 className="truncate text-lg font-bold">👷 เจ้าหน้าที่ · เสรีไทย 57</h1>
             {user && <p className="truncate text-xs text-neutral-400">{user.name} · งานค้าง {tasks.filter((t) => t.status !== "done").length} · ยังไม่มีคนรับ {tasks.filter((t) => t.status !== "done" && !t.assignee).length}</p>}
           </div>
+          {user && (
+            <button onClick={() => setShowGuide(true)} aria-label="เปิดวิธีใช้งานเจ้าหน้าที่" className="min-h-[44px] min-w-[44px] rounded-lg bg-white/10 px-3 font-bold">
+              ❓
+            </button>
+          )}
           <a href="/" className="min-h-[44px] rounded-lg bg-white/10 px-3 py-2 text-sm">หน้าหลัก</a>
         </div>
         {user && (
@@ -601,6 +614,7 @@ export default function StaffApp() {
               />
             )}
             {tab === "map" && <TaskMap user={user} tasks={tasks} sois={sois} />}
+            {tab === "trip" && <TripPanel user={user} />}
             {tab === "import" && (
               <Import
                 onDone={(m) => {
@@ -615,6 +629,16 @@ export default function StaffApp() {
           </>
         )}
       </main>
+      {showGuide && (
+        <Guide
+          slides={STAFF_SLIDES}
+          heading="วิธีใช้งานเจ้าหน้าที่"
+          onClose={() => {
+            setShowGuide(false);
+            save("staffGuideSeen", true);
+          }}
+        />
+      )}
     </div>
   );
 }

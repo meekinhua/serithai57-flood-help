@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { KINDS, VILLAGE_BOUNDARY, VILLAGE_CENTER, VILLAGE_ZOOM, categoryOf, timeAgo, waterOf } from "../config";
 import { mediaUrl } from "../media";
-import { WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
+import { MISSIONS, PHASES, VEHICLES, WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
 import { describeLevel, estimateAt, fieldBounds, renderField, toPoints } from "../waterField";
 import { load, save } from "../api";
 
@@ -38,11 +38,12 @@ function postIcon(post, isNew = false) {
   });
 }
 
-export default function MapView({ posts, water, onSelect, focus }) {
+export default function MapView({ posts, water, trips = [], onSelect, focus }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
   const fieldRef = useRef(null);
+  const tripsRef = useRef(null);
   const pointsRef = useRef([]);
   const seenPins = useRef(new Set());
   const [showField, setShowField] = useState(() => load("showWaterField", true));
@@ -53,6 +54,8 @@ export default function MapView({ posts, water, onSelect, focus }) {
     map.createPane("waterField").style.zIndex = 350;
     map.getPane("waterField").style.pointerEvents = "none";
     layerRef.current = L.layerGroup().addTo(map);
+    map.createPane("trips").style.zIndex = 650; // moving vehicles above every other pin
+    tripsRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     map.on("click", (e) => {
       if (!fieldRef.current) return;
@@ -107,6 +110,33 @@ export default function MapView({ posts, water, onSelect, focus }) {
         .addTo(layer);
     }
   }, [posts, water, onSelect]);
+
+  // Staff boats / trucks: icon + label, dashed trail of where they've been
+  useEffect(() => {
+    const layer = tripsRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+    for (const t of trips) {
+      const [ve] = VEHICLES[t.vehicle] || ["🚗"];
+      const [me, mt] = MISSIONS[t.mission] || ["🤝", ""];
+      const [pe, pt] = PHASES[t.phase] || PHASES.enroute;
+      if (t.path?.length > 1) L.polyline(t.path, { pane: "trips", color: "#2563eb", weight: 3, opacity: 0.6, dashArray: "6 6", interactive: false }).addTo(layer);
+      L.marker([t.lat, t.lng], {
+        pane: "trips",
+        icon: L.divIcon({
+          className: "",
+          iconSize: [44, 44],
+          iconAnchor: [22, 22],
+          html: `<div style="width:44px;height:44px;border-radius:9999px;background:#fff;border:4px solid #2563eb;box-shadow:0 2px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:22px;position:relative">${ve}<span style="position:absolute;bottom:-6px;right:-8px;font-size:14px;background:#fff;border-radius:9999px;border:1.5px solid #2563eb;padding:1px">${me}</span></div>`,
+        }),
+      })
+        .bindTooltip(escapeHtml(t.label), { permanent: true, direction: "top", offset: [0, -24], className: "trip-label" })
+        .bindPopup(
+          `<b>${ve} ${escapeHtml(t.label)}</b><br>${me} ${mt}<br>${pe} ${pt}${t.soi ? ` · ซอย ${escapeHtml(t.soi)}` : ""}${t.note ? `<br>${escapeHtml(t.note)}` : ""}<br><span style="color:#666">อัปเดต ${timeAgo(t.updated_at)}</span>`
+        )
+        .addTo(layer);
+    }
+  }, [trips]);
 
   // Interpolated water surface. Rebuilt only when the set of reports changes (not on every 20 s poll).
   const fieldKey = useRef("");
