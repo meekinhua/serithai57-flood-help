@@ -415,6 +415,8 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
                 note = f"จาก LINE: {row.text[:200]}"
                 if not any(h.get("note") == note for h in existing.get("history", [])):  # re-imports repeat the same lines
                     await history(existing["id"], user, existing["status"], note)
+                if needs_of(row.text)[1] and not existing.get("urgent"):  # new message says elderly / sick / children
+                    await db.posts.update_one({"id": existing["id"]}, {"$set": {"urgent": True}})
                 updated += 1
                 continue
             if not row.force and await db.posts.find_one({"kind": "need", "status": "done", "house": row.house, "updated_at": {"$gte": now() - RECENT_DONE}}):
@@ -427,7 +429,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
             doc = {
                 "id": str(uuid.uuid4()), "kind": "need", "category": category, "detail": row.text or "ขอความช่วยเหลือ (จาก LINE)",
                 "place": place, "name": "จาก LINE OpenChat", "phone": row.phone, "people": row.portions,
-                "urgent": vulnerable and category in ("evacuate", "vulnerable"), "general": False, "payment": "free", "price": "",
+                "urgent": vulnerable, "general": False, "payment": "free", "price": "",
                 "media": [], "pinned": False, "status": "open", "created_at": t, "updated_at": t,
                 "lat": loc["lat"], "lng": loc["lng"], "house": row.house, "soi": loc["soi"], "precision": loc["precision"], "source": "line",
                 "history": [{"at": t, "status": "open", "name": user["name"], "note": "นำเข้าจาก LINE OpenChat", "staff": True}],
