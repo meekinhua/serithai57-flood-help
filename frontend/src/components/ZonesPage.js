@@ -94,6 +94,11 @@ function ZoneStatus({ zone, entries, onAdded }) {
   const quietH = last ? (Date.now() - new Date(last.at).getTime()) / 3.6e6 : null;
 
   async function submit() {
+    // say what's missing instead of a greyed-out button nobody understands
+    if (!kind || !name.trim()) {
+      setMsg(!kind ? "👆 เลือกก่อนว่าทำอะไร (ปุ่มด้านบน)" : "✍️ ใส่ชื่อหรือทีมของคุณก่อน");
+      return;
+    }
     setMsg("");
     try {
       await api(`/zones/${zone.id}/log`, { method: "POST", body: JSON.stringify({ kind, minutes_ago: when, note: note.trim(), name: name.trim() }) });
@@ -104,7 +109,7 @@ function ZoneStatus({ zone, entries, onAdded }) {
       setWhen(0);
       onAdded();
     } catch (e) {
-      setMsg(e.message);
+      setMsg(e.message === "404" || e.message === "Not Found" ? "ระบบสถานะโซนยังไม่เปิดบนเว็บนี้ (ต้อง deploy รุ่นใหม่)" : e.message);
     }
   }
 
@@ -143,7 +148,7 @@ function ZoneStatus({ zone, entries, onAdded }) {
       {openLog && <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto border-t pt-2">{entries.slice(1).map(row)}</ul>}
       {adding && (
         <div className="mt-2 space-y-2 border-t pt-2">
-          <p className="text-sm font-semibold">ทำอะไรในโซน {zone.id}?</p>
+          <p className={`text-sm font-semibold ${msg && !kind ? "text-red-700" : ""}`}>1. ทำอะไรในโซน {zone.id}?</p>
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(ACTIONS).map(([k, [e, t]]) => (
               <button key={k} type="button" onClick={() => setKind(k)} aria-pressed={kind === k} className={`min-h-[40px] rounded-full px-3 text-sm ${kind === k ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}>
@@ -151,7 +156,7 @@ function ZoneStatus({ zone, entries, onAdded }) {
               </button>
             ))}
           </div>
-          <p className="text-sm font-semibold">เมื่อไหร่?</p>
+          <p className="text-sm font-semibold">2. เมื่อไหร่?</p>
           <div className="flex flex-wrap gap-1.5">
             {WHEN.map(([m, t]) => (
               <button key={m} type="button" onClick={() => setWhen(m)} aria-pressed={when === m} className={`min-h-[36px] rounded-full px-3 text-sm ${when === m ? "bg-black text-white" : "border border-neutral-300 bg-white"}`}>
@@ -160,9 +165,9 @@ function ZoneStatus({ zone, entries, onAdded }) {
             ))}
           </div>
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className="min-h-[44px] w-full rounded-lg border border-neutral-300 px-3" placeholder="รายละเอียด (ไม่ใส่ก็ได้) เช่น ข้าว 80 กล่อง ซอย 18–20" />
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className="min-h-[44px] w-full rounded-lg border border-neutral-300 px-3" placeholder="ชื่อ / ทีม เช่น เรือทีมต้น" />
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={`min-h-[44px] w-full rounded-lg border px-3 ${msg && kind && !name.trim() ? "border-2 border-red-500" : "border-neutral-300"}`} placeholder="3. ชื่อ / ทีม (จำเป็น) เช่น เรือทีมต้น" />
           {msg && <p className="rounded bg-red-50 p-2 text-sm text-red-700">{msg}</p>}
-          <button onClick={submit} disabled={!kind || !name.trim()} className="min-h-[48px] w-full rounded-lg bg-black font-bold text-white disabled:opacity-40">
+          <button onClick={submit} className="min-h-[48px] w-full rounded-lg bg-black font-bold text-white">
             ส่งสถานะ
           </button>
         </div>
