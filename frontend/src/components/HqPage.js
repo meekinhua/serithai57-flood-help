@@ -108,6 +108,7 @@ export default function HqPage() {
           </button>
           <button onClick={() => go("people")} className="min-h-[44px] rounded-lg bg-white/15 px-3 text-sm font-semibold">📞 รายชื่อ</button>
           <a href="/team" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm font-semibold">🚶 หน้าทีมแจก</a>
+          <a href="/teamwork" title="หน้าสำหรับชาวบ้าน (ไม่มีข้อมูลส่วนตัว)" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm">🌐 หน้าชาวบ้าน</a>
           <a href="/zones" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm">🗺️</a>
         </div>
       </header>

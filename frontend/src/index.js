@@ -8,9 +8,10 @@ import ZonesPage from "./components/ZonesPage";
 import OpsPage from "./components/OpsPage";
 import HqPage from "./components/HqPage";
 import TeamPage from "./components/TeamPage";
+import TeamworkPage from "./components/TeamworkPage";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {{ "/staff": <StaffApp />, "/zones": <ZonesPage />, "/ops": <OpsPage />, "/hq": <HqPage />, "/team": <TeamPage /> }[window.location.pathname.replace(/\/+$/, "")] || <App />}
+    {{ "/staff": <StaffApp />, "/zones": <ZonesPage />, "/ops": <OpsPage />, "/hq": <HqPage />, "/team": <TeamPage />, "/teamwork": <TeamworkPage /> }[window.location.pathname.replace(/\/+$/, "")] || <App />}
   </React.StrictMode>
 );

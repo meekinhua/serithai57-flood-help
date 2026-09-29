@@ -418,6 +418,14 @@ export default function App() {
             <span className="block text-xs font-normal text-neutral-600">ทีมช่วยเหลือเลือกโซน · คนนำของมาบริจาคดูจุดจอดริมถนนหลัก</span>
           </span>
         </a>
+        {/* what the volunteer teams are doing, and how to join them (read only, nothing personal) */}
+        <a href="/teamwork" className="mt-2 flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-sky-700 px-3 text-center font-bold text-white">
+          <span className="text-xl">💪</span>
+          <span>
+            ทีมอาสาหมู่บ้านทำอะไรอยู่ · อยากช่วย?
+            <span className="block text-xs font-normal opacity-90">ส่งของถึงบ้านไปแล้วกี่หลัง · ทีมขาดอะไร · มาช่วยได้อย่างไร</span>
+          </span>
+        </a>
         {/* volunteer coordination: who is at which drop point, what each needs, hazards, boats */}
         <a href="/ops" className="mt-2 flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-green-600 bg-green-50 px-3 text-center font-bold text-black">
           <span className="text-xl">🤝</span>

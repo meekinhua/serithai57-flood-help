@@ -168,4 +168,55 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
         await db.posts.insert_one(dict(doc))
         return case_view(doc)
 
+    # ---------- /teamwork: what the teams are doing, for the whole village (read only, nothing personal) ----------
+    @router.get("/public/teamwork")
+    async def teamwork(request: Request):
+        """Counts and progress only. No house numbers, no resident or volunteer names, no phone numbers,
+        no internal board questions. Safe for the village LINE group whatever the team-page lock is."""
+        rate_limit(request, "teamwork", limit=120, window_s=600)
+        t = now()
+        day = t - timedelta(hours=24)
+        per: dict = {}
+        totals = {"open": 0, "helping": 0, "urgent": 0, "done_24h": 0, "done_total": 0}
+        activity = []
+        async for p in db.posts.find({"kind": "need", "payment": {"$ne": "paid"}}, {"_id": 0, "status": 1, "soi": 1, "urgent": 1, "updated_at": 1, "history": 1}):
+            z = soi_zone.get(p.get("soi") or "") or "?"
+            o = per.setdefault(z, {"open": 0, "helping": 0, "done_24h": 0, "done_total": 0})
+            st = p.get("status")
+            if st == "done":
+                o["done_total"] += 1
+                totals["done_total"] += 1
+                upd = p.get("updated_at")
+                if upd and (upd if upd.tzinfo else upd.replace(tzinfo=timezone.utc)) >= day:
+                    o["done_24h"] += 1
+                    totals["done_24h"] += 1
+            else:
+                key = "helping" if st == "helping" else "open"
+                o[key] += 1
+                totals[key] += 1
+                totals["urgent"] += bool(p.get("urgent"))
+            for h in p.get("history") or []:
+                at = h.get("at")
+                if not at:
+                    continue
+                at = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+                if at >= day and h.get("status") in ("done", "helping") and h.get("staff"):
+                    activity.append({"zone": z, "kind": "delivered" if h["status"] == "done" else "on_the_way", "at": at})
+        async for e in db.zone_log.find({"at": {"$gte": day}}, {"_id": 0, "zone": 1, "kind": 1, "at": 1}):
+            activity.append({"zone": e["zone"], "kind": e["kind"], "at": e["at"]})
+        activity.sort(key=lambda x: x["at"], reverse=True)
+
+        points = [{"zone": d["zone"], "place": d.get("place", ""), "manned": bool(d.get("person")) and d.get("manned") is not False, "needs": d.get("needs") or []}
+                  async for d in db.ops_points.find({}, {"_id": 0})]
+        people = await db.ops_people.count_documents({"active": True, "role": {"$not": {"$regex": "^ติดต่อ"}}})
+        boats = [b async for b in db.ops_boats.find({"active": True}, {"_id": 0, "need_driver": 1, "kind": 1})]
+        supplies = [n["text"] async for n in db.ops_notes.find({"archived": False, "kind": "supply", "done": False}, {"_id": 0, "text": 1}).sort("created_at", 1)]
+        hazards = [{"kind": h["kind"], "soi": h.get("soi", ""), "note": h.get("note", "")}
+                   async for h in db.ops_hazards.find({"cleared_at": None}, {"_id": 0}).sort("created_at", -1)]
+        return {
+            "updated_at": t, "totals": totals, "zones": per, "points": points, "volunteers": people,
+            "boats": {"total": len(boats), "need_driver": sum(1 for b in boats if b.get("need_driver"))},
+            "supplies": supplies, "hazards": hazards, "activity": activity[:25],
+        }
+
     return router, is_team
