@@ -631,6 +631,8 @@ async def startup():
     await db.ops_hazards.create_index([("cleared_at", 1), ("created_at", -1)])
     await db.ops_boats.create_index([("active", 1), ("created_at", 1)])
     await db.ops_history.create_index("expires_at", expireAfterSeconds=0)
+    await db.ops_notes.create_index([("archived", 1), ("created_at", -1)])
+    await db.ops_people.create_index([("active", 1), ("digits", 1)])
     await db.ops_history.create_index([("ref", 1), ("at", -1)])
     await db.services.create_index([("category", 1), ("updated_at", -1)])
     await db.media.create_index("id", unique=True)

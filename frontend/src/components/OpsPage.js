@@ -411,6 +411,224 @@ function Boats({ boats, onChange }) {
   );
 }
 
+// ---------- pin board: ❓ waiting for a decision → ✅ decided; 🛒 what the team is short of ----------
+const NOTE = {
+  question: { icon: "❓", title: "รอสรุป", add: "ปักเรื่องที่ยังไม่จบ", ph: "เช่น พรุ่งนี้ใครประจำจุด E (ซ.28 หรือ ซ.32)?", who: "ใครควรเป็นคนตัดสิน (ไม่ใส่ก็ได้)" },
+  decision: { icon: "✅", title: "ข้อสรุป", add: "บันทึกข้อสรุป", ph: "เช่น พรุ่งนี้เริ่ม 11:00 เหมือนเดิม", who: "ใครสรุป (ไม่ใส่ก็ได้)" },
+  supply: { icon: "🛒", title: "ทีมขาดอะไร", add: "ขอของใช้ทีม", ph: "เช่น รองเท้าบูท", who: "สำหรับใคร / จุดไหน เช่น ทีมจุด F" },
+};
+
+function NoteForm({ kind, onDone }) {
+  const [text, setText] = useState("");
+  const [detail, setDetail] = useState("");
+  const [forWho, setForWho] = useState("");
+  const [name, setName, remember] = useName();
+  const [msg, setMsg] = useState("");
+  const k = NOTE[kind];
+  async function submit() {
+    if (!text.trim()) return setMsg("พิมพ์เรื่องก่อน");
+    if (!name.trim()) return setMsg("✍️ ใส่ชื่อของคุณ");
+    try {
+      await api("/ops/notes", { method: "POST", body: JSON.stringify({ kind, text: text.trim(), detail: detail.trim(), for_who: forWho.trim(), name: name.trim() }) });
+      remember();
+      onDone(true);
+    } catch (e) {
+      setMsg(e.message === "404" || e.message === "Not Found" ? "ระบบนี้ยังไม่เปิดบนเว็บ (ต้อง deploy รุ่นใหม่)" : e.message);
+    }
+  }
+  return (
+    <div className="mb-2 space-y-2 rounded-xl border-2 border-black bg-white p-3">
+      <p className="font-semibold">
+        {k.icon} {k.add}
+      </p>
+      <input value={text} onChange={(e) => setText(e.target.value)} maxLength={200} className={inputCls} placeholder={k.ph} />
+      <input value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={200} className={inputCls} placeholder={kind === "supply" ? "จำนวน / ไซซ์ เช่น 40–41 ×4 คู่, 42–43 ×6 คู่" : "รายละเอียด (ไม่ใส่ก็ได้)"} />
+      <input value={forWho} onChange={(e) => setForWho(e.target.value)} maxLength={60} className={inputCls} placeholder={k.who} />
+      <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={inputCls} placeholder="ชื่อคุณ (จำเป็น)" />
+      {msg && <p className="rounded bg-yellow-50 p-2 text-sm">{msg}</p>}
+      <div className="grid grid-cols-3 gap-2">
+        <button onClick={() => onDone(false)} className="min-h-[48px] rounded-lg border border-neutral-300">ยกเลิก</button>
+        <button onClick={submit} className="col-span-2 min-h-[48px] rounded-lg bg-black font-bold text-white">บันทึก</button>
+      </div>
+    </div>
+  );
+}
+
+function Board({ notes, onChange }) {
+  const [adding, setAdding] = useState(null); // kind of the open form
+  const [name] = useName();
+  const who = () => (name.trim() || window.prompt("ชื่อคุณ") || "").trim();
+  async function post(path, body) {
+    try {
+      await api(path, { method: "POST", body: JSON.stringify(body) });
+      onChange();
+    } catch (e) {
+      window.alert(e.message);
+    }
+  }
+  function resolve(n) {
+    const res =
+      n.kind === "question"
+        ? window.prompt(`สรุปว่าอย่างไร?\n❓ ${n.text}`)
+        : window.prompt(`ได้ “${n.text}” แล้ว — ตอนนี้อยู่กับใคร / ที่ไหน? (ไม่ใส่ก็ได้)`, "");
+    if (res == null || (n.kind === "question" && !res.trim())) return;
+    const w = who();
+    if (w) post(`/ops/notes/${n.id}/resolve`, { resolution: res.trim(), name: w });
+  }
+  function archive(n) {
+    const w = who();
+    if (w && window.confirm(`เอา “${n.text}” ออกจากบอร์ด?`)) post(`/ops/notes/${n.id}/archive`, { name: w });
+  }
+  const done = (saved) => {
+    setAdding(null);
+    if (saved) onChange();
+  };
+  const open = notes.filter((n) => n.kind === "question" && !n.done);
+  const decided = notes.filter((n) => n.kind !== "supply" && n.done).sort((a, b) => new Date(b.done_at) - new Date(a.done_at));
+  const supply = notes.filter((n) => n.kind === "supply").sort((a, b) => a.done - b.done);
+
+  const item = (n) => (
+    <li key={n.id} className={`rounded-lg p-2 ${n.done && n.kind === "supply" ? "bg-green-50 opacity-70" : "bg-neutral-50"}`}>
+      <p className="font-semibold">
+        {n.kind === "supply" && n.done ? "✅ " : ""}
+        {n.text}
+      </p>
+      {n.detail && <p className="text-sm text-neutral-700">{n.detail}</p>}
+      {n.resolution && (
+        <p className="text-sm font-semibold text-green-800">
+          {n.kind === "question" ? "➡️ " : "📦 "}
+          {n.resolution}
+        </p>
+      )}
+      <p className="text-xs text-neutral-500">
+        {n.for_who && `${n.kind === "supply" ? "สำหรับ" : n.kind === "question" ? "ให้" : "โดย"} ${n.for_who} · `}
+        {n.done && n.kind !== "decision" ? `เสร็จ ${timeAgo(n.done_at)} (${n.done_by})` : `${timeAgo(n.created_at)} · ${n.by}`}
+      </p>
+      <div className="mt-1 flex gap-2">
+        {!n.done && (
+          <button onClick={() => resolve(n)} className="min-h-[36px] rounded-lg bg-green-600 px-3 text-sm font-bold text-white">
+            {n.kind === "question" ? "✅ สรุปแล้ว" : "✅ ได้แล้ว"}
+          </button>
+        )}
+        <button onClick={() => archive(n)} className="min-h-[36px] rounded-lg border border-neutral-300 px-3 text-sm">
+          🗑️ เอาออก
+        </button>
+      </div>
+    </li>
+  );
+  const section = (kind, list, empty) => (
+    <section className="rounded-xl bg-white p-3 shadow">
+      <div className="mb-2 flex items-center gap-2">
+        <p className="flex-1 text-lg font-bold">
+          {NOTE[kind].icon} {NOTE[kind].title} {list.length > 0 && <span className="text-sm font-normal text-neutral-500">({list.length})</span>}
+        </p>
+        <button onClick={() => setAdding(kind)} className="min-h-[40px] rounded-lg bg-black px-3 text-sm font-bold text-white">
+          ➕ เพิ่ม
+        </button>
+      </div>
+      {adding === kind && <NoteForm kind={kind} onDone={done} />}
+      {list.length ? <ul className="space-y-2">{list.map(item)}</ul> : adding !== kind && <p className="text-sm text-neutral-500">{empty}</p>}
+    </section>
+  );
+  return (
+    <div className="space-y-3">
+      {section("question", open, "ไม่มีเรื่องค้าง — เรื่องไหนคุยใน LINE แล้วยังไม่จบ กด ➕ ปักไว้ตรงนี้")}
+      {section("supply", supply, "ทีมยังไม่ได้แจ้งว่าขาดอะไร")}
+      {section("decision", decided, "ยังไม่มีข้อสรุป")}
+    </div>
+  );
+}
+
+// ---------- volunteer roster: replaces the copy-paste name+phone chain in LINE ----------
+function Roster({ people, insider, onChange }) {
+  const [name, setName, remember] = useName();
+  const [phone, setPhone] = useState(() => load("contact", {}).phone || "");
+  const [role, setRole] = useState("");
+  const [msg, setMsg] = useState("");
+  const [copied, setCopied] = useState(false);
+  async function join() {
+    if (!name.trim()) return setMsg("✍️ ใส่ชื่อ");
+    if (phone.replace(/\D/g, "").length < 9) return setMsg("📞 ใส่เบอร์ให้ครบ");
+    try {
+      const res = await api("/ops/people", { method: "POST", body: JSON.stringify({ name: name.trim(), phone: phone.trim(), role: role.trim() }) });
+      remember();
+      save("contact", { ...load("contact", {}), name: name.trim(), phone: phone.trim() });
+      setMsg(res.updated ? "✅ อัปเดตชื่อของคุณแล้ว" : "✅ ลงชื่อแล้ว ขอบคุณครับ");
+      setRole("");
+      onChange();
+    } catch (e) {
+      setMsg(e.message === "404" || e.message === "Not Found" ? "ระบบนี้ยังไม่เปิดบนเว็บ (ต้อง deploy รุ่นใหม่)" : e.message);
+    }
+  }
+  async function remove(pp) {
+    const w = name.trim() || window.prompt("ชื่อคุณ") || "";
+    if (!w.trim() || !window.confirm(`ลบ “${pp.name}” ออกจากรายชื่อ?`)) return;
+    try {
+      await api(`/ops/people/${pp.id}/remove`, { method: "POST", body: JSON.stringify({ name: w.trim() }) });
+      onChange();
+    } catch (e) {
+      window.alert(e.message);
+    }
+  }
+  async function copyList() {
+    const text = [`📋 รายชื่ออาสา (${people.length} คน)`, ...people.map((pp, i) => `${i + 1}. ${pp.name} ${pp.phone}${pp.role ? ` · ${pp.role}` : ""}`)].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      window.prompt("คัดลอกข้อความนี้", text);
+    }
+  }
+  return (
+    <div className="space-y-3">
+      <section className="space-y-2 rounded-xl border-2 border-green-600 bg-white p-3 shadow">
+        <p className="text-lg font-bold">🙋 ลงชื่ออาสา (ไม่ต้องก๊อปต่อกันในไลน์แล้ว)</p>
+        <div className="grid grid-cols-2 gap-2">
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={inputCls} placeholder="ชื่อเล่น" />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} inputMode="tel" className={inputCls} placeholder="📞 เบอร์" />
+        </div>
+        <input value={role} onChange={(e) => setRole(e.target.value)} maxLength={80} className={inputCls} placeholder="ช่วยตรงไหน เช่น หน้าหมู่บ้าน ทีมมีจัง / จุด F / ขับเรือเป็น" />
+        {msg && <p className="rounded bg-yellow-50 p-2 text-sm">{msg}</p>}
+        <button onClick={join} className="min-h-[48px] w-full rounded-lg bg-green-600 font-bold text-white">
+          ลงชื่อ
+        </button>
+        <p className="text-xs text-neutral-500">
+          🔒 เบอร์โทรเห็นเต็มเฉพาะทีมที่ล็อกอินใน /staff · คนทั่วไปเห็นแค่ 08x-xxx-1234 · ลงซ้ำด้วยเบอร์เดิม = แก้ชื่อ/หน้าที่
+        </p>
+      </section>
+      <section className="rounded-xl bg-white p-3 shadow">
+        <div className="mb-2 flex items-center gap-2">
+          <p className="flex-1 text-lg font-bold">📋 รายชื่ออาสา ({people.length})</p>
+          {insider && people.length > 0 && (
+            <button onClick={copyList} className="min-h-[40px] rounded-lg bg-black px-3 text-sm font-bold text-white">
+              {copied ? "✅ คัดลอกแล้ว" : "📋 คัดลอก"}
+            </button>
+          )}
+        </div>
+        {people.length === 0 ? (
+          <p className="text-sm text-neutral-500">ยังไม่มีใครลงชื่อ</p>
+        ) : (
+          <ol className="space-y-1">
+            {people.map((pp, i) => (
+              <li key={pp.id} className="flex items-center gap-2 rounded-lg bg-neutral-50 px-2 py-1.5">
+                <span className="w-6 text-right text-sm text-neutral-500">{i + 1}.</span>
+                <span className="min-w-0 flex-1">
+                  <b>{pp.name}</b> {insider ? <Tel phone={pp.phone} /> : <span className="text-sm text-neutral-600">{pp.phone}</span>}
+                  {pp.role && <span className="block text-xs text-neutral-600">{pp.role}</span>}
+                </span>
+                <button onClick={() => remove(pp)} aria-label={`ลบ ${pp.name}`} className="min-h-[36px] rounded px-2 text-sm text-neutral-400">
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </div>
+  );
+}
+
 // ---------- the LINE summary ----------
 function summaryText(zones, board) {
   const t = new Date().toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -420,10 +638,28 @@ function summaryText(zones, board) {
     out.push("", "⚠️ อันตราย ระวัง!");
     for (const h of live) out.push(`${(HAZ[h.kind] || HAZ.other)[0]} ${(HAZ[h.kind] || HAZ.other)[1]}${h.soi ? ` ซ.${h.soi}` : ""}${h.note ? ` — ${h.note}` : ""}`);
   }
+  const notes = board.notes || [];
+  const open = notes.filter((n) => n.kind === "question" && !n.done);
+  if (open.length) {
+    out.push("", "❓ รอสรุป");
+    for (const n of open) out.push(`• ${n.text}${n.for_who ? ` (${n.for_who})` : ""}`);
+  }
+  const decided = notes.filter((n) => n.kind !== "supply" && n.done && hoursSince(n.done_at) < 24);
+  if (decided.length) {
+    out.push("", "✅ ข้อสรุป");
+    for (const n of decided.slice(0, 8)) out.push(`• ${n.kind === "question" ? `${n.text} → ${n.resolution}` : n.text}`);
+  }
+  const need = notes.filter((n) => n.kind === "supply" && !n.done);
+  if (need.length) {
+    out.push("", "🛒 ทีมขาด");
+    for (const n of need) out.push(`• ${n.text}${n.detail ? ` — ${n.detail}` : ""}${n.for_who ? ` (${n.for_who})` : ""}`);
+  }
   out.push("", "📍 จุดลงของ");
   for (const z of zones) {
     const p = board.points[z.id] || {};
-    const bits = [`${z.id} · ${p.place || placeOf(z)}`];
+    const shared = z.drop.shared || [z.id];
+    if (shared[0] !== z.id && !p.updated_at) continue; // G, H: reported on F's line
+    const bits = [`${shared[0] === z.id ? shared.join("·") : z.id} · ${p.place || placeOf(z)}`];
     bits.push(p.person ? `${p.person}${p.phone ? ` ${p.phone}` : ""}${p.hours ? ` (${p.hours})` : ""}${p.manned === false ? " ❌ไม่อยู่" : ""}` : "❌ ยังไม่มีคนประจำ");
     if (p.needs?.length) bits.push(`ต้องการ: ${p.needs.map((n) => NEEDS[n].split(" ")[1]).join(", ")}`);
     if (p.surplus) bits.push(`เหลือ: ${p.surplus}`);
@@ -439,14 +675,14 @@ function summaryText(zones, board) {
 
 export default function OpsPage() {
   const [zones, setZones] = useState(null);
-  const [board, setBoard] = useState({ points: {}, hazards: [], boats: [] });
+  const [board, setBoard] = useState({ points: {}, hazards: [], boats: [], notes: [], people: [], insider: false });
   const [error, setError] = useState("");
-  const [tab, setTab] = useState(() => (window.location.hash === "#hazards" ? "hazards" : window.location.hash === "#boats" ? "boats" : "points"));
+  const [tab, setTab] = useState(() => ({ "#hazards": "hazards", "#boats": "boats", "#board": "board", "#people": "people" })[window.location.hash] || "points");
   const [copied, setCopied] = useState(false);
   const reload = () =>
     api("/ops")
       .then((b) => {
-        setBoard(b);
+        setBoard({ notes: [], people: [], ...b });
         setError("");
       })
       .catch((e) => setError(e.message === "404" || e.message === "Not Found" ? "ระบบประสานงานยังไม่เปิดบนเว็บนี้ (ต้อง deploy รุ่นใหม่)" : e.message));
@@ -497,10 +733,13 @@ export default function OpsPage() {
     else window.open(`https://line.me/R/share?text=${encodeURIComponent(text)}`, "_blank");
   }
 
+  const openQ = (board.notes || []).filter((n) => n.kind === "question" && !n.done).length;
   const TABS = [
-    ["points", `📍 จุดลงของ`],
+    ["points", `📍 จุด`],
+    ["board", `📌 บอร์ด${openQ ? ` (${openQ})` : ""}`],
     ["hazards", `⚠️ อันตราย${live.length ? ` (${live.length})` : ""}`],
-    ["boats", `🚤 เรือ (${board.boats.length})`],
+    ["boats", `🚤 เรือ`],
+    ["people", `🙋 อาสา`],
   ];
 
   return (
@@ -576,9 +815,9 @@ export default function OpsPage() {
           )}
         </section>
 
-        <nav className="sticky top-0 z-10 grid grid-cols-3 gap-1 rounded-xl bg-white p-1 shadow">
+        <nav className="sticky top-0 z-10 grid grid-cols-5 gap-1 rounded-xl bg-white p-1 shadow">
           {TABS.map(([k, t]) => (
-            <button key={k} onClick={() => setTab(k)} className={`min-h-[44px] rounded-lg text-sm font-semibold ${tab === k ? "bg-black text-white" : ""}`}>
+            <button key={k} onClick={() => setTab(k)} className={`min-h-[48px] rounded-lg px-0.5 text-xs font-semibold leading-tight ${tab === k ? "bg-black text-white" : ""}`}>
               {t}
             </button>
           ))}
@@ -594,6 +833,8 @@ export default function OpsPage() {
         )}
         {tab === "hazards" && <Hazards hazards={board.hazards} onChange={reload} />}
         {tab === "boats" && <Boats boats={board.boats} onChange={reload} />}
+        {tab === "board" && <Board notes={board.notes || []} onChange={reload} />}
+        {tab === "people" && <Roster people={board.people || []} insider={!!board.insider} onChange={reload} />}
 
         <p className="pb-6 text-xs text-neutral-500">
           ทุกคนแก้ได้ (ใส่ชื่อทุกครั้ง ระบบเก็บประวัติว่าใครแก้อะไร) · ส่งลิงก์ให้คนประจำจุดโดยตรงได้ เช่น {window.location.host}/ops#F
