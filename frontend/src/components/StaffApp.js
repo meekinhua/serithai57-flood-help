@@ -310,6 +310,7 @@ function Tasks({ user, tasks, reload, setTasks, onLocate }) {
             </button>
           ))}
           <a href="/zones" className="ml-1 text-sm underline">🗺️ แผนที่โซน</a>
+          <a href="/ops" className="ml-1 text-sm underline">🤝 ประสานงาน</a>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">

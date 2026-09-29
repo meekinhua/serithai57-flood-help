@@ -183,7 +183,13 @@ export default function ZonesPage() {
   const [posts, setPosts] = useState([]);
   const [error, setError] = useState("");
   const [log, setLog] = useState([]);
-  const loadLog = () => api("/zones/log").then(setLog).catch(() => {});
+  const [hazards, setHazards] = useState([]); // live ⚡/🌳 warnings from /ops
+  const loadLog = () => {
+    api("/zones/log").then(setLog).catch(() => {});
+    api("/ops")
+      .then((b) => setHazards(b.hazards.filter((h) => !h.cleared_at)))
+      .catch(() => {});
+  };
   useEffect(() => {
     if (FOCUS) return;
     loadLog();
@@ -348,17 +354,30 @@ export default function ZonesPage() {
   return (
     <div className={`zones-page min-h-screen bg-neutral-100${POSTER ? " poster" : ""}`}>
       <header className="bg-black px-4 py-3 text-white print:bg-white print:text-black">
-        <div className="mx-auto flex max-w-5xl items-center gap-2">
-          <div className="min-w-0 flex-1">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2">
+          <div className="min-w-[12rem] flex-1">
             <h1 className="text-xl font-bold">🗺️ แผนที่โซน · จุดลงของ</h1>
             <p className="text-sm text-neutral-300 print:text-neutral-700">หมู่บ้านสหกรณ์เคหะสถาน 4 · เสรีไทย 57</p>
           </div>
+          {!POSTER && <a href="/ops" className="min-h-[44px] rounded-lg bg-green-600 px-3 py-2.5 text-sm font-semibold print:hidden">🤝 ประสานงาน</a>}
           <button onClick={() => window.print()} className="min-h-[44px] rounded-lg bg-white/10 px-3 text-sm font-semibold print:hidden">🖨️ พิมพ์</button>
           <a href="/" className="min-h-[44px] rounded-lg bg-white/10 px-3 py-2.5 text-sm print:hidden">หน้าหลัก</a>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl space-y-3 px-3 py-3">
+        {hazards.length > 0 && !POSTER && (
+          <a href="/ops#hazards" className="block rounded-xl bg-red-600 p-3 font-semibold text-white shadow print:hidden">
+            <span className="text-lg font-black">⚠️ ระวัง! จุดอันตราย</span>
+            {hazards.slice(0, 4).map((h) => (
+              <span key={h.id} className="block">
+                {h.kind === "power" ? "⚡ ไฟรั่ว" : h.kind === "tree" ? "🌳 ต้นไม้ล้ม" : h.kind === "deep" ? "🌊 น้ำลึก" : h.kind === "closed" ? "🚧 ห้ามเข้า" : "⚠️"}
+                {h.soi && ` ซ.${h.soi}`}
+                {h.note && ` — ${h.note}`}
+              </span>
+            ))}
+          </a>
+        )}
         <section className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-xl border-4 border-yellow-400 bg-yellow-50 p-3">
             <p className="text-lg font-bold">🚚 รถใหญ่ / คนนำของมาบริจาค</p>

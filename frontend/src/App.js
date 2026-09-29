@@ -418,6 +418,14 @@ export default function App() {
             <span className="block text-xs font-normal text-neutral-600">ทีมช่วยเหลือเลือกโซน · คนนำของมาบริจาคดูจุดจอดริมถนนหลัก</span>
           </span>
         </a>
+        {/* volunteer coordination: who is at which drop point, what each needs, hazards, boats */}
+        <a href="/ops" className="mt-2 flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-green-600 bg-green-50 px-3 text-center font-bold text-black">
+          <span className="text-xl">🤝</span>
+          <span>
+            ห้องประสานงานอาสา
+            <span className="block text-xs font-normal text-neutral-600">ใครอยู่จุดไหน · จุดไหนขาดอะไร · ⚠️ จุดอันตราย · 🚤 เรือ</span>
+          </span>
+        </a>
 
         {trips.length > 0 && (
           <div className="mt-3">
