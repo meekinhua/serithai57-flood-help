@@ -590,21 +590,6 @@ export function Roster({ people, insider, onChange }) {
   }
   return (
     <div className="space-y-3">
-      <section className="space-y-2 rounded-xl border-2 border-green-600 bg-white p-3 shadow">
-        <p className="text-lg font-bold">🙋 ลงชื่ออาสา (ไม่ต้องก๊อปต่อกันในไลน์แล้ว)</p>
-        <div className="grid grid-cols-2 gap-2">
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={inputCls} placeholder="ชื่อเล่น" />
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} inputMode="tel" className={inputCls} placeholder="📞 เบอร์" />
-        </div>
-        <input value={role} onChange={(e) => setRole(e.target.value)} maxLength={80} className={inputCls} placeholder="ช่วยตรงไหน เช่น หน้าหมู่บ้าน ทีมมีจัง / จุด F / ขับเรือเป็น" />
-        {msg && <p className="rounded bg-yellow-50 p-2 text-sm">{msg}</p>}
-        <button onClick={join} className="min-h-[48px] w-full rounded-lg bg-green-600 font-bold text-white">
-          ลงชื่อ
-        </button>
-        <p className="text-xs text-neutral-500">
-          🔒 เบอร์โทรเห็นเต็มเฉพาะทีมที่ล็อกอินใน /staff · คนทั่วไปเห็นแค่ 08x-xxx-1234 · ลงซ้ำด้วยเบอร์เดิม = แก้ชื่อ/หน้าที่
-        </p>
-      </section>
       <section className="rounded-xl bg-white p-3 shadow">
         <div className="mb-2 flex items-center gap-2">
           <p className="flex-1 text-lg font-bold">📋 รายชื่ออาสา ({people.length})</p>
@@ -617,13 +602,21 @@ export function Roster({ people, insider, onChange }) {
         {people.length === 0 ? (
           <p className="text-sm text-neutral-500">ยังไม่มีใครลงชื่อ</p>
         ) : (
+          [
+            ["🙋 ทีมอาสา", people.filter((pp) => !pp.role?.startsWith("ติดต่อ"))],
+            ["📇 ติดต่อภายนอก (เขต / ทหาร / เรือ / รถ)", people.filter((pp) => pp.role?.startsWith("ติดต่อ"))],
+          ]
+            .filter(([, list]) => list.length)
+            .map(([title, list]) => (
+          <div key={title} className="mb-3">
+          <p className="mb-1 text-sm font-bold text-neutral-700">{title} ({list.length})</p>
           <ol className="space-y-1">
-            {people.map((pp, i) => (
+            {list.map((pp, i) => (
               <li key={pp.id} className="flex items-center gap-2 rounded-lg bg-neutral-50 px-2 py-1.5">
                 <span className="w-6 text-right text-sm text-neutral-500">{i + 1}.</span>
                 <span className="min-w-0 flex-1">
                   <b>{pp.name}</b> {insider ? <Tel phone={pp.phone} /> : <span className="text-sm text-neutral-600">{pp.phone}</span>}
-                  {pp.role && <span className="block text-xs text-neutral-600">{pp.role}</span>}
+                  {pp.role && <span className="block text-xs text-neutral-600">{pp.role.replace(/^ติดต่อ · /, "")}</span>}
                 </span>
                 <button onClick={() => remove(pp)} aria-label={`ลบ ${pp.name}`} className="min-h-[36px] rounded px-2 text-sm text-neutral-400">
                   ✕
@@ -631,7 +624,24 @@ export function Roster({ people, insider, onChange }) {
               </li>
             ))}
           </ol>
+          </div>
+            ))
         )}
+      </section>
+      <section className="space-y-2 rounded-xl border-2 border-green-600 bg-white p-3 shadow">
+        <p className="text-lg font-bold">➕ เพิ่มชื่อ / ลงชื่ออาสา (ไม่ต้องก๊อปต่อกันในไลน์แล้ว)</p>
+        <div className="grid grid-cols-2 gap-2">
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={inputCls} placeholder="ชื่อเล่น" />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} inputMode="tel" className={inputCls} placeholder="📞 เบอร์" />
+        </div>
+        <input value={role} onChange={(e) => setRole(e.target.value)} maxLength={80} className={inputCls} placeholder="ช่วยตรงไหน เช่น หน้าหมู่บ้าน ทีมมีจัง / จุด F / ขับเรือเป็น" />
+        {msg && <p className="rounded bg-yellow-50 p-2 text-sm">{msg}</p>}
+        <button onClick={join} className="min-h-[48px] w-full rounded-lg bg-green-600 font-bold text-white">
+          ลงชื่อ
+        </button>
+        <p className="text-xs text-neutral-500">
+          🔒 รายชื่อนี้เห็นเฉพาะคนที่เปิดจากลิงก์ทีม · ลงซ้ำด้วยเบอร์เดิม = แก้ชื่อ/หน้าที่ · ขึ้นต้นหน้าที่ด้วย “ติดต่อ” = ไปอยู่กลุ่มติดต่อภายนอก
+        </p>
       </section>
     </div>
   );

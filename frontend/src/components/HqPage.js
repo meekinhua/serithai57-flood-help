@@ -105,6 +105,7 @@ export default function HqPage() {
           <button onClick={copy} className="min-h-[44px] rounded-lg bg-green-600 px-3 text-sm font-bold">
             {copied ? "✅ คัดลอกแล้ว" : "📋 สรุปส่ง LINE"}
           </button>
+          <button onClick={() => go("people")} className="min-h-[44px] rounded-lg bg-white/15 px-3 text-sm font-semibold">📞 รายชื่อ</button>
           <a href="/team" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm font-semibold">🚶 หน้าทีมแจก</a>
           <a href="/zones" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm">🗺️</a>
         </div>
@@ -250,7 +251,7 @@ export default function HqPage() {
         <Fold id="boats" title={`🚤 เรือ / อุปกรณ์ (${b.boats.length})`}>
           <Boats boats={b.boats} onChange={reload} />
         </Fold>
-        <Fold id="people" title={`🙋 รายชื่ออาสา (${b.people.length})`}>
+        <Fold id="people" title={`📞 รายชื่อ + เบอร์ (${b.people.length})`} open>
           <Roster people={b.people} insider onChange={reload} />
         </Fold>
         <p className="text-xs text-neutral-500">🔒 หน้านี้เปิดได้เฉพาะคนที่มีลิงก์ทีม · อย่าโพสต์ลิงก์ในกลุ่มสาธารณะ · ถ้าลิงก์หลุด ผู้ดูแลกด “เปลี่ยนลิงก์ทีม” ในหน้า /staff</p>

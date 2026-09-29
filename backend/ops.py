@@ -289,7 +289,10 @@ def build_router(db, rate_limit, current_admin, zone_ids: set, is_team) -> APIRo
     @router.post("/people", status_code=201)
     async def add_person(body: PersonCreate, request: Request):
         await require_insider(request)
-        name, _ = await author(request, body)
+        by, _ = await author(request, body)  # who is adding (the signed-in account, else the typed name)
+        name = body.name.strip()  # the volunteer on the list: always the typed name, even when a coordinator adds them
+        if not name:
+            raise HTTPException(422, "ใส่ชื่อ")
         digits = re.sub(r"\D", "", body.phone)
         if len(digits) < 9:
             raise HTTPException(422, "เบอร์โทรไม่ครบ")
@@ -301,7 +304,7 @@ def build_router(db, rate_limit, current_admin, zone_ids: set, is_team) -> APIRo
         doc = {"id": str(uuid.uuid4()), "name": name, "phone": body.phone.strip(), "digits": digits, "role": body.role.strip(),
                "active": True, "created_at": t, "updated_at": t}
         await db.ops_people.insert_one(dict(doc))
-        await history("person", doc["id"], name, {"add": name})
+        await history("person", doc["id"], by, {"add": name})
         return {"id": doc["id"], "updated": False}
 
     @router.post("/people/{pid}/remove")
