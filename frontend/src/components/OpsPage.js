@@ -491,9 +491,9 @@ export function Board({ notes, onChange }) {
     setAdding(null);
     if (saved) onChange();
   };
-  const open = notes.filter((n) => n.kind === "question" && !n.done);
+  const open = notes.filter((n) => n.kind === "question" && !n.done).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   const decided = notes.filter((n) => n.kind !== "supply" && n.done).sort((a, b) => new Date(b.done_at) - new Date(a.done_at));
-  const supply = notes.filter((n) => n.kind === "supply").sort((a, b) => a.done - b.done);
+  const supply = notes.filter((n) => n.kind === "supply").sort((a, b) => a.done - b.done || new Date(a.created_at) - new Date(b.created_at));
 
   const item = (n) => (
     <li key={n.id} className={`rounded-lg p-2 ${n.done && n.kind === "supply" ? "bg-green-50 opacity-70" : "bg-neutral-50"}`}>
@@ -657,7 +657,7 @@ export function summaryText(zones, board) {
     for (const h of live) out.push(`${(HAZ[h.kind] || HAZ.other)[0]} ${(HAZ[h.kind] || HAZ.other)[1]}${h.soi ? ` ซ.${h.soi}` : ""}${h.note ? ` — ${h.note}` : ""}`);
   }
   const notes = board.notes || [];
-  const open = notes.filter((n) => n.kind === "question" && !n.done);
+  const open = notes.filter((n) => n.kind === "question" && !n.done).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   if (open.length) {
     out.push("", "❓ รอสรุป");
     for (const n of open) out.push(`• ${n.text}${n.for_who ? ` (${n.for_who})` : ""}`);
@@ -667,7 +667,7 @@ export function summaryText(zones, board) {
     out.push("", "✅ ข้อสรุป");
     for (const n of decided.slice(0, 8)) out.push(`• ${n.kind === "question" ? `${n.text} → ${n.resolution}` : n.text}`);
   }
-  const need = notes.filter((n) => n.kind === "supply" && !n.done);
+  const need = notes.filter((n) => n.kind === "supply" && !n.done).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   if (need.length) {
     out.push("", "🛒 ทีมขาด");
     for (const n of need) out.push(`• ${n.text}${n.detail ? ` — ${n.detail}` : ""}${n.for_who ? ` (${n.for_who})` : ""}`);

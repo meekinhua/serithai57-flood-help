@@ -76,8 +76,9 @@ export default function HqPage() {
   if (locked) return <NoKey />;
   const b = board || { points: {}, hazards: [], boats: [], notes: [], people: [] };
   const liveHaz = b.hazards.filter((h) => !h.cleared_at);
-  const openQ = b.notes.filter((n) => n.kind === "question" && !n.done);
-  const short = b.notes.filter((n) => n.kind === "supply" && !n.done);
+  const byAge = (a, c) => new Date(a.created_at) - new Date(c.created_at); // raised first = on top
+  const openQ = b.notes.filter((n) => n.kind === "question" && !n.done).sort(byAge);
+  const short = b.notes.filter((n) => n.kind === "supply" && !n.done).sort(byAge);
   const go = (id) => {
     const el = document.getElementById(id);
     if (el?.tagName === "DETAILS") el.open = true;
