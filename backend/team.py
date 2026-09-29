@@ -1,0 +1,153 @@
+"""Team link: the volunteer teams work without accounts. One secret key, shared only inside the team
+(serithai57.com/hq#k=… and /team#k=…), opens the team dashboard and the per-zone case list, and lets
+them mark houses "on the way" / "received". Admins can rotate the key (the old link stops working).
+
+The key travels in the X-Team-Key header (the page keeps it after reading it from the URL #fragment,
+which browsers never send to the server or in Referer).
+"""
+import hmac
+import secrets
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Literal, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
+
+NeedCategory = Literal["evacuate", "medical", "vulnerable", "food", "medicine", "power", "move_items", "pets", "other"]
+RECENT_DONE = timedelta(hours=12)  # finished cases stay on the zone list (greyed) this long
+
+
+def now():
+    return datetime.now(timezone.utc)
+
+
+class CaseStatus(BaseModel):
+    status: Literal["helping", "done", "open"]
+    name: str = Field(..., min_length=1, max_length=60)
+    note: str = Field("", max_length=300)
+
+
+class CaseCreate(BaseModel):
+    house: str = Field(..., pattern=r"^4/\d{1,4}$")
+    soi: str = Field("", max_length=10)
+    category: NeedCategory = "food"
+    detail: str = Field("", max_length=500)
+    people: Optional[int] = Field(None, ge=0, le=500)
+    urgent: bool = False
+    phone: str = Field("", max_length=40)
+    name: str = Field(..., min_length=1, max_length=60)
+
+
+def build_router(db, rate_limit, current_admin, require_admin, locate, zones: dict, needs_of):
+    router = APIRouter(prefix="/api")
+    soi_zone = zones["soi_zone"]
+
+    async def team_key() -> str:
+        doc = await db.settings.find_one({"id": "team_key"})
+        if not doc:
+            key = secrets.token_urlsafe(18)
+            await db.settings.update_one({"id": "team_key"}, {"$setOnInsert": {"id": "team_key", "key": key, "created_at": now()}}, upsert=True)
+            doc = await db.settings.find_one({"id": "team_key"})
+        return doc["key"]
+
+    async def is_team(request: Request) -> Optional[str]:
+        """'admin' / 'staff' / 'team' when the caller may see team data, else None."""
+        who = await current_admin(request)
+        if who:
+            return who.get("role", "admin")
+        given = request.headers.get("x-team-key", "")
+        if not given:
+            return None
+        if hmac.compare_digest(given, await team_key()):
+            return "team"
+        rate_limit(request, "teamkey-miss", limit=20, window_s=600)  # slow down guessing
+        return None
+
+    async def require_team(request: Request) -> str:
+        role = await is_team(request)
+        if not role:
+            raise HTTPException(401, "ลิงก์ทีมไม่ถูกต้อง หรือถูกเปลี่ยนแล้ว — ขอลิงก์ใหม่จากผู้ประสานงาน")
+        return role
+
+    # ---------- the key itself ----------
+    @router.get("/admin/team-key")
+    async def get_key(admin: dict = Depends(require_admin)):
+        return {"key": await team_key()}
+
+    @router.post("/admin/team-key/rotate")
+    async def rotate_key(admin: dict = Depends(require_admin)):
+        key = secrets.token_urlsafe(18)
+        await db.settings.update_one({"id": "team_key"}, {"$set": {"key": key, "created_at": now(), "rotated_by": admin["name"]}}, upsert=True)
+        return {"key": key}
+
+    @router.get("/team/check")
+    async def check(role: str = Depends(require_team)):
+        return {"ok": True, "role": role}
+
+    # ---------- cases (help requests) by zone ----------
+    def case_view(p: dict) -> dict:
+        last = (p.get("history") or [{}])[-1]
+        return {
+            **{k: p.get(k) for k in ("id", "house", "soi", "category", "detail", "people", "urgent", "status", "lat", "lng", "precision",
+                                     "created_at", "updated_at", "assignee", "source", "phone", "place")},
+            "zone": soi_zone.get(p.get("soi") or ""),
+            "last": {"note": last.get("note", ""), "name": last.get("name", ""), "at": last.get("at")},
+        }
+
+    @router.get("/team/cases")
+    async def cases(zone: str = "", role: str = Depends(require_team)):
+        q = {"kind": "need", "payment": {"$ne": "paid"},
+             "$or": [{"status": {"$ne": "done"}}, {"status": "done", "updated_at": {"$gte": now() - RECENT_DONE}}]}
+        docs = await db.posts.find(q, {"_id": 0, "edit_key_hash": 0}).to_list(3000)
+        out = [case_view(p) for p in docs]
+        if zone:
+            z = zone.upper()
+            out = [c for c in out if c["zone"] == z or (z == "?" and not c["zone"])]
+        return out
+
+    @router.post("/team/cases/{post_id}/status")
+    async def set_status(post_id: str, body: CaseStatus, request: Request, role: str = Depends(require_team)):
+        rate_limit(request, "teamcase", limit=120, window_s=600)
+        who = await current_admin(request)
+        name = (who or {}).get("name") or body.name.strip()
+        t = now()
+        changes = {"status": body.status, "updated_at": t}
+        if body.status == "helping":
+            changes["assignee"] = {"id": (who or {}).get("id") or f"team:{name}", "name": name}
+            changes["assigned_at"] = t
+        elif body.status == "open":
+            changes["assignee"] = None
+        else:
+            changes["done_by"] = {"id": (who or {}).get("id") or f"team:{name}", "name": name}
+        note = body.note.strip() or {"helping": "ทีมกำลังไป", "done": "ทีมแจก: ได้รับแล้ว", "open": "ยังไม่ได้ไป (ปล่อยคืน)"}[body.status]
+        res = await db.posts.update_one({"id": post_id, "kind": "need"}, {"$set": changes, "$push": {"history": {"at": t, "status": body.status, "name": name, "note": note, "staff": True}}})
+        if not res.matched_count:
+            raise HTTPException(404, "ไม่พบเคสนี้")
+        return case_view(await db.posts.find_one({"id": post_id}, {"_id": 0}))
+
+    @router.post("/team/cases", status_code=201)
+    async def add_case(body: CaseCreate, request: Request, role: str = Depends(require_team)):
+        """A house the team found door to door: add it on the spot (or add to its open case)."""
+        rate_limit(request, "teamcase-add", limit=40, window_s=600)
+        t = now()
+        existing = await db.posts.find_one({"kind": "need", "status": {"$ne": "done"}, "house": body.house})
+        line = body.detail.strip() or "ทีมแจกพบว่าต้องการความช่วยเหลือ"
+        if existing:
+            await db.posts.update_one({"id": existing["id"]}, {"$set": {"updated_at": t, **({"urgent": True} if body.urgent else {})},
+                                                              "$push": {"history": {"at": t, "status": existing["status"], "name": body.name, "note": f"ทีมแจก: {line}", "staff": True}}})
+            return case_view(await db.posts.find_one({"id": existing["id"]}, {"_id": 0}))
+        loc = await locate(body.house, body.soi or None)
+        urgent = body.urgent or needs_of(line)[1]
+        doc = {
+            "id": str(uuid.uuid4()), "kind": "need", "category": body.category, "detail": line,
+            "place": body.house + (f" แยก {loc['soi']}" if loc["soi"] else ""), "name": f"ทีมแจก · {body.name}", "phone": body.phone.strip(),
+            "people": body.people, "urgent": urgent, "general": False, "payment": "free", "price": "", "media": [], "pinned": False,
+            "status": "open", "created_at": t, "updated_at": t, "lat": loc["lat"], "lng": loc["lng"], "house": body.house, "soi": loc["soi"],
+            "precision": loc["precision"], "source": "team",
+            "history": [{"at": t, "status": "open", "name": body.name, "note": "ทีมแจกเพิ่มเคส", "staff": True}], "edit_key_hash": "", "assignee": None,
+        }
+        await db.posts.insert_one(dict(doc))
+        return case_view(doc)
+
+    return router, is_team

@@ -136,8 +136,13 @@ POINT_FIELDS = ("place", "person", "phone", "hours", "manned", "needs", "surplus
 BOAT_FIELDS = ("label", "kind", "owner", "owner_phone", "holder", "holder_phone", "where", "due", "need_driver", "note")
 
 
-def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
+def build_router(db, rate_limit, current_admin, zone_ids: set, is_team) -> APIRouter:
     router = APIRouter(prefix="/api/ops")
+
+    async def require_insider(request: Request):
+        """Team-only data (board, boats, roster) and editing the drop points: team link or a signed-in account."""
+        if not await is_team(request):
+            raise HTTPException(401, "สำหรับทีมงาน — เปิดจากลิงก์ทีม")
 
     async def author(request: Request, body: Who) -> tuple[str, bool]:
         rate_limit(request, "ops", limit=60, window_s=600)
@@ -157,19 +162,19 @@ def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
 
     @router.get("")
     async def board(request: Request):
-        insider = bool(await current_admin(request))
+        insider = bool(await is_team(request))
         points = {d["zone"]: strip(d) for d in await db.ops_points.find({}, {"_id": 0}).to_list(100)}
         hazards = await db.ops_hazards.find({"$or": [{"cleared_at": None}, {"cleared_at": {"$gte": now() - CLEARED_SHOWN}}]}, {"_id": 0}).sort("created_at", -1).to_list(200)
         boats = await db.ops_boats.find({"active": True}, {"_id": 0}).sort("created_at", 1).to_list(200)
         notes = await db.ops_notes.find({"archived": False}, {"_id": 0}).sort("created_at", -1).to_list(300)
         people = await db.ops_people.find({"active": True}, {"_id": 0, "digits": 0, "removed_by": 0}).sort("created_at", 1).to_list(500)
-        if not insider:
-            for pp in people:
-                pp["phone"] = mask(pp["phone"])
+        if not insider:  # the public page: drop points and hazards only
+            notes, people, boats = [], [], []
         return {"points": points, "hazards": hazards, "boats": boats, "notes": notes, "people": people, "insider": insider}
 
     @router.put("/points/{zone}")
     async def edit_point(zone: str, body: PointEdit, request: Request):
+        await require_insider(request)
         zone = zone.upper()
         if zone not in zone_ids:
             raise HTTPException(404, "ไม่มีโซนนี้")
@@ -202,6 +207,7 @@ def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
 
     @router.post("/hazards/{hid}/clear")
     async def clear_hazard(hid: str, body: Who, request: Request):
+        await require_insider(request)
         name, _ = await author(request, body)
         res = await db.ops_hazards.update_one({"id": hid, "cleared_at": None}, {"$set": {"cleared_at": now(), "cleared_by": name}})
         if not res.matched_count:
@@ -211,6 +217,7 @@ def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
 
     @router.post("/boats", status_code=201)
     async def add_boat(body: BoatEdit, request: Request):
+        await require_insider(request)
         name, _ = await author(request, body)
         if not (body.label or "").strip():
             raise HTTPException(422, "ตั้งชื่อเรือ เช่น เรือพาย พี่โอ ซ.11")
@@ -224,6 +231,7 @@ def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
 
     @router.put("/boats/{bid}")
     async def edit_boat(bid: str, body: BoatEdit, request: Request):
+        await require_insider(request)
         name, _ = await author(request, body)
         change = {k: (v.strip() if isinstance(v, str) else v) for k in BOAT_FIELDS if (v := getattr(body, k)) is not None}
         res = await db.ops_boats.update_one({"id": bid, "active": True}, {"$set": {**change, "updated_by": name, "updated_at": now()}})
@@ -234,6 +242,7 @@ def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
 
     @router.post("/boats/{bid}/return")
     async def return_boat(bid: str, body: Who, request: Request):
+        await require_insider(request)
         name, _ = await author(request, body)
         res = await db.ops_boats.update_one({"id": bid, "active": True}, {"$set": {"active": False, "returned_by": name, "returned_at": now()}})
         if not res.matched_count:
@@ -243,6 +252,7 @@ def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
 
     @router.post("/notes", status_code=201)
     async def add_note(body: NoteCreate, request: Request):
+        await require_insider(request)
         name, staff = await author(request, body)
         t = now()
         doc = {"id": str(uuid.uuid4()), "kind": body.kind, "text": body.text.strip(), "detail": body.detail.strip(), "for_who": body.for_who.strip(),
@@ -254,6 +264,7 @@ def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
 
     @router.post("/notes/{nid}/resolve")
     async def resolve_note(nid: str, body: NoteResolve, request: Request):
+        await require_insider(request)
         """❓ → ✅ with the decision; 🛒 → got it (resolution: who brought it / where it is)."""
         name, _ = await author(request, body)
         note = await db.ops_notes.find_one({"id": nid, "archived": False})
@@ -267,6 +278,7 @@ def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
 
     @router.post("/notes/{nid}/archive")
     async def archive_note(nid: str, body: Who, request: Request):
+        await require_insider(request)
         name, _ = await author(request, body)
         res = await db.ops_notes.update_one({"id": nid}, {"$set": {"archived": True}})
         if not res.matched_count:
@@ -276,6 +288,7 @@ def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
 
     @router.post("/people", status_code=201)
     async def add_person(body: PersonCreate, request: Request):
+        await require_insider(request)
         name, _ = await author(request, body)
         digits = re.sub(r"\D", "", body.phone)
         if len(digits) < 9:
@@ -293,6 +306,7 @@ def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
 
     @router.post("/people/{pid}/remove")
     async def remove_person(pid: str, body: Who, request: Request):
+        await require_insider(request)
         name, _ = await author(request, body)
         res = await db.ops_people.update_one({"id": pid, "active": True}, {"$set": {"active": False, "removed_by": name, "removed_at": now()}})
         if not res.matched_count:
@@ -301,7 +315,8 @@ def build_router(db, rate_limit, current_admin, zone_ids: set) -> APIRouter:
         return {"ok": True}
 
     @router.get("/history")
-    async def ops_history(ref: str = ""):
+    async def ops_history(request: Request, ref: str = ""):
+        await require_insider(request)
         q = {"ref": ref} if ref else {}
         return await db.ops_history.find(q, {"_id": 0, "expires_at": 0}).sort("at", -1).to_list(100)
 

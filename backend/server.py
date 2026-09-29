@@ -34,6 +34,7 @@ import staff  # noqa: E402
 import trips  # noqa: E402
 import zonelog  # noqa: E402
 import ops  # noqa: E402
+import team  # noqa: E402
 import weather  # noqa: E402
 
 # tz_aware so datetimes go out as "+00:00" and browsers don't misread them as local time
@@ -602,7 +603,9 @@ staff_router, locate_house, learn_address, require_staff = staff.build_router(
 app.include_router(staff_router)
 app.include_router(trips.build_router(db, require_staff, staff.SOIS))
 app.include_router(zonelog.build_router(db, rate_limit, current_admin, {z["id"] for z in staff.ZONES["zones"]}))
-app.include_router(ops.build_router(db, rate_limit, current_admin, {z["id"] for z in staff.ZONES["zones"]}))
+team_router, is_team = team.build_router(db, rate_limit, current_admin, require_admin, locate_house, staff.ZONES, staff.needs_of)
+app.include_router(team_router)
+app.include_router(ops.build_router(db, rate_limit, current_admin, {z["id"] for z in staff.ZONES["zones"]}, is_team))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 

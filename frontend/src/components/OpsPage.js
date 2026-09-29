@@ -7,7 +7,7 @@ import { placeOf } from "./ZonesPage";
 // "drop point B is which soi? who's there? number?", "which point is short of what?",
 // "power leak in soi 24", "who has the boat / who can drive it". One tap copies a summary to post in LINE.
 
-const NEEDS = {
+export const NEEDS = {
   food: "🍱 ข้าว/อาหาร",
   water: "💧 น้ำดื่ม",
   meds: "💊 ยา",
@@ -17,7 +17,7 @@ const NEEDS = {
   boat: "🚤 เรือ",
   car: "🛻 รถขนของ",
 };
-const HAZ = {
+export const HAZ = {
   power: ["⚡", "ไฟรั่ว / สายไฟ"],
   tree: ["🌳", "ต้นไม้ล้ม"],
   deep: ["🌊", "น้ำลึก / กระแสแรง"],
@@ -132,7 +132,7 @@ function PointEditor({ zone, p, onDone }) {
   );
 }
 
-function PointCard({ zone, p = {}, onSaved }) {
+export function PointCard({ zone, p = {}, onSaved, insider = true }) {
   const [edit, setEdit] = useState(false);
   const lat = p.lat ?? zone.drop.lat;
   const lng = p.lng ?? zone.drop.lng;
@@ -194,9 +194,17 @@ function PointCard({ zone, p = {}, onSaved }) {
           <a href={navUrl(lat, lng)} target="_blank" rel="noreferrer" className="flex min-h-[44px] items-center justify-center rounded-lg border-2 border-black text-sm font-semibold">
             🧭 นำทาง{p.lat != null ? " (หมุดจริง)" : ""}
           </a>
-          <button onClick={() => setEdit(true)} className="min-h-[44px] rounded-lg bg-blue-600 text-sm font-bold text-white">
-            ✏️ อัปเดตจุดนี้
-          </button>
+          {insider ? (
+            <button onClick={() => setEdit(true)} className="min-h-[44px] rounded-lg bg-blue-600 text-sm font-bold text-white">
+              ✏️ อัปเดตจุดนี้
+            </button>
+          ) : (
+            p.phone && (
+              <a href={`tel:${p.phone.replace(/[^0-9+]/g, "")}`} className="flex min-h-[44px] items-center justify-center rounded-lg bg-green-600 text-sm font-bold text-white">
+                📞 โทรหาคนประจำจุด
+              </a>
+            )
+          )}
         </div>
       )}
     </div>
@@ -204,7 +212,7 @@ function PointCard({ zone, p = {}, onSaved }) {
 }
 
 // ---------- hazards ----------
-function Hazards({ hazards, onChange }) {
+export function Hazards({ hazards, onChange, insider = true }) {
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState(null);
   const [soi, setSoi] = useState("");
@@ -258,7 +266,7 @@ function Hazards({ hazards, onChange }) {
               แจ้ง {timeAgo(h.created_at)} โดย {h.by}
               {done && ` · ✅ แก้แล้ว ${timeAgo(h.cleared_at)} (${h.cleared_by})`}
             </p>
-            {!done && (
+            {!done && insider && (
               <button onClick={() => clear(h)} className="mt-2 min-h-[40px] rounded-lg border border-green-700 bg-white px-3 text-sm font-semibold text-green-800">
                 ✅ แก้แล้ว / ปลอดภัยแล้ว
               </button>
@@ -346,7 +354,7 @@ function BoatForm({ boat, onDone }) {
   );
 }
 
-function Boats({ boats, onChange }) {
+export function Boats({ boats, onChange }) {
   const [editing, setEditing] = useState(null); // boat id | "new" | null (an id survives the 30 s refresh)
   const [name] = useName();
   async function giveBack(b) {
@@ -454,7 +462,7 @@ function NoteForm({ kind, onDone }) {
   );
 }
 
-function Board({ notes, onChange }) {
+export function Board({ notes, onChange }) {
   const [adding, setAdding] = useState(null); // kind of the open form
   const [name] = useName();
   const who = () => (name.trim() || window.prompt("ชื่อคุณ") || "").trim();
@@ -540,7 +548,7 @@ function Board({ notes, onChange }) {
 }
 
 // ---------- volunteer roster: replaces the copy-paste name+phone chain in LINE ----------
-function Roster({ people, insider, onChange }) {
+export function Roster({ people, insider, onChange }) {
   const [name, setName, remember] = useName();
   const [phone, setPhone] = useState(() => load("contact", {}).phone || "");
   const [role, setRole] = useState("");
@@ -630,7 +638,7 @@ function Roster({ people, insider, onChange }) {
 }
 
 // ---------- the LINE summary ----------
-function summaryText(zones, board) {
+export function summaryText(zones, board) {
   const t = new Date().toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const out = [`🤝 สรุปงานอาสา · ${t}`];
   const live = board.hazards.filter((h) => !h.cleared_at);
@@ -740,7 +748,7 @@ export default function OpsPage() {
     ["hazards", `⚠️ อันตราย${live.length ? ` (${live.length})` : ""}`],
     ["boats", `🚤 เรือ`],
     ["people", `🙋 อาสา`],
-  ];
+  ].filter(([k]) => board.insider || k === "points" || k === "hazards");
 
   return (
     <div className="min-h-screen bg-neutral-100">
@@ -815,7 +823,7 @@ export default function OpsPage() {
           )}
         </section>
 
-        <nav className="sticky top-0 z-10 grid grid-cols-5 gap-1 rounded-xl bg-white p-1 shadow">
+        <nav className={`sticky top-0 z-10 grid ${board.insider ? "grid-cols-5" : "grid-cols-2"} gap-1 rounded-xl bg-white p-1 shadow`}>
           {TABS.map(([k, t]) => (
             <button key={k} onClick={() => setTab(k)} className={`min-h-[48px] rounded-lg px-0.5 text-xs font-semibold leading-tight ${tab === k ? "bg-black text-white" : ""}`}>
               {t}
@@ -827,17 +835,19 @@ export default function OpsPage() {
           <section className="space-y-2">
             {!zones && !error && <p className="p-3 text-neutral-600">กำลังโหลด…</p>}
             {zones?.map((z) => (
-              <PointCard key={z.id} zone={z} p={board.points[z.id]} onSaved={reload} />
+              <PointCard key={z.id} zone={z} p={board.points[z.id]} onSaved={reload} insider={!!board.insider} />
             ))}
           </section>
         )}
-        {tab === "hazards" && <Hazards hazards={board.hazards} onChange={reload} />}
+        {tab === "hazards" && <Hazards hazards={board.hazards} onChange={reload} insider={!!board.insider} />}
         {tab === "boats" && <Boats boats={board.boats} onChange={reload} />}
         {tab === "board" && <Board notes={board.notes || []} onChange={reload} />}
         {tab === "people" && <Roster people={board.people || []} insider={!!board.insider} onChange={reload} />}
 
         <p className="pb-6 text-xs text-neutral-500">
-          ทุกคนแก้ได้ (ใส่ชื่อทุกครั้ง ระบบเก็บประวัติว่าใครแก้อะไร) · ส่งลิงก์ให้คนประจำจุดโดยตรงได้ เช่น {window.location.host}/ops#F
+          {board.insider
+            ? `ทีมงานแก้ได้ (ใส่ชื่อทุกครั้ง ระบบเก็บประวัติว่าใครแก้อะไร) · ภาพรวมทั้งหมด: ${window.location.host}/hq · ทีมแจกตามโซน: ${window.location.host}/team`
+            : "ทีมงาน: เปิดจากลิงก์ทีมเพื่ออัปเดตจุด / บอร์ด / เรือ / รายชื่อ"}
         </p>
       </main>
     </div>

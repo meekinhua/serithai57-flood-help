@@ -6,9 +6,11 @@ import App from "./App";
 import StaffApp from "./components/StaffApp";
 import ZonesPage from "./components/ZonesPage";
 import OpsPage from "./components/OpsPage";
+import HqPage from "./components/HqPage";
+import TeamPage from "./components/TeamPage";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {{ "/staff": <StaffApp />, "/zones": <ZonesPage />, "/ops": <OpsPage /> }[window.location.pathname.replace(/\/+$/, "")] || <App />}
+    {{ "/staff": <StaffApp />, "/zones": <ZonesPage />, "/ops": <OpsPage />, "/hq": <HqPage />, "/team": <TeamPage /> }[window.location.pathname.replace(/\/+$/, "")] || <App />}
   </React.StrictMode>
 );

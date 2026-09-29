@@ -671,6 +671,46 @@ function Lookup() {
 }
 
 // ---------------- invite teammates: one link / QR anyone on the team can pass on ----------------
+// Admins: the secret team link for /hq and /team (no accounts). Rotate it if it leaks.
+function TeamLinks() {
+  const [key, setKey] = useState("");
+  const [qr, setQr] = useState("");
+  const [msg, setMsg] = useState("");
+  const show = (k) => {
+    setKey(k);
+    QRCode.toDataURL(`${window.location.origin}/team#k=${k}`, { margin: 1, width: 240 }).then(setQr);
+  };
+  useEffect(() => {
+    api("/admin/team-key")
+      .then((r) => show(r.key))
+      .catch((e) => setMsg(e.message));
+  }, []);
+  async function rotate() {
+    if (!window.confirm("เปลี่ยนลิงก์ทีม? ลิงก์เดิมจะใช้ไม่ได้ทันที ต้องส่งลิงก์ใหม่ให้ทีมทุกคน")) return;
+    try {
+      show((await api("/admin/team-key/rotate", { method: "POST" })).key);
+      setMsg("✅ เปลี่ยนแล้ว ส่งลิงก์ใหม่ให้ทีม");
+    } catch (e) {
+      setMsg(e.message);
+    }
+  }
+  const copy = (text) => navigator.clipboard?.writeText(text).then(() => setMsg("✅ คัดลอกแล้ว"), () => window.prompt("คัดลอก", text));
+  if (!key) return msg ? <p className="text-sm text-red-700">{msg}</p> : null;
+  const hq = `${window.location.origin}/hq#k=${key}`;
+  const team = `${window.location.origin}/team#k=${key}`;
+  return (
+    <div className="mt-4 space-y-2 rounded-xl border-2 border-black bg-white p-3">
+      <p className="text-lg font-bold">🔑 ลิงก์ทีม (ไม่ต้องล็อกอิน)</p>
+      <p className="text-sm text-neutral-700">ส่งในกลุ่มไลน์ทีมเท่านั้น อย่าโพสต์ในกลุ่มหมู่บ้าน · เปิดครั้งเดียว เครื่องจะจำไว้</p>
+      <button onClick={() => copy(hq)} className="min-h-[44px] w-full rounded-lg bg-black text-sm font-bold text-white">🧭 คัดลอกลิงก์ศูนย์ทีมงาน (/hq)</button>
+      <button onClick={() => copy(team)} className="min-h-[44px] w-full rounded-lg border-2 border-black text-sm font-bold">🚶 คัดลอกลิงก์ทีมแจก (/team)</button>
+      {qr && <img src={qr} alt="QR ลิงก์ทีมแจก" className="mx-auto h-48 w-48" />}
+      <button onClick={rotate} className="min-h-[40px] w-full rounded-lg border border-red-600 text-sm text-red-700">🔄 เปลี่ยนลิงก์ทีม (ถ้าลิงก์หลุด)</button>
+      {msg && <p className="text-sm">{msg}</p>}
+    </div>
+  );
+}
+
 function InviteShare() {
   const [inv, setInv] = useState(null);
   const [qr, setQr] = useState("");
@@ -860,7 +900,12 @@ export default function StaffApp() {
               />
             )}
             {tab === "trip" && <TripPanel user={user} live={live} trip={trip} setTrip={setTrip} />}
-            {tab === "invite" && <InviteShare />}
+            {tab === "invite" && (
+              <>
+                <InviteShare />
+                {user?.role === "admin" && <TeamLinks />}
+              </>
+            )}
             {tab === "import" && (
               <Import
                 onDone={(m) => {
