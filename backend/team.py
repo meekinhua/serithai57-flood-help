@@ -181,7 +181,7 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
         activity = []
         async for p in db.posts.find({"kind": "need", "payment": {"$ne": "paid"}}, {"_id": 0, "status": 1, "soi": 1, "urgent": 1, "updated_at": 1, "history": 1}):
             z = soi_zone.get(p.get("soi") or "") or "?"
-            o = per.setdefault(z, {"open": 0, "helping": 0, "done_24h": 0, "done_total": 0})
+            o = per.setdefault(z, {"open": 0, "helping": 0, "done_24h": 0, "done_total": 0, "urgent": 0})
             st = p.get("status")
             if st == "done":
                 o["done_total"] += 1
@@ -195,6 +195,7 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
                 o[key] += 1
                 totals[key] += 1
                 totals["urgent"] += bool(p.get("urgent"))
+                o["urgent"] += bool(p.get("urgent"))
             for h in p.get("history") or []:
                 at = h.get("at")
                 if not at:
@@ -208,13 +209,15 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
 
         points = [{"zone": d["zone"], "place": d.get("place", ""), "manned": bool(d.get("person")) and d.get("manned") is not False, "needs": d.get("needs") or []}
                   async for d in db.ops_points.find({}, {"_id": 0})]
-        people = await db.ops_people.count_documents({"active": True, "role": {"$not": {"$regex": "^ติดต่อ"}}})
+        # the team as roles only (no names, no phones)
+        roles = [x.get("role") or "อาสา" async for x in db.ops_people.find({"active": True, "role": {"$not": {"$regex": "^ติดต่อ"}}}, {"_id": 0, "role": 1}).sort("created_at", 1)]
+        people = len(roles)
         boats = [b async for b in db.ops_boats.find({"active": True}, {"_id": 0, "need_driver": 1, "kind": 1})]
         supplies = [n["text"] async for n in db.ops_notes.find({"archived": False, "kind": "supply", "done": False}, {"_id": 0, "text": 1}).sort("created_at", 1)]
         hazards = [{"kind": h["kind"], "soi": h.get("soi", ""), "note": h.get("note", "")}
                    async for h in db.ops_hazards.find({"cleared_at": None}, {"_id": 0}).sort("created_at", -1)]
         return {
-            "updated_at": t, "totals": totals, "zones": per, "points": points, "volunteers": people,
+            "updated_at": t, "totals": totals, "zones": per, "points": points, "volunteers": people, "roles": roles,
             "boats": {"total": len(boats), "need_driver": sum(1 for b in boats if b.get("need_driver"))},
             "supplies": supplies, "hazards": hazards, "activity": activity[:25],
         }
