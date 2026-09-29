@@ -11,6 +11,8 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const QS = new URLSearchParams(window.location.search);
 const POSTER = QS.has("poster");
 const FOCUS = (QS.get("zone") || "").toUpperCase() || null; // /zones?zone=D — one zone per sheet
+const metres = (a, b) => Math.hypot((a[0] - b[0]) * 110540, (a[1] - b[1]) * 108000);
+const fmtDist = (m) => (m < 1000 ? `${Math.round(m / 10) * 10} ม.` : `${(m / 1000).toFixed(1)} กม.`);
 const navUrl = (d) => `https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}`;
 
 const GREY = "#9ca3af";
@@ -65,6 +67,59 @@ export default function ZonesPage() {
   const [data, setData] = useState(null);
   const [posts, setPosts] = useState([]);
   const [error, setError] = useState("");
+  // "where am I": live GPS dot on the map, which zone that is, and the nearest truck drop point
+  const [me, setMe] = useState(null); // { lat, lng, acc }
+  const [locMsg, setLocMsg] = useState("");
+  const watchRef = useRef(null);
+  const meLayer = useRef(null);
+  const centred = useRef(false);
+  useEffect(() => () => watchRef.current != null && navigator.geolocation?.clearWatch(watchRef.current), []);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !me) return;
+    meLayer.current?.remove();
+    meLayer.current = L.layerGroup([
+      L.circle([me.lat, me.lng], { radius: Math.min(me.acc, 300), color: "#2563eb", weight: 1, fillColor: "#3b82f6", fillOpacity: 0.12, interactive: false }),
+      L.circleMarker([me.lat, me.lng], { radius: 9, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).bindTooltip("คุณอยู่ที่นี่", { permanent: true, direction: "top", offset: [0, -10] }),
+    ]).addTo(map);
+    if (!centred.current) {
+      centred.current = true;
+      map.setView([me.lat, me.lng], Math.max(map.getZoom(), 17), { animate: false });
+    }
+  }, [me]);
+  const here = useMemo(() => {
+    if (!me || !data) return null;
+    const p = [me.lat, me.lng];
+    let best = null;
+    for (const h of data.houses) {
+      const d = metres(p, h);
+      if (!best || d < best.d) best = { d, zi: h[2] };
+    }
+    const zone = best && best.d < 150 ? data.zones[best.zi] : null; // outside the village: no zone
+    const drops = data.zones.map((z) => ({ z, d: metres(p, [z.drop.lat, z.drop.lng]) })).sort((a, b) => a.d - b.d);
+    return { zone, own: zone && drops.find((x) => x.z.id === zone.id), nearest: drops[0] };
+  }, [me, data]);
+  function locate() {
+    if (!navigator.geolocation) return setLocMsg("เครื่องนี้หาตำแหน่งไม่ได้");
+    if (watchRef.current != null) {
+      centred.current = false; // tapped again: recentre on me
+      if (me) setMe({ ...me });
+      return;
+    }
+    setLocMsg("กำลังหาตำแหน่ง… (ถ้ามือถือถาม ให้กด “อนุญาต”)");
+    watchRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        setLocMsg("");
+        setMe({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy || 0 });
+      },
+      (err) => {
+        setLocMsg(err.code === 1 ? "ไม่ได้อนุญาตตำแหน่ง — เปิดสิทธิ์ตำแหน่งให้เว็บนี้ในตั้งค่าเบราว์เซอร์" : "หาตำแหน่งไม่ได้ ลองออกไปที่โล่ง");
+        navigator.geolocation.clearWatch(watchRef.current);
+        watchRef.current = null;
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+    );
+  }
 
   useEffect(() => {
     Promise.all([api("/zones"), api("/sois")])
@@ -193,7 +248,49 @@ export default function ZonesPage() {
         </section>
 
         {error && <p className="rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
-        <div ref={el} className="zones-map h-[70vh] w-full overflow-hidden rounded-xl border border-neutral-300 bg-white print:h-[180mm]" />
+        <div className="relative">
+          <div ref={el} className="zones-map h-[70vh] w-full overflow-hidden rounded-xl border border-neutral-300 bg-white print:h-[180mm]" />
+          {!POSTER && (
+            <button onClick={locate} className="absolute right-2 top-2 z-[500] min-h-[48px] rounded-full border-2 border-blue-600 bg-white px-4 text-sm font-bold text-blue-700 shadow-lg print:hidden">
+              📍 {me ? "กลับมาที่ฉัน" : "ฉันอยู่ตรงไหน"}
+            </button>
+          )}
+        </div>
+        {(locMsg || here) && !POSTER && (
+          <section className="rounded-xl border-2 border-blue-600 bg-blue-50 p-3 print:hidden">
+            {locMsg && <p className="font-semibold">{locMsg}</p>}
+            {here && (
+              <>
+                <p className="text-lg font-bold">
+                  {here.zone ? (
+                    <>
+                      📍 คุณอยู่ใน{" "}
+                      <span className="rounded-lg px-2 text-white" style={{ background: here.zone.color }}>
+                        โซน {here.zone.id}
+                      </span>
+                    </>
+                  ) : (
+                    "📍 คุณอยู่นอกหมู่บ้าน"
+                  )}
+                  {me?.acc > 100 && <span className="ml-2 text-sm font-normal text-neutral-600">(GPS คลาดเคลื่อน ~{Math.round(me.acc)} ม.)</span>}
+                </p>
+                {here.own && (
+                  <p>
+                    🚚 จุดลงของโซน {here.own.z.id}: ปากซอย {here.own.z.drop.soi} · ห่าง {fmtDist(here.own.d)}
+                  </p>
+                )}
+                {(!here.own || here.nearest.z.id !== here.own.z.id) && (
+                  <p>
+                    🚚 จุดลงของที่ใกล้สุด: <b>{here.nearest.z.id}</b> ปากซอย {here.nearest.z.drop.soi} · ห่าง {fmtDist(here.nearest.d)}
+                  </p>
+                )}
+                <a href={navUrl((here.own || here.nearest).z.drop)} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-[44px] items-center rounded-lg bg-black px-4 font-semibold text-white">
+                  🧭 นำทางไปจุดลงของ {(here.own || here.nearest).z.id}
+                </a>
+              </>
+            )}
+          </section>
+        )}
 
         {data && (
           <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
