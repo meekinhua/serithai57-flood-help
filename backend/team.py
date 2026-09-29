@@ -1,4 +1,8 @@
-"""Team link: the volunteer teams work without accounts. One secret key, shared only inside the team
+"""Team pages (/hq, /team). By default they are OPEN: anyone who opens the URL can see and update
+(the coordinator's choice, 2026-09-30: no password at all). An admin can lock them in /staff; then
+only the secret team link works.
+
+Team link: the volunteer teams work without accounts. One secret key, shared only inside the team
 (serithai57.com/hq#k=… and /team#k=…), opens the team dashboard and the per-zone case list, and lets
 them mark houses "on the way" / "received". Admins can rotate the key (the old link stops working).
 
@@ -51,11 +55,17 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
             doc = await db.settings.find_one({"id": "team_key"})
         return doc["key"]
 
+    async def team_open() -> bool:
+        doc = await db.settings.find_one({"id": "team_open"})
+        return True if doc is None else bool(doc.get("open"))
+
     async def is_team(request: Request) -> Optional[str]:
-        """'admin' / 'staff' / 'team' when the caller may see team data, else None."""
+        """'admin' / 'staff' / 'team' / 'open' when the caller may see team data, else None."""
         who = await current_admin(request)
         if who:
             return who.get("role", "admin")
+        if await team_open():
+            return "open"
         given = request.headers.get("x-team-key", "")
         if not given:
             return None
@@ -73,7 +83,15 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
     # ---------- the key itself ----------
     @router.get("/admin/team-key")
     async def get_key(admin: dict = Depends(require_admin)):
-        return {"key": await team_key()}
+        return {"key": await team_key(), "open": await team_open()}
+
+    class Access(BaseModel):
+        open: bool
+
+    @router.post("/admin/team-access")
+    async def set_access(body: Access, admin: dict = Depends(require_admin)):
+        await db.settings.update_one({"id": "team_open"}, {"$set": {"id": "team_open", "open": body.open, "by": admin["name"], "at": now()}}, upsert=True)
+        return {"open": body.open}
 
     @router.post("/admin/team-key/rotate")
     async def rotate_key(admin: dict = Depends(require_admin)):
@@ -101,9 +119,9 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
              "$or": [{"status": {"$ne": "done"}}, {"status": "done", "updated_at": {"$gte": now() - RECENT_DONE}}]}
         docs = await db.posts.find(q, {"_id": 0, "edit_key_hash": 0}).to_list(3000)
         out = [case_view(p) for p in docs]
-        if zone:
-            z = zone.upper()
-            out = [c for c in out if c["zone"] == z or (z == "?" and not c["zone"])]
+        if zone:  # "F" or a merged group "F,G,H"; "?" = cases whose zone isn't known yet
+            want = {z.strip().upper() for z in zone.split(",") if z.strip()}
+            out = [c for c in out if c["zone"] in want or ("?" in want and not c["zone"])]
         return out
 
     @router.post("/team/cases/{post_id}/status")

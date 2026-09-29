@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, load, save, useTeamKey } from "../api";
+import { api, load, save } from "../api";
 import { CATEGORIES, timeAgo } from "../config";
 import { HAZ } from "./OpsPage";
-import { placeOf } from "./ZonesPage";
+import { placeOf, zoneGroups } from "./ZonesPage";
 
 // /team#k=…&zone=F — for a distribution team: leave it open on a phone and see which houses in your zone
 // asked for help, go, and tap "received". No account: the team link carries the key.
@@ -16,6 +16,15 @@ const soiKey = (s) => {
 const houseNum = (h) => parseInt(String(h || "").split("/")[1], 10) || 0;
 const navUrl = (c) => `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}`;
 const zoneFromHash = () => (window.location.hash.match(/zone=([A-Z?])/i) || [])[1]?.toUpperCase();
+
+// team pages hold phone numbers: keep them out of search engines
+export function noIndex() {
+  if (document.querySelector('meta[name="robots"]')) return;
+  const m = document.createElement("meta");
+  m.name = "robots";
+  m.content = "noindex, nofollow";
+  document.head.appendChild(m);
+}
 
 export function NoKey() {
   return (
@@ -212,7 +221,7 @@ function CaseCard({ c, name, onChanged, isNew }) {
 }
 
 export default function TeamPage() {
-  const key = useTeamKey();
+  const [locked, setLocked] = useState(false);
   const [zones, setZones] = useState(null);
   const [zone, setZoneState] = useState(() => zoneFromHash() || load("myZone", ""));
   const [cases, setCases] = useState(null);
@@ -234,8 +243,11 @@ export default function TeamPage() {
     window.history.replaceState(null, "", `/team${z ? `#zone=${z}` : ""}`);
   };
 
+  const groups0 = useMemo(() => zoneGroups(zones), [zones]);
+  const z = groups0.find((g) => g.ids.includes(zone)); // "G" (old choice) opens the F·G·H block
+  const zq = z ? z.ids.join(",") : zone; // query: all zones of the block
   const reload = () =>
-    Promise.all([api(`/team/cases${zone ? `?zone=${encodeURIComponent(zone)}` : ""}`), api("/ops")])
+    Promise.all([api(`/team/cases${zq ? `?zone=${encodeURIComponent(zq)}` : ""}`), api("/ops")])
       .then(([c, o]) => {
         const ids = new Set(c.map((x) => x.id));
         if (seen.current) {
@@ -251,26 +263,26 @@ export default function TeamPage() {
         setUpdated(new Date());
         setError("");
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => (e.message.startsWith("ลิงก์ทีม") ? setLocked(true) : setError(e.message)));
 
   useEffect(() => {
+    noIndex();
     api("/zones")
       .then((d) => setZones(d.zones))
       .catch(() => {});
   }, []);
   useEffect(() => {
-    if (!key) return;
+    if (zone && zone !== "?" && !zones) return; // wait for the zone list to know the whole block
     setCases(null);
     reload();
     const t = setInterval(() => document.visibilityState === "visible" && reload(), 30000);
     return () => clearInterval(t);
-  }, [zone, key]); // eslint-disable-line react-hooks/exhaustive-deps -- reload reads the current zone
+  }, [zq, zones]); // eslint-disable-line react-hooks/exhaustive-deps -- reload reads the current zone
   useEffect(() => {
     const open = (cases || []).filter((c) => c.status !== "done").length;
-    document.title = `${open ? `(${open}) ` : ""}ทีมแจก${zone ? ` โซน ${zone}` : ""}`;
-  }, [cases, zone]);
+    document.title = `${open ? `(${open}) ` : ""}ทีมแจก${z ? ` โซน ${z.label}` : ""}`;
+  }, [cases, z]);
 
-  const z = zones?.find((x) => x.id === zone);
   const point = z && ops.points?.[z.id];
   const liveHaz = (ops.hazards || []).filter((h) => !h.cleared_at);
   const groups = useMemo(() => {
@@ -293,14 +305,14 @@ export default function TeamPage() {
     };
   }, [cases]);
 
-  if (!key) return <NoKey />;
+  if (locked) return <NoKey />;
 
   return (
     <div className="min-h-screen bg-neutral-100 pb-10">
       <header className="px-3 py-3 text-white" style={{ background: z?.color || "#111" }}>
         <div className="mx-auto flex max-w-2xl items-center gap-2">
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-black">🚶 ทีมแจก{zone ? ` · โซน ${zone === "?" ? "ไม่รู้โซน" : zone}` : ""}</h1>
+            <h1 className="text-xl font-black">🚶 ทีมแจก{zone ? ` · โซน ${zone === "?" ? "ไม่รู้โซน" : z?.label || zone}` : ""}</h1>
             <p className="text-sm opacity-90">{updated ? `อัปเดต ${updated.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} · รีเฟรชเองทุก 30 วิ` : "กำลังโหลด…"}</p>
           </div>
           <a href="/hq" className="rounded-lg bg-white/20 px-3 py-2.5 text-sm font-semibold">🧭 ภาพรวม</a>
@@ -325,15 +337,15 @@ export default function TeamPage() {
         <section className="rounded-xl bg-white p-3 shadow">
           <p className="text-sm font-semibold">โซนที่ทีมคุณดูแล</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
-            {(zones || []).map((x) => (
+            {groups0.map((x) => (
               <button
                 key={x.id}
                 onClick={() => setZone(x.id)}
-                aria-pressed={zone === x.id}
-                className="min-h-[44px] min-w-[44px] rounded-full text-lg font-black"
-                style={zone === x.id ? { background: x.color, color: "#fff" } : { border: `2px solid ${x.color}`, color: x.color }}
+                aria-pressed={z?.id === x.id}
+                className="min-h-[44px] min-w-[44px] rounded-full px-2 text-lg font-black"
+                style={z?.id === x.id ? { background: x.color, color: "#fff" } : { border: `2px solid ${x.color}`, color: x.color }}
               >
-                {x.id}
+                {x.label}
               </button>
             ))}
             <button onClick={() => setZone("?")} aria-pressed={zone === "?"} className={`min-h-[44px] rounded-full px-3 text-sm ${zone === "?" ? "bg-black text-white" : "border border-neutral-400"}`}>

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, useTeamKey } from "../api";
+import { api } from "../api";
 import { timeAgo } from "../config";
 import { Board, Boats, HAZ, Hazards, NEEDS, PointCard, Roster, summaryText } from "./OpsPage";
-import { NoKey } from "./TeamPage";
-import { placeOf } from "./ZonesPage";
+import { NoKey, noIndex } from "./TeamPage";
+import { placeOf, zoneGroups } from "./ZonesPage";
 
 // /hq#k=… — the team's one-screen picture: cases per zone, drop points, hazards, open questions,
 // what the team is short of, boats, volunteers. Everything editable in place; the LINE sweep
@@ -30,7 +30,7 @@ function Fold({ id, title, children, open = false }) {
 }
 
 export default function HqPage() {
-  const key = useTeamKey();
+  const [locked, setLocked] = useState(false);
   const [zones, setZones] = useState(null);
   const [board, setBoard] = useState(null);
   const [cases, setCases] = useState([]);
@@ -49,17 +49,17 @@ export default function HqPage() {
         setUpdated(new Date());
         setError("");
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => (e.message.startsWith("ลิงก์ทีม") ? setLocked(true) : setError(e.message)));
 
   useEffect(() => {
+    noIndex();
     api("/zones")
       .then((d) => setZones(d.zones))
       .catch((e) => setError(e.message));
-    if (!key) return;
     reload();
     const t = setInterval(() => document.visibilityState === "visible" && reload(), 30000);
     return () => clearInterval(t);
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const perZone = useMemo(() => {
     const out = {};
@@ -73,7 +73,7 @@ export default function HqPage() {
   }, [cases]);
   const total = useMemo(() => Object.values(perZone).reduce((a, o) => ({ open: a.open + o.open, helping: a.helping + o.helping, done: a.done + o.done, urgent: a.urgent + o.urgent }), { open: 0, helping: 0, done: 0, urgent: 0 }), [perZone]);
 
-  if (!key) return <NoKey />;
+  if (locked) return <NoKey />;
   const b = board || { points: {}, hazards: [], boats: [], notes: [], people: [] };
   const liveHaz = b.hazards.filter((h) => !h.cleared_at);
   const openQ = b.notes.filter((n) => n.kind === "question" && !n.done);
@@ -165,20 +165,23 @@ export default function HqPage() {
 
         {/* zones: cases + drop point + last activity */}
         <section id="zones" className="scroll-mt-4">
-          <h2 className="mb-2 text-lg font-black">📍 โซน A–I</h2>
+          <h2 className="mb-2 text-lg font-black">📍 โซน (จุดที่ใช้ร่วมกันรวมเป็นก้อนเดียว)</h2>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {(updated ? zones || [] : []).map((z) => {
-              const n = perZone[z.id] || { open: 0, helping: 0, done: 0, urgent: 0 };
+            {(updated ? zoneGroups(zones) : []).map((z) => {
+              // a merged block (F·G·H) adds up its zones
+              const n = z.ids.reduce((a, id) => {
+                const o = perZone[id] || {};
+                return { open: a.open + (o.open || 0), helping: a.helping + (o.helping || 0), done: a.done + (o.done || 0), urgent: a.urgent + (o.urgent || 0) };
+              }, { open: 0, helping: 0, done: 0, urgent: 0 });
               const p = b.points[z.id] || {};
-              const shared = (z.drop.shared || [z.id])[0];
-              const pp = shared !== z.id ? b.points[shared] || {} : p; // G, H: the person is at F's point
+              const pp = p;
               const here = !!pp.person && pp.manned !== false;
-              const last = log.find((e) => e.zone === z.id);
+              const last = log.find((e) => z.ids.includes(e.zone));
               return (
                 <div key={z.id} className="rounded-xl border-l-8 bg-white p-3 shadow" style={{ borderColor: z.color }}>
                   <div className="flex items-center gap-2">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-black text-white" style={{ background: z.color }}>
-                      {z.id}
+                    <span className={`flex h-10 shrink-0 items-center justify-center rounded-full font-black text-white ${z.ids.length > 1 ? "px-2 text-sm" : "w-10 text-xl"}`} style={{ background: z.color }}>
+                      {z.label}
                     </span>
                     <div className="grid flex-1 grid-cols-4 gap-1 text-center text-xs">
                       <span className={`rounded py-1 ${n.open ? "bg-neutral-800 text-white" : "bg-neutral-100"}`}>
@@ -216,7 +219,7 @@ export default function HqPage() {
                   </p>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <a href={`/team#zone=${z.id}`} className="flex min-h-[40px] items-center justify-center rounded-lg bg-black text-sm font-bold text-white">
-                      📋 ดูเคสโซน {z.id}
+                      📋 ดูเคส {z.label}
                     </a>
                     <button onClick={() => setEditZone(editZone === z.id ? null : z.id)} className="min-h-[40px] rounded-lg border border-neutral-300 text-sm">
                       ✏️ จุดลงของ

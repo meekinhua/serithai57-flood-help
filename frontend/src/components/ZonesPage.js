@@ -19,6 +19,18 @@ const navUrl = (d) => `https://www.google.com/maps/dir/?api=1&destination=${d.la
 const GREY = "#9ca3af";
 // where the drop point is, in words: the shop the teams use, else the soi mouth
 export const placeOf = (z) => z.drop.place || `ปากซอย ${z.drop.soi}`;
+// zones that share one drop point (F·G·H) work as one block: one card, one team, one case list.
+// The group keeps the first zone's id (its drop point record) and adds ids / label / all sois.
+export function zoneGroups(zones) {
+  const out = [];
+  for (const z of zones || []) {
+    const ids = z.drop.shared || [z.id];
+    if (ids[0] !== z.id) continue;
+    const members = ids.map((id) => zones.find((x) => x.id === id)).filter(Boolean);
+    out.push({ ...z, ids, label: ids.join("·"), sois: members.flatMap((m) => m.sois).sort((a, b) => parseFloat(a) - parseFloat(b) || a.localeCompare(b)), houses: members.reduce((a, m) => a + m.houses, 0) });
+  }
+  return out;
+}
 const sharedWith = (z) => (z.drop.shared || [z.id]).filter((id) => id !== z.id);
 
 export function drawZones(map, data, { houses = true, labels = true, pane, focus } = {}) {

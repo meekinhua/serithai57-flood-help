@@ -676,13 +676,17 @@ function TeamLinks() {
   const [key, setKey] = useState("");
   const [qr, setQr] = useState("");
   const [msg, setMsg] = useState("");
+  const [open, setOpen] = useState(null);
   const show = (k) => {
     setKey(k);
     QRCode.toDataURL(`${window.location.origin}/team#k=${k}`, { margin: 1, width: 240 }).then(setQr);
   };
   useEffect(() => {
     api("/admin/team-key")
-      .then((r) => show(r.key))
+      .then((r) => {
+        show(r.key);
+        setOpen(r.open);
+      })
       .catch((e) => setMsg(e.message));
   }, []);
   async function rotate() {
@@ -694,6 +698,15 @@ function TeamLinks() {
       setMsg(e.message);
     }
   }
+  async function toggle() {
+    const next = !open;
+    if (!window.confirm(next ? "เปิดให้ทุกคนที่รู้ URL เข้า /hq และ /team ได้เลย (ไม่ต้องใช้ลิงก์ลับ) — รายชื่อ/เบอร์อาสาจะเปิดด้วย ยืนยัน?" : "ล็อก /hq และ /team ให้เข้าได้เฉพาะลิงก์ทีม?")) return;
+    try {
+      setOpen((await api("/admin/team-access", { method: "POST", body: JSON.stringify({ open: next }) })).open);
+    } catch (e) {
+      setMsg(e.message);
+    }
+  }
   const copy = (text) => navigator.clipboard?.writeText(text).then(() => setMsg("✅ คัดลอกแล้ว"), () => window.prompt("คัดลอก", text));
   if (!key) return msg ? <p className="text-sm text-red-700">{msg}</p> : null;
   const hq = `${window.location.origin}/hq#k=${key}`;
@@ -701,6 +714,14 @@ function TeamLinks() {
   return (
     <div className="mt-4 space-y-2 rounded-xl border-2 border-black bg-white p-3">
       <p className="text-lg font-bold">🔑 ลิงก์ทีม (ไม่ต้องล็อกอิน)</p>
+      {open != null && (
+        <div className={`rounded-lg p-2 text-sm ${open ? "bg-yellow-100" : "bg-green-100"}`}>
+          <p className="font-semibold">{open ? "🔓 ตอนนี้: เปิด — ใครรู้ URL /hq, /team ก็เข้าได้" : "🔒 ตอนนี้: ล็อก — เข้าได้เฉพาะลิงก์ทีมด้านล่าง"}</p>
+          <button onClick={toggle} className="mt-1 min-h-[40px] w-full rounded-lg border border-black bg-white font-semibold">
+            {open ? "🔒 ล็อก (ใช้ลิงก์ทีมเท่านั้น)" : "🔓 เปิดให้เข้าได้เลย"}
+          </button>
+        </div>
+      )}
       <p className="text-sm text-neutral-700">ส่งในกลุ่มไลน์ทีมเท่านั้น อย่าโพสต์ในกลุ่มหมู่บ้าน · เปิดครั้งเดียว เครื่องจะจำไว้</p>
       <button onClick={() => copy(hq)} className="min-h-[44px] w-full rounded-lg bg-black text-sm font-bold text-white">🧭 คัดลอกลิงก์ศูนย์ทีมงาน (/hq)</button>
       <button onClick={() => copy(team)} className="min-h-[44px] w-full rounded-lg border-2 border-black text-sm font-bold">🚶 คัดลอกลิงก์ทีมแจก (/team)</button>
