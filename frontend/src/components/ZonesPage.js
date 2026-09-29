@@ -17,6 +17,9 @@ const fmtDist = (m) => (m < 1000 ? `${Math.round(m / 10) * 10} ม.` : `${(m / 1
 const navUrl = (d) => `https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}`;
 
 const GREY = "#9ca3af";
+// where the drop point is, in words: the shop the teams use, else the soi mouth
+export const placeOf = (z) => z.drop.place || `ปากซอย ${z.drop.soi}`;
+const sharedWith = (z) => (z.drop.shared || [z.id]).filter((id) => id !== z.id);
 
 export function drawZones(map, data, { houses = true, labels = true, pane, focus } = {}) {
   const group = L.layerGroup().addTo(map);
@@ -49,15 +52,29 @@ export function drawZones(map, data, { houses = true, labels = true, pane, focus
         icon: L.divIcon({ className: "", iconSize: [58, 58], iconAnchor: [29, 29], html: `<div class="zone-label" style="--c:${z.color}">${z.id}</div>` }),
       }).addTo(group);
     }
-    L.marker([z.drop.lat, z.drop.lng], {
-      ...P,
-      zIndexOffset: mine ? 2000 : 1000,
-      icon: L.divIcon({ className: "", iconSize: [64, 40], iconAnchor: [32, 20], html: `<div class="drop-pin${mine ? "" : " faded"}" style="--c:${mine ? z.color : GREY}">🚚 ${z.id}</div>` }),
-    })
-      .bindPopup(
-        `<b>🚚 ${esc(z.drop.label)}</b><br>โซน ${z.id} · ${z.houses} หลัง · ซอย ${esc(z.sois.join(", "))}<br>รถใหญ่จอดริมถนนหลัก แล้วทีมโซน ${z.id} ขนเข้าซอย<br><a href="${navUrl(z.drop)}" target="_blank" rel="noreferrer">🧭 นำทางไปจุดนี้</a>`
-      )
-      .addTo(group);
+    // zones sharing one drop point (F·G·H) get one pin, drawn with the first zone of the group
+    const shared = z.drop.shared || [z.id];
+    if (shared[0] !== z.id) continue;
+    const pinMine = !focus || shared.includes(focus);
+    const pins = [{ ...z.drop, tag: shared.join("·") }, ...(z.drop.extra || []).map((x, i) => ({ ...x, tag: `${z.id}${i + 2}`, second: true }))];
+    for (const d of pins) {
+      L.marker([d.lat, d.lng], {
+        ...P,
+        zIndexOffset: pinMine ? 2000 : 1000,
+        icon: L.divIcon({
+          className: "",
+          iconSize: [shared.length > 1 ? 96 : 64, 40],
+          iconAnchor: [shared.length > 1 ? 48 : 32, 20],
+          html: `<div class="drop-pin${pinMine ? "" : " faded"}${d.second ? " second" : ""}" style="--c:${pinMine ? z.color : GREY}">🚚 ${esc(d.tag)}</div>`,
+        }),
+      })
+        .bindPopup(
+          `<b>🚚 จุดลงของ ${esc(d.tag)}</b><br>${esc(d.place || `ปากซอย ${d.soi}`)}<br>${
+            shared.length > 1 ? `จุดรวมของโซน ${esc(shared.join(", "))} — ทีมที่จุดนี้แบ่งของเข้าแต่ละโซน` : `โซน ${z.id} · ${z.houses} หลัง · ซอย ${esc(z.sois.join(", "))}`
+          }<br>รถใหญ่จอดริมถนนหลัก แล้วทีมขนเข้าซอย<br><a href="${navUrl(d)}" target="_blank" rel="noreferrer">🧭 นำทางไปจุดนี้</a> · <a href="/ops#${z.id}">👤 ใครอยู่จุดนี้</a>`
+        )
+        .addTo(group);
+    }
   }
   return group;
 }
@@ -331,7 +348,11 @@ export default function ZonesPage() {
         </header>
         <div className="grid grid-cols-2 gap-3 px-6 py-3 text-lg">
           <div className="rounded-xl border-4 border-yellow-400 bg-yellow-50 p-3">
-            <p className="text-2xl font-black">🚚 จุดลงของ: ปากซอย {fzone?.drop.soi}</p>
+            <p className="text-2xl font-black">🚚 จุดลงของ: {fzone && placeOf(fzone)}</p>
+            {fzone && sharedWith(fzone).length > 0 && <p className="font-bold">ใช้ร่วมกับโซน {sharedWith(fzone).join(", ")}</p>}
+            {fzone?.drop.extra?.map((x) => (
+              <p key={x.soi} className="font-bold">+ จุดที่ 2: {x.place}</p>
+            ))}
             <p>รถใหญ่จอด<b>ริมถนนหลัก (เส้นเหลือง)</b> ที่ป้าย 🚚 {FOCUS} เข้าซอยเล็กไม่ได้</p>
           </div>
           <div className="rounded-xl border-4 p-3" style={{ borderColor: fzone?.color }}>
@@ -418,12 +439,12 @@ export default function ZonesPage() {
                 </p>
                 {here.own && (
                   <p>
-                    🚚 จุดลงของโซน {here.own.z.id}: ปากซอย {here.own.z.drop.soi} · ห่าง {fmtDist(here.own.d)}
+                    🚚 จุดลงของโซน {here.own.z.id}: {placeOf(here.own.z)} · ห่าง {fmtDist(here.own.d)}
                   </p>
                 )}
                 {(!here.own || here.nearest.z.id !== here.own.z.id) && (
                   <p>
-                    🚚 จุดลงของที่ใกล้สุด: <b>{here.nearest.z.id}</b> ปากซอย {here.nearest.z.drop.soi} · ห่าง {fmtDist(here.nearest.d)}
+                    🚚 จุดลงของที่ใกล้สุด: <b>{here.nearest.z.id}</b> {placeOf(here.nearest.z)} · ห่าง {fmtDist(here.nearest.d)}
                   </p>
                 )}
                 <a href={navUrl((here.own || here.nearest).z.drop)} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-[44px] items-center rounded-lg bg-black px-4 font-semibold text-white">
@@ -449,7 +470,13 @@ export default function ZonesPage() {
                       <p className="text-sm text-neutral-600">ซอย {z.sois.join(", ")}</p>
                     </div>
                   </div>
-                  <p className="mt-2 font-semibold">🚚 จุดลงของ: ปากซอย {z.drop.soi} (ริมถนนหลัก)</p>
+                  <p className="mt-2 font-semibold">🚚 จุดลงของ: {placeOf(z)}</p>
+                  {sharedWith(z).length > 0 && <p className="text-sm font-semibold text-neutral-700">🤝 จุดรวมกับโซน {sharedWith(z).join(", ")}</p>}
+                  {z.drop.extra?.map((x) => (
+                    <p key={x.soi} className="text-sm font-semibold">
+                      🚚 จุดที่ 2: {x.place}
+                    </p>
+                  ))}
                   {n && !POSTER && (
                     <p className="text-sm">
                       🆘 คำขอค้าง {n.open}

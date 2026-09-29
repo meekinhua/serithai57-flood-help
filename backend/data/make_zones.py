@@ -16,6 +16,20 @@ HERE = Path(__file__).resolve().parent
 TARGET_PER_ZONE = 170  # houses; ~one team-day of door-to-door
 FAR_M = 30  # a house farther than this from its soi is "off the sois" (on an unmapped lane / a separate block)
 LINK_M = 90  # off-soi houses closer than this belong to the same block (the NE block has 60–90 m gaps)
+# Drop points the volunteer teams actually used on the ground (volunteer LINE group, 29 Sep 2026),
+# replacing the computed "soi mouth nearest the middle of the zone". Zones not listed keep the computed one.
+#   soi:   the soi mouth on the main road, or at: an exact [lat, lng] for a shop between sois
+#   extra: second points in the same zone
+FIELD_DROPS = {
+    "B": {"soi": "11", "place": "ร้านสายชล ปากซอย 11"},
+    "D": {"soi": "19", "place": "ร้านเพื่อนบ้าน ปากซอย 19 (มีโต๊ะวางของ)", "extra": [{"soi": "21", "place": "บังดำ ปากซอย 21 (ร้านมอไซค์ / ลูกชิ้น)"}]},
+    "E": {"soi": "28", "place": "ปากซอย 28 (ดูแลซอย 22–33)"},
+    # one shared point for F·G·H: the team there splits the goods between the three zones
+    "F": {"at": [13.797297, 100.669162], "soi": "34–36", "place": "ร้านไอซ์มาร์ท ระหว่างซอย 34–36 (จุดรวม F·G·H)"},
+    "G": {"same_as": "F"},
+    "H": {"same_as": "F"},
+    "I": {"soi": "71", "place": "แยก 71 ร้านแหนมเนือง / ร้านสเต็ก"},
+}
 COLORS = ["#e11d48", "#2563eb", "#16a34a", "#f59e0b", "#9333ea", "#0891b2", "#ea580c", "#4f46e5", "#65a30d", "#db2777", "#0d9488", "#b45309"]
 
 KX = 111320 * math.cos(math.radians(13.8))
@@ -155,7 +169,18 @@ def main():
         # drop point: the soi mouth nearest the middle (by houses) of the zone, on the main road
         mid_along = sum(along(mouths[n]) * count[n] for n in names) / max(1, sum(count[n] for n in names))
         drop_soi = min(names, key=lambda n: abs(along(mouths[n]) - mid_along))
-        dp = mouths[drop_soi]
+        fd = FIELD_DROPS.get(letter, {})
+        fd = FIELD_DROPS[fd["same_as"]] if "same_as" in fd else fd
+        if "at" in fd:
+            dp, drop_soi = fd["at"], fd["soi"]
+        elif "soi" in fd:
+            drop_soi = fd["soi"]
+            dp = mouths[drop_soi]
+        else:
+            dp = mouths[drop_soi]
+        place = fd.get("place", f"ปากซอย {drop_soi}")
+        root = FIELD_DROPS.get(letter, {}).get("same_as", letter)  # zones sharing one drop point
+        shared = [chr(ord("A") + j) for j in range(len(zones)) if FIELD_DROPS.get(chr(ord("A") + j), {}).get("same_as", chr(ord("A") + j)) == root]
         zb = [b for k, (b, n) in enumerate(home) if hz[k] == i]
         # label spot: middle of the houses on the busier side of the road, so it doesn't sit under the drop pin
         road_side = lambda p: across(p) - across(dp)  # noqa: E731
@@ -168,9 +193,11 @@ def main():
         out.append({
             "id": letter, "color": COLORS[i % len(COLORS)], "sois": sorted(names, key=soi_key), "houses": houses,
             "center": [round(cy, 6), round(cx, 6)],
-            "drop": {"lat": round(dp[0], 6), "lng": round(dp[1], 6), "soi": drop_soi, "label": f"จุดลงของ {letter} · ปากซอย {drop_soi}"},
+            "drop": {"lat": round(dp[0], 6), "lng": round(dp[1], 6), "soi": drop_soi, "place": place, "shared": shared,
+                     "label": f"จุดลงของ {'·'.join(shared)} · {place}",
+                     "extra": [{**x, "lat": round(mouths[x["soi"]][0], 6), "lng": round(mouths[x["soi"]][1], 6)} for x in fd.get("extra", [])]},
         })
-        print(f"{letter}: {houses:4d} บ้าน · ซอย {', '.join(sorted(names, key=soi_key))} · จุดลงของปากซอย {drop_soi}")
+        print(f"{letter}: {houses:4d} บ้าน · ซอย {', '.join(sorted(names, key=soi_key))} · จุดลงของ {place}")
 
     zone_of = {n: z["id"] for z in out for n in z["sois"]}
     idx = {z["id"]: i for i, z in enumerate(out)}

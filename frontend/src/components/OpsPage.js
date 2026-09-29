@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, load, save } from "../api";
 import { timeAgo } from "../config";
+import { placeOf } from "./ZonesPage";
 
 // /ops — the volunteer coordination board. Answers what the volunteer LINE group asked all day:
 // "drop point B is which soi? who's there? number?", "which point is short of what?",
@@ -96,7 +97,7 @@ function PointEditor({ zone, p, onDone }) {
     <div className="mt-2 space-y-2 border-t pt-2">
       <label className="block text-sm font-semibold">
         📍 จุดลงของอยู่ตรงไหนจริงๆ
-        <input value={f.place} onChange={set("place")} maxLength={120} className={inputCls} placeholder={`เช่น ร้านสายชล ปากซอย ${zone.drop.soi}`} />
+        <input value={f.place} onChange={set("place")} maxLength={120} className={inputCls} placeholder={placeOf(zone)} />
       </label>
       <button type="button" onClick={gps} className="min-h-[40px] w-full rounded-lg border-2 border-blue-600 text-sm font-semibold text-blue-700">
         {pin ? "✅ ได้ตำแหน่งแล้ว (จะใช้นำทาง)" : "📍 ฉันยืนอยู่ที่จุดนี้ — ปักหมุดตรงนี้"}
@@ -145,7 +146,7 @@ function PointCard({ zone, p = {}, onSaved }) {
           {zone.id}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-bold leading-tight">{p.place || `ปากซอย ${zone.drop.soi}`}</p>
+          <p className="font-bold leading-tight">{p.place || placeOf(zone)}</p>
           <p className="text-xs text-neutral-500">โซน {zone.id} · ซอย {zone.sois.join(", ")}</p>
         </div>
         {touched && (
@@ -422,7 +423,7 @@ function summaryText(zones, board) {
   out.push("", "📍 จุดลงของ");
   for (const z of zones) {
     const p = board.points[z.id] || {};
-    const bits = [`${z.id} · ${p.place || `ปากซอย ${z.drop.soi}`}`];
+    const bits = [`${z.id} · ${p.place || placeOf(z)}`];
     bits.push(p.person ? `${p.person}${p.phone ? ` ${p.phone}` : ""}${p.hours ? ` (${p.hours})` : ""}${p.manned === false ? " ❌ไม่อยู่" : ""}` : "❌ ยังไม่มีคนประจำ");
     if (p.needs?.length) bits.push(`ต้องการ: ${p.needs.map((n) => NEEDS[n].split(" ")[1]).join(", ")}`);
     if (p.surplus) bits.push(`เหลือ: ${p.surplus}`);
@@ -550,7 +551,7 @@ export default function OpsPage() {
                     <span className="rounded px-1.5 font-black text-white" style={{ background: z.color }}>
                       {z.id}
                     </span>
-                    <span className="text-sm">{p.place || `ปากซอย ${z.drop.soi}`}:</span>
+                    <span className="text-sm">{p.place || placeOf(z)}:</span>
                     {p.needs.map((n) => (
                       <span key={n} className="rounded-full bg-red-100 px-2 text-xs font-semibold text-red-800">
                         {NEEDS[n]}
