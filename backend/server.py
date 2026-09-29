@@ -32,6 +32,7 @@ import media  # noqa: E402
 import services  # noqa: E402
 import staff  # noqa: E402
 import trips  # noqa: E402
+import zonelog  # noqa: E402
 import weather  # noqa: E402
 
 # tz_aware so datetimes go out as "+00:00" and browsers don't misread them as local time
@@ -599,6 +600,7 @@ staff_router, locate_house, learn_address, require_staff = staff.build_router(
 )
 app.include_router(staff_router)
 app.include_router(trips.build_router(db, require_staff, staff.SOIS))
+app.include_router(zonelog.build_router(db, rate_limit, current_admin, {z["id"] for z in staff.ZONES["zones"]}))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
@@ -621,6 +623,8 @@ async def startup():
     await db.trips.create_index("staff_id")
     await db.trips.create_index([("staff_id", 1), ("presence", 1)])
     await db.handoffs.create_index("expires_at", expireAfterSeconds=0)
+    await db.zone_log.create_index("expires_at", expireAfterSeconds=0)
+    await db.zone_log.create_index([("at", -1)])
     await db.services.create_index([("category", 1), ("updated_at", -1)])
     await db.media.create_index("id", unique=True)
     await db.media.create_index([("attached_to", 1), ("created_at", 1)])

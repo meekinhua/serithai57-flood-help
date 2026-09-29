@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
-import { api } from "../api";
+import { api, load, save } from "../api";
+import { timeAgo } from "../config";
 import { createBaseMap } from "./MapView";
 
 // /zones — the village split into zones A, B, C… (so relief teams don't overlap) and one truck
@@ -61,12 +62,129 @@ export function drawZones(map, data, { houses = true, labels = true, pane, focus
   return group;
 }
 
+// what was done in a zone; keys match backend/zonelog.py
+const ACTIONS = {
+  boat: ["🚤", "ส่งเรือเข้าไปแจกของ"],
+  truck_drop: ["🚛", "รถลงของที่จุดลงของ"],
+  food: ["🍱", "แจกอาหารแล้ว"],
+  water: ["💧", "แจกน้ำดื่มแล้ว"],
+  evacuate: ["🚣", "รับคน / อพยพ"],
+  medical: ["🩺", "หน่วยแพทย์ / ยา"],
+  need: ["⚠️", "ยังขาด / ต้องการเพิ่ม"],
+  other: ["📝", "อื่นๆ"],
+};
+const WHEN = [
+  [0, "ตอนนี้"],
+  [30, "30 นาทีก่อน"],
+  [60, "1 ชม.ก่อน"],
+  [120, "2 ชม.ก่อน"],
+  [180, "3 ชม.ก่อน"],
+];
+const QUIET_H = 6; // no update for this long: flag the zone
+
+function ZoneStatus({ zone, entries, onAdded }) {
+  const [openLog, setOpenLog] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [kind, setKind] = useState(null);
+  const [when, setWhen] = useState(0);
+  const [note, setNote] = useState("");
+  const [name, setName] = useState(() => load("contact", {}).name || "");
+  const [msg, setMsg] = useState("");
+  const last = entries[0];
+  const quietH = last ? (Date.now() - new Date(last.at).getTime()) / 3.6e6 : null;
+
+  async function submit() {
+    setMsg("");
+    try {
+      await api(`/zones/${zone.id}/log`, { method: "POST", body: JSON.stringify({ kind, minutes_ago: when, note: note.trim(), name: name.trim() }) });
+      save("contact", { ...load("contact", {}), name: name.trim() });
+      setAdding(false);
+      setKind(null);
+      setNote("");
+      setWhen(0);
+      onAdded();
+    } catch (e) {
+      setMsg(e.message);
+    }
+  }
+
+  const row = (e) => {
+    const [emoji, label] = ACTIONS[e.kind] || ACTIONS.other;
+    return (
+      <li key={e.id} className="text-sm">
+        <b>
+          {emoji} {label}
+        </b>{" "}
+        · {timeAgo(e.at)}
+        {e.note && <span className="block text-neutral-700">{e.note}</span>}
+        <span className="block text-xs text-neutral-500">
+          โดย {e.name}
+          {e.staff ? " ✓ ทีม" : ""}
+        </span>
+      </li>
+    );
+  };
+
+  return (
+    <div className="mt-2 rounded-lg bg-neutral-50 p-2">
+      <p className="text-xs font-semibold text-neutral-600">สถานะโซน</p>
+      {last ? <ul>{row(last)}</ul> : <p className="text-sm text-neutral-600">ยังไม่มีใครแจ้งว่าเข้ามาช่วยโซนนี้</p>}
+      {(quietH == null || quietH >= QUIET_H) && (
+        <p className="mt-1 rounded bg-yellow-200 px-2 py-0.5 text-xs font-bold">⏰ {quietH == null ? "ยังไม่มีการแจ้ง" : `เงียบมา ${Math.floor(quietH)} ชม.`} — อาจยังไม่มีคนเข้าไป</p>
+      )}
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button onClick={() => setOpenLog((v) => !v)} disabled={entries.length < 2} className="min-h-[40px] rounded-lg border border-neutral-300 bg-white text-sm disabled:opacity-40">
+          📋 ประวัติ ({entries.length})
+        </button>
+        <button onClick={() => setAdding((v) => !v)} className="min-h-[40px] rounded-lg bg-blue-600 text-sm font-semibold text-white">
+          ➕ แจ้งสถานะ
+        </button>
+      </div>
+      {openLog && <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto border-t pt-2">{entries.slice(1).map(row)}</ul>}
+      {adding && (
+        <div className="mt-2 space-y-2 border-t pt-2">
+          <p className="text-sm font-semibold">ทำอะไรในโซน {zone.id}?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(ACTIONS).map(([k, [e, t]]) => (
+              <button key={k} type="button" onClick={() => setKind(k)} aria-pressed={kind === k} className={`min-h-[40px] rounded-full px-3 text-sm ${kind === k ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}>
+                {e} {t}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm font-semibold">เมื่อไหร่?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {WHEN.map(([m, t]) => (
+              <button key={m} type="button" onClick={() => setWhen(m)} aria-pressed={when === m} className={`min-h-[36px] rounded-full px-3 text-sm ${when === m ? "bg-black text-white" : "border border-neutral-300 bg-white"}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className="min-h-[44px] w-full rounded-lg border border-neutral-300 px-3" placeholder="รายละเอียด (ไม่ใส่ก็ได้) เช่น ข้าว 80 กล่อง ซอย 18–20" />
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className="min-h-[44px] w-full rounded-lg border border-neutral-300 px-3" placeholder="ชื่อ / ทีม เช่น เรือทีมต้น" />
+          {msg && <p className="rounded bg-red-50 p-2 text-sm text-red-700">{msg}</p>}
+          <button onClick={submit} disabled={!kind || !name.trim()} className="min-h-[48px] w-full rounded-lg bg-black font-bold text-white disabled:opacity-40">
+            ส่งสถานะ
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ZonesPage() {
   const el = useRef(null);
   const mapRef = useRef(null);
   const [data, setData] = useState(null);
   const [posts, setPosts] = useState([]);
   const [error, setError] = useState("");
+  const [log, setLog] = useState([]);
+  const loadLog = () => api("/zones/log").then(setLog).catch(() => {});
+  useEffect(() => {
+    if (FOCUS) return;
+    loadLog();
+    const t = setInterval(() => document.visibilityState === "visible" && loadLog(), 60000);
+    return () => clearInterval(t);
+  }, []);
   // "where am I": live GPS dot on the map, which zone that is, and the nearest truck drop point
   const [me, setMe] = useState(null); // { lat, lng, acc }
   const [locMsg, setLocMsg] = useState("");
@@ -314,6 +432,7 @@ export default function ZonesPage() {
                       {n.urgent ? <span className="ml-1 rounded bg-red-600 px-1.5 font-bold text-white">ด่วน {n.urgent}</span> : null}
                     </p>
                   )}
+                  {!POSTER && <ZoneStatus zone={z} entries={log.filter((e) => e.zone === z.id)} onAdded={loadLog} />}
                   <div className="mt-2 grid grid-cols-2 gap-2 print:hidden">
                     <button onClick={() => focus(z)} className="min-h-[44px] rounded-lg border-2 border-black text-sm font-semibold">📍 ดูบนแผนที่</button>
                     <a href={navUrl(z.drop)} target="_blank" rel="noreferrer" className="flex min-h-[44px] items-center justify-center rounded-lg bg-black text-sm font-semibold text-white">
