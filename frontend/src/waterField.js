@@ -4,7 +4,9 @@
 import { VILLAGE_BOUNDARY, WATER_LEVELS } from "./config";
 
 export const INFLUENCE_M = 300; // beyond this from every report: no colour
-const HALF_LIFE_H = 6; // a report's weight halves every 6 hours
+const HALF_LIFE_H = 3; // a report's weight halves every 3 hours: when the water moves, new reports must win
+export const MAX_AGE_H = 12; // older reports don't colour the map at all
+export const STALE_H = 6; // older than this: shown faded and marked "old"
 const MIN_DIST_M = 15; // avoids a spike exactly on top of a report
 const MAX_ALPHA = 0.55;
 const MARGIN_M = 400; // paint a little beyond the village boundary
@@ -31,7 +33,8 @@ export function toPoints(reports, nowMs = Date.now()) {
     if (seen.has(cell)) continue; // reports arrive newest first
     seen.add(cell);
     const ageH = Math.max(0, (nowMs - new Date(r.created_at).getTime()) / 3.6e6);
-    points.push({ lat: r.lat, lng: r.lng, level: r.level, timeW: Math.pow(0.5, ageH / HALF_LIFE_H) });
+    if (ageH > MAX_AGE_H) continue;
+    points.push({ lat: r.lat, lng: r.lng, level: r.level, ageH, timeW: Math.pow(0.5, ageH / HALF_LIFE_H) });
   }
   return points;
 }
@@ -42,6 +45,7 @@ export function estimateAt(lat, lng, points) {
   let den = 0;
   let nearest = Infinity;
   let used = 0;
+  let newestH = Infinity; // age of the freshest report that counts here
   for (const p of points) {
     const dx = (p.lng - lng) * kx;
     const dy = (p.lat - lat) * M_PER_DEG_LAT;
@@ -52,9 +56,10 @@ export function estimateAt(lat, lng, points) {
     num += w * p.level;
     den += w;
     used++;
+    if (d <= INFLUENCE_M) newestH = Math.min(newestH, p.ageH ?? 0);
   }
   if (!den || nearest > INFLUENCE_M) return null;
-  return { level: num / den, nearest, used };
+  return { level: num / den, nearest, used, newestH };
 }
 
 export function fieldBounds() {
@@ -90,7 +95,9 @@ export function renderField(points, bounds = fieldBounds(), cols = 180) {
       const est = estimateAt(lat, lng, points);
       if (!est) continue;
       const [r, g, b] = levelColor(est.level);
-      const fade = Math.pow(1 - est.nearest / INFLUENCE_M, 0.6);
+      // fade with distance, and with age: an area only old reports speak for turns pale
+      const fresh = est.newestH <= 2 ? 1 : Math.max(0.25, 1 - (est.newestH - 2) / (MAX_AGE_H - 2));
+      const fade = Math.pow(1 - est.nearest / INFLUENCE_M, 0.6) * fresh;
       const i = (y * cols + x) * 4;
       img.data[i] = r;
       img.data[i + 1] = g;

@@ -6,7 +6,7 @@ import { KINDS, VILLAGE_BOUNDARY, VILLAGE_CENTER, VILLAGE_ZOOM, categoryOf, time
 import { mediaUrl } from "../media";
 import { drawStaff } from "./staffMarkers";
 import { WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
-import { describeLevel, estimateAt, fieldBounds, renderField, toPoints } from "../waterField";
+import { MAX_AGE_H, STALE_H, describeLevel, estimateAt, fieldBounds, renderField, toPoints } from "../waterField";
 import { load, save } from "../api";
 
 const OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
@@ -48,9 +48,11 @@ const LAYER_DEFAULTS = { need: true, offer: false, info: false };
 
 function levelHtml(lat, lng, points) {
   const est = estimateAt(lat, lng, points);
-  return est
-    ? `<b>ระดับน้ำโดยประมาณ: ${describeLevel(est.level).label}</b> (${describeLevel(est.level).cm})<br><span style="color:#555">คำนวณจากรายงานใกล้เคียง ${est.used} จุด · ใกล้สุด ${Math.round(est.nearest)} ม.</span>`
-    : `ยังไม่มีรายงานระดับน้ำในระยะ 300 ม. จากจุดนี้`;
+  if (!est) return `ยังไม่มีรายงานระดับน้ำใน ${MAX_AGE_H} ชม. ในระยะ 300 ม. จากจุดนี้`;
+  const age = est.newestH < 1 ? "ไม่ถึง 1 ชม.ที่แล้ว" : `${Math.round(est.newestH)} ชม.ที่แล้ว`;
+  return `<b>ระดับน้ำโดยประมาณ: ${describeLevel(est.level).label}</b> (${describeLevel(est.level).cm})<br><span style="color:#555">จากรายงานใกล้เคียง ${est.used} จุด · ใกล้สุด ${Math.round(est.nearest)} ม. · ล่าสุด ${age}</span>${
+    est.newestH > STALE_H ? `<br><b style="color:#b45309">⚠️ ข้อมูลแถวนี้เก่าแล้ว น้ำอาจเปลี่ยนไป ช่วยแจ้งระดับน้ำตอนนี้</b>` : ""
+  }`;
 }
 
 // Group bubble: how many requests, and a red badge when there are ones nobody is helping yet.
@@ -66,7 +68,7 @@ function clusterIcon(cluster) {
   });
 }
 
-export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all" }) {
+export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -135,10 +137,21 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
       const cell = `${w.lat.toFixed(4)},${w.lng.toFixed(4)}`;
       if (seen.has(cell)) continue;
       seen.add(cell);
+      const ageH = (Date.now() - new Date(w.created_at).getTime()) / 3.6e6;
+      if (ageH > 24) continue; // a day old says nothing about now
+      const stale = ageH > STALE_H;
       const lv = waterOf(w.level);
-      L.circleMarker([w.lat, w.lng], { radius: 11, color: "#fff", weight: 2, fillColor: lv.color, fillOpacity: 0.85, bubblingMouseEvents: false }) // its own popup, not the map's estimate
+      L.circleMarker([w.lat, w.lng], {
+        radius: stale ? 7 : 11,
+        color: stale ? "#9ca3af" : "#fff",
+        weight: 2,
+        dashArray: stale ? "3 3" : null,
+        fillColor: lv.color,
+        fillOpacity: stale ? 0.3 : 0.85,
+        bubblingMouseEvents: false, // its own popup, not the map's estimate
+      })
         .bindPopup(
-          `<b>💧 ระดับน้ำ: ${lv.label} (${w.cm != null ? `${w.cm} ซม.` : lv.cm})</b>${w.trend ? ` ${WATER_TREND[w.trend][0]} ${WATER_TREND[w.trend][1]}` : ""}${
+          `${stale ? `<b style="color:#b45309">⚠️ ข้อมูลเก่า ${Math.round(ageH)} ชม. — ตอนนี้อาจไม่ใช่แล้ว</b><br>` : ""}<b>💧 ระดับน้ำ: ${lv.label} (${w.cm != null ? `${w.cm} ซม.` : lv.cm})</b>${w.trend ? ` ${WATER_TREND[w.trend][0]} ${WATER_TREND[w.trend][1]}` : ""}${
             w.where ? `<br>${WATER_WHERE[w.where][0]} วัด${WATER_WHERE[w.where][1]}` : ""
           }<br>${timeAgo(w.created_at)}${w.name ? ` · ${escapeHtml(w.name)}` : ""}${
             w.note ? `<br>${escapeHtml(w.note)}` : ""
@@ -244,12 +257,22 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
                 </span>
               ))}
             </div>
-            <p className="mt-1 font-semibold">👆 แตะที่ไหนก็ได้บนแผนที่ เพื่อดูระดับน้ำตรงนั้น · จุดสี = รายงานจริง ({water.length})</p>
+            <p className="mt-1 font-semibold">👆 แตะที่ไหนก็ได้บนแผนที่ เพื่อดูระดับน้ำตรงนั้น</p>
+            <p className="text-neutral-600">
+              สีจากรายงานใน {MAX_AGE_H} ชม. · <b>สีจาง / จุดประ = ข้อมูลเก่ากว่า {STALE_H} ชม.</b>
+            </p>
             {hint && <p className="text-neutral-600">{hint}</p>}
           </div>
-          <button type="button" onClick={hereLevel} className="pointer-events-auto min-h-[44px] rounded-full border-2 border-black bg-white px-3 text-sm font-bold shadow">
-            📍 น้ำตรงที่ฉันอยู่
-          </button>
+          <div className="flex flex-wrap gap-1">
+            <button type="button" onClick={hereLevel} className="pointer-events-auto min-h-[44px] rounded-full border-2 border-black bg-white px-3 text-sm font-bold shadow">
+              📍 น้ำตรงที่ฉันอยู่
+            </button>
+            {onReportWater && (
+              <button type="button" onClick={onReportWater} className="pointer-events-auto min-h-[44px] rounded-full bg-sky-600 px-3 text-sm font-bold text-white shadow">
+                💧 แจ้งระดับน้ำตอนนี้
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="pointer-events-none absolute bottom-6 left-2 z-[500] flex max-w-[85%] flex-wrap gap-1">

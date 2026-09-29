@@ -16,7 +16,8 @@ import { useCountUp } from "./motion";
 
 const REFRESH_MS = 20000;
 const WEATHER_REFRESH_MS = 10 * 60 * 1000; // server caches Open-Meteo for 10 min too
-const WATER_STAT_HOURS = 6;
+const WATER_NOW_HOURS = 3; // "now" = reports from the last 3 h
+const WATER_PREV_HOURS = 9; // compared with the 3–9 h before, for the trend
 const IS_ADMIN_PAGE = window.location.pathname.replace(/\/+$/, "") === "/admin";
 
 export default function App() {
@@ -282,18 +283,30 @@ export default function App() {
     }
   }
 
-  // Village-wide picture: the deepest report in the last 6 h (newest wins a tie).
-  // Falls back to the latest report when nothing is that recent.
+  // Village-wide picture NOW: the typical (median) level reported in the last 3 h, and whether it is
+  // going down or up compared with the 3–9 h before. The deepest-ever report misleads once water falls.
   const waterStat = useMemo(() => {
-    const since = Date.now() - WATER_STAT_HOURS * 3600 * 1000;
-    const recent = water.filter((w) => new Date(w.created_at).getTime() >= since);
+    const t = Date.now();
+    const ageH = (w) => (t - new Date(w.created_at).getTime()) / 3.6e6;
+    const median = (arr) => {
+      const v = arr.map((w) => w.level).sort((a, b) => a - b);
+      return v[Math.floor((v.length - 1) / 2)];
+    };
+    const recent = water.filter((w) => ageH(w) <= WATER_NOW_HOURS);
+    const before = water.filter((w) => ageH(w) > WATER_NOW_HOURS && ageH(w) <= WATER_PREV_HOURS);
     if (recent.length) {
-      const top = recent.reduce((a, b) => (b.level > a.level ? b : a));
-      return { report: top, label: `ระดับน้ำสูงสุด (${WATER_STAT_HOURS} ชม.)`, sub: `จาก ${recent.length} รายงาน · ${timeAgo(top.created_at)}` };
+      const now = median(recent);
+      const report = recent.find((w) => w.level === now) || recent[0];
+      let trend = "";
+      if (before.length >= 2) {
+        const prev = median(before);
+        trend = now < prev ? `⬇️ ลดลงจาก${waterOf(prev).label} · ` : now > prev ? `⬆️ สูงขึ้นจาก${waterOf(prev).label} · ` : "➡️ ทรงตัว · ";
+      }
+      return { report, label: `ระดับน้ำตอนนี้ (${WATER_NOW_HOURS} ชม.)`, sub: `${trend}จาก ${recent.length} รายงาน` };
     }
-    if (water.length) return { report: water[0], label: "ระดับน้ำล่าสุด", sub: `${timeAgo(water[0].created_at)} (เก่ากว่า ${WATER_STAT_HOURS} ชม.)` };
+    if (water.length) return { report: water[0], label: "⚠️ ยังไม่มีรายงานใหม่", sub: `ล่าสุด ${timeAgo(water[0].created_at)} · ช่วยแจ้งระดับน้ำ` };
     return null;
-  }, [water, updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps -- updatedAt re-evaluates the 6 h window on each poll
+  }, [water, updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps -- updatedAt re-evaluates the time windows on each poll
 
   return (
     <div className="min-h-screen bg-neutral-100 text-neutral-900">
@@ -438,7 +451,7 @@ export default function App() {
         <div className="mt-3 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-4">
           <section className={`${tab === "map" ? "block" : "hidden"} lg:block`}>
             <div className="relative h-[65vh] overflow-hidden rounded-xl border border-neutral-300 bg-white lg:sticky lg:top-20 lg:h-[calc(100vh-7rem)]">
-              <MapView posts={visible} water={water} trips={trips} onSelect={openDetail} focus={focus} filter={filter} />
+              <MapView posts={visible} water={water} trips={trips} onSelect={openDetail} focus={focus} filter={filter} onReportWater={() => setSheet({ type: "water" })} />
               <a href="/zones" className="absolute bottom-6 right-2 z-[500] rounded-full border-2 border-black bg-white px-3 py-2 text-xs font-bold shadow">
                 🗺️ โซน · 🚚 จุดลงของ
               </a>
