@@ -21,7 +21,8 @@ LINK_M = 90  # off-soi houses closer than this belong to the same block (the NE 
 #   soi:   the soi mouth on the main road, or at: an exact [lat, lng] for a shop between sois
 #   extra: second points in the same zone
 FIELD_DROPS = {
-    "B": {"soi": "11", "place": "ร้านสายชล ปากซอย 11"},
+    "A": {"soi": "4", "place": "หน้าร้านมู้ดคอฟฟี่ (พี่โอ)"},  # 30 Sep: moved from ปากซอย 4; pin with GPS in /ops
+    "B": {"soi": "10", "place": "ซอย 10 หน้าบ้านผึ้ง (มีโต๊ะ)"},  # 30 Sep: moved from ร้านสายชล ซ.11
     "D": {"soi": "19", "place": "ร้านเพื่อนบ้าน ปากซอย 19 (มีโต๊ะวางของ)", "extra": [{"soi": "21", "place": "บังดำ ปากซอย 21 (ร้านมอไซค์ / ลูกชิ้น)"}]},
     "E": {"soi": "28", "place": "ปากซอย 28 (ดูแลซอย 22–33)"},
     # one shared point for F·G·H: the team there splits the goods between the three zones

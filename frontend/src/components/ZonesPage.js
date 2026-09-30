@@ -19,6 +19,24 @@ const navUrl = (d) => `https://www.google.com/maps/dir/?api=1&destination=${d.la
 const GREY = "#9ca3af";
 // where the drop point is, in words: the shop the teams use, else the soi mouth
 export const placeOf = (z) => z.drop.place || `ปากซอย ${z.drop.soi}`;
+// The drop points the teams actually use change during the day (A moved to a coffee shop, B to soi 10).
+// Teams update them in /ops or /hq; the map takes the typed place and, when someone standing there pinned
+// it with GPS, the real spot. Zones sharing a point (F·G·H) all follow the first zone's record.
+export function withLiveDrops(z, ops) {
+  const pts = ops?.points || {};
+  return {
+    ...z,
+    zones: z.zones.map((zone) => {
+      const p = pts[(zone.drop.shared || [zone.id])[0]];
+      if (!p || (!p.place && p.lat == null)) return zone;
+      const drop = { ...zone.drop };
+      if (p.place) drop.place = p.place;
+      if (p.lat != null && p.lng != null) Object.assign(drop, { lat: p.lat, lng: p.lng });
+      return { ...zone, drop };
+    }),
+  };
+}
+
 // zones that share one drop point (F·G·H) work as one block: one card, one team, one case list.
 // The group keeps the first zone's id (its drop point record) and adds ids / label / all sois.
 export function zoneGroups(zones) {
@@ -280,8 +298,8 @@ export default function ZonesPage() {
   }
 
   useEffect(() => {
-    Promise.all([api("/zones"), api("/sois")])
-      .then(([z, s]) => setData({ ...z, soiLines: Object.fromEntries(Object.entries(s.sois).map(([k, v]) => [k, v.lines])) }))
+    Promise.all([api("/zones"), api("/sois"), api("/ops").catch(() => null)])
+      .then(([z, s, ops]) => setData({ ...withLiveDrops(z, ops), soiLines: Object.fromEntries(Object.entries(s.sois).map(([k, v]) => [k, v.lines])) }))
       .catch((e) => setError(e.message));
     api("/posts?kind=need")
       .then((p) => setPosts(Array.isArray(p) ? p : p.items || []))
