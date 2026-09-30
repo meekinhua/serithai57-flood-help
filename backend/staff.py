@@ -154,6 +154,33 @@ class LookupBody(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
 
 
+def with_groups(base: dict, groups: list[list[str]]) -> dict:
+    """Regroup zones at runtime: each group works as one block from its first zone's own drop point,
+    the other zones' own field points staying on the map as second pins. Zones in no group stand alone.
+    Sois, houses and letters never change, so cases and history keep their zones."""
+    order = [z["id"] for z in base["zones"]]
+    of = {}
+    for g in groups:
+        ids = [i for i in order if i in set(g)]
+        for i in ids:
+            of[i] = ids
+    by = {z["id"]: z for z in base["zones"]}
+    out = []
+    for z in base["zones"]:
+        ids = of.get(z["id"], [z["id"]])
+        r = by[ids[0]]["own_drop"]
+        extra = r["extra"] + [{"soi": by[m]["own_drop"]["soi"], "place": by[m]["own_drop"]["place"], "lat": by[m]["own_drop"]["lat"],
+                               "lng": by[m]["own_drop"]["lng"], "tag": m} for m in ids[1:] if by[m]["own_drop"]["explicit"]]
+        place = r["place"]
+        out.append({**z, "drop": {"lat": r["lat"], "lng": r["lng"], "soi": r["soi"], "place": place, "shared": ids,
+                                  "label": f"จุดลงของ {'·'.join(ids)} · {place}", "extra": extra}})
+    return {**base, "zones": out}
+
+
+class ZoneGroups(BaseModel):
+    groups: list[list[str]] = Field(max_length=12)
+
+
 def zone_of_soi(soi) -> Optional[str]:
     """Zone of a soi; a soi missing from the map (แยก 85 when the map ends at 83) takes the zone of
     the nearest mapped soi with a close number, so the case still reaches that zone's team."""
@@ -302,8 +329,37 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
 
     @router.get("/zones")
     async def zones():
-        """Public: zones, the drop points on the main road, and every house coloured by zone."""
-        return ZONES
+        """Public: zones, the drop points on the main road, and every house coloured by zone.
+        Merged zones (one block, one drop point) follow settings "zone_groups" when an admin has set it,
+        else the grouping baked into zones.json."""
+        doc = await db.settings.find_one({"id": "zone_groups"}, {"_id": 0})
+        return with_groups(ZONES, doc["groups"]) if doc else ZONES
+
+    @router.get("/admin/zone-groups")
+    async def get_zone_groups(admin: dict = Depends(require_admin)):
+        doc = await db.settings.find_one({"id": "zone_groups"}, {"_id": 0})
+        default = sorted({tuple(z["drop"]["shared"]) for z in ZONES["zones"]})
+        return {"groups": doc["groups"] if doc else [list(g) for g in default], "custom": bool(doc)}
+
+    @router.put("/admin/zone-groups")
+    async def set_zone_groups(body: ZoneGroups, admin: dict = Depends(require_admin)):
+        """Merge / split zones without a deploy, e.g. [["A","B"],["G","H"]]; [] = every zone alone.
+        DELETE goes back to the grouping in zones.json."""
+        ids = {z["id"] for z in ZONES["zones"]}
+        seen = set()
+        for g in body.groups:
+            if not g or any(i not in ids for i in g) or seen & set(g):
+                raise HTTPException(422, "กลุ่มโซนไม่ถูกต้อง: ต้องเป็นโซนที่มีอยู่ และแต่ละโซนอยู่ได้กลุ่มเดียว")
+            seen |= set(g)
+        groups = [g for g in body.groups if len(g) > 1]
+        await db.settings.update_one({"id": "zone_groups"}, {"$set": {"id": "zone_groups", "groups": groups, "by": admin["name"], "at": now()}}, upsert=True)
+        await audit(admin, "set_zone_groups", " ".join("+".join(g) for g in groups))
+        return {"groups": groups}
+
+    @router.delete("/admin/zone-groups", status_code=204)
+    async def reset_zone_groups(admin: dict = Depends(require_admin)):
+        await db.settings.delete_one({"id": "zone_groups"})
+        await audit(admin, "reset_zone_groups", "")
 
     @router.get("/staff/buildings")
     async def buildings(user: dict = Depends(require_staff)):

@@ -20,9 +20,13 @@ LINK_M = 90  # off-soi houses closer than this belong to the same block (the NE 
 # replacing the computed "soi mouth nearest the middle of the zone". Zones not listed keep the computed one.
 #   soi:   the soi mouth on the main road, or at: an exact [lat, lng] for a shop between sois
 #   extra: second points in the same zone
+#   same_as: this zone works as one block with that zone (one team, one card, one case list) and uses its
+#            drop point; the zone's own point, if given, stays on the map as a second pin of the block.
+#            The server can regroup zones at runtime (settings "zone_groups") without regenerating this file.
 FIELD_DROPS = {
-    "A": {"soi": "5", "place": "หน้าร้านมู้ด ซอย 5 (พี่โอ)"},  # 30 Sep: moved from ปากซอย 4
-    "B": {"soi": "10", "place": "ซอย 10 หน้าบ้านผึ้ง (มีโต๊ะ)"},  # 30 Sep: moved from ร้านสายชล ซ.11
+    "A": {"soi": "5", "place": "หน้าร้านมู้ด ซอย 5 (จุดหลัก A·B)"},  # 30 Sep: moved from ปากซอย 4
+    # 30 Sep night: A and B merged into one block run from ร้านมู้ด; บ้านผึ้ง ซ.10 stays as a second point
+    "B": {"same_as": "A", "soi": "10", "place": "ซอย 10 หน้าบ้านผึ้ง (มีโต๊ะ)"},
     "D": {"soi": "19", "place": "ร้านเพื่อนบ้าน ปากซอย 19 (มีโต๊ะวางของ)", "extra": [{"soi": "21", "place": "บังดำ ปากซอย 21 (ร้านมอไซค์ / ลูกชิ้น)"}]},
     "E": {"soi": "28", "place": "ปากซอย 28 (ดูแลซอย 22–33)"},
     # 30 Sep 09:26: F split off to พี่ไจ๋ at ปากซอย 32; G·H stay at ร้านไอซ์มาร์ท — the main point where big trucks unload,
@@ -164,25 +168,31 @@ def main():
         for k in ks:
             hz[k] = best
 
-    out = []
+    def own_point(fd, drop_soi):
+        """A zone's own drop point: the field one if given, else the computed soi mouth."""
+        explicit = "at" in fd or "soi" in fd
+        if "at" in fd:
+            dp, drop_soi = fd["at"], fd["soi"]
+        else:
+            drop_soi = fd.get("soi", drop_soi)
+            dp = mouths[drop_soi]
+        return {"lat": round(dp[0], 6), "lng": round(dp[1], 6), "soi": drop_soi, "place": fd.get("place", f"ปากซอย {drop_soi}"), "explicit": explicit,
+                "extra": [{**x, "lat": round(mouths[x["soi"]][0], 6), "lng": round(mouths[x["soi"]][1], 6)} for x in fd.get("extra", [])]}
+
+    out, own = [], {}
     for i, names in enumerate(zones):
         letter = chr(ord("A") + i)
-        houses = sum(1 for z in hz if z == i)
         # drop point: the soi mouth nearest the middle (by houses) of the zone, on the main road
         mid_along = sum(along(mouths[n]) * count[n] for n in names) / max(1, sum(count[n] for n in names))
         drop_soi = min(names, key=lambda n: abs(along(mouths[n]) - mid_along))
-        fd = FIELD_DROPS.get(letter, {})
-        fd = FIELD_DROPS[fd["same_as"]] if "same_as" in fd else fd
-        if "at" in fd:
-            dp, drop_soi = fd["at"], fd["soi"]
-        elif "soi" in fd:
-            drop_soi = fd["soi"]
-            dp = mouths[drop_soi]
-        else:
-            dp = mouths[drop_soi]
-        place = fd.get("place", f"ปากซอย {drop_soi}")
+        own[letter] = own_point(FIELD_DROPS.get(letter, {}), drop_soi)
+    for i, names in enumerate(zones):
+        letter = chr(ord("A") + i)
+        houses = sum(1 for z in hz if z == i)
         root = FIELD_DROPS.get(letter, {}).get("same_as", letter)  # zones sharing one drop point
         shared = [chr(ord("A") + j) for j in range(len(zones)) if FIELD_DROPS.get(chr(ord("A") + j), {}).get("same_as", chr(ord("A") + j)) == root]
+        rp = own[root]
+        dp, drop_soi, place = [rp["lat"], rp["lng"]], rp["soi"], rp["place"]
         zb = [b for k, (b, n) in enumerate(home) if hz[k] == i]
         # label spot: middle of the houses on the busier side of the road, so it doesn't sit under the drop pin
         road_side = lambda p: across(p) - across(dp)  # noqa: E731
@@ -195,9 +205,12 @@ def main():
         out.append({
             "id": letter, "color": COLORS[i % len(COLORS)], "sois": sorted(names, key=soi_key), "houses": houses,
             "center": [round(cy, 6), round(cx, 6)],
-            "drop": {"lat": round(dp[0], 6), "lng": round(dp[1], 6), "soi": drop_soi, "place": place, "shared": shared,
+            "own_drop": own[letter],
+            "drop": {"lat": dp[0], "lng": dp[1], "soi": drop_soi, "place": place, "shared": shared,
                      "label": f"จุดลงของ {'·'.join(shared)} · {place}",
-                     "extra": [{**x, "lat": round(mouths[x["soi"]][0], 6), "lng": round(mouths[x["soi"]][1], 6)} for x in fd.get("extra", [])]},
+                     # the block's other points: the root's extras, then the other zones' own field points
+                     "extra": rp["extra"] + [{"soi": own[m]["soi"], "place": own[m]["place"], "lat": own[m]["lat"], "lng": own[m]["lng"], "tag": m}
+                                             for m in shared[1:] if own[m]["explicit"]]},
         })
         print(f"{letter}: {houses:4d} บ้าน · ซอย {', '.join(sorted(names, key=soi_key))} · จุดลงของ {place}")
 

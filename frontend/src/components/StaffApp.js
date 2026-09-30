@@ -672,6 +672,58 @@ function Lookup() {
 
 // ---------------- invite teammates: one link / QR anyone on the team can pass on ----------------
 // Admins: the secret team link for /hq and /team (no accounts). Rotate it if it leaks.
+// Which zones work as one block (one drop point, one team card, one case list). Changes apply at once,
+// no deploy: the server regroups /api/zones. Letters, sois and cases stay as they are.
+function ZoneGroups() {
+  const [text, setText] = useState("");
+  const [custom, setCustom] = useState(false);
+  const [msg, setMsg] = useState("");
+  const fmt = (groups) => groups.filter((g) => g.length > 1).map((g) => g.join("+")).join(" ");
+  useEffect(() => {
+    api("/admin/zone-groups")
+      .then((r) => {
+        setText(fmt(r.groups));
+        setCustom(r.custom);
+      })
+      .catch((e) => setMsg(e.message));
+  }, []);
+  async function save() {
+    const groups = text.toUpperCase().split(/[\s,]+/).filter(Boolean).map((g) => g.split("+").filter(Boolean));
+    if (!window.confirm(`ตั้งโซนรวมเป็น: ${fmt(groups) || "(ทุกโซนแยกกัน)"} ?
+หน้า /hq /team /zones จะเปลี่ยนทันที`)) return;
+    try {
+      const r = await api("/admin/zone-groups", { method: "PUT", body: JSON.stringify({ groups }) });
+      setText(fmt(r.groups));
+      setCustom(true);
+      setMsg("✅ บันทึกแล้ว");
+    } catch (e) {
+      setMsg(e.message);
+    }
+  }
+  async function reset() {
+    if (!window.confirm("กลับไปใช้การรวมโซนตามไฟล์ตั้งต้น?")) return;
+    try {
+      await api("/admin/zone-groups", { method: "DELETE" });
+      const r = await api("/admin/zone-groups");
+      setText(fmt(r.groups));
+      setCustom(false);
+      setMsg("✅ กลับเป็นค่าตั้งต้นแล้ว");
+    } catch (e) {
+      setMsg(e.message);
+    }
+  }
+  return (
+    <div className="mt-4 space-y-2 rounded-xl border-2 border-black bg-white p-3">
+      <p className="text-lg font-bold">🗺️ รวมโซน (ทีมเดียว จุดลงของเดียว)</p>
+      <p className="text-sm text-neutral-700">พิมพ์โซนที่รวมกัน เว้นวรรคระหว่างกลุ่ม เช่น <b>A+B G+H</b> · โซนที่ไม่ได้พิมพ์ = แยกเดี่ยว · จุดลงของใช้ของโซนแรกในกลุ่ม</p>
+      <input value={text} onChange={(e) => setText(e.target.value)} className="min-h-[44px] w-full rounded-lg border-2 border-black px-3 font-mono text-lg" placeholder="A+B G+H" />
+      <button onClick={save} className="min-h-[44px] w-full rounded-lg bg-black text-sm font-bold text-white">💾 บันทึกการรวมโซน</button>
+      {custom && <button onClick={reset} className="min-h-[40px] w-full rounded-lg border border-black text-sm">↩️ กลับเป็นค่าตั้งต้น</button>}
+      {msg && <p className="text-sm">{msg}</p>}
+    </div>
+  );
+}
+
 function TeamLinks() {
   const [key, setKey] = useState("");
   const [qr, setQr] = useState("");
@@ -925,6 +977,7 @@ export default function StaffApp() {
               <>
                 <InviteShare />
                 {user?.role === "admin" && <TeamLinks />}
+                {user?.role === "admin" && <ZoneGroups />}
               </>
             )}
             {tab === "import" && (

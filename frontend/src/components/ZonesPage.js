@@ -21,7 +21,7 @@ const GREY = "#9ca3af";
 export const placeOf = (z) => z.drop.place || `ปากซอย ${z.drop.soi}`;
 // The drop points the teams actually use change during the day (A moved to a coffee shop, B to soi 10).
 // Teams update them in /ops or /hq; the map takes the typed place and, when someone standing there pinned
-// it with GPS, the real spot. Zones sharing a point (F·G·H) all follow the first zone's record.
+// it with GPS, the real spot. Zones sharing a point (A·B, G·H) all follow the first zone's record.
 export function withLiveDrops(z, ops) {
   const pts = ops?.points || {};
   return {
@@ -37,7 +37,7 @@ export function withLiveDrops(z, ops) {
   };
 }
 
-// zones that share one drop point (F·G·H) work as one block: one card, one team, one case list.
+// zones that share one drop point (A·B, G·H) work as one block: one card, one team, one case list.
 // The group keeps the first zone's id (its drop point record) and adds ids / label / all sois.
 export function zoneGroups(zones) {
   const out = [];
@@ -86,7 +86,7 @@ export function drawZones(map, data, { houses = true, labels = true, pane, focus
     const shared = z.drop.shared || [z.id];
     if (shared[0] !== z.id) continue;
     const pinMine = !focus || shared.includes(focus);
-    const pins = [{ ...z.drop, tag: shared.join("·") }, ...(z.drop.extra || []).map((x, i) => ({ ...x, tag: `${z.id}${i + 2}`, second: true }))];
+    const pins = [{ ...z.drop, tag: shared.join("·") }, ...(z.drop.extra || []).map((x, i) => ({ ...x, tag: x.tag || `${z.id}${i + 2}`, second: true }))];
     for (const d of pins) {
       L.marker([d.lat, d.lng], {
         ...P,
