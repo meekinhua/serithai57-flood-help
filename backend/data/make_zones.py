@@ -21,7 +21,7 @@ LINK_M = 90  # off-soi houses closer than this belong to the same block (the NE 
 #   soi:   the soi mouth on the main road, or at: an exact [lat, lng] for a shop between sois
 #   extra: second points in the same zone
 FIELD_DROPS = {
-    "A": {"soi": "4", "place": "หน้าร้านมู้ดคอฟฟี่ (พี่โอ)"},  # 30 Sep: moved from ปากซอย 4; pin with GPS in /ops
+    "A": {"soi": "5", "place": "หน้าร้านมู้ด ซอย 5 (พี่โอ)"},  # 30 Sep: moved from ปากซอย 4
     "B": {"soi": "10", "place": "ซอย 10 หน้าบ้านผึ้ง (มีโต๊ะ)"},  # 30 Sep: moved from ร้านสายชล ซ.11
     "D": {"soi": "19", "place": "ร้านเพื่อนบ้าน ปากซอย 19 (มีโต๊ะวางของ)", "extra": [{"soi": "21", "place": "บังดำ ปากซอย 21 (ร้านมอไซค์ / ลูกชิ้น)"}]},
     "E": {"soi": "28", "place": "ปากซอย 28 (ดูแลซอย 22–33)"},
@@ -30,7 +30,7 @@ FIELD_DROPS = {
     "F": {"soi": "32", "place": "ปากซอย 32 บ้านหัวมุม ริมถนนหลัก (พี่ไจ๋)"},
     "G": {"at": [13.797297, 100.669162], "soi": "34–36", "place": "ร้านไอซ์มาร์ท ระหว่างซอย 34–36 (จุดหลัก G·H · รถใหญ่ลงที่นี่)"},
     "H": {"same_as": "G"},
-    "I": {"soi": "71", "place": "แยก 71 ร้านแหนมเนือง / ร้านสเต็ก"},
+    "I": {"soi": "71", "place": "Triple wood ซอย 71 (จุดหลักท้ายหมู่บ้าน)"},
 }
 COLORS = ["#e11d48", "#2563eb", "#16a34a", "#f59e0b", "#9333ea", "#0891b2", "#ea580c", "#4f46e5", "#65a30d", "#db2777", "#0d9488", "#b45309"]
 
