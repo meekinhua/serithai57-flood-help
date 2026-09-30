@@ -49,9 +49,27 @@ export function zoneGroups(zones) {
   }
   return out;
 }
-const sharedWith = (z) => (z.drop.shared || [z.id]).filter((id) => id !== z.id);
+
+// The map drawn by blocks: zones that work as one (A·B, G·H) become one zone with the first zone's
+// colour, one label in the middle of them, and their houses re-pointed to it. Each keeps `ids`
+// (its letters) and `label`. Safe to call twice.
+export function mergeZones(data) {
+  if (!data?.zones || data.zones.every((z) => z.ids)) return data;
+  const groups = zoneGroups(data.zones);
+  const gi = {};
+  groups.forEach((g, i) => g.ids.forEach((id) => (gi[id] = i)));
+  const zones = groups.map((g) => {
+    const members = g.ids.map((id) => data.zones.find((z) => z.id === id));
+    const w = members.reduce((a, m) => a + m.houses, 0) || 1;
+    const center = [0, 1].map((k) => members.reduce((a, m) => a + m.center[k] * m.houses, 0) / w);
+    return { ...g, center };
+  });
+  return { ...data, zones, houses: (data.houses || []).map(([lat, lng, zi]) => [lat, lng, gi[data.zones[zi].id]]) };
+}
+const inZone = (z, id) => (z.ids || [z.id]).includes(id);
 
 export function drawZones(map, data, { houses = true, labels = true, pane, focus } = {}) {
+  data = mergeZones(data);
   const group = L.layerGroup().addTo(map);
   const P = pane ? { pane } : {}; // Leaflet breaks on pane: undefined
   // main road: the only road trucks can use
@@ -59,12 +77,12 @@ export function drawZones(map, data, { houses = true, labels = true, pane, focus
   L.polyline(data.main_road, { color: "#facc15", weight: 5, opacity: 0.95, interactive: false, ...P }).addTo(group);
   if (houses) {
     for (const [lat, lng, zi] of data.houses) {
-      const mine = !focus || data.zones[zi].id === focus; // single-zone sheet: other zones greyed out
+      const mine = !focus || inZone(data.zones[zi], focus); // single-zone sheet: other zones greyed out
       L.circleMarker([lat, lng], { ...P, radius: mine ? (focus ? 4 : 3) : 2.5, stroke: false, fillColor: mine ? data.zones[zi].color : GREY, fillOpacity: mine ? 0.9 : 0.5, interactive: false }).addTo(group);
     }
   }
   for (const z of data.zones) {
-    const mine = !focus || z.id === focus;
+    const mine = !focus || inZone(z, focus);
     for (const s of z.sois) {
       const lines = data.soiLines?.[s] || [];
       for (const line of lines) L.polyline(line, { color: mine ? z.color : GREY, weight: mine ? (focus ? 6 : 4) : 3, opacity: mine ? 0.9 : 0.5, interactive: false, ...P }).addTo(group);
@@ -79,13 +97,13 @@ export function drawZones(map, data, { houses = true, labels = true, pane, focus
       L.marker(z.center, {
         ...P,
         interactive: false,
-        icon: L.divIcon({ className: "", iconSize: [58, 58], iconAnchor: [29, 29], html: `<div class="zone-label" style="--c:${z.color}">${z.id}</div>` }),
+        icon: L.divIcon({ className: "", iconSize: [z.ids?.length > 1 ? 96 : 58, 58], iconAnchor: [z.ids?.length > 1 ? 48 : 29, 29], html: `<div class="zone-label" style="--c:${z.color}">${z.label || z.id}</div>` }),
       }).addTo(group);
     }
     // zones sharing one drop point (F·G·H) get one pin, drawn with the first zone of the group
     const shared = z.drop.shared || [z.id];
     if (shared[0] !== z.id) continue;
-    const pinMine = !focus || shared.includes(focus);
+    const pinMine = !focus || shared.includes(focus) || inZone(z, focus);
     const pins = [{ ...z.drop, tag: shared.join("·") }, ...(z.drop.extra || []).map((x, i) => ({ ...x, tag: x.tag || `${z.id}${i + 2}`, second: true }))];
     for (const d of pins) {
       L.marker([d.lat, d.lng], {
@@ -299,7 +317,7 @@ export default function ZonesPage() {
 
   useEffect(() => {
     Promise.all([api("/zones"), api("/sois"), api("/ops").catch(() => null)])
-      .then(([z, s, ops]) => setData({ ...withLiveDrops(z, ops), soiLines: Object.fromEntries(Object.entries(s.sois).map(([k, v]) => [k, v.lines])) }))
+      .then(([z, s, ops]) => setData({ ...mergeZones(withLiveDrops(z, ops)), soiLines: Object.fromEntries(Object.entries(s.sois).map(([k, v]) => [k, v.lines])) }))
       .catch((e) => setError(e.message));
     api("/posts?kind=need")
       .then((p) => setPosts(Array.isArray(p) ? p : p.items || []))
@@ -321,7 +339,7 @@ export default function ZonesPage() {
     }
     mapRef.current = map;
     drawZones(map, data, { focus: FOCUS });
-    const fz = FOCUS && data.zones.findIndex((z) => z.id === FOCUS);
+    const fz = FOCUS && data.zones.findIndex((z) => inZone(z, FOCUS));
     const pts = data.houses.filter((h) => !FOCUS || h[2] === fz).map((h) => [h[0], h[1]]);
     const bounds = L.latLngBounds(pts.length ? pts : data.houses.map((h) => [h[0], h[1]])).pad(FOCUS ? Number(QS.get("pad")) || 0.08 : 0.03); // &pad= widens a sheet's view
     // keep the whole village in view while the page lays out (a background tab starts at 0×0),
@@ -352,7 +370,8 @@ export default function ZonesPage() {
     if (!data) return out;
     for (const p of posts) {
       if (p.status === "done") continue;
-      const z = data.soi_zone[p.soi || ""];
+      const letter = data.soi_zone[p.soi || ""];
+      const z = letter && data.zones.find((g) => inZone(g, letter))?.id;
       if (!z) continue;
       out[z] = out[z] || { open: 0, urgent: 0 };
       out[z].open += 1;
@@ -362,16 +381,17 @@ export default function ZonesPage() {
   }, [data, posts]);
 
   // one printable sheet per zone: /zones?zone=D (&poster=1 hides buttons)
-  const fzone = FOCUS && data?.zones.find((z) => z.id === FOCUS);
+  const fzone = FOCUS && data?.zones.find((z) => inZone(z, FOCUS));
+  const fname = fzone?.label || FOCUS;
   if (FOCUS) {
     return (
       <div className={`zone-sheet flex h-screen flex-col bg-white${POSTER ? " poster" : ""}`}>
         <header className="flex items-center gap-4 px-6 py-4 text-white" style={{ background: fzone?.color || "#111" }}>
           <span className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-white text-6xl font-black" style={{ color: fzone?.color }}>
-            {FOCUS}
+            {fname}
           </span>
           <div className="min-w-0">
-            <p className="text-4xl font-black">โซน {FOCUS}{fzone ? ` · ~${fzone.houses} หลัง` : ""}</p>
+            <p className="text-4xl font-black">โซน {fname}{fzone ? ` · ~${fzone.houses} หลัง` : ""}</p>
             <p className="text-2xl font-semibold">ซอย {fzone?.sois.join(", ")}</p>
             <p className="text-lg opacity-90">หมู่บ้านสหกรณ์เคหะสถาน 4 · เสรีไทย 57</p>
           </div>
@@ -379,15 +399,14 @@ export default function ZonesPage() {
         <div className="grid grid-cols-2 gap-3 px-6 py-3 text-lg">
           <div className="rounded-xl border-4 border-yellow-400 bg-yellow-50 p-3">
             <p className="text-2xl font-black">🚚 จุดลงของ: {fzone && placeOf(fzone)}</p>
-            {fzone && sharedWith(fzone).length > 0 && <p className="font-bold">ใช้ร่วมกับโซน {sharedWith(fzone).join(", ")}</p>}
             {fzone?.drop.extra?.map((x) => (
               <p key={x.soi} className="font-bold">+ จุดที่ 2: {x.place}</p>
             ))}
-            <p>รถใหญ่จอด<b>ริมถนนหลัก (เส้นเหลือง)</b> ที่ป้าย 🚚 {FOCUS} เข้าซอยเล็กไม่ได้</p>
+            <p>รถใหญ่จอด<b>ริมถนนหลัก (เส้นเหลือง)</b> ที่ป้าย 🚚 {fname} เข้าซอยเล็กไม่ได้</p>
           </div>
           <div className="rounded-xl border-4 p-3" style={{ borderColor: fzone?.color }}>
-            <p className="text-2xl font-black">👷 ทีมโซน {FOCUS}</p>
-            <p>ขนของจากจุดลงของเข้าซอย · รับงาน/กดเสร็จที่ <b>serithai57.com/staff</b> เลือก “โซน {FOCUS}”</p>
+            <p className="text-2xl font-black">👷 ทีมโซน {fname}</p>
+            <p>ขนของจากจุดลงของเข้าซอย · รับงาน/กดเสร็จที่ <b>serithai57.com/team</b> เลือก “{fname}”</p>
           </div>
         </div>
         {error && <p className="mx-6 rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
@@ -459,7 +478,7 @@ export default function ZonesPage() {
                     <>
                       📍 คุณอยู่ใน{" "}
                       <span className="rounded-lg px-2 text-white" style={{ background: here.zone.color }}>
-                        โซน {here.zone.id}
+                        โซน {here.zone.label || here.zone.id}
                       </span>
                     </>
                   ) : (
@@ -469,16 +488,16 @@ export default function ZonesPage() {
                 </p>
                 {here.own && (
                   <p>
-                    🚚 จุดลงของโซน {here.own.z.id}: {placeOf(here.own.z)} · ห่าง {fmtDist(here.own.d)}
+                    🚚 จุดลงของโซน {here.own.z.label || here.own.z.id}: {placeOf(here.own.z)} · ห่าง {fmtDist(here.own.d)}
                   </p>
                 )}
                 {(!here.own || here.nearest.z.id !== here.own.z.id) && (
                   <p>
-                    🚚 จุดลงของที่ใกล้สุด: <b>{here.nearest.z.id}</b> {placeOf(here.nearest.z)} · ห่าง {fmtDist(here.nearest.d)}
+                    🚚 จุดลงของที่ใกล้สุด: <b>{here.nearest.z.label || here.nearest.z.id}</b> {placeOf(here.nearest.z)} · ห่าง {fmtDist(here.nearest.d)}
                   </p>
                 )}
                 <a href={navUrl((here.own || here.nearest).z.drop)} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-[44px] items-center rounded-lg bg-black px-4 font-semibold text-white">
-                  🧭 นำทางไปจุดลงของ {(here.own || here.nearest).z.id}
+                  🧭 นำทางไปจุดลงของ {(here.own || here.nearest).z.label || (here.own || here.nearest).z.id}
                 </a>
               </>
             )}
@@ -493,15 +512,14 @@ export default function ZonesPage() {
                 <div key={z.id} className="zone-card rounded-xl border-l-8 bg-white p-3 shadow" style={{ borderColor: z.color }}>
                   <div className="flex items-center gap-2">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-2xl font-black text-white" style={{ background: z.color }}>
-                      {z.id}
+                      {z.label || z.id}
                     </span>
                     <div className="min-w-0">
-                      <p className="font-bold">โซน {z.id} · ~{z.houses} หลัง</p>
+                      <p className="font-bold">โซน {z.label || z.id} · ~{z.houses} หลัง{z.ids?.length > 1 ? " (รวมโซน)" : ""}</p>
                       <p className="text-sm text-neutral-600">ซอย {z.sois.join(", ")}</p>
                     </div>
                   </div>
                   <p className="mt-2 font-semibold">🚚 จุดลงของ: {placeOf(z)}</p>
-                  {sharedWith(z).length > 0 && <p className="text-sm font-semibold text-neutral-700">🤝 จุดรวมกับโซน {sharedWith(z).join(", ")}</p>}
                   {z.drop.extra?.map((x) => (
                     <p key={x.soi} className="text-sm font-semibold">
                       🚚 จุดที่ 2: {x.place}
@@ -513,14 +531,14 @@ export default function ZonesPage() {
                       {n.urgent ? <span className="ml-1 rounded bg-red-600 px-1.5 font-bold text-white">ด่วน {n.urgent}</span> : null}
                     </p>
                   )}
-                  {!POSTER && <ZoneStatus zone={z} entries={log.filter((e) => e.zone === z.id)} onAdded={loadLog} />}
+                  {!POSTER && <ZoneStatus zone={z} entries={log.filter((e) => inZone(z, e.zone))} onAdded={loadLog} />}
                   <div className="mt-2 grid grid-cols-2 gap-2 print:hidden">
                     <button onClick={() => focus(z)} className="min-h-[44px] rounded-lg border-2 border-black text-sm font-semibold">📍 ดูบนแผนที่</button>
                     <a href={navUrl(z.drop)} target="_blank" rel="noreferrer" className="flex min-h-[44px] items-center justify-center rounded-lg bg-black text-sm font-semibold text-white">
                       🧭 นำทาง
                     </a>
                     <a href={`/zones?zone=${z.id}`} className="col-span-2 flex min-h-[40px] items-center justify-center rounded-lg border border-neutral-300 text-sm">
-                      🖨️ แผ่นแผนที่โซน {z.id} (พิมพ์แจก)
+                      🖨️ แผ่นแผนที่โซน {z.label || z.id} (พิมพ์แจก)
                     </a>
                   </div>
                 </div>
