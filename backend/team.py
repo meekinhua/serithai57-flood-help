@@ -153,8 +153,8 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
     async def set_soi(post_id: str, body: CaseSoi, request: Request, role: str = Depends(require_team)):
         """The team knows the soi of a case that came in without one: it then shows up in the right zone."""
         rate_limit(request, "teamcase", limit=120, window_s=600)
-        post = await db.posts.find_one({"id": post_id, "kind": "need"}, {"_id": 0, "house": 1, "precision": 1})
-        if not post:
+        post = await db.posts.find_one({"id": post_id, "kind": "need"}, {"_id": 0, "id": 1, "house": 1, "precision": 1})
+        if post is None:  # a web post without a house number projects to {"id": …} — still a case
             raise HTTPException(404, "ไม่พบเคสนี้")
         loc = await locate(post.get("house"), body.soi)
         changes = {"soi": loc["soi"] or body.soi, "updated_at": now()}
