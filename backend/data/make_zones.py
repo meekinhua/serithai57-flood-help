@@ -24,17 +24,16 @@ LINK_M = 90  # off-soi houses closer than this belong to the same block (the NE 
 #            drop point; the zone's own point, if given, stays on the map as a second pin of the block.
 #            The server can regroup zones at runtime (settings "zone_groups") without regenerating this file.
 FIELD_DROPS = {
-    "A": {"soi": "5", "place": "หน้าร้านมู้ด ซอย 5 (จุดหลัก A·B)"},  # 30 Sep: moved from ปากซอย 4
-    # 30 Sep night: A and B merged into one block run from ร้านมู้ด; บ้านผึ้ง ซ.10 stays as a second point
-    "B": {"same_as": "A", "soi": "10", "place": "ซอย 10 หน้าบ้านผึ้ง (มีโต๊ะ)"},
-    "D": {"soi": "19", "place": "ร้านเพื่อนบ้าน ปากซอย 19 (มีโต๊ะวางของ)", "extra": [{"soi": "21", "place": "บังดำ ปากซอย 21 (ร้านมอไซค์ / ลูกชิ้น)"}]},
-    "E": {"soi": "28", "place": "ปากซอย 28 (ดูแลซอย 22–33)"},
-    # 30 Sep 09:26: F split off to พี่ไจ๋ at ปากซอย 32; G·H stay at ร้านไอซ์มาร์ท — the main point where big trucks unload,
-    # covering from the shop to ซอย 67
-    "F": {"soi": "32", "place": "ปากซอย 32 บ้านหัวมุม ริมถนนหลัก (พี่ไจ๋)"},
-    "G": {"at": [13.797297, 100.669162], "soi": "34–36", "place": "ร้านไอซ์มาร์ท ระหว่างซอย 34–36 (จุดหลัก G·H · รถใหญ่ลงที่นี่)"},
+    # 30 Sep night, from the volunteer lead: A+B one block at ร้านมู้ด (พี่โอ + พี่เขม)
+    "A": {"at": [13.789902, 100.673467], "soi": "5", "place": "ร้านมู้ด ซ.5 (จุดหลัก A·B)"},
+    "B": {"same_as": "A"},
+    # D and E are separate teams unloading at the same shop
+    "D": {"at": [13.794391, 100.670270], "soi": "24", "place": "ร้านไทยอีสานเก่า ซ.24 · จุดอิสลาม"},
+    "E": {"at": [13.794391, 100.670270], "soi": "24", "place": "ร้านไทยอีสาน ซ.24 (ที่เดียวกับจุด D)"},
+    "F": {"at": [13.796154, 100.669628], "soi": "32", "place": "หน้าบริษัท Amata (พี่ไจ๋)"},
+    "G": {"at": [13.797297, 100.669162], "soi": "34–36", "place": "ร้านไอซ์มาร์ท (จุดหลักกลางหมู่บ้าน G·H · รถใหญ่ลงที่นี่)"},
     "H": {"same_as": "G"},
-    "I": {"soi": "71", "place": "Triple wood ซอย 71 (จุดหลักท้ายหมู่บ้าน)"},
+    "I": {"at": [13.802496, 100.667669], "soi": "71", "place": "Triple wood ซ.71 (จุดหลักท้ายหมู่บ้าน)"},
 }
 COLORS = ["#e11d48", "#2563eb", "#16a34a", "#f59e0b", "#9333ea", "#0891b2", "#ea580c", "#4f46e5", "#65a30d", "#db2777", "#0d9488", "#b45309"]
 

@@ -71,6 +71,7 @@ const inZone = (z, id) => (z.ids || [z.id]).includes(id);
 export function drawZones(map, data, { houses = true, labels = true, pane, focus } = {}) {
   data = mergeZones(data);
   const group = L.layerGroup().addTo(map);
+  const stacked = {}; // teams unloading at the same shop (D, E): stack their pins instead of hiding one
   const P = pane ? { pane } : {}; // Leaflet breaks on pane: undefined
   // main road: the only road trucks can use
   L.polyline(data.main_road, { color: "#111", weight: 12, opacity: 0.35, interactive: false, ...P }).addTo(group);
@@ -106,13 +107,15 @@ export function drawZones(map, data, { houses = true, labels = true, pane, focus
     const pinMine = !focus || shared.includes(focus) || inZone(z, focus);
     const pins = [{ ...z.drop, tag: shared.join("·") }, ...(z.drop.extra || []).map((x, i) => ({ ...x, tag: x.tag || `${z.id}${i + 2}`, second: true }))];
     for (const d of pins) {
+      const at = `${(+d.lat).toFixed(5)},${(+d.lng).toFixed(5)}`;
+      const lift = 44 * (stacked[at] = (stacked[at] ?? -1) + 1);
       L.marker([d.lat, d.lng], {
         ...P,
         zIndexOffset: pinMine ? 2000 : 1000,
         icon: L.divIcon({
           className: "",
           iconSize: [shared.length > 1 ? 96 : 64, 40],
-          iconAnchor: [shared.length > 1 ? 48 : 32, 20],
+          iconAnchor: [shared.length > 1 ? 48 : 32, 20 + lift],
           html: `<div class="drop-pin${pinMine ? "" : " faded"}${d.second ? " second" : ""}" style="--c:${pinMine ? z.color : GREY}">🚚 ${esc(d.tag)}</div>`,
         }),
       })
