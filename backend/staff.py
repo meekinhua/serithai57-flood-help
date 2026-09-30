@@ -154,6 +154,22 @@ class LookupBody(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
 
 
+def zone_of_soi(soi) -> Optional[str]:
+    """Zone of a soi; a soi missing from the map (แยก 85 when the map ends at 83) takes the zone of
+    the nearest mapped soi with a close number, so the case still reaches that zone's team."""
+    if not soi:
+        return None
+    sz = ZONES["soi_zone"]
+    if soi in sz:
+        return sz[soi]
+    m = re.match(r"(\d+)", str(soi))
+    if not m:
+        return None
+    n = int(m.group(1))
+    near = min(((abs(int(k.split("/")[0]) - n), z) for k, z in sz.items() if k.split("/")[0].isdigit()), default=None)
+    return near[1] if near and near[0] <= 4 else None
+
+
 def build_router(db, rate_limit, current_admin, require_admin, start_session, audit, public_post, village_center):
     router = APIRouter(prefix="/api")
 
@@ -324,7 +340,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
     def task_view(p: dict) -> dict:
         out = public_post(p)
         out["phone"] = p.get("phone", "")  # staff need to call
-        out["zone"] = ZONES["soi_zone"].get(p.get("soi") or "")
+        out["zone"] = zone_of_soi(p.get("soi"))
         return out
 
     @router.get("/staff/tasks")

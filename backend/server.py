@@ -603,7 +603,7 @@ staff_router, locate_house, learn_address, require_staff = staff.build_router(
 app.include_router(staff_router)
 app.include_router(trips.build_router(db, require_staff, staff.SOIS))
 app.include_router(zonelog.build_router(db, rate_limit, current_admin, {z["id"] for z in staff.ZONES["zones"]}))
-team_router, is_team = team.build_router(db, rate_limit, current_admin, require_admin, locate_house, staff.ZONES, staff.needs_of)
+team_router, is_team = team.build_router(db, rate_limit, current_admin, require_admin, locate_house, staff.ZONES, staff.needs_of, staff.zone_of_soi)
 app.include_router(team_router)
 app.include_router(ops.build_router(db, rate_limit, current_admin, {z["id"] for z in staff.ZONES["zones"]}, is_team))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.

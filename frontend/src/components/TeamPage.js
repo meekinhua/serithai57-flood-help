@@ -133,7 +133,7 @@ function AddCase({ zone, name, onDone }) {
   );
 }
 
-function CaseCard({ c, name, onChanged, isNew }) {
+function CaseCard({ c, name, onChanged, isNew, sois }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -175,6 +175,32 @@ function CaseCard({ c, name, onChanged, isNew }) {
       <p className={`mt-1 text-[15px] ${open ? "" : "line-clamp-3"}`} onClick={() => setOpen(!open)}>
         {c.detail}
       </p>
+      {!c.soi && !done && (
+        <label className="mt-1 flex items-center gap-2 rounded bg-yellow-50 px-2 py-1 text-sm">
+          ❔ ไม่รู้ซอย — รู้ไหม?
+          <select
+            defaultValue=""
+            onChange={async (e) => {
+              if (!e.target.value) return;
+              if (!name.trim()) return setErr("✍️ ใส่ชื่อ/ทีมด้านบนก่อน");
+              try {
+                await api(`/team/cases/${c.id}/soi`, { method: "POST", body: JSON.stringify({ soi: e.target.value, name: name.trim() }) });
+                onChanged();
+              } catch (x) {
+                setErr(x.message);
+              }
+            }}
+            className="min-h-[36px] flex-1 rounded border border-neutral-300"
+          >
+            <option value="">เลือกซอย</option>
+            {sois.map((s) => (
+              <option key={s} value={s}>
+                ซอย {s}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {c.last?.note && c.last.note !== "นำเข้าจาก LINE OpenChat" && (
         <p className="mt-1 text-xs text-neutral-500">
           ล่าสุด: {c.last.note} · {c.last.name} {c.last.at && `· ${timeAgo(c.last.at)}`}
@@ -244,6 +270,7 @@ export default function TeamPage() {
   };
 
   const groups0 = useMemo(() => zoneGroups(zones), [zones]);
+  const allSois = useMemo(() => (zones || []).flatMap((x) => x.sois).sort((a, b) => parseFloat(a) - parseFloat(b) || a.localeCompare(b)), [zones]);
   const z = groups0.find((g) => g.ids.includes(zone)); // "G" (old choice) opens the F·G·H block
   const zq = z ? z.ids.join(",") : zone; // query: all zones of the block
   const reload = () =>
@@ -446,7 +473,7 @@ export default function TeamPage() {
             <h2 className="mb-1 text-lg font-black text-red-700">🔴 ด่วนก่อน ({groups.urgent.length})</h2>
             <ul className="space-y-2">
               {groups.urgent.map((c) => (
-                <CaseCard key={c.id} c={c} name={name} onChanged={reload} isNew={fresh.has(c.id)} />
+                <CaseCard key={c.id} c={c} name={name} onChanged={reload} isNew={fresh.has(c.id)} sois={allSois} />
               ))}
             </ul>
           </section>
@@ -458,7 +485,7 @@ export default function TeamPage() {
             </h2>
             <ul className="space-y-2">
               {groups.bySoi[s].map((c) => (
-                <CaseCard key={c.id} c={c} name={name} onChanged={reload} isNew={fresh.has(c.id)} />
+                <CaseCard key={c.id} c={c} name={name} onChanged={reload} isNew={fresh.has(c.id)} sois={allSois} />
               ))}
             </ul>
           </section>

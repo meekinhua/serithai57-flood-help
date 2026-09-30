@@ -60,6 +60,7 @@ class PointEdit(Who):
     hours: Optional[str] = Field(None, max_length=40)
     manned: Optional[bool] = None
     needs: Optional[List[Need]] = Field(None, max_length=8)
+    boats_needed: Optional[int] = Field(None, ge=0, le=10)  # "each point: how many boats does it need"
     surplus: Optional[str] = Field(None, max_length=120)
     note: Optional[str] = Field(None, max_length=200)
     lat: Optional[float] = None
@@ -98,6 +99,7 @@ class BoatEdit(Who):
     where: Optional[str] = Field(None, max_length=80)
     due: Optional[str] = Field(None, max_length=60)
     need_driver: Optional[bool] = None
+    zone: Optional[str] = Field(None, max_length=2)  # which drop point / zone the boat works for ("" = none)
     note: Optional[str] = Field(None, max_length=200)
 
     @field_validator("owner_phone", "holder_phone")
@@ -132,8 +134,8 @@ def mask(phone: str) -> str:
     return f"{d[:3]}-xxx-{d[-4:]}" if len(d) >= 9 else "xxx"
 
 
-POINT_FIELDS = ("place", "person", "phone", "hours", "manned", "needs", "surplus", "note", "lat", "lng")
-BOAT_FIELDS = ("label", "kind", "owner", "owner_phone", "holder", "holder_phone", "where", "due", "need_driver", "note")
+POINT_FIELDS = ("place", "person", "phone", "hours", "manned", "needs", "boats_needed", "surplus", "note", "lat", "lng")
+BOAT_FIELDS = ("label", "kind", "owner", "owner_phone", "holder", "holder_phone", "where", "due", "need_driver", "zone", "note")
 
 
 def build_router(db, rate_limit, current_admin, zone_ids: set, is_team) -> APIRouter:

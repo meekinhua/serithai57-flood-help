@@ -61,6 +61,7 @@ function PointEditor({ zone, p, onDone }) {
     manned: p.manned ?? true, // "❌" only when someone says so; no name already reads as "no one here"
     needs: p.needs || [],
     surplus: p.surplus || "",
+    boats_needed: p.boats_needed || 0,
     note: p.note || "",
   });
   const [pin, setPin] = useState(null); // {lat,lng} from GPS
@@ -120,6 +121,12 @@ function PointEditor({ zone, p, onDone }) {
           </Chip>
         ))}
       </div>
+      <div className="flex items-center gap-2">
+        <span className="flex-1 text-sm font-semibold">🚤 จุดนี้ต้องการเรือกี่ลำ</span>
+        <button type="button" onClick={() => setF({ ...f, boats_needed: Math.max(0, f.boats_needed - 1) })} className="h-11 w-11 rounded-full border border-neutral-300 text-xl">−</button>
+        <span className="w-8 text-center text-xl font-black">{f.boats_needed}</span>
+        <button type="button" onClick={() => setF({ ...f, boats_needed: Math.min(10, f.boats_needed + 1) })} className="h-11 w-11 rounded-full border border-neutral-300 text-xl">+</button>
+      </div>
       <input value={f.surplus} onChange={set("surplus")} maxLength={120} className={inputCls} placeholder="✅ มีของเหลือ / พอแบ่ง เช่น น้ำ 20 แพ็ค" />
       <input value={f.note} onChange={set("note")} maxLength={200} className={inputCls} placeholder="📝 หมายเหตุ เช่น รวมจุดกับ G · มีโต๊ะวางของ" />
       <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={`${inputCls} ${msg.startsWith("✍️") ? "border-2 border-red-500" : ""}`} placeholder="ชื่อคุณ (จำเป็น)" />
@@ -132,7 +139,7 @@ function PointEditor({ zone, p, onDone }) {
   );
 }
 
-export function PointCard({ zone, p = {}, onSaved, insider = true }) {
+export function PointCard({ zone, p = {}, onSaved, insider = true, boatsHere }) {
   const [edit, setEdit] = useState(false);
   const lat = p.lat ?? zone.drop.lat;
   const lng = p.lng ?? zone.drop.lng;
@@ -170,6 +177,12 @@ export function PointCard({ zone, p = {}, onSaved, insider = true }) {
               {NEEDS[n]}
             </span>
           ))}
+        </p>
+      )}
+      {(p.boats_needed > 0 || boatsHere > 0) && (
+        <p className={`mt-1 text-sm font-semibold ${(boatsHere || 0) < (p.boats_needed || 0) ? "text-red-700" : "text-green-800"}`}>
+          🚤 เรือที่จุดนี้ {boatsHere || 0}
+          {p.boats_needed > 0 && ` / ต้องการ ${p.boats_needed} ลำ`}
         </p>
       )}
       {p.surplus && <p className="mt-1 text-sm text-green-800">✅ มีเหลือ: {p.surplus}</p>}
@@ -303,7 +316,8 @@ export function Hazards({ hazards, onChange, insider = true }) {
 }
 
 // ---------- boats ----------
-const EMPTY_BOAT = { label: "", kind: "paddle", owner: "", owner_phone: "", holder: "", holder_phone: "", where: "", due: "", need_driver: false, note: "" };
+const EMPTY_BOAT = { label: "", kind: "paddle", owner: "", owner_phone: "", holder: "", holder_phone: "", where: "", due: "", need_driver: false, zone: "", note: "" };
+const ZONE_IDS = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
 
 function BoatForm({ boat, onDone }) {
   const [f, setF] = useState({ ...EMPTY_BOAT, ...(boat || {}) });
@@ -340,6 +354,17 @@ function BoatForm({ boat, onDone }) {
         <input value={f.owner_phone} onChange={set("owner_phone")} maxLength={20} inputMode="tel" className={inputCls} placeholder="📞 เบอร์เจ้าของ" />
       </div>
       <input value={f.due} onChange={set("due")} maxLength={60} className={inputCls} placeholder="คืนเมื่อไหร่ เช่น ยืม 3 วัน ถึง 2 ต.ค." />
+      <label className="flex items-center gap-2 text-sm font-semibold">
+        ประจำจุด / โซน
+        <select value={f.zone || ""} onChange={set("zone")} className="min-h-[44px] flex-1 rounded-lg border border-neutral-300 px-2">
+          <option value="">ไม่ประจำจุดไหน (ใช้รับส่ง / ส่วนกลาง)</option>
+          {ZONE_IDS.map((z) => (
+            <option key={z} value={z}>
+              จุด {z}
+            </option>
+          ))}
+        </select>
+      </label>
       <Chip on={f.need_driver} onClick={() => setF({ ...f, need_driver: !f.need_driver })}>
         🙋 ต้องการคนขับ/พายเป็น
       </Chip>
@@ -383,6 +408,7 @@ export function Boats({ boats, onChange }) {
               {(BOAT[b.kind] || BOAT.other).split(" ")[0]} {b.label}
             </p>
             {b.need_driver && <p className="mt-1 inline-block rounded-full bg-red-600 px-2 py-0.5 text-sm font-bold text-white">🙋 ต้องการคนขับ/พายเป็น</p>}
+            {b.zone && <p className="font-semibold">🚚 ประจำจุด {b.zone}</p>}
             {b.where && <p>📍 {b.where}</p>}
             {b.holder && (
               <p>
@@ -845,7 +871,7 @@ export default function OpsPage() {
           <section className="space-y-2">
             {!zones && !error && <p className="p-3 text-neutral-600">กำลังโหลด…</p>}
             {zones?.map((z) => (
-              <PointCard key={z.id} zone={z} p={board.points[z.id]} onSaved={reload} insider={!!board.insider} />
+              <PointCard key={z.id} zone={z} p={board.points[z.id]} onSaved={reload} insider={!!board.insider} boatsHere={(board.boats || []).filter((b) => (z.drop.shared || [z.id]).includes(b.zone)).length} />
             ))}
           </section>
         )}

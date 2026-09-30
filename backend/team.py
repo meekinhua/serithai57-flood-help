@@ -32,6 +32,11 @@ class CaseStatus(BaseModel):
     note: str = Field("", max_length=300)
 
 
+class CaseSoi(BaseModel):
+    soi: str = Field(..., pattern=r"^\d{1,3}(/\d{1,2})?$")
+    name: str = Field(..., min_length=1, max_length=60)
+
+
 class CaseCreate(BaseModel):
     house: str = Field(..., pattern=r"^4/\d{1,4}$")
     soi: str = Field("", max_length=10)
@@ -43,7 +48,7 @@ class CaseCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=60)
 
 
-def build_router(db, rate_limit, current_admin, require_admin, locate, zones: dict, needs_of):
+def build_router(db, rate_limit, current_admin, require_admin, locate, zones: dict, needs_of, zone_of_soi):
     router = APIRouter(prefix="/api")
     soi_zone = zones["soi_zone"]
 
@@ -109,7 +114,7 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
         return {
             **{k: p.get(k) for k in ("id", "house", "soi", "category", "detail", "people", "urgent", "status", "lat", "lng", "precision",
                                      "created_at", "updated_at", "assignee", "source", "phone", "place")},
-            "zone": soi_zone.get(p.get("soi") or ""),
+            "zone": zone_of_soi(p.get("soi")),
             "last": {"note": last.get("note", ""), "name": last.get("name", ""), "at": last.get("at")},
         }
 
@@ -144,6 +149,20 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
             raise HTTPException(404, "ไม่พบเคสนี้")
         return case_view(await db.posts.find_one({"id": post_id}, {"_id": 0}))
 
+    @router.post("/team/cases/{post_id}/soi")
+    async def set_soi(post_id: str, body: CaseSoi, request: Request, role: str = Depends(require_team)):
+        """The team knows the soi of a case that came in without one: it then shows up in the right zone."""
+        rate_limit(request, "teamcase", limit=120, window_s=600)
+        post = await db.posts.find_one({"id": post_id, "kind": "need"}, {"_id": 0, "house": 1, "precision": 1})
+        if not post:
+            raise HTTPException(404, "ไม่พบเคสนี้")
+        loc = await locate(post.get("house"), body.soi)
+        changes = {"soi": loc["soi"] or body.soi, "updated_at": now()}
+        if post.get("precision") != "house":  # a confirmed house pin stays where it is
+            changes.update(lat=loc["lat"], lng=loc["lng"], precision=loc["precision"])
+        await db.posts.update_one({"id": post_id}, {"$set": changes, "$push": {"history": {"at": now(), "status": "open", "name": body.name, "note": f"ทีมใส่ซอย {body.soi}", "staff": True}}})
+        return case_view(await db.posts.find_one({"id": post_id}, {"_id": 0}))
+
     @router.post("/team/cases", status_code=201)
     async def add_case(body: CaseCreate, request: Request, role: str = Depends(require_team)):
         """A house the team found door to door: add it on the spot (or add to its open case)."""
@@ -159,9 +178,10 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
         urgent = body.urgent or needs_of(line)[1]
         doc = {
             "id": str(uuid.uuid4()), "kind": "need", "category": body.category, "detail": line,
-            "place": body.house + (f" แยก {loc['soi']}" if loc["soi"] else ""), "name": f"ทีมแจก · {body.name}", "phone": body.phone.strip(),
+            "place": body.house + (f" แยก {loc['soi'] or body.soi.strip()}" if loc["soi"] or body.soi.strip() else ""), "name": f"ทีมแจก · {body.name}", "phone": body.phone.strip(),
             "people": body.people, "urgent": urgent, "general": False, "payment": "free", "price": "", "media": [], "pinned": False,
-            "status": "open", "created_at": t, "updated_at": t, "lat": loc["lat"], "lng": loc["lng"], "house": body.house, "soi": loc["soi"],
+            "status": "open", "created_at": t, "updated_at": t, "lat": loc["lat"], "lng": loc["lng"], "house": body.house,
+            "soi": loc["soi"] or (body.soi.strip() or None),  # a soi past the map (แยก 85) is kept: its zone comes from the nearest mapped soi
             "precision": loc["precision"], "source": "team",
             "history": [{"at": t, "status": "open", "name": body.name, "note": "ทีมแจกเพิ่มเคส", "staff": True}], "edit_key_hash": "", "assignee": None,
         }
@@ -180,7 +200,7 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
         totals = {"open": 0, "helping": 0, "urgent": 0, "done_24h": 0, "done_total": 0}
         activity = []
         async for p in db.posts.find({"kind": "need", "payment": {"$ne": "paid"}}, {"_id": 0, "status": 1, "soi": 1, "urgent": 1, "updated_at": 1, "history": 1}):
-            z = soi_zone.get(p.get("soi") or "") or "?"
+            z = zone_of_soi(p.get("soi")) or "?"
             o = per.setdefault(z, {"open": 0, "helping": 0, "done_24h": 0, "done_total": 0, "urgent": 0})
             st = p.get("status")
             if st == "done":
@@ -207,18 +227,20 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
             activity.append({"zone": e["zone"], "kind": e["kind"], "at": e["at"]})
         activity.sort(key=lambda x: x["at"], reverse=True)
 
-        points = [{"zone": d["zone"], "place": d.get("place", ""), "manned": bool(d.get("person")) and d.get("manned") is not False, "needs": d.get("needs") or []}
+        points = [{"zone": d["zone"], "place": d.get("place", ""), "manned": bool(d.get("person")) and d.get("manned") is not False, "needs": d.get("needs") or [],
+                   "boats_needed": d.get("boats_needed") or 0}
                   async for d in db.ops_points.find({}, {"_id": 0})]
         # the team as roles only (no names, no phones)
         roles = [x.get("role") or "อาสา" async for x in db.ops_people.find({"active": True, "role": {"$not": {"$regex": "^ติดต่อ"}}}, {"_id": 0, "role": 1}).sort("created_at", 1)]
         people = len(roles)
-        boats = [b async for b in db.ops_boats.find({"active": True}, {"_id": 0, "need_driver": 1, "kind": 1})]
+        boats = [b async for b in db.ops_boats.find({"active": True}, {"_id": 0, "need_driver": 1, "kind": 1, "zone": 1})]
         supplies = [n["text"] async for n in db.ops_notes.find({"archived": False, "kind": "supply", "done": False}, {"_id": 0, "text": 1}).sort("created_at", 1)]
         hazards = [{"kind": h["kind"], "soi": h.get("soi", ""), "note": h.get("note", "")}
                    async for h in db.ops_hazards.find({"cleared_at": None}, {"_id": 0}).sort("created_at", -1)]
         return {
             "updated_at": t, "totals": totals, "zones": per, "points": points, "volunteers": people, "roles": roles,
-            "boats": {"total": len(boats), "need_driver": sum(1 for b in boats if b.get("need_driver"))},
+            "boats": {"total": len(boats), "need_driver": sum(1 for b in boats if b.get("need_driver")),
+                      "by_zone": {z: sum(1 for b in boats if b.get("zone") == z) for z in {b.get("zone") for b in boats} if z}},
             "supplies": supplies, "hazards": hazards, "activity": activity[:25],
         }
 

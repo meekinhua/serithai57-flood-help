@@ -178,6 +178,7 @@ export default function HqPage() {
               const p = b.points[z.id] || {};
               const pp = p;
               const here = !!pp.person && pp.manned !== false;
+              const boatsHere = b.boats.filter((x) => z.ids.includes(x.zone)).length;
               const last = log.find((e) => z.ids.includes(e.zone));
               return (
                 <div key={z.id} className="rounded-xl border-l-8 bg-white p-3 shadow" style={{ borderColor: z.color }}>
@@ -216,6 +217,12 @@ export default function HqPage() {
                     )}
                   </p>
                   {p.needs?.length > 0 && <p className="text-sm text-red-700">ขาด: {p.needs.map((k) => NEEDS[k]).join(" ")}</p>}
+                  {(p.boats_needed > 0 || boatsHere > 0) && (
+                    <p className={`text-sm font-semibold ${boatsHere < (p.boats_needed || 0) ? "text-red-700" : "text-green-800"}`}>
+                      🚤 เรือ {boatsHere}
+                      {p.boats_needed > 0 && ` / ต้องการ ${p.boats_needed}`}
+                    </p>
+                  )}
                   <p className="text-xs text-neutral-500">
                     {last ? `${ACTION[last.kind] || "📝"} ${last.note || ""} · ${timeAgo(last.at)} (${last.name})` : "ยังไม่มีบันทึกว่าเข้าไปทำอะไร"}
                   </p>
@@ -229,7 +236,7 @@ export default function HqPage() {
                   </div>
                   {editZone === z.id && (
                     <div className="mt-2">
-                      <PointCard zone={z} p={b.points[z.id]} onSaved={reload} />
+                      <PointCard zone={z} p={b.points[z.id]} onSaved={reload} boatsHere={boatsHere} />
                     </div>
                   )}
                 </div>
