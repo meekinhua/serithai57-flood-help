@@ -12,6 +12,7 @@ import Guide from "./components/Guide";
 import { WeatherAlerts, WeatherCard, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm, ServiceStrip } from "./components/ServiceBoard";
 import { TripsStrip } from "./components/Trips";
+import { CanalBox, CanalForm, PumpForm } from "./components/Canal";
 import { useCountUp } from "./motion";
 
 const REFRESH_MS = 20000;
@@ -23,6 +24,7 @@ const IS_ADMIN_PAGE = window.location.pathname.replace(/\/+$/, "") === "/admin";
 export default function App() {
   const [posts, setPosts] = useState([]);
   const [water, setWater] = useState([]);
+  const [canal, setCanal] = useState(null); // {reports, pumps}: canal level vs the flood wall, and the pumps
   const [showDone, setShowDone] = useState(false);
   const [filter, setFilter] = useState("all");
   const [tab, setTab] = useState("map"); // phones: map | list — the map with requests on it is what people need first
@@ -104,7 +106,14 @@ export default function App() {
         .catch(() => {});
     }
     try {
-      const [p, w, a, sv] = await Promise.all([api(`/posts?include_done=${showDone}`), api("/water"), api("/announcements"), api("/services")]);
+      const [p, w, a, sv, cn] = await Promise.all([
+        api(`/posts?include_done=${showDone}`),
+        api("/water"),
+        api("/announcements"),
+        api("/services"),
+        api("/canal").catch(() => null),
+      ]);
+      if (cn) setCanal(cn);
       setServices(sv);
       setPosts(p);
       if (knownIds.current) {
@@ -394,6 +403,22 @@ export default function App() {
 
         {/* 1 Oct: the volunteer teams now reach people on the street, so the home page leads with the water
             level, then only the fresh, truly urgent requests */}
+        <CanalBox
+          data={canal}
+          onReport={() => setSheet({ type: "canal" })}
+          onPump={(pump) => setSheet({ type: "pump", pump })}
+          onAddPump={() => setSheet({ type: "pump" })}
+          onDelete={
+            admin
+              ? async (r) => {
+                  if (!window.confirm("ลบรายงานคลองนี้?")) return;
+                  await api(`/admin/canal/${r.id}`, { method: "DELETE" }).catch((e) => setToast(e.message));
+                  refresh();
+                }
+              : null
+          }
+        />
+        <div className="mt-3" />
         <WaterHero stat={waterStat} water={water} onReport={() => setSheet({ type: "water" })} onShow={showOnMap} onDelete={admin ? deleteWater : null} />
         <UrgentNow posts={posts} onOpen={openDetail} />
 
@@ -571,6 +596,29 @@ export default function App() {
               }
               setSheet({ type: "detail", id: p.id });
               setToast("ส่งแล้ว ทุกคนเห็นรายการนี้แล้ว");
+            }}
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "canal" && (
+        <Sheet title="🌊 แจ้งระดับน้ำในคลอง" onClose={() => setSheet(null)}>
+          <CanalForm
+            onDone={(r) => {
+              setCanal((c) => ({ ...(c || { pumps: [] }), reports: [r, ...((c && c.reports) || [])] }));
+              setSheet(null);
+              setToast("ขอบคุณที่แจ้งระดับคลอง");
+            }}
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "pump" && (
+        <Sheet title={sheet.pump ? "⚙️ สถานะเครื่องสูบ" : "⚙️ เพิ่มเครื่องสูบ"} onClose={() => setSheet(null)}>
+          <PumpForm
+            pump={sheet.pump}
+            onDone={() => {
+              setSheet(null);
+              setToast("บันทึกเครื่องสูบแล้ว");
+              refresh();
             }}
           />
         </Sheet>

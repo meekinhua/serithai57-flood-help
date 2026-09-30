@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field, field_validator
 # Load .env BEFORE importing our own modules: they read settings (e.g. WEATHER_PROVIDERS) at import time.
 load_dotenv(Path(__file__).parent / ".env")
 
+import canal  # noqa: E402
 import media  # noqa: E402
 import services  # noqa: E402
 import staff  # noqa: E402
@@ -606,6 +607,7 @@ app.include_router(zonelog.build_router(db, rate_limit, current_admin, {z["id"] 
 team_router, is_team = team.build_router(db, rate_limit, current_admin, require_admin, locate_house, staff.ZONES, staff.needs_of, staff.zone_of_soi)
 app.include_router(team_router)
 app.include_router(ops.build_router(db, rate_limit, current_admin, {z["id"] for z in staff.ZONES["zones"]}, is_team))
+app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
@@ -615,6 +617,8 @@ async def startup():
     await db.posts.create_index("id", unique=True)
     await db.posts.create_index([("status", 1), ("created_at", -1)])
     await db.water.create_index("created_at")
+    await db.canal_reports.create_index("created_at")
+    await db.pumps.create_index("id", unique=True)
     await db.admins.create_index("email", unique=True)
     await db.sessions.create_index("token_hash", unique=True)
     await db.sessions.create_index("expires_at", expireAfterSeconds=0)
