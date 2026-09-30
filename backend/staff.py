@@ -539,7 +539,8 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         open_posts = {p["house"]: p async for p in db.posts.find({"kind": "need", "status": {"$ne": "done"}, "house": {"$in": list(houses)}}, {"_id": 0, "id": 1, "house": 1, "status": 1})}
         # Copy-and-extend lists keep re-posting houses that were already helped: flag them.
         recent_done = {p["house"]: p async for p in db.posts.find(
-            {"kind": "need", "status": "done", "house": {"$in": list(houses)}, "updated_at": {"$gte": now() - RECENT_DONE}}, {"_id": 0, "house": 1, "updated_at": 1, "done_by": 1})}
+            {"kind": "need", "status": "done", "closed_reason": None, "house": {"$in": list(houses)}, "updated_at": {"$gte": now() - RECENT_DONE}},
+            {"_id": 0, "house": 1, "updated_at": 1, "done_by": 1})}
         rows = []
         for h, r in sorted(houses.items(), key=lambda kv: house_num(kv[0])):
             loc = await locate(h, r.get("soi"), pairs)
@@ -587,8 +588,15 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
                     await db.posts.update_one({"id": existing["id"]}, {"$set": {"urgent": True}})
                 updated += 1
                 continue
-            if not row.force and await db.posts.find_one({"kind": "need", "status": "done", "house": row.house, "updated_at": {"$gte": now() - RECENT_DONE}}):
+            if not row.force and await db.posts.find_one({"kind": "need", "status": "done", "closed_reason": None, "house": row.house, "updated_at": {"$gte": now() - RECENT_DONE}}):
                 skipped_done += 1  # helped recently; the chat is just repeating an old list
+                continue
+            # closed WITHOUT help (went quiet / "not needed" / not a request) and now asking again: reopen that case
+            closed = await db.posts.find_one({"kind": "need", "status": "done", "closed_reason": {"$ne": None}, "house": row.house}, sort=[("updated_at", -1)])
+            if closed:
+                await db.posts.update_one({"id": closed["id"]}, {"$set": {"status": "open", "closed_reason": None, "assignee": None, "updated_at": now()}})
+                await history(closed["id"], user, "open", f"เปิดใหม่ — ขอใน LINE อีกครั้ง: {row.text[:180]}")
+                updated += 1
                 continue
             loc = await locate(row.house, soi, pairs)
             category, vulnerable = needs_of(row.text)

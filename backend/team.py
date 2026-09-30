@@ -26,8 +26,21 @@ def now():
     return datetime.now(timezone.utc)
 
 
+# History notes that are the person asking (again): the LINE import, the team adding the case, a web post.
+ASK_NOTES = ("นำเข้าจาก LINE", "จาก LINE", "ทีมแจกเพิ่มเคส", "ทีมแจก:", "สร้างรายการ", "เปิดใหม่")
+# A case closed with a note starting "ปิด:" was closed WITHOUT help (not a request / no longer needed / went quiet):
+# it doesn't count as delivered, and the next ask in LINE reopens it instead of being skipped as "helped recently".
+CLOSED_PREFIX = "ปิด:"
+
+
+def asks_of(p: dict) -> tuple[int, Optional[datetime]]:
+    """How many times the person asked, and when they last did."""
+    at = [h["at"] for h in p.get("history") or [] if h.get("at") and str(h.get("note", "")).startswith(ASK_NOTES)]
+    return len(at) or 1, max(at) if at else p.get("created_at")
+
+
 class CaseStatus(BaseModel):
-    status: Literal["helping", "done", "open"]
+    status: Literal["helping", "done", "open"]  # done + a note starting "ปิด:" = closed without help
     name: str = Field(..., min_length=1, max_length=60)
     note: str = Field("", max_length=300)
 
@@ -116,6 +129,7 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
                                      "created_at", "updated_at", "assignee", "source", "phone", "place")},
             "zone": zone_of_soi(p.get("soi")),
             "last": {"note": last.get("note", ""), "name": last.get("name", ""), "at": last.get("at")},
+            "asks": asks_of(p)[0], "last_ask": asks_of(p)[1], "closed_reason": p.get("closed_reason"),
         }
 
     @router.get("/team/cases")
@@ -135,7 +149,8 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
         who = await current_admin(request)
         name = (who or {}).get("name") or body.name.strip()
         t = now()
-        changes = {"status": body.status, "updated_at": t}
+        changes = {"status": body.status, "updated_at": t,
+                   "closed_reason": body.note.strip()[:80] if body.status == "done" and body.note.strip().startswith(CLOSED_PREFIX) else None}
         if body.status == "helping":
             changes["assignee"] = {"id": (who or {}).get("id") or f"team:{name}", "name": name}
             changes["assigned_at"] = t
@@ -199,11 +214,13 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
         per: dict = {}
         totals = {"open": 0, "helping": 0, "urgent": 0, "done_24h": 0, "done_total": 0}
         activity = []
-        async for p in db.posts.find({"kind": "need", "payment": {"$ne": "paid"}}, {"_id": 0, "status": 1, "soi": 1, "urgent": 1, "updated_at": 1, "history": 1}):
+        async for p in db.posts.find({"kind": "need", "payment": {"$ne": "paid"}}, {"_id": 0, "status": 1, "soi": 1, "urgent": 1, "updated_at": 1, "history": 1, "closed_reason": 1}):
             z = zone_of_soi(p.get("soi")) or "?"
             o = per.setdefault(z, {"open": 0, "helping": 0, "done_24h": 0, "done_total": 0, "urgent": 0})
             st = p.get("status")
-            if st == "done":
+            if st == "done" and p.get("closed_reason"):
+                pass  # closed without help (not a request / no longer needed): not a delivery
+            elif st == "done":
                 o["done_total"] += 1
                 totals["done_total"] += 1
                 upd = p.get("updated_at")
@@ -221,7 +238,7 @@ def build_router(db, rate_limit, current_admin, require_admin, locate, zones: di
                 if not at:
                     continue
                 at = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
-                if at >= day and h.get("status") in ("done", "helping") and h.get("staff"):
+                if at >= day and h.get("status") in ("done", "helping") and h.get("staff") and not str(h.get("note", "")).startswith(CLOSED_PREFIX):
                     activity.append({"zone": z, "kind": "delivered" if h["status"] == "done" else "on_the_way", "at": at})
         async for e in db.zone_log.find({"at": {"$gte": day}}, {"_id": 0, "zone": 1, "kind": 1, "at": 1}):
             activity.append({"zone": e["zone"], "kind": e["kind"], "at": e["at"]})

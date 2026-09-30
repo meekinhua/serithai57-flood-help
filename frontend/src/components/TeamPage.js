@@ -139,13 +139,14 @@ function CaseCard({ c, name, onChanged, isNew, sois }) {
   const [err, setErr] = useState("");
   const done = c.status === "done";
   const [emoji, label] = NEED[c.category] || NEED.other;
-  async function set(status) {
+  const quietH = (Date.now() - new Date(c.last_ask || c.created_at)) / 36e5;
+  async function set(status, note = "") {
     if (!name.trim()) return setErr("✍️ ใส่ชื่อ/ทีมด้านบนก่อน");
     if (status === "open" && !window.confirm(`ปล่อย ${c.house} คืน (ยังไม่มีใครไป)?`)) return;
     setBusy(true);
     setErr("");
     try {
-      await api(`/team/cases/${c.id}/status`, { method: "POST", body: JSON.stringify({ status, name: name.trim() }) });
+      await api(`/team/cases/${c.id}/status`, { method: "POST", body: JSON.stringify({ status, name: name.trim(), note }) });
       onChanged();
     } catch (e) {
       setErr(e.message);
@@ -166,6 +167,16 @@ function CaseCard({ c, name, onChanged, isNew, sois }) {
             {c.soi ? `ซอย ${c.soi}` : "ไม่รู้ซอย"}
             {c.precision === "estimated_soi" && " (ประมาณ)"} · {timeAgo(c.created_at)}
           </p>
+          {!done && (
+            <p className="mt-0.5 text-sm">
+              {c.asks > 1 && <span className="mr-1 rounded bg-orange-100 px-1.5 font-semibold text-orange-800">📣 ขอ {c.asks} ครั้ง</span>}
+              {quietH >= 24 ? (
+                <span className="rounded bg-neutral-200 px-1.5 text-neutral-700">😶 เงียบ {Math.round(quietH)} ชม. — ยังต้องการไหม?</span>
+              ) : (
+                c.asks > 1 && <span className="text-neutral-600">ขอล่าสุด {timeAgo(c.last_ask)}</span>
+              )}
+            </p>
+          )}
         </div>
         <span className="shrink-0 text-right text-sm font-semibold">
           {emoji} {label.split(" / ")[0]}
@@ -207,7 +218,9 @@ function CaseCard({ c, name, onChanged, isNew, sois }) {
         </p>
       )}
       {done ? (
-        <p className="mt-2 font-semibold text-green-700">✅ เสร็จแล้ว {timeAgo(c.updated_at)}</p>
+        <p className={`mt-2 font-semibold ${c.closed_reason ? "text-neutral-600" : "text-green-700"}`}>
+          {c.closed_reason ? `🚫 ${c.closed_reason}` : "✅ เสร็จแล้ว"} {timeAgo(c.updated_at)}
+        </p>
       ) : (
         <>
           {c.status === "helping" && c.assignee && <p className="mt-2 rounded bg-blue-50 px-2 py-1 text-sm font-semibold text-blue-800">🚶 {c.assignee.name} กำลังไป</p>}
@@ -238,6 +251,13 @@ function CaseCard({ c, name, onChanged, isNew, sois }) {
                 ✅ ได้รับแล้ว
               </button>
             )}
+            <button
+              disabled={busy}
+              onClick={() => window.confirm(`ปิด ${c.house || "เคสนี้"} โดยไม่ได้ไปส่ง?\n(ไม่ใช่คำขอ / ไม่ต้องแล้ว / ย้ายออก) — ถ้าเขาขอใหม่ในไลน์ เคสจะเปิดเอง`) && set("done", "ปิด: ไม่ต้องแล้ว / ไม่ใช่คำขอ")}
+              className="col-span-2 min-h-[40px] rounded-lg border border-neutral-300 text-sm text-neutral-600"
+            >
+              🚫 ไม่ต้องแล้ว / ไม่ใช่คำขอ
+            </button>
           </div>
         </>
       )}
