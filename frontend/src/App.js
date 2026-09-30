@@ -392,7 +392,12 @@ export default function App() {
           </div>
         )}
 
-        <div ref={actionsRef} className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {/* 1 Oct: the volunteer teams now reach people on the street, so the home page leads with the water
+            level, then only the fresh, truly urgent requests */}
+        <WaterHero stat={waterStat} water={water} onReport={() => setSheet({ type: "water" })} onShow={showOnMap} onDelete={admin ? deleteWater : null} />
+        <UrgentNow posts={posts} onOpen={openDetail} />
+
+        <div ref={actionsRef} className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
           <ActionButton color="bg-black text-white active:bg-neutral-800" onClick={() => setSheet({ type: "form", kind: "need" })}>
             🆘 ขอความช่วยเหลือ
           </ActionButton>
@@ -441,18 +446,9 @@ export default function App() {
           </div>
         )}
 
-        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <div className="mt-3 grid grid-cols-2 gap-2 text-center">
           <Stat value={counts.need} label="คำขอค้างอยู่" sub={counts.urgent ? `ด่วน ${counts.urgent}` : ""} color="text-black" />
           <Stat value={counts.offer} label="ผู้พร้อมช่วย" color="text-black" />
-          <Stat
-            value={waterStat ? waterOf(waterStat.report.level).label : "–"}
-            label={waterStat ? waterStat.label : "ระดับน้ำ"}
-            sub={waterStat ? waterStat.sub : "ยังไม่มีรายงาน"}
-            color="text-black"
-            dot={waterStat ? waterOf(waterStat.report.level).color : null}
-            onClick={waterStat ? () => showOnMap(waterStat.report) : null}
-            actionLabel="ดูจุดนี้บนแผนที่"
-          />
         </div>
 
         {/* Phone: tabs. Desktop: map and list side by side. */}
@@ -523,42 +519,6 @@ export default function App() {
               </div>
             )}
 
-            {water.length > 0 && (
-              <div className="mt-4 rounded-xl bg-white p-3">
-                <h2 className="mb-2 font-semibold">💧 รายงานระดับน้ำล่าสุด</h2>
-                <ul className="space-y-1 text-sm">
-                  {water.slice(0, 8).map((w) => {
-                    const lv = waterOf(w.level);
-                    return (
-                      <li key={w.id} className="flex items-center gap-2">
-                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: lv.color }} />
-                        <b>{lv.label}</b>
-                        {w.trend && <span title={WATER_TREND[w.trend][1]}>{WATER_TREND[w.trend][0]}</span>}
-                        <span className="min-w-0 truncate text-neutral-600">
-                          {w.cm != null && `${w.cm} ซม. · `}
-                          {w.where && `${WATER_WHERE[w.where][1]} · `}
-                          {timeAgo(w.created_at)}
-                          {w.note && ` · ${w.note}`}
-                        </span>
-                        {w.media?.[0] && (
-                          <a href={mediaUrl(w.media[0].id)} target="_blank" rel="noreferrer" aria-label="ดูรูประดับน้ำ" className="ml-auto flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center">
-                            <img src={mediaUrl(w.media[0].id, "thumb")} alt="" loading="lazy" className="h-9 w-9 rounded object-cover" />
-                          </a>
-                        )}
-                        <button onClick={() => showOnMap(w)} className={`${w.media?.[0] ? "" : "ml-auto "}min-h-[44px] min-w-[44px] shrink-0 px-2 text-black underline`}>
-                          ดู
-                        </button>
-                        {admin && (
-                          <button onClick={() => deleteWater(w)} className="min-h-[44px] shrink-0 px-2 text-red-700 underline">
-                            ลบ
-                          </button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
           </section>
         </div>
 
@@ -726,6 +686,98 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+}
+
+// The water level for the whole village, first thing on the page: the level now (median of the last
+// 3 h), the trend, and the latest reports with their photos.
+function WaterHero({ stat, water, onReport, onShow, onDelete }) {
+  const lv = stat ? waterOf(stat.report.level) : null;
+  return (
+    <section className="rounded-2xl border-4 bg-white p-3 shadow" style={{ borderColor: lv?.color || "#a3a3a3" }}>
+      <div className="flex items-center gap-3">
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-3xl text-white" style={{ background: lv?.color || "#a3a3a3" }} aria-hidden="true">
+          💧
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-neutral-600">{stat ? stat.label : "ระดับน้ำในหมู่บ้าน"}</p>
+          <p className="text-3xl font-black leading-tight">{lv ? lv.label : "ยังไม่มีรายงาน"}</p>
+          <p className="text-sm text-neutral-700">{stat ? `${lv.cm} · ${stat.sub}` : "ช่วยแจ้งระดับน้ำหน้าบ้านคุณ"}</p>
+        </div>
+      </div>
+      {water.length > 0 && (
+        <ul className="mt-2 space-y-1 border-t border-neutral-200 pt-2 text-sm">
+          {water.slice(0, 5).map((w) => {
+            const l = waterOf(w.level);
+            return (
+              <li key={w.id} className="flex items-center gap-2">
+                <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: l.color }} />
+                <b className="shrink-0">{l.label}</b>
+                {w.trend && <span title={WATER_TREND[w.trend][1]}>{WATER_TREND[w.trend][0]}</span>}
+                <span className="min-w-0 truncate text-neutral-600">
+                  {w.cm != null && `${w.cm} ซม. · `}
+                  {w.where && `${WATER_WHERE[w.where][1]} · `}
+                  {timeAgo(w.created_at)}
+                  {w.note && ` · ${w.note}`}
+                </span>
+                {w.media?.[0] && (
+                  <a href={mediaUrl(w.media[0].id)} target="_blank" rel="noreferrer" aria-label="ดูรูประดับน้ำ" className="ml-auto flex min-h-[40px] min-w-[40px] shrink-0 items-center justify-center">
+                    <img src={mediaUrl(w.media[0].id, "thumb")} alt="" loading="lazy" className="h-9 w-9 rounded object-cover" />
+                  </a>
+                )}
+                <button onClick={() => onShow(w)} className={`${w.media?.[0] ? "" : "ml-auto "}min-h-[40px] shrink-0 px-2 underline`}>
+                  ดู
+                </button>
+                {onDelete && (
+                  <button onClick={() => onDelete(w)} className="min-h-[40px] shrink-0 px-2 text-red-700 underline">
+                    ลบ
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <button onClick={onReport} className="mt-2 min-h-[52px] w-full rounded-xl bg-black text-lg font-bold text-white active:bg-neutral-800">
+        💧 แจ้งระดับน้ำหน้าบ้าน (ถ่ายรูปได้)
+      </button>
+    </section>
+  );
+}
+
+// Only what needs someone NOW: evacuation / medical, or requests marked urgent, asked in the last 12 h.
+const URGENT_FRESH_H = 12;
+const lastAskAt = (p) =>
+  Math.max(new Date(p.created_at).getTime(), ...(p.history || []).filter((h) => /^(จาก LINE|เปิดใหม่|ทีมแจก)/.test(h.note || "")).map((h) => new Date(h.at).getTime()));
+function UrgentNow({ posts, onOpen }) {
+  const t = Date.now();
+  const list = posts
+    .filter((p) => p.kind === "need" && p.status !== "done" && (p.urgent || ["evacuate", "medical"].includes(p.category)) && t - lastAskAt(p) <= URGENT_FRESH_H * 3.6e6)
+    .sort((a, b) => ["evacuate", "medical"].includes(b.category) - ["evacuate", "medical"].includes(a.category) || lastAskAt(b) - lastAskAt(a));
+  if (!list.length)
+    return <p className="mt-2 rounded-xl bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">✅ ไม่มีเคสด่วนใหม่ใน {URGENT_FRESH_H} ชม. · ด่วนถึงชีวิตโทร 1669 / 199</p>;
+  return (
+    <section className="mt-2 rounded-2xl border-4 border-red-600 bg-red-50 p-3">
+      <p className="text-lg font-black text-red-700">🚨 เคสด่วนใหม่ ({URGENT_FRESH_H} ชม.) · {list.length}</p>
+      <ul className="mt-1 space-y-1">
+        {list.slice(0, 6).map((p) => {
+          const [emoji, label] = categoryOf(p);
+          return (
+            <li key={p.id}>
+              <button onClick={() => onOpen(p)} className="flex min-h-[48px] w-full items-center gap-2 rounded-lg bg-white px-2 text-left shadow-sm">
+                <span className="text-xl">{emoji}</span>
+                <span className="min-w-0 flex-1">
+                  <b>{p.place || p.house || label}</b>
+                  <span className="block truncate text-sm text-neutral-700">{p.detail}</span>
+                </span>
+                <span className="shrink-0 text-xs text-neutral-500">{timeAgo(new Date(lastAskAt(p)).toISOString())}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {list.length > 6 && <p className="mt-1 text-sm text-red-800">+ อีก {list.length - 6} เคส ดูในรายการด้านล่าง</p>}
+    </section>
   );
 }
 
