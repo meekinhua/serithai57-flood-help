@@ -25,7 +25,7 @@ LINK_M = 90  # off-soi houses closer than this belong to the same block (the NE 
 #            The server can regroup zones at runtime (settings "zone_groups") without regenerating this file.
 FIELD_DROPS = {
     # 30 Sep night, from the volunteer lead: A+B one block at ร้านมู้ด (พี่โอ + พี่เขม)
-    "A": {"at": [13.789902, 100.673467], "soi": "5", "place": "ร้านมู้ด ซ.5 (จุดหลัก A·B)"},
+    "A": {"at": [13.789872, 100.673517], "soi": "5", "place": "หน้าซอย 5 ร้านมู้ด (จุดหลัก A·B)"},
     "B": {"same_as": "A"},
     # D and E are separate teams unloading at the same shop
     "D": {"at": [13.794391, 100.670270], "soi": "24", "place": "ร้านไทยอีสานเก่า ซ.24 · จุดอิสลาม"},
