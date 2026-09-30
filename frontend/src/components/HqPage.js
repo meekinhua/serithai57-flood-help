@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { timeAgo } from "../config";
-import { Board, Boats, HAZ, Hazards, NEEDS, PointCard, Roster, summaryText } from "./OpsPage";
+import { Board, Boats, FoodIn, HAZ, Hazards, NEEDS, PointCard, Roster, isFood, summaryText } from "./OpsPage";
 import { NoKey, noIndex } from "./TeamPage";
 import { placeOf, zoneGroups } from "./ZonesPage";
 
@@ -77,7 +77,7 @@ export default function HqPage() {
   const b = board || { points: {}, hazards: [], boats: [], notes: [], people: [] };
   const liveHaz = b.hazards.filter((h) => !h.cleared_at);
   const byAge = (a, c) => new Date(a.created_at) - new Date(c.created_at); // raised first = on top
-  const openQ = b.notes.filter((n) => n.kind === "question" && !n.done).sort(byAge);
+  const openQ = b.notes.filter((n) => n.kind === "question" && !n.done && !isFood(n)).sort(byAge);
   const short = b.notes.filter((n) => n.kind === "supply" && !n.done).sort(byAge);
   const go = (id) => {
     const el = document.getElementById(id);
@@ -137,6 +137,8 @@ export default function HqPage() {
             ))}
           </button>
         )}
+
+        <FoodIn notes={b.notes} onChange={reload} />
 
         {(openQ.length > 0 || short.length > 0) && (
           <section className="grid gap-2 sm:grid-cols-2">

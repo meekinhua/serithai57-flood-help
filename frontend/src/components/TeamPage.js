@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, load, save } from "../api";
 import { CATEGORIES, timeAgo } from "../config";
-import { HAZ } from "./OpsPage";
+import { FoodIn, HAZ } from "./OpsPage";
 import { placeOf, zoneGroups } from "./ZonesPage";
 
 // /team#k=…&zone=F — for a distribution team: leave it open on a phone and see which houses in your zone
@@ -348,6 +348,7 @@ export default function TeamPage() {
 
       <main className="mx-auto max-w-2xl space-y-3 px-3 py-3">
         {error && <p className="rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
+        <FoodIn notes={ops.notes || []} compact />
         {liveHaz.length > 0 && (
           <div className="rounded-xl bg-red-600 p-3 font-semibold text-white">
             <p className="font-black">⚠️ ระวัง!</p>

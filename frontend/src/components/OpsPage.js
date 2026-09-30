@@ -517,7 +517,7 @@ export function Board({ notes, onChange }) {
     setAdding(null);
     if (saved) onChange();
   };
-  const open = notes.filter((n) => n.kind === "question" && !n.done).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const open = notes.filter((n) => n.kind === "question" && !n.done && !isFood(n)).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   const decided = notes.filter((n) => n.kind !== "supply" && n.done).sort((a, b) => new Date(b.done_at) - new Date(a.done_at));
   const supply = notes.filter((n) => n.kind === "supply").sort((a, b) => a.done - b.done || new Date(a.created_at) - new Date(b.created_at));
 
@@ -673,6 +673,56 @@ export function Roster({ people, insider, onChange }) {
   );
 }
 
+// ---------- 🍱 food coming in: board items that start with 🍱 (from the village LINE sweep) ----------
+// Food that needs a drop spot or people to hand it out. After 4 h the meal has probably passed: greyed.
+export const isFood = (n) => n.kind === "question" && (n.text || "").startsWith("🍱");
+const FOOD_STALE_H = 4;
+
+export function FoodIn({ notes, onChange, compact = false }) {
+  const list = notes.filter((n) => isFood(n) && !n.done).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  if (!list.length) return null;
+  const who = () => (load("contact", {}).name || window.prompt("ชื่อคุณ") || "").trim();
+  async function done(n) {
+    const res = window.prompt(`“${n.text.replace(/^🍱\s*/, "")}”\nจัดการแล้วอย่างไร? เช่น ลงจุด G แจกแล้ว / เขาแจกเอง / ยกเลิก`, "");
+    if (res == null) return;
+    const w = who();
+    if (!w) return;
+    try {
+      await api(`/ops/notes/${n.id}/resolve`, { method: "POST", body: JSON.stringify({ resolution: res.trim() || "จัดการแล้ว", name: w }) });
+      onChange?.();
+    } catch (e) {
+      window.alert(e.message);
+    }
+  }
+  return (
+    <section className="rounded-xl border-4 border-orange-400 bg-orange-50 p-3 shadow">
+      <p className="text-lg font-black">🍱 อาหาร / ของเข้ามา — ต้องการคนแจก หรือที่ลง</p>
+      <ul className="mt-2 space-y-2">
+        {list.map((n) => {
+          const stale = hoursSince(n.created_at) > FOOD_STALE_H;
+          return (
+            <li key={n.id} className={`rounded-lg p-2 ${stale ? "bg-neutral-100 opacity-60" : "bg-white"}`}>
+              <p className="font-bold">
+                {n.text.replace(/^🍱\s*/, "")}
+                {stale && <span className="ml-1 rounded bg-neutral-400 px-1.5 text-xs text-white">อาจเลยมื้อแล้ว</span>}
+              </p>
+              {!compact && n.detail && <p className="text-sm text-neutral-700">{n.detail}</p>}
+              <p className="text-xs text-neutral-500">
+                {n.for_who && `${n.for_who} · `}ลงบอร์ด {timeAgo(n.created_at)}
+              </p>
+              {onChange && (
+                <button onClick={() => done(n)} className="mt-1 min-h-[36px] rounded-lg bg-green-600 px-3 text-sm font-bold text-white">
+                  ✅ จัดการแล้ว
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 // ---------- the LINE summary ----------
 export function summaryText(zones, board) {
   const t = new Date().toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -683,7 +733,12 @@ export function summaryText(zones, board) {
     for (const h of live) out.push(`${(HAZ[h.kind] || HAZ.other)[0]} ${(HAZ[h.kind] || HAZ.other)[1]}${h.soi ? ` ซ.${h.soi}` : ""}${h.note ? ` — ${h.note}` : ""}`);
   }
   const notes = board.notes || [];
-  const open = notes.filter((n) => n.kind === "question" && !n.done).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const food = notes.filter((n) => isFood(n) && !n.done && hoursSince(n.created_at) <= 4);
+  if (food.length) {
+    out.push("", "🍱 อาหารเข้ามา ต้องการคนแจก / ที่ลง");
+    for (const n of food) out.push(`• ${n.text.replace(/^🍱\s*/, "")}`);
+  }
+  const open = notes.filter((n) => n.kind === "question" && !n.done && !isFood(n)).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   if (open.length) {
     out.push("", "❓ รอสรุป");
     for (const n of open) out.push(`• ${n.text}${n.for_who ? ` (${n.for_who})` : ""}`);
@@ -777,7 +832,7 @@ export default function OpsPage() {
     else window.open(`https://line.me/R/share?text=${encodeURIComponent(text)}`, "_blank");
   }
 
-  const openQ = (board.notes || []).filter((n) => n.kind === "question" && !n.done).length;
+  const openQ = (board.notes || []).filter((n) => n.kind === "question" && !n.done && !isFood(n)).length;
   const TABS = [
     ["points", `📍 จุด`],
     ["board", `📌 บอร์ด${openQ ? ` (${openQ})` : ""}`],
