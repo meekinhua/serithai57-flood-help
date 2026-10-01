@@ -657,6 +657,16 @@ async def startup():
 
     app.state.media_task = asyncio.create_task(media_housekeeping())
 
+    async def expire_requests():  # old requests nobody asked again for: closed as expired (team.expire_stale)
+        while True:
+            try:
+                await team.expire_stale(db)
+            except Exception:
+                pass
+            await asyncio.sleep(1800)
+
+    app.state.expire_task = asyncio.create_task(expire_requests())
+
     # Water scale v1 -> v2 (inserted ต้นขา between เข่า and เอว). Idempotent: only touches unversioned docs.
     await db.water.update_many({"v": {"$exists": False}, "level": 5}, {"$set": {"level": 6, "v": WATER_SCALE_VERSION}})
     await db.water.update_many({"v": {"$exists": False}, "level": 4}, {"$set": {"level": 5, "v": WATER_SCALE_VERSION}})

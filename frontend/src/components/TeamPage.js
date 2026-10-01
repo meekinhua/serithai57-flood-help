@@ -142,7 +142,7 @@ function CaseCard({ c, name, onChanged, isNew, sois }) {
   const quietH = (Date.now() - new Date(c.last_ask || c.created_at)) / 36e5;
   async function set(status, note = "") {
     if (!name.trim()) return setErr("✍️ ใส่ชื่อ/ทีมด้านบนก่อน");
-    if (status === "open" && !window.confirm(`ปล่อย ${c.house} คืน (ยังไม่มีใครไป)?`)) return;
+    if (status === "open" && c.status === "helping" && !window.confirm(`ปล่อย ${c.house} คืน (ยังไม่มีใครไป)?`)) return;
     setBusy(true);
     setErr("");
     try {
@@ -218,9 +218,16 @@ function CaseCard({ c, name, onChanged, isNew, sois }) {
         </p>
       )}
       {done ? (
-        <p className={`mt-2 font-semibold ${c.closed_reason ? "text-neutral-600" : "text-green-700"}`}>
-          {c.closed_reason ? `🚫 ${c.closed_reason}` : "✅ เสร็จแล้ว"} {timeAgo(c.updated_at)}
-        </p>
+        <>
+          <p className={`mt-2 font-semibold ${c.closed_reason ? "text-neutral-600" : "text-green-700"}`}>
+            {c.closed_reason ? `🚫 ${c.closed_reason}` : "✅ เสร็จแล้ว"} {timeAgo(c.updated_at)}
+          </p>
+          {c.closed_reason && (
+            <button disabled={busy} onClick={() => set("open", "เปิดใหม่ — ทีมเห็นว่ายังต้องการ")} className="mt-1 min-h-[40px] w-full rounded-lg border border-neutral-400 text-sm">
+              ↩️ ยังต้องการอยู่ — เปิดเคสใหม่
+            </button>
+          )}
+        </>
       ) : (
         <>
           {c.status === "helping" && c.assignee && <p className="mt-2 rounded bg-blue-50 px-2 py-1 text-sm font-semibold text-blue-800">🚶 {c.assignee.name} กำลังไป</p>}

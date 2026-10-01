@@ -33,6 +33,41 @@ ASK_NOTES = ("นำเข้าจาก LINE", "จาก LINE", "ทีมแ
 CLOSED_PREFIX = "ปิด:"
 
 
+# Requests expire: food / water / supplies nobody asked for again in 48 h are most likely sorted (teams
+# hand out on the street, people flag them down); evacuation / medical get 72 h. Closed as "ปิด: หมดอายุ",
+# so they don't count as delivered and the next ask (LINE import) reopens the same case.
+EXPIRE_H = 48
+EXPIRE_URGENT_H = 72
+EXPIRE_REASON = "ปิด: หมดอายุ"
+
+
+async def expire_stale(db) -> int:
+    t = now()
+    n = 0
+    async for p in db.posts.find({"kind": "need", "status": "open", "payment": {"$ne": "paid"}}, {"_id": 0, "id": 1, "history": 1, "created_at": 1, "category": 1}):
+        _, last = asks_of(p)
+        if not last:
+            continue
+        last = last if last.tzinfo else last.replace(tzinfo=timezone.utc)
+        hours = EXPIRE_URGENT_H if p.get("category") in ("evacuate", "medical") else EXPIRE_H
+        if t - last < timedelta(hours=hours):
+            continue
+        note = f"{EXPIRE_REASON} — ไม่มีคำขอใหม่ {hours} ชม. (ขอใหม่ในไลน์ เคสจะเปิดเอง)"
+        res = await db.posts.update_one(
+            {"id": p["id"], "status": "open"},  # not one someone has just taken
+            {"$set": {"status": "done", "closed_reason": EXPIRE_REASON, "updated_at": t},
+             "$push": {"history": {"at": t, "status": "done", "name": "ระบบ (หมดอายุอัตโนมัติ)", "note": note, "staff": True}}},
+        )
+        n += res.modified_count
+    # "ฉันช่วยได้" offers go stale too: after 72 h without an update they leave the home page
+    res = await db.posts.update_many(
+        {"kind": "offer", "status": "open", "updated_at": {"$lt": t - timedelta(hours=EXPIRE_URGENT_H)}},
+        {"$set": {"status": "done", "closed_reason": EXPIRE_REASON, "updated_at": t},
+         "$push": {"history": {"at": t, "status": "done", "name": "ระบบ (หมดอายุอัตโนมัติ)", "note": f"{EXPIRE_REASON} — ไม่มีการอัปเดต {EXPIRE_URGENT_H} ชม.", "staff": True}}},
+    )
+    return n + res.modified_count
+
+
 def asks_of(p: dict) -> tuple[int, Optional[datetime]]:
     """How many times the person asked, and when they last did."""
     at = [h["at"] for h in p.get("history") or [] if h.get("at") and str(h.get("note", "")).startswith(ASK_NOTES)]
