@@ -12,7 +12,7 @@ import Guide from "./components/Guide";
 import { WeatherAlerts, WeatherCard, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm, ServiceStrip } from "./components/ServiceBoard";
 import { TripsStrip } from "./components/Trips";
-import { CanalForm, PumpForm, PumpList } from "./components/Canal";
+import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { mergeZones, withLiveDrops } from "./components/ZonesPage";
 import { useCountUp } from "./motion";
 
@@ -429,7 +429,7 @@ export default function App() {
 
         <div className="mt-3 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-4">
           <section className={`${tab === "map" ? "block" : "hidden"} lg:block`}>
-            <div className="relative h-[65vh] overflow-hidden rounded-xl border border-neutral-300 bg-white lg:sticky lg:top-20 lg:h-[calc(100vh-7rem)]">
+            <div className="relative h-[calc(100dvh-11rem)] min-h-[320px] overflow-hidden rounded-xl border border-neutral-300 bg-white lg:sticky lg:top-[6.5rem] lg:h-[calc(100dvh-8rem)]">
               <MapView
                 posts={visible}
                 water={water}
@@ -444,6 +444,8 @@ export default function App() {
                 onPump={(pump) => setSheet({ type: "pump", pump })}
                 onPumps={() => setSheet({ type: "pumps" })}
                 canAddPump={!!admin}
+                onLeak={(leak) => setSheet({ type: "leak", leak })}
+                onLeaks={() => setSheet({ type: "leaks" })}
               />
               <a href="/zones" className="absolute right-2 top-16 z-[500] rounded-full border-2 border-black bg-white px-3 py-2 text-xs font-bold shadow">
                 🗺️ โซน · 🚚 จุดลงของ
@@ -665,6 +667,43 @@ export default function App() {
               setSheet(null);
               setToast("ขอบคุณที่แจ้งระดับคลอง");
             }}
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "leaks" && (
+        <Sheet title="🕳️ รูรั่วริมคลอง / เขื่อน" onClose={() => setSheet(null)}>
+          <LeakList leaks={canal?.leaks || []} onLeak={(leak) => setSheet({ type: "leak", leak })} onAdd={() => setSheet({ type: "leakForm" })} />
+        </Sheet>
+      )}
+      {sheet?.type === "leakForm" && (
+        <Sheet title="🕳️ แจ้งรูรั่ว" onClose={() => setSheet(null)}>
+          <LeakForm
+            onDone={(l) => {
+              setCanal((c) => ({ ...(c || { reports: [], pumps: [] }), leaks: [l, ...((c && c.leaks) || [])] }));
+              setSheet(null);
+              setToast("แจ้งรูรั่วแล้ว ทีมจะเห็นบนแผนที่ทันที");
+            }}
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "leak" && (
+        <Sheet title="🕳️ รูรั่ว" onClose={() => setSheet(null)}>
+          <LeakSheet
+            leak={sheet.leak}
+            onDone={() => {
+              setSheet(null);
+              setToast("อัปเดตรูรั่วแล้ว");
+              refresh();
+            }}
+            onDelete={
+              admin
+                ? async (l) => {
+                    await api(`/admin/leaks/${l.id}`, { method: "DELETE" }).catch((e) => setToast(e.message));
+                    setSheet(null);
+                    refresh();
+                  }
+                : null
+            }
           />
         </Sheet>
       )}

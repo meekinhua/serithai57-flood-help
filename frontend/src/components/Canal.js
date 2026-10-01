@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { api, load, save } from "../api";
 import { timeAgo } from "../config";
+import { mediaUrl } from "../media";
 import LocationPicker from "./LocationPicker";
 import MediaPicker, { mediaState } from "./MediaPicker";
 
@@ -295,5 +296,200 @@ export function PumpForm({ pump, onDone, admin = false }) {
         {busy ? "กำลังส่ง…" : pump ? (editing ? "บันทึกตำแหน่ง / ข้อมูล" : "บันทึกสถานะเครื่องสูบ") : "เพิ่มเครื่องสูบ"}
       </button>
     </form>
+  );
+}
+
+// ---------- leaks through the flood wall / under the canal bank (1 Oct: holes found at the soi ends) ----------
+export const LEAK_SEV = {
+  seep: { icon: "💧", label: "ซึม" },
+  flow: { icon: "🌊", label: "ไหลเข้า" },
+  gush: { icon: "🚨", label: "พุ่งแรง" },
+};
+export const LEAK_STATUS = {
+  open: { label: "เจอรูรั่ว ยังไม่มีคนอุด", cls: "bg-red-600 text-white", color: "#dc2626" },
+  sealing: { label: "กำลังอุด", cls: "bg-amber-400 text-black", color: "#f59e0b" },
+  worse: { label: "หนักขึ้น!", cls: "bg-purple-700 text-white", color: "#7e22ce" },
+  sealed: { label: "อุดแล้ว", cls: "bg-green-600 text-white", color: "#16a34a" },
+};
+
+export function LeakForm({ onDone }) {
+  const [name, setName] = useName();
+  const [canal, setCanal] = useState("rahat");
+  const [severity, setSeverity] = useState("flow");
+  const [soi, setSoi] = useState("");
+  const [bags, setBags] = useState("");
+  const [note, setNote] = useState("");
+  const [media, setMedia] = useState([]);
+  const [loc, setLoc] = useState(null);
+  const [pinned, setPinned] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const attached = mediaState(media);
+  async function submit(e) {
+    e.preventDefault();
+    if (!pinned && !soi.trim()) return setError("บอกตำแหน่ง: ใส่ท้ายซอย หรือเลื่อนหมุด / กด “ใช้ตำแหน่งปัจจุบัน” ตรงรูรั่ว");
+    if (attached.busy) return setError("รอรูปอัปโหลดให้เสร็จก่อน");
+    setBusy(true);
+    setError("");
+    try {
+      const r = await api("/leaks", {
+        method: "POST",
+        body: JSON.stringify({
+          canal, severity, soi: soi.trim(), note: note.trim(), name: name.trim(), sandbags: bags === "" ? null : Number(bags), media_ids: attached.ids,
+          ...(pinned && loc ? loc : {}),
+        }),
+      });
+      onDone(r);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <fieldset>
+        <legend className="mb-1 block font-medium">น้ำเข้ามาแค่ไหน *</legend>
+        <div className="grid grid-cols-3 gap-2">
+          {Object.entries(LEAK_SEV).map(([k, v]) => (
+            <button type="button" key={k} onClick={() => setSeverity(k)} aria-pressed={severity === k} className={seg(severity === k)}>
+              {v.icon} {v.label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+      <div>
+        <span className="mb-1 block font-medium">ตรงไหน * (ยืนอยู่ตรงรูรั่ว กด “ใช้ตำแหน่งปัจจุบัน” ได้เลย)</span>
+        <LocationPicker value={loc} onChange={setLoc} onTouched={() => setPinned(true)} />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">ท้ายซอย</span>
+          <input value={soi} onChange={(e) => setSoi(e.target.value)} maxLength={10} className={input} placeholder="เช่น 15" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">ต้องใช้ทรายกี่ถุง (ถ้ากะได้)</span>
+          <input type="number" inputMode="numeric" min={0} max={2000} value={bags} onChange={(e) => setBags(e.target.value)} className={input} placeholder="ถุง" />
+        </label>
+      </div>
+      <fieldset>
+        <legend className="mb-1 block text-sm font-medium">ริมคลองไหน</legend>
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(CANALS).map(([k, v]) => (
+            <button type="button" key={k} onClick={() => setCanal(k)} aria-pressed={canal === k} className={seg(canal === k)}>
+              {v}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+      <div>
+        <span className="mb-1 block font-medium">รูป / คลิปรูรั่ว (ช่วยให้ทีมรู้ว่าต้องเอาอะไรไป)</span>
+        <MediaPicker items={media} setItems={setMedia} max={2} allowVideo />
+      </div>
+      <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className={input} placeholder="หมายเหตุ เช่น รูใต้คันปูน ข้างบ้าน 4/xxx กว้างราว 1 ฝ่ามือ" />
+      <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} className={input} placeholder="ชื่อผู้แจ้ง" />
+      {error && <p className="rounded-lg bg-red-50 p-2 font-semibold text-red-700">{error}</p>}
+      <button type="submit" disabled={busy} className="min-h-[52px] w-full rounded-xl bg-red-700 text-lg font-semibold text-white disabled:opacity-60">
+        {busy ? "กำลังส่ง…" : "🕳️ แจ้งรูรั่ว"}
+      </button>
+    </form>
+  );
+}
+
+// One leak: what was reported, and anyone can move it along (กำลังอุด → อุดแล้ว / หนักขึ้น).
+export function LeakSheet({ leak, onDone, onDelete }) {
+  const [name, setName] = useName();
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function set(status) {
+    setBusy(true);
+    setError("");
+    try {
+      onDone(await api(`/leaks/${leak.id}/status`, { method: "POST", body: JSON.stringify({ status, note: note.trim(), name: name.trim() }) }));
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+  const st = LEAK_STATUS[leak.status] || LEAK_STATUS.open;
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg bg-neutral-100 p-2">
+        <p className="font-bold">
+          <span className={`mr-1 rounded px-1.5 py-0.5 text-xs ${st.cls}`}>{st.label}</span>
+          {LEAK_SEV[leak.severity]?.icon} {LEAK_SEV[leak.severity]?.label} · {CANALS[leak.canal]}
+          {leak.soi && ` · ท้ายซอย ${leak.soi}`}
+        </p>
+        {leak.sandbags != null && <p className="text-sm">ต้องใช้ทรายประมาณ {leak.sandbags} ถุง</p>}
+        {(leak.history || []).slice().reverse().slice(0, 4).map((h, i) => (
+          <p key={i} className="text-xs text-neutral-600">
+            {LEAK_STATUS[h.status]?.label} · {h.name} · {timeAgo(h.at)}
+            {h.note && ` · ${h.note}`}
+          </p>
+        ))}
+        <div className="mt-1 flex gap-2">
+          {(leak.media || []).map((m) => (
+            <a key={m.id} href={mediaUrl(m.id)} target="_blank" rel="noreferrer">
+              <img src={mediaUrl(m.id, "thumb")} alt="รูรั่ว" className="h-20 w-20 rounded object-cover" />
+            </a>
+          ))}
+        </div>
+        <a href={`https://www.google.com/maps/dir/?api=1&destination=${leak.lat},${leak.lng}`} target="_blank" rel="noreferrer" className="mt-1 inline-block text-sm underline">
+          🧭 นำทางไปจุดนี้
+        </a>
+      </div>
+      <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className={input} placeholder="หมายเหตุ เช่น ใช้ทราย 15 ถุง / ต้องการคนเพิ่ม 3 คน" />
+      <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} className={input} placeholder="ชื่อ" />
+      <div className="grid grid-cols-2 gap-2">
+        <button disabled={busy} onClick={() => set("sealing")} className="min-h-[52px] rounded-xl bg-amber-400 font-bold">
+          🧱 กำลังอุด
+        </button>
+        <button disabled={busy} onClick={() => set("sealed")} className="min-h-[52px] rounded-xl bg-green-600 font-bold text-white">
+          ✅ อุดแล้ว
+        </button>
+        <button disabled={busy} onClick={() => set("worse")} className="min-h-[48px] rounded-xl bg-purple-700 font-bold text-white">
+          🚨 หนักขึ้น
+        </button>
+        <button disabled={busy} onClick={() => set("open")} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">
+          ↩️ ยังรั่วอยู่
+        </button>
+      </div>
+      {onDelete && (
+        <button onClick={() => window.confirm("ลบรายงานรูรั่วนี้?") && onDelete(leak)} className="min-h-[40px] w-full rounded-lg border border-red-600 text-sm text-red-700">
+          ลบ (ผู้ดูแล)
+        </button>
+      )}
+      {error && <p className="rounded-lg bg-red-50 p-2 font-semibold text-red-700">{error}</p>}
+    </div>
+  );
+}
+
+export function LeakList({ leaks, onLeak, onAdd }) {
+  const order = { worse: 0, open: 1, sealing: 2, sealed: 3 };
+  const list = [...leaks].sort((a, b) => order[a.status] - order[b.status] || new Date(b.updated_at) - new Date(a.updated_at));
+  return (
+    <div className="space-y-2">
+      <button onClick={onAdd} className="min-h-[52px] w-full rounded-xl bg-red-700 text-lg font-bold text-white">
+        🕳️ แจ้งรูรั่วใหม่
+      </button>
+      {list.length === 0 && <p className="text-neutral-600">ยังไม่มีรายงานรูรั่ว</p>}
+      {list.map((l) => {
+        const st = LEAK_STATUS[l.status] || LEAK_STATUS.open;
+        return (
+          <button key={l.id} onClick={() => onLeak(l)} className="flex min-h-[56px] w-full items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2 text-left">
+            <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${st.cls}`}>{st.label}</span>
+            <span className="min-w-0 flex-1">
+              <b className="block">
+                {LEAK_SEV[l.severity]?.icon} {l.soi ? `ท้ายซอย ${l.soi}` : CANALS[l.canal]} · {LEAK_SEV[l.severity]?.label}
+              </b>
+              <span className="block truncate text-xs text-neutral-600">
+                {l.sandbags != null && `ทราย ~${l.sandbags} ถุง · `}อัปเดต {timeAgo(l.updated_at)}
+                {l.note && ` · ${l.note}`}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

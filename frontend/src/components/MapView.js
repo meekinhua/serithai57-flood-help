@@ -8,7 +8,7 @@ import { drawStaff } from "./staffMarkers";
 import { WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
 import { MAX_AGE_H, STALE_H, describeLevel, estimateAt, fieldBounds, renderField, toPoints } from "../waterField";
 import { load, save } from "../api";
-import { CANALS, CANAL_STATE, PUMP_STATUS, canalSummary } from "./Canal";
+import { CANALS, CANAL_STATE, LEAK_SEV, LEAK_STATUS, PUMP_STATUS, canalSummary } from "./Canal";
 
 const OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
@@ -71,7 +71,7 @@ function clusterIcon(cluster) {
 
 // 1 Oct: the map opens on the water view; truck drop points are always on it; in the water view it also
 // shows the canal reports (how far below the flood wall) and the pumps.
-export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater, drops = [], canal = null, onReportCanal, onPump, onPumps, canAddPump = false }) {
+export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater, drops = [], canal = null, onReportCanal, onPump, onPumps, canAddPump = false, onLeak, onLeaks }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -180,6 +180,18 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
         .bindPopup(`<b>🚚 จุดลงของ ${escapeHtml(d.tag)}</b><br>${escapeHtml(d.place || "")}${d.person ? `<br>👤 ${escapeHtml(d.person)}` : ""}<br><a href="/zones">ดูแผนที่โซน</a>`)
         .addTo(layer);
     }
+    // leaks in the flood wall: on both views, they need hands now
+    for (const lk of canal?.leaks || []) {
+      if (lk.lat == null) continue;
+      const st = LEAK_STATUS[lk.status] || LEAK_STATUS.open;
+      L.marker([lk.lat, lk.lng], {
+        zIndexOffset: 1200,
+        icon: L.divIcon({ className: "", iconSize: [36, 36], iconAnchor: [18, 18], html: `<div class="leak-pin ${lk.status}" style="--c:${st.color}">🕳️</div>` }),
+      })
+        .on("click", () => onLeak?.(lk))
+        .bindTooltip(`รูรั่ว${lk.soi ? ` ท้ายซอย ${escapeHtml(lk.soi)}` : ""} · ${LEAK_SEV[lk.severity]?.label || ""} · ${st.label}`, { direction: "top", offset: [0, -16] })
+        .addTo(layer);
+    }
     if (waterMode && canal) {
       // latest report per spot (canal + ~30 m), last 24 h
       const spot = new Set();
@@ -230,7 +242,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
     }
     pinned.forEach((m) => m.addTo(layer));
     cluster.addLayers(grouped);
-  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump]);
+  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak]);
 
   // Staff boats / trucks / people on duty: big, pulsing, always above residents' pins
   useEffect(() => {
@@ -280,6 +292,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
   const count = (k) => posts.filter((p) => p.kind === k && !p.general).length;
   const canalLines = canalSummary(canal?.reports || []);
   const pumps = (canal?.pumps || []).filter((x) => x.status !== "removed");
+  const openLeaks = (canal?.leaks || []).filter((x) => x.status !== "sealed").length;
   const chips = [
     ["offer", "🤝 ช่วยได้", count("offer")],
     ["info", "📍 ข้อมูล", count("info")],
@@ -330,6 +343,11 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
                 💧 แจ้งน้ำ
               </button>
             )}
+            {onLeaks && (
+              <button type="button" onClick={onLeaks} className="pointer-events-auto min-h-[44px] rounded-full bg-red-700 px-3 text-sm font-bold text-white shadow">
+                🕳️ รูรั่ว{openLeaks ? ` ${openLeaks}` : ""}
+              </button>
+            )}
             {onReportCanal && (
               <button type="button" onClick={onReportCanal} className="pointer-events-auto min-h-[44px] rounded-full bg-blue-900 px-3 text-sm font-bold text-white shadow">
                 🌊 แจ้งคลอง
@@ -344,6 +362,11 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
         </div>
       ) : (
         <div className="pointer-events-none absolute bottom-6 left-2 z-[500] flex max-w-[85%] flex-wrap gap-1">
+          {onLeaks && (
+            <button type="button" onClick={onLeaks} className="pointer-events-auto min-h-[36px] rounded-full bg-red-700 px-2.5 text-xs font-bold text-white shadow">
+              🕳️ รูรั่ว{openLeaks ? ` ${openLeaks}` : ""}
+            </button>
+          )}
           {water.length > 0 && (
             <button
               type="button"

@@ -190,6 +190,11 @@ body {
 /* home map, water view: canal reports and pumps */
 .canal-pin { width: 100%; height: 100%; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: var(--c); border: 3px solid #fff; font-size: 15px; box-shadow: 0 1px 6px rgba(0,0,0,.45); }
 .canal-pin.old { opacity: .55; border-style: dashed; }
+.leak-pin { width: 100%; height: 100%; border-radius: 9999px; display: flex; align-items: center; justify-content: center; background: #fff; border: 4px solid var(--c); font-size: 17px; box-shadow: 0 0 0 4px rgba(220,38,38,.25), 0 1px 6px rgba(0,0,0,.45); }
+.leak-pin.open, .leak-pin.worse { animation: leak-pulse 1.4s ease-in-out infinite; }
+.leak-pin.sealed { opacity: .6; box-shadow: 0 1px 6px rgba(0,0,0,.35); }
+@keyframes leak-pulse { 50% { box-shadow: 0 0 0 10px rgba(220,38,38,.0), 0 1px 6px rgba(0,0,0,.45); } }
+@media (prefers-reduced-motion: reduce) { .leak-pin.open, .leak-pin.worse { animation: none; } }
 .pump-pin { width: 100%; height: 100%; border-radius: 9999px; display: flex; align-items: center; justify-content: center; background: #fff; border: 4px solid #737373; font-size: 17px; box-shadow: 0 1px 6px rgba(0,0,0,.45); }
 .pump-pin.running { border-color: #16a34a; animation: pump-spin 2.5s linear infinite; }
 .pump-pin.broken { border-color: #dc2626; }

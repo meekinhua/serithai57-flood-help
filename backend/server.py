@@ -619,6 +619,8 @@ async def startup():
     await db.water.create_index("created_at")
     await db.canal_reports.create_index("created_at")
     await db.pumps.create_index("id", unique=True)
+    await db.leaks.create_index("id", unique=True)
+    await db.leaks.create_index([("status", 1), ("updated_at", -1)])
     await db.admins.create_index("email", unique=True)
     await db.sessions.create_index("token_hash", unique=True)
     await db.sessions.create_index("expires_at", expireAfterSeconds=0)

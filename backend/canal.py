@@ -16,6 +16,9 @@ from pydantic import BaseModel, Field
 Canal = Literal["rahat", "bueng", "lamrang", "other"]  # คลองระหัส · สวนน้ำ/บึงกุ่ม · คลองลำราง · อื่นๆ
 State = Literal["below", "brim", "over", "leak"]  # ต่ำกว่าขอบ · ปริ่มขอบ · ล้นเข้ามา · เขื่อนรั่ว/ซึม
 PumpStatusValue = Literal["running", "stopped", "broken", "planned", "removed"]
+# Leaks through the flood wall / under the canal bank at the end of a soi (1 Oct: holes found along the canal).
+LeakSeverity = Literal["seep", "flow", "gush"]  # ซึม · ไหล · พุ่งแรง
+LeakStatusValue = Literal["open", "sealing", "sealed", "worse"]  # เจอรูรั่ว · กำลังอุด · อุดแล้ว · หนักขึ้น
 KEEP = timedelta(hours=72)
 
 
@@ -51,6 +54,22 @@ class PumpCreate(Located):
 
 class PumpStatus(BaseModel):
     status: PumpStatusValue
+    note: str = Field("", max_length=200)
+    name: str = Field("", max_length=80)
+
+
+class LeakCreate(Located):
+    canal: Canal = "rahat"
+    soi: str = Field("", max_length=10)
+    severity: LeakSeverity = "flow"
+    note: str = Field("", max_length=200)  # "รูใต้คันปูน ข้างบ้าน 4/xxx", "ต้องการทราย 20 ถุง"
+    sandbags: Optional[int] = Field(None, ge=0, le=2000)  # how many bags it needs, if known
+    name: str = Field("", max_length=80)
+    media_ids: list[str] = Field(default_factory=list, max_length=2)
+
+
+class LeakStatus(BaseModel):
+    status: LeakStatusValue
     note: str = Field("", max_length=200)
     name: str = Field("", max_length=80)
 
@@ -94,7 +113,43 @@ def build_router(db, rate_limit, current_admin, require_admin, claim_media, dele
         """Reports of the last 72 h (newest first) and every pump that isn't removed."""
         reports = await db.canal_reports.find({"created_at": {"$gte": now() - KEEP}}, {"_id": 0}).sort("created_at", -1).to_list(300)
         pumps = await db.pumps.find({"status": {"$ne": "removed"}}, {"_id": 0}).sort([("status", 1), ("updated_at", -1)]).to_list(100)
-        return {"reports": reports, "pumps": pumps}
+        # leaks still open, and sealed ones for a day (so people see they were fixed)
+        leaks = await db.leaks.find({"$or": [{"status": {"$ne": "sealed"}}, {"updated_at": {"$gte": now() - timedelta(hours=24)}}]}, {"_id": 0}) \
+            .sort("created_at", -1).to_list(300)
+        return {"reports": reports, "pumps": pumps, "leaks": leaks}
+
+    @router.post("/leaks", status_code=201)
+    async def add_leak(body: LeakCreate, request: Request):
+        rate_limit(request, "leak", limit=20, window_s=600)
+        name, staff = await who(request, body.name)
+        at = place(body)
+        if at["lat"] is None:
+            raise HTTPException(422, "บอกตำแหน่ง: ใส่ซอย หรือเลื่อนหมุดไปตรงรูรั่ว")
+        lid = str(uuid.uuid4())
+        t = now()
+        media = await claim_media(body.media_ids, f"leak:{lid}", {"image", "video"})
+        doc = {"id": lid, **body.model_dump(exclude={"media_ids", "name"}), **at, "status": "open", "name": name, "staff": staff, "media": media,
+               "created_at": t, "updated_at": t, "history": [{"at": t, "status": "open", "note": body.note.strip(), "name": name, "staff": staff}]}
+        await db.leaks.insert_one(dict(doc))
+        doc.pop("_id", None)
+        return doc
+
+    @router.post("/leaks/{lid}/status")
+    async def leak_status(lid: str, body: LeakStatus, request: Request):
+        rate_limit(request, "leak", limit=40, window_s=600)
+        name, staff = await who(request, body.name)
+        t = now()
+        res = await db.leaks.update_one({"id": lid}, {"$set": {"status": body.status, "updated_at": t},
+                                                     "$push": {"history": {"at": t, "status": body.status, "note": body.note.strip(), "name": name, "staff": staff}}})
+        if not res.matched_count:
+            raise HTTPException(404, "ไม่พบรูรั่วนี้")
+        return await db.leaks.find_one({"id": lid}, {"_id": 0})
+
+    @router.delete("/admin/leaks/{lid}", status_code=204)
+    async def delete_leak(lid: str, admin: dict = Depends(require_admin)):
+        doc = await db.leaks.find_one_and_delete({"id": lid})
+        if doc:
+            await delete_media([m["id"] for m in doc.get("media", [])])
 
     @router.post("/canal/reports", status_code=201)
     async def add_report(body: CanalReport, request: Request):
