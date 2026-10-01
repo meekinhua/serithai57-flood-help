@@ -55,6 +55,16 @@ class PumpStatus(BaseModel):
     name: str = Field("", max_length=80)
 
 
+class PumpEdit(Located):
+    """Move a pump / fix its details (the pumps get moved around: "ย้ายปั๊มไปท้ายซอย 15")."""
+    label: Optional[str] = Field(None, min_length=2, max_length=80)
+    place: Optional[str] = Field(None, max_length=120)
+    soi: Optional[str] = Field(None, max_length=10)
+    owner: Optional[str] = Field(None, max_length=60)
+    into: Optional[str] = Field(None, max_length=60)
+    name: str = Field("", max_length=80)
+
+
 def soi_end(sois: dict, main_road: list, soi: str) -> Optional[list]:
     """The far end of a soi (away from the main road) — where it meets the canal / the flood wall."""
     s = sois.get((soi or "").strip())
@@ -121,6 +131,32 @@ def build_router(db, rate_limit, current_admin, require_admin, claim_media, dele
         res = await db.pumps.update_one({"id": pid}, {"$set": changes, "$push": {"history": {"at": t, "status": body.status, "note": body.note.strip(), "name": name, "staff": staff}}})
         if not res.matched_count:
             raise HTTPException(404, "ไม่พบเครื่องสูบนี้")
+        return await db.pumps.find_one({"id": pid}, {"_id": 0})
+
+    @router.put("/pumps/{pid}")
+    async def edit_pump(pid: str, body: PumpEdit, request: Request):
+        rate_limit(request, "pump", limit=30, window_s=600)
+        name, staff = await who(request, body.name)
+        pump = await db.pumps.find_one({"id": pid}, {"_id": 0})
+        if not pump:
+            raise HTTPException(404, "ไม่พบเครื่องสูบนี้")
+        changes = {k: v.strip() for k, v in body.model_dump(include={"label", "place", "soi", "owner", "into"}).items() if v is not None}
+        moved = body.lat is not None and body.lng is not None and (body.lat, body.lng) != (pump.get("lat"), pump.get("lng"))
+        if moved:
+            changes.update(lat=body.lat, lng=body.lng)
+        elif "soi" in changes and changes["soi"] != (pump.get("soi") or "") and body.lat is None:
+            at = place(PumpEdit(soi=changes["soi"]))  # a new soi and no pin: the canal end of that soi
+            if at["lat"] is not None:
+                changes.update(at)
+                moved = True
+        if not changes:
+            return pump
+        t = now()
+        what = "ย้ายตำแหน่ง" if moved else "แก้ข้อมูล"
+        if changes.get("place"):
+            what += f" → {changes['place']}"
+        await db.pumps.update_one({"id": pid}, {"$set": {**changes, "updated_at": t, "updated_by": name},
+                                               "$push": {"history": {"at": t, "status": pump["status"], "note": what, "name": name, "staff": staff}}})
         return await db.pumps.find_one({"id": pid}, {"_id": 0})
 
     @router.delete("/admin/canal/{rid}", status_code=204)

@@ -192,22 +192,29 @@ export function CanalForm({ onDone }) {
 export function PumpForm({ pump, onDone }) {
   const [name, setName] = useName();
   const [status, setStatus] = useState(pump?.status || "running");
-  const [f, setF] = useState({ label: "", place: "", soi: "", owner: "", into: "" });
+  const [f, setF] = useState({ label: pump?.label || "", place: pump?.place || "", soi: pump?.soi || "", owner: pump?.owner || "", into: pump?.into || "" });
+  const [editing, setEditing] = useState(false); // existing pump: move it / fix its details
   const [note, setNote] = useState("");
-  const [loc, setLoc] = useState(null);
+  const [loc, setLoc] = useState(pump?.lat != null ? { lat: pump.lat, lng: pump.lng } : null);
   const [pinned, setPinned] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function submit(e) {
     e.preventDefault();
-    if (!pump && f.label.trim().length < 2) return setError("ตั้งชื่อเครื่อง เช่น “ปั๊ม 8 นิ้ว หน้าป้อม รปภ.”");
+    if ((!pump || editing) && f.label.trim().length < 2) return setError("ตั้งชื่อเครื่อง เช่น “ปั๊ม 8 นิ้ว หน้าป้อม รปภ.”");
     if (!pump && !pinned && !f.soi.trim()) return setError("บอกตำแหน่ง: ใส่ซอย หรือเลื่อนหมุดบนแผนที่ไปตรงเครื่องสูบ");
     setBusy(true);
     setError("");
     try {
       const body = { status, note: note.trim(), name: name.trim() };
+      const fields = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim()]));
+      if (pump && editing) {
+        await api(`/pumps/${pump.id}`, { method: "PUT", body: JSON.stringify({ ...fields, ...(pinned && loc ? loc : {}), name: name.trim() }) });
+      }
       const r = pump
-        ? await api(`/pumps/${pump.id}/status`, { method: "POST", body: JSON.stringify(body) })
+        ? status !== pump.status || note.trim() || !editing
+          ? await api(`/pumps/${pump.id}/status`, { method: "POST", body: JSON.stringify(body) })
+          : pump
         : await api("/pumps", {
             method: "POST",
             body: JSON.stringify({ ...body, ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim()])), ...(pinned && loc ? loc : {}) }),
@@ -220,7 +227,7 @@ export function PumpForm({ pump, onDone }) {
   }
   return (
     <form onSubmit={submit} className="space-y-4">
-      {pump ? (
+      {pump && !editing ? (
         <div className="rounded-lg bg-neutral-100 p-2 text-sm">
           <p className="font-bold">{pump.label}</p>
           <p>{[pump.place || (pump.soi && `ซอย ${pump.soi}`), pump.into && `สูบลง ${pump.into}`, pump.owner].filter(Boolean).join(" · ")}</p>
@@ -230,12 +237,16 @@ export function PumpForm({ pump, onDone }) {
               {h.note && ` · ${h.note}`}
             </p>
           ))}
+          <button type="button" onClick={() => setEditing(true)} className="mt-2 min-h-[44px] w-full rounded-lg border-2 border-black bg-white font-semibold">
+            📍 ย้ายตำแหน่ง / แก้ข้อมูลเครื่อง
+          </button>
         </div>
       ) : (
         <div className="space-y-2">
           <input value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} maxLength={80} className={input} placeholder="ชื่อเครื่อง เช่น ปั๊ม 8 นิ้ว หน้าป้อม รปภ. *" />
           <input value={f.place} onChange={(e) => setF({ ...f, place: e.target.value })} maxLength={120} className={input} placeholder="อยู่ตรงไหน เช่น หน้าป้อม รปภ. / ท้ายซอย 15" />
           <input value={f.soi} onChange={(e) => setF({ ...f, soi: e.target.value })} maxLength={10} className={`${input} w-40`} placeholder="ซอย (ถ้ามี)" />
+          <p className="text-sm font-medium">{pump ? "ลากแผนที่ให้หมุดอยู่ตรงตำแหน่งใหม่ของเครื่อง" : "ตำแหน่งเครื่อง (ลากแผนที่ หรือใส่ซอย)"}</p>
           <LocationPicker value={loc} onChange={setLoc} onTouched={() => setPinned(true)} />
           <div className="grid grid-cols-2 gap-2">
             <input value={f.into} onChange={(e) => setF({ ...f, into: e.target.value })} maxLength={60} className={input} placeholder="สูบลง เช่น คลองระหัส" />
@@ -257,7 +268,7 @@ export function PumpForm({ pump, onDone }) {
       <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} className={input} placeholder="ชื่อผู้แจ้ง" />
       {error && <p className="rounded-lg bg-red-50 p-2 font-semibold text-red-700">{error}</p>}
       <button type="submit" disabled={busy} className="min-h-[52px] w-full rounded-xl bg-black text-lg font-semibold text-white disabled:opacity-60">
-        {busy ? "กำลังส่ง…" : pump ? "บันทึกสถานะเครื่องสูบ" : "เพิ่มเครื่องสูบ"}
+        {busy ? "กำลังส่ง…" : pump ? (editing ? "บันทึกตำแหน่ง / ข้อมูล" : "บันทึกสถานะเครื่องสูบ") : "เพิ่มเครื่องสูบ"}
       </button>
     </form>
   );
