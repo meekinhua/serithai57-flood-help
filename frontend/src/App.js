@@ -416,11 +416,10 @@ export default function App() {
           </div>
         )}
 
-        {/* 1 Oct: the volunteer teams reach people on the street now, so the page opens on fresh urgent
-            requests and the map (water level, canals, pumps, truck drop points) */}
-        <UrgentNow posts={posts} onOpen={openDetail} />
+        {/* 1 Oct: the volunteer teams reach people on the street now, so the page opens on the map (water
+            level, canals, pumps, truck drop points) with the fresh urgent requests right under it */}
         {/* Phone: tabs. Desktop: map and list side by side. */}
-        <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 lg:hidden" role="tablist">
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 lg:hidden" role="tablist">
           {[["map", "🗺️ แผนที่"], ["list", `🆘 คำขอ / รายการ${counts.need ? ` (${counts.need})` : ""}`]].map(([key, text]) => (
             <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`min-h-[44px] rounded-lg font-semibold ${tab === key ? "bg-white shadow" : "text-neutral-600"}`}>
               {text}
@@ -449,6 +448,7 @@ export default function App() {
                 🗺️ โซน · 🚚 จุดลงของ
               </a>
             </div>
+            <UrgentNow posts={posts} onOpen={openDetail} />
             <Legend />
           </section>
 
