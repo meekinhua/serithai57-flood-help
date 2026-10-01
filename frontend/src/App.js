@@ -443,6 +443,7 @@ export default function App() {
                 onReportCanal={() => setSheet({ type: "canal" })}
                 onPump={(pump) => setSheet({ type: "pump", pump })}
                 onPumps={() => setSheet({ type: "pumps" })}
+                canAddPump={!!admin}
               />
               <a href="/zones" className="absolute right-2 top-16 z-[500] rounded-full border-2 border-black bg-white px-3 py-2 text-xs font-bold shadow">
                 🗺️ โซน · 🚚 จุดลงของ
@@ -669,13 +670,14 @@ export default function App() {
       )}
       {sheet?.type === "pumps" && (
         <Sheet title="⚙️ เครื่องสูบน้ำ" onClose={() => setSheet(null)}>
-          <PumpList pumps={(canal?.pumps || []).filter((x) => x.status !== "removed")} onPump={(pump) => setSheet({ type: "pump", pump })} />
+          <PumpList pumps={(canal?.pumps || []).filter((x) => x.status !== "removed")} onPump={(pump) => setSheet({ type: "pump", pump })} admin={!!admin} />
         </Sheet>
       )}
       {sheet?.type === "pump" && (
         <Sheet title={sheet.pump ? "⚙️ สถานะเครื่องสูบ" : "⚙️ เพิ่มเครื่องสูบ"} onClose={() => setSheet(null)}>
           <PumpForm
             pump={sheet.pump}
+            admin={!!admin}
             onDone={() => {
               setSheet(null);
               setToast("บันทึกเครื่องสูบแล้ว");

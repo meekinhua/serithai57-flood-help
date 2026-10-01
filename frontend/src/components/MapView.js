@@ -71,7 +71,7 @@ function clusterIcon(cluster) {
 
 // 1 Oct: the map opens on the water view; truck drop points are always on it; in the water view it also
 // shows the canal reports (how far below the flood wall) and the pumps.
-export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater, drops = [], canal = null, onReportCanal, onPump, onPumps }) {
+export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater, drops = [], canal = null, onReportCanal, onPump, onPumps, canAddPump = false }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -335,7 +335,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
                 🌊 แจ้งคลอง
               </button>
             )}
-            {onPumps && (
+            {onPumps && (pumps.length > 0 || canAddPump) && (
               <button type="button" onClick={onPumps} className="pointer-events-auto min-h-[44px] rounded-full border-2 border-black bg-white px-3 text-sm font-bold shadow">
                 ⚙️ ปั๊ม {pumps.filter((x) => x.status === "running").length}/{pumps.length}
               </button>

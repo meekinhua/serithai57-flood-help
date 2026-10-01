@@ -56,8 +56,8 @@ export function canalSummary(reports) {
   return out;
 }
 
-// Every pump, its status, and a way to update it or add one (opened from the map).
-export function PumpList({ pumps, onPump }) {
+// Every pump, its status, and a way to update it; admins can also add one (opened from the map).
+export function PumpList({ pumps, onPump, admin = false }) {
   return (
     <div className="space-y-2">
       {pumps.length === 0 && <p className="text-neutral-600">ยังไม่มีข้อมูลเครื่องสูบ</p>}
@@ -79,9 +79,13 @@ export function PumpList({ pumps, onPump }) {
           </button>
         );
       })}
-      <button onClick={() => onPump(null)} className="min-h-[48px] w-full rounded-lg border-2 border-dashed border-neutral-400 font-semibold">
-        + เพิ่มเครื่องสูบที่เห็น
-      </button>
+      {admin ? (
+        <button onClick={() => onPump(null)} className="min-h-[48px] w-full rounded-lg border-2 border-dashed border-neutral-400 font-semibold">
+          + เพิ่มเครื่องสูบ (ผู้ดูแล)
+        </button>
+      ) : (
+        <p className="text-sm text-neutral-600">เห็นเครื่องสูบที่ยังไม่มีในรายการ หรือเครื่องย้ายที่ — แจ้งผู้ดูแล / ทีมอาสา ให้เพิ่มหรือย้ายให้</p>
+      )}
     </div>
   );
 }
@@ -189,7 +193,8 @@ export function CanalForm({ onDone }) {
 }
 
 // Update a pump's status, or (no pump) add one that someone has seen.
-export function PumpForm({ pump, onDone }) {
+// Status: anyone. Adding, moving, fixing details and deleting: admins (the server checks too).
+export function PumpForm({ pump, onDone, admin = false }) {
   const [name, setName] = useName();
   const [status, setStatus] = useState(pump?.status || "running");
   const [f, setF] = useState({ label: pump?.label || "", place: pump?.place || "", soi: pump?.soi || "", owner: pump?.owner || "", into: pump?.into || "" });
@@ -237,9 +242,28 @@ export function PumpForm({ pump, onDone }) {
               {h.note && ` · ${h.note}`}
             </p>
           ))}
-          <button type="button" onClick={() => setEditing(true)} className="mt-2 min-h-[44px] w-full rounded-lg border-2 border-black bg-white font-semibold">
-            📍 ย้ายตำแหน่ง / แก้ข้อมูลเครื่อง
-          </button>
+          {admin && (
+            <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
+              <button type="button" onClick={() => setEditing(true)} className="min-h-[44px] rounded-lg border-2 border-black bg-white font-semibold">
+                📍 ย้ายตำแหน่ง / แก้ข้อมูล
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm(`ลบ “${pump.label}” ออกจากรายการ? (ถ้าเครื่องถูกถอดไป เลือกสถานะ “ถอดออกแล้ว” แทนได้ ประวัติยังอยู่)`)) return;
+                  try {
+                    await api(`/admin/pumps/${pump.id}`, { method: "DELETE" });
+                    onDone(null);
+                  } catch (err) {
+                    setError(err.message);
+                  }
+                }}
+                className="min-h-[44px] rounded-lg border-2 border-red-600 px-3 font-semibold text-red-700"
+              >
+                ลบ
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-2">

@@ -2,8 +2,8 @@
 beside the village are below the top of the flood wall, at it, over it, or leaking through it. Residents
 near a canal report how far the water is below the wall ("ต่ำกว่าขอบ 12 ซม.", ล้นแล้ว, เขื่อนรั่ว), so
 everyone can see whether pumping out into that canal still makes sense. Pumps: where each one is, where
-it pumps to, and whether it is running now. Anyone can report / update (name + rate limit, like the
-water reports); admins can delete.
+it pumps to, and whether it is running now. Anyone can report the canal and update a pump's status
+(name + rate limit, like the water reports); adding, moving and deleting pumps is for admins.
 """
 import math
 import uuid
@@ -110,9 +110,8 @@ def build_router(db, rate_limit, current_admin, require_admin, claim_media, dele
         return doc
 
     @router.post("/pumps", status_code=201)
-    async def add_pump(body: PumpCreate, request: Request):
-        rate_limit(request, "pump", limit=10, window_s=600)
-        name, staff = await who(request, body.name)
+    async def add_pump(body: PumpCreate, request: Request, admin: dict = Depends(require_admin)):
+        name, staff = admin["name"], True
         t = now()
         doc = {"id": str(uuid.uuid4()), **body.model_dump(exclude={"name"}), **place(body), "created_at": t, "updated_at": t, "updated_by": name,
                "history": [{"at": t, "status": body.status, "note": body.note, "name": name, "staff": staff}]}
@@ -134,9 +133,8 @@ def build_router(db, rate_limit, current_admin, require_admin, claim_media, dele
         return await db.pumps.find_one({"id": pid}, {"_id": 0})
 
     @router.put("/pumps/{pid}")
-    async def edit_pump(pid: str, body: PumpEdit, request: Request):
-        rate_limit(request, "pump", limit=30, window_s=600)
-        name, staff = await who(request, body.name)
+    async def edit_pump(pid: str, body: PumpEdit, request: Request, admin: dict = Depends(require_admin)):
+        name, staff = admin["name"], True
         pump = await db.pumps.find_one({"id": pid}, {"_id": 0})
         if not pump:
             raise HTTPException(404, "ไม่พบเครื่องสูบนี้")
