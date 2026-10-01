@@ -33,11 +33,12 @@ ASK_NOTES = ("นำเข้าจาก LINE", "จาก LINE", "ทีมแ
 CLOSED_PREFIX = "ปิด:"
 
 
-# Requests expire: food / water / supplies nobody asked for again in 48 h are most likely sorted (teams
-# hand out on the street, people flag them down); evacuation / medical get 72 h. Closed as "ปิด: หมดอายุ",
-# so they don't count as delivered and the next ask (LINE import) reopens the same case.
-EXPIRE_H = 48
-EXPIRE_URGENT_H = 72
+# Requests expire: a request nobody asked for again in 20 h is most likely sorted (1 Oct: teams hand out
+# on the street, people flag them down; the lead asked to clear everything past 20 h). Closed as
+# "ปิด: หมดอายุ", so they don't count as delivered and the next ask (LINE import) reopens the same case.
+EXPIRE_H = 20
+EXPIRE_URGENT_H = 20  # evacuate / medical (kept separate in case they should stay longer)
+OFFER_EXPIRE_H = 72  # "ฉันช่วยได้" offers
 EXPIRE_REASON = "ปิด: หมดอายุ"
 
 
@@ -59,11 +60,11 @@ async def expire_stale(db) -> int:
              "$push": {"history": {"at": t, "status": "done", "name": "ระบบ (หมดอายุอัตโนมัติ)", "note": note, "staff": True}}},
         )
         n += res.modified_count
-    # "ฉันช่วยได้" offers go stale too: after 72 h without an update they leave the home page
+    # "ฉันช่วยได้" offers go stale too: after OFFER_EXPIRE_H without an update they leave the home page
     res = await db.posts.update_many(
-        {"kind": "offer", "status": "open", "updated_at": {"$lt": t - timedelta(hours=EXPIRE_URGENT_H)}},
+        {"kind": "offer", "status": "open", "updated_at": {"$lt": t - timedelta(hours=OFFER_EXPIRE_H)}},
         {"$set": {"status": "done", "closed_reason": EXPIRE_REASON, "updated_at": t},
-         "$push": {"history": {"at": t, "status": "done", "name": "ระบบ (หมดอายุอัตโนมัติ)", "note": f"{EXPIRE_REASON} — ไม่มีการอัปเดต {EXPIRE_URGENT_H} ชม.", "staff": True}}},
+         "$push": {"history": {"at": t, "status": "done", "name": "ระบบ (หมดอายุอัตโนมัติ)", "note": f"{EXPIRE_REASON} — ไม่มีการอัปเดต {OFFER_EXPIRE_H} ชม.", "staff": True}}},
     )
     return n + res.modified_count
 
