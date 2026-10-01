@@ -5,6 +5,7 @@ everyone can see whether pumping out into that canal still makes sense. Pumps: w
 it pumps to, and whether it is running now. Anyone can report / update (name + rate limit, like the
 water reports); admins can delete.
 """
+import math
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
@@ -54,8 +55,25 @@ class PumpStatus(BaseModel):
     name: str = Field("", max_length=80)
 
 
-def build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media) -> APIRouter:
+def soi_end(sois: dict, main_road: list, soi: str) -> Optional[list]:
+    """The far end of a soi (away from the main road) — where it meets the canal / the flood wall."""
+    s = sois.get((soi or "").strip())
+    if not s:
+        return None
+    ends = [p for line in s["lines"] for p in (line[0], line[-1])]
+    near_road = lambda p: min(math.hypot(p[0] - q[0], p[1] - q[1]) for q in main_road)  # noqa: E731
+    return max(ends, key=near_road)
+
+
+def build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media, sois: dict, main_road: list) -> APIRouter:
     router = APIRouter(prefix="/api")
+
+    def place(body) -> dict:
+        """Where to put it on the map: the pin given, else the far end of the soi named."""
+        if body.lat is not None and body.lng is not None:
+            return {"lat": body.lat, "lng": body.lng}
+        end = soi_end(sois, main_road, body.soi)
+        return {"lat": end[0], "lng": end[1]} if end else {"lat": None, "lng": None}
 
     async def who(request: Request, typed: str) -> tuple[str, bool]:
         admin = await current_admin(request)
@@ -76,7 +94,7 @@ def build_router(db, rate_limit, current_admin, require_admin, claim_media, dele
         name, staff = await who(request, body.name)
         rid = str(uuid.uuid4())
         media = await claim_media(body.media_ids, f"canal:{rid}", {"image"})
-        doc = {"id": rid, **body.model_dump(exclude={"media_ids", "name"}), "below_cm": body.below_cm if body.state == "below" else None,
+        doc = {"id": rid, **body.model_dump(exclude={"media_ids", "name"}), **place(body), "below_cm": body.below_cm if body.state == "below" else None,
                "name": name, "staff": staff, "media": media, "created_at": now()}
         await db.canal_reports.insert_one(dict(doc))
         return doc
@@ -86,7 +104,7 @@ def build_router(db, rate_limit, current_admin, require_admin, claim_media, dele
         rate_limit(request, "pump", limit=10, window_s=600)
         name, staff = await who(request, body.name)
         t = now()
-        doc = {"id": str(uuid.uuid4()), **body.model_dump(exclude={"name"}), "created_at": t, "updated_at": t, "updated_by": name,
+        doc = {"id": str(uuid.uuid4()), **body.model_dump(exclude={"name"}), **place(body), "created_at": t, "updated_at": t, "updated_by": name,
                "history": [{"at": t, "status": body.status, "note": body.note, "name": name, "staff": staff}]}
         await db.pumps.insert_one(dict(doc))
         doc.pop("_id", None)

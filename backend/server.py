@@ -607,7 +607,7 @@ app.include_router(zonelog.build_router(db, rate_limit, current_admin, {z["id"] 
 team_router, is_team = team.build_router(db, rate_limit, current_admin, require_admin, locate_house, staff.ZONES, staff.needs_of, staff.zone_of_soi)
 app.include_router(team_router)
 app.include_router(ops.build_router(db, rate_limit, current_admin, {z["id"] for z in staff.ZONES["zones"]}, is_team))
-app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media))
+app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media, staff.SOIS, staff.ZONES["main_road"]))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 

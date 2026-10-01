@@ -8,6 +8,7 @@ import { drawStaff } from "./staffMarkers";
 import { WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
 import { MAX_AGE_H, STALE_H, describeLevel, estimateAt, fieldBounds, renderField, toPoints } from "../waterField";
 import { load, save } from "../api";
+import { CANALS, CANAL_STATE, PUMP_STATUS, canalSummary } from "./Canal";
 
 const OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
@@ -68,7 +69,9 @@ function clusterIcon(cluster) {
   });
 }
 
-export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater }) {
+// 1 Oct: the map opens on the water view; truck drop points are always on it; in the water view it also
+// shows the canal reports (how far below the flood wall) and the pumps.
+export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater, drops = [], canal = null, onReportCanal, onPump, onPumps }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -80,7 +83,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
   const [showField, setShowField] = useState(() => load("showWaterField", true));
   const [layers, setLayers] = useState(() => ({ ...LAYER_DEFAULTS, ...load("mapLayers", {}) }));
   // Two clear views instead of everything at once: 🆘 requests, or 💧 water level (colours + report dots only)
-  const [mode, setModeState] = useState("need"); // always open on the main view
+  const [mode, setModeState] = useState("water"); // opens on the water level
   const setMode = (m) => {
     setModeState(m);
     mapRef.current?.closePopup();
@@ -164,6 +167,56 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
         .addTo(layer);
     }
 
+    // truck drop points (one pin per block, stacked when two teams share a shop)
+    const stacked = {};
+    for (const d of drops) {
+      if (d.lat == null) continue;
+      const at = `${(+d.lat).toFixed(5)},${(+d.lng).toFixed(5)}`;
+      const lift = 30 * (stacked[at] = (stacked[at] ?? -1) + 1);
+      L.marker([d.lat, d.lng], {
+        zIndexOffset: 800,
+        icon: L.divIcon({ className: "", iconSize: [74, 28], iconAnchor: [37, 14 + lift], html: `<div class="drop-pin small" style="--c:${d.color}">🚚 ${escapeHtml(d.tag)}</div>` }),
+      })
+        .bindPopup(`<b>🚚 จุดลงของ ${escapeHtml(d.tag)}</b><br>${escapeHtml(d.place || "")}${d.person ? `<br>👤 ${escapeHtml(d.person)}` : ""}<br><a href="/zones">ดูแผนที่โซน</a>`)
+        .addTo(layer);
+    }
+    if (waterMode && canal) {
+      // latest report per spot (canal + ~30 m), last 24 h
+      const spot = new Set();
+      for (const r of canal.reports || []) {
+        if (r.lat == null) continue;
+        const key = `${r.canal}|${(+r.lat).toFixed(4)},${(+r.lng).toFixed(4)}`;
+        const ageH = (Date.now() - new Date(r.created_at).getTime()) / 3.6e6;
+        if (spot.has(key) || ageH > 24) continue;
+        spot.add(key);
+        const st = CANAL_STATE[r.state];
+        const text = r.state === "below" && r.below_cm != null ? `ต่ำกว่าขอบ ${r.below_cm} ซม.` : st.label;
+        L.marker([r.lat, r.lng], {
+          zIndexOffset: 900,
+          icon: L.divIcon({ className: "", iconSize: [30, 30], iconAnchor: [15, 15], html: `<div class="canal-pin${ageH > 3 ? " old" : ""}" style="--c:${st.color}">🌊</div>` }),
+        })
+          .bindPopup(
+            `<b>🌊 ${CANALS[r.canal]}: ${text}</b>${r.soi ? `<br>ท้ายซอย ${escapeHtml(r.soi)}` : ""}<br>${timeAgo(r.created_at)}${r.name ? ` · ${escapeHtml(r.name)}` : ""}${
+              r.note ? `<br>${escapeHtml(r.note)}` : ""
+            }${ageH > 3 ? `<br><b style="color:#b45309">⚠️ รายงานเก่ากว่า 3 ชม.</b>` : ""}${
+              r.media?.[0] ? `<br><a href="${mediaUrl(r.media[0].id)}" target="_blank" rel="noreferrer"><img src="${mediaUrl(r.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>` : ""
+            }`
+          )
+          .addTo(layer);
+      }
+      for (const pm of canal.pumps || []) {
+        if (pm.lat == null) continue;
+        const st = PUMP_STATUS[pm.status] || PUMP_STATUS.stopped;
+        L.marker([pm.lat, pm.lng], {
+          zIndexOffset: 950,
+          icon: L.divIcon({ className: "", iconSize: [34, 34], iconAnchor: [17, 17], html: `<div class="pump-pin ${pm.status}">⚙️</div>` }),
+        })
+          .on("click", () => onPump?.(pm))
+          .bindTooltip(`${st.icon} ${escapeHtml(pm.label)} · ${st.label}`, { direction: "top", offset: [0, -14] })
+          .addTo(layer);
+      }
+    }
+
     const pinned = []; // urgent open requests: never hidden inside a group
     const grouped = [];
     for (const p of waterMode ? [] : posts) {
@@ -177,7 +230,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
     }
     pinned.forEach((m) => m.addTo(layer));
     cluster.addLayers(grouped);
-  }, [posts, water, onSelect, layers, filter, waterMode]);
+  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump]);
 
   // Staff boats / trucks / people on duty: big, pulsing, always above residents' pins
   useEffect(() => {
@@ -225,6 +278,8 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
   }
 
   const count = (k) => posts.filter((p) => p.kind === k && !p.general).length;
+  const canalLines = canalSummary(canal?.reports || []);
+  const pumps = (canal?.pumps || []).filter((x) => x.status !== "removed");
   const chips = [
     ["offer", "🤝 ช่วยได้", count("offer")],
     ["info", "📍 ข้อมูล", count("info")],
@@ -257,19 +312,32 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
                 </span>
               ))}
             </div>
-            <p className="mt-1 font-semibold">👆 แตะที่ไหนก็ได้บนแผนที่ เพื่อดูระดับน้ำตรงนั้น</p>
-            <p className="text-neutral-600">
-              สีจากรายงานใน {MAX_AGE_H} ชม. · <b>สีจาง / จุดประ = ข้อมูลเก่ากว่า {STALE_H} ชม.</b>
-            </p>
+            {canalLines.map((c) => (
+              <p key={c.key} className="mt-0.5 font-semibold">
+                {CANAL_STATE[c.state].icon} {c.name}: {c.title} → {c.short}
+                {c.stale && <span className="font-normal text-amber-700"> (เก่า)</span>}
+              </p>
+            ))}
+            <p className="mt-0.5 text-neutral-600">👆 แตะแผนที่ดูระดับน้ำตรงนั้น · 🌊 / ⚙️ แตะดูรายละเอียด</p>
             {hint && <p className="text-neutral-600">{hint}</p>}
           </div>
           <div className="flex flex-wrap gap-1">
-            <button type="button" onClick={hereLevel} className="pointer-events-auto min-h-[44px] rounded-full border-2 border-black bg-white px-3 text-sm font-bold shadow">
-              📍 น้ำตรงที่ฉันอยู่
+            <button type="button" onClick={hereLevel} aria-label="ระดับน้ำตรงที่ฉันอยู่" className="pointer-events-auto min-h-[44px] rounded-full border-2 border-black bg-white px-3 text-sm font-bold shadow">
+              📍 ตรงฉัน
             </button>
             {onReportWater && (
               <button type="button" onClick={onReportWater} className="pointer-events-auto min-h-[44px] rounded-full bg-sky-600 px-3 text-sm font-bold text-white shadow">
-                💧 แจ้งระดับน้ำตอนนี้
+                💧 แจ้งน้ำ
+              </button>
+            )}
+            {onReportCanal && (
+              <button type="button" onClick={onReportCanal} className="pointer-events-auto min-h-[44px] rounded-full bg-blue-900 px-3 text-sm font-bold text-white shadow">
+                🌊 แจ้งคลอง
+              </button>
+            )}
+            {onPumps && (
+              <button type="button" onClick={onPumps} className="pointer-events-auto min-h-[44px] rounded-full border-2 border-black bg-white px-3 text-sm font-bold shadow">
+                ⚙️ ปั๊ม {pumps.filter((x) => x.status === "running").length}/{pumps.length}
               </button>
             )}
           </div>

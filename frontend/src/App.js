@@ -12,7 +12,8 @@ import Guide from "./components/Guide";
 import { WeatherAlerts, WeatherCard, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm, ServiceStrip } from "./components/ServiceBoard";
 import { TripsStrip } from "./components/Trips";
-import { CanalBox, CanalForm, PumpForm } from "./components/Canal";
+import { CanalForm, PumpForm, PumpList } from "./components/Canal";
+import { mergeZones, withLiveDrops } from "./components/ZonesPage";
 import { useCountUp } from "./motion";
 
 const REFRESH_MS = 20000;
@@ -25,6 +26,20 @@ export default function App() {
   const [posts, setPosts] = useState([]);
   const [water, setWater] = useState([]);
   const [canal, setCanal] = useState(null); // {reports, pumps}: canal level vs the flood wall, and the pumps
+  const [drops, setDrops] = useState([]); // truck drop points of the zone blocks, for the map
+  useEffect(() => {
+    Promise.all([api("/zones"), api("/ops").catch(() => null)])
+      .then(([z, ops]) => {
+        const zs = mergeZones(withLiveDrops(z, ops)).zones;
+        setDrops(
+          zs.flatMap((g) => [
+            { tag: g.label || g.id, place: g.drop.place, lat: g.drop.lat, lng: g.drop.lng, color: g.color, person: ops?.points?.[g.id]?.person },
+            ...(g.drop.extra || []).map((x) => ({ tag: x.tag || `${g.id}2`, place: x.place, lat: x.lat, lng: x.lng, color: g.color })),
+          ])
+        );
+      })
+      .catch(() => {});
+  }, []);
   const [showDone, setShowDone] = useState(false);
   const [filter, setFilter] = useState("all");
   const [tab, setTab] = useState("map"); // phones: map | list — the map with requests on it is what people need first
@@ -401,81 +416,9 @@ export default function App() {
           </div>
         )}
 
-        {/* 1 Oct: the volunteer teams now reach people on the street, so the home page leads with the water
-            level, then only the fresh, truly urgent requests */}
-        <CanalBox
-          data={canal}
-          onReport={() => setSheet({ type: "canal" })}
-          onPump={(pump) => setSheet({ type: "pump", pump })}
-          onAddPump={() => setSheet({ type: "pump" })}
-          onDelete={
-            admin
-              ? async (r) => {
-                  if (!window.confirm("ลบรายงานคลองนี้?")) return;
-                  await api(`/admin/canal/${r.id}`, { method: "DELETE" }).catch((e) => setToast(e.message));
-                  refresh();
-                }
-              : null
-          }
-        />
-        <div className="mt-3" />
-        <WaterHero stat={waterStat} water={water} onReport={() => setSheet({ type: "water" })} onShow={showOnMap} onDelete={admin ? deleteWater : null} />
+        {/* 1 Oct: the volunteer teams reach people on the street now, so the page opens on fresh urgent
+            requests and the map (water level, canals, pumps, truck drop points) */}
         <UrgentNow posts={posts} onOpen={openDetail} />
-
-        <div ref={actionsRef} className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-          <ActionButton color="bg-black text-white active:bg-neutral-800" onClick={() => setSheet({ type: "form", kind: "need" })}>
-            🆘 ขอความช่วยเหลือ
-          </ActionButton>
-          <ActionButton color="border-2 border-black bg-white text-black active:bg-neutral-100" onClick={() => setSheet({ type: "form", kind: "offer" })}>
-            🤝 ฉันช่วยได้
-          </ActionButton>
-          <ActionButton color="border-2 border-black bg-white text-black active:bg-neutral-100" onClick={() => setSheet({ type: "water" })}>
-            💧 แจ้งระดับน้ำ
-          </ActionButton>
-          <ActionButton color="border-2 border-black bg-white text-black active:bg-neutral-100" onClick={() => setSheet({ type: "form", kind: "info" })}>
-            📍 แจ้งข้อมูล / ถนน
-          </ActionButton>
-        </div>
-
-        {/* zones A–I + truck drop points: for donors with trucks and for relief teams */}
-        <a
-          href="/zones"
-          className="mt-2 flex min-h-[52px] items-center justify-center gap-2 rounded-xl border-4 border-yellow-400 bg-yellow-50 px-3 text-center font-bold text-black"
-        >
-          <span className="text-xl">🗺️</span>
-          <span>
-            แผนที่โซน A–I · 🚚 จุดลงของสำหรับรถใหญ่
-            <span className="block text-xs font-normal text-neutral-600">ทีมช่วยเหลือเลือกโซน · คนนำของมาบริจาคดูจุดจอดริมถนนหลัก</span>
-          </span>
-        </a>
-        {/* what the volunteer teams are doing, and how to join them (read only, nothing personal) */}
-        <a href="/teamwork" className="mt-2 flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-sky-700 px-3 text-center font-bold text-white">
-          <span className="text-xl">💪</span>
-          <span>
-            ทีมอาสาหมู่บ้านทำอะไรอยู่ · อยากช่วย?
-            <span className="block text-xs font-normal opacity-90">ส่งของถึงบ้านไปแล้วกี่หลัง · ทีมขาดอะไร · มาช่วยได้อย่างไร</span>
-          </span>
-        </a>
-        {/* volunteer coordination: who is at which drop point, what each needs, hazards, boats */}
-        <a href="/ops" className="mt-2 flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-green-600 bg-green-50 px-3 text-center font-bold text-black">
-          <span className="text-xl">🤝</span>
-          <span>
-            ห้องประสานงานอาสา
-            <span className="block text-xs font-normal text-neutral-600">ใครอยู่จุดไหน · จุดไหนขาดอะไร · ⚠️ จุดอันตราย · 🚤 เรือ</span>
-          </span>
-        </a>
-
-        {trips.length > 0 && (
-          <div className="mt-3">
-            <TripsStrip trips={trips} onFocus={showOnMap} />
-          </div>
-        )}
-
-        <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-          <Stat value={counts.need} label="คำขอค้างอยู่" sub={counts.urgent ? `ด่วน ${counts.urgent}` : ""} color="text-black" />
-          <Stat value={counts.offer} label="ผู้พร้อมช่วย" color="text-black" />
-        </div>
-
         {/* Phone: tabs. Desktop: map and list side by side. */}
         <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 lg:hidden" role="tablist">
           {[["map", "🗺️ แผนที่"], ["list", `🆘 คำขอ / รายการ${counts.need ? ` (${counts.need})` : ""}`]].map(([key, text]) => (
@@ -488,8 +431,21 @@ export default function App() {
         <div className="mt-3 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-4">
           <section className={`${tab === "map" ? "block" : "hidden"} lg:block`}>
             <div className="relative h-[65vh] overflow-hidden rounded-xl border border-neutral-300 bg-white lg:sticky lg:top-20 lg:h-[calc(100vh-7rem)]">
-              <MapView posts={visible} water={water} trips={trips} onSelect={openDetail} focus={focus} filter={filter} onReportWater={() => setSheet({ type: "water" })} />
-              <a href="/zones" className="absolute bottom-6 right-2 z-[500] rounded-full border-2 border-black bg-white px-3 py-2 text-xs font-bold shadow">
+              <MapView
+                posts={visible}
+                water={water}
+                trips={trips}
+                onSelect={openDetail}
+                focus={focus}
+                filter={filter}
+                onReportWater={() => setSheet({ type: "water" })}
+                drops={drops}
+                canal={canal}
+                onReportCanal={() => setSheet({ type: "canal" })}
+                onPump={(pump) => setSheet({ type: "pump", pump })}
+                onPumps={() => setSheet({ type: "pumps" })}
+              />
+              <a href="/zones" className="absolute right-2 top-16 z-[500] rounded-full border-2 border-black bg-white px-3 py-2 text-xs font-bold shadow">
                 🗺️ โซน · 🚚 จุดลงของ
               </a>
             </div>
@@ -544,7 +500,107 @@ export default function App() {
               </div>
             )}
 
+            {water.length > 0 && (
+              <div className="mt-4 rounded-xl bg-white p-3">
+                <h2 className="mb-2 font-semibold">💧 รายงานระดับน้ำล่าสุด</h2>
+                <ul className="space-y-1 text-sm">
+                  {water.slice(0, 8).map((w) => {
+                    const lv = waterOf(w.level);
+                    return (
+                      <li key={w.id} className="flex items-center gap-2">
+                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: lv.color }} />
+                        <b>{lv.label}</b>
+                        {w.trend && <span title={WATER_TREND[w.trend][1]}>{WATER_TREND[w.trend][0]}</span>}
+                        <span className="min-w-0 truncate text-neutral-600">
+                          {w.cm != null && `${w.cm} ซม. · `}
+                          {w.where && `${WATER_WHERE[w.where][1]} · `}
+                          {timeAgo(w.created_at)}
+                          {w.note && ` · ${w.note}`}
+                        </span>
+                        {w.media?.[0] && (
+                          <a href={mediaUrl(w.media[0].id)} target="_blank" rel="noreferrer" aria-label="ดูรูประดับน้ำ" className="ml-auto flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center">
+                            <img src={mediaUrl(w.media[0].id, "thumb")} alt="" loading="lazy" className="h-9 w-9 rounded object-cover" />
+                          </a>
+                        )}
+                        <button onClick={() => showOnMap(w)} className={`${w.media?.[0] ? "" : "ml-auto "}min-h-[44px] min-w-[44px] shrink-0 px-2 text-black underline`}>
+                          ดู
+                        </button>
+                        {admin && (
+                          <button onClick={() => deleteWater(w)} className="min-h-[44px] shrink-0 px-2 text-red-700 underline">
+                            ลบ
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
           </section>
+        </div>
+
+
+        <div ref={actionsRef} className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <ActionButton color="bg-black text-white active:bg-neutral-800" onClick={() => setSheet({ type: "form", kind: "need" })}>
+            🆘 ขอความช่วยเหลือ
+          </ActionButton>
+          <ActionButton color="border-2 border-black bg-white text-black active:bg-neutral-100" onClick={() => setSheet({ type: "form", kind: "offer" })}>
+            🤝 ฉันช่วยได้
+          </ActionButton>
+          <ActionButton color="border-2 border-black bg-white text-black active:bg-neutral-100" onClick={() => setSheet({ type: "water" })}>
+            💧 แจ้งระดับน้ำ
+          </ActionButton>
+          <ActionButton color="border-2 border-black bg-white text-black active:bg-neutral-100" onClick={() => setSheet({ type: "form", kind: "info" })}>
+            📍 แจ้งข้อมูล / ถนน
+          </ActionButton>
+        </div>
+
+        {/* zones A–I + truck drop points: for donors with trucks and for relief teams */}
+        <a
+          href="/zones"
+          className="mt-2 flex min-h-[52px] items-center justify-center gap-2 rounded-xl border-4 border-yellow-400 bg-yellow-50 px-3 text-center font-bold text-black"
+        >
+          <span className="text-xl">🗺️</span>
+          <span>
+            แผนที่โซน A–I · 🚚 จุดลงของสำหรับรถใหญ่
+            <span className="block text-xs font-normal text-neutral-600">ทีมช่วยเหลือเลือกโซน · คนนำของมาบริจาคดูจุดจอดริมถนนหลัก</span>
+          </span>
+        </a>
+        {/* what the volunteer teams are doing, and how to join them (read only, nothing personal) */}
+        <a href="/teamwork" className="mt-2 flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-sky-700 px-3 text-center font-bold text-white">
+          <span className="text-xl">💪</span>
+          <span>
+            ทีมอาสาหมู่บ้านทำอะไรอยู่ · อยากช่วย?
+            <span className="block text-xs font-normal opacity-90">ส่งของถึงบ้านไปแล้วกี่หลัง · ทีมขาดอะไร · มาช่วยได้อย่างไร</span>
+          </span>
+        </a>
+        {/* volunteer coordination: who is at which drop point, what each needs, hazards, boats */}
+        <a href="/ops" className="mt-2 flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-green-600 bg-green-50 px-3 text-center font-bold text-black">
+          <span className="text-xl">🤝</span>
+          <span>
+            ห้องประสานงานอาสา
+            <span className="block text-xs font-normal text-neutral-600">ใครอยู่จุดไหน · จุดไหนขาดอะไร · ⚠️ จุดอันตราย · 🚤 เรือ</span>
+          </span>
+        </a>
+
+        {trips.length > 0 && (
+          <div className="mt-3">
+            <TripsStrip trips={trips} onFocus={showOnMap} />
+          </div>
+        )}
+
+        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+          <Stat value={counts.need} label="คำขอค้างอยู่" sub={counts.urgent ? `ด่วน ${counts.urgent}` : ""} color="text-black" />
+          <Stat value={counts.offer} label="ผู้พร้อมช่วย" color="text-black" />
+          <Stat
+            value={waterStat ? waterOf(waterStat.report.level).label : "–"}
+            label={waterStat ? waterStat.label : "ระดับน้ำ"}
+            sub={waterStat ? waterStat.sub : "ยังไม่มีรายงาน"}
+            color="text-black"
+            dot={waterStat ? waterOf(waterStat.report.level).color : null}
+            onClick={waterStat ? () => showOnMap(waterStat.report) : null}
+            actionLabel="ดูจุดนี้บนแผนที่"
+          />
         </div>
 
         {/* Lower priority: weather detail (current weather is already in the header bar) and paid services */}
@@ -609,6 +665,11 @@ export default function App() {
               setToast("ขอบคุณที่แจ้งระดับคลอง");
             }}
           />
+        </Sheet>
+      )}
+      {sheet?.type === "pumps" && (
+        <Sheet title="⚙️ เครื่องสูบน้ำ" onClose={() => setSheet(null)}>
+          <PumpList pumps={(canal?.pumps || []).filter((x) => x.status !== "removed")} onPump={(pump) => setSheet({ type: "pump", pump })} />
         </Sheet>
       )}
       {sheet?.type === "pump" && (
@@ -734,62 +795,6 @@ export default function App() {
         </div>
       )}
     </div>
-  );
-}
-
-// The water level for the whole village, first thing on the page: the level now (median of the last
-// 3 h), the trend, and the latest reports with their photos.
-function WaterHero({ stat, water, onReport, onShow, onDelete }) {
-  const lv = stat ? waterOf(stat.report.level) : null;
-  return (
-    <section className="rounded-2xl border-4 bg-white p-3 shadow" style={{ borderColor: lv?.color || "#a3a3a3" }}>
-      <div className="flex items-center gap-3">
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-3xl text-white" style={{ background: lv?.color || "#a3a3a3" }} aria-hidden="true">
-          💧
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-neutral-600">{stat ? stat.label : "ระดับน้ำในหมู่บ้าน"}</p>
-          <p className="text-3xl font-black leading-tight">{lv ? lv.label : "ยังไม่มีรายงาน"}</p>
-          <p className="text-sm text-neutral-700">{stat ? `${lv.cm} · ${stat.sub}` : "ช่วยแจ้งระดับน้ำหน้าบ้านคุณ"}</p>
-        </div>
-      </div>
-      {water.length > 0 && (
-        <ul className="mt-2 space-y-1 border-t border-neutral-200 pt-2 text-sm">
-          {water.slice(0, 5).map((w) => {
-            const l = waterOf(w.level);
-            return (
-              <li key={w.id} className="flex items-center gap-2">
-                <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: l.color }} />
-                <b className="shrink-0">{l.label}</b>
-                {w.trend && <span title={WATER_TREND[w.trend][1]}>{WATER_TREND[w.trend][0]}</span>}
-                <span className="min-w-0 truncate text-neutral-600">
-                  {w.cm != null && `${w.cm} ซม. · `}
-                  {w.where && `${WATER_WHERE[w.where][1]} · `}
-                  {timeAgo(w.created_at)}
-                  {w.note && ` · ${w.note}`}
-                </span>
-                {w.media?.[0] && (
-                  <a href={mediaUrl(w.media[0].id)} target="_blank" rel="noreferrer" aria-label="ดูรูประดับน้ำ" className="ml-auto flex min-h-[40px] min-w-[40px] shrink-0 items-center justify-center">
-                    <img src={mediaUrl(w.media[0].id, "thumb")} alt="" loading="lazy" className="h-9 w-9 rounded object-cover" />
-                  </a>
-                )}
-                <button onClick={() => onShow(w)} className={`${w.media?.[0] ? "" : "ml-auto "}min-h-[40px] shrink-0 px-2 underline`}>
-                  ดู
-                </button>
-                {onDelete && (
-                  <button onClick={() => onDelete(w)} className="min-h-[40px] shrink-0 px-2 text-red-700 underline">
-                    ลบ
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <button onClick={onReport} className="mt-2 min-h-[52px] w-full rounded-xl bg-black text-lg font-bold text-white active:bg-neutral-800">
-        💧 แจ้งระดับน้ำหน้าบ้าน (ถ่ายรูปได้)
-      </button>
-    </section>
   );
 }
 

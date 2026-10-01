@@ -186,6 +186,16 @@ body {
   width: 100%; height: 100%; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 2px;
   background: #111; color: #fff; border: 4px solid var(--c); font: 800 17px/1 sans-serif; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
+.drop-pin.small { font-size: 13px; border-width: 3px; border-radius: 8px; }
+/* home map, water view: canal reports and pumps */
+.canal-pin { width: 100%; height: 100%; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: var(--c); border: 3px solid #fff; font-size: 15px; box-shadow: 0 1px 6px rgba(0,0,0,.45); }
+.canal-pin.old { opacity: .55; border-style: dashed; }
+.pump-pin { width: 100%; height: 100%; border-radius: 9999px; display: flex; align-items: center; justify-content: center; background: #fff; border: 4px solid #737373; font-size: 17px; box-shadow: 0 1px 6px rgba(0,0,0,.45); }
+.pump-pin.running { border-color: #16a34a; animation: pump-spin 2.5s linear infinite; }
+.pump-pin.broken { border-color: #dc2626; }
+.pump-pin.planned { border-color: #eab308; border-style: dashed; }
+@keyframes pump-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pump-pin.running { animation: none; } }
 /* poster mode (?poster=1) = print look on screen */
 .poster button, .poster .print\:hidden, .poster .leaflet-control-zoom { display: none !important; }
 .poster header { background: #fff; color: #000; }
