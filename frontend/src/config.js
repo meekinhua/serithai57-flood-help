@@ -170,7 +170,31 @@ export const JOB_TYPES = {
   fix: ["🛠️", "ช่วยซ่อมเล็กๆ น้อยๆ"],
   check: ["⚡", "ช่วยดูไฟ / ปลั๊ก ก่อนเปิดใช้"],
   elderly: ["🧓", "บ้านผู้สูงอายุ / อยู่คนเดียว"],
+  ride: ["🚗", "ติดรถออกไปข้างนอก"],
+  errand: ["🛒", "ฝากซื้อของ / ยา"],
+  hire: ["🧑‍🔧", "หาช่าง / จ้างงาน (มีค่าจ้าง)"],
   other: ["🙋", "อื่นๆ"],
+};
+// What each job type asks of the reader: [request: who answers, offer: who answers]
+export const JOB_VERBS = {
+  ride: ["🚗 ฉันไปส่งได้", "🙋 ขอติดรถด้วย"],
+  errand: ["🛒 ฉันซื้อฝากให้", "🛒 ขอฝากซื้อ"],
+  hire: ["🧑‍🔧 ฉันรับงานนี้", "🧑‍🔧 อยากจ้าง"],
+};
+
+// ---------- lost & found (repair mode). Keys must match backend/repair.py ----------
+export const LOST_KINDS = {
+  lost: { emoji: "😢", label: "หาย", verb: "แจ้งของหาย / สัตว์หาย" },
+  found: { emoji: "🙌", label: "เจอ", verb: "เจอสัตว์ / เจอของ" },
+};
+export const LOST_CATEGORIES = {
+  dog: ["🐕", "หมา"],
+  cat: ["🐈", "แมว"],
+  pet: ["🐾", "สัตว์เลี้ยงอื่น"],
+  item: ["🎒", "ของใช้ / ของมีค่า"],
+  document: ["📄", "เอกสาร / บัตร"],
+  vehicle: ["🛵", "รถ / จักรยาน"],
+  other: ["📦", "อื่นๆ"],
 };
 export const JOB_STATUS = {
   open: { label: "ยังต้องการคน", cls: "bg-red-100 text-red-800" },

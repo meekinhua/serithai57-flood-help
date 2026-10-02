@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { api, load, save } from "../api";
-import { ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, LEND_CATEGORIES, LEND_KINDS, LEND_STATUS, timeAgo } from "../config";
+import { ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, JOB_VERBS, LEND_CATEGORIES, LEND_KINDS, LEND_STATUS, timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import { createBaseMap } from "./MapView";
 import LocationPicker from "./LocationPicker";
@@ -463,11 +463,11 @@ export function JobBoard({ jobs, setJobs, admin, onAdd }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
-        <button onClick={() => onAdd("need")} className="min-h-[56px] rounded-xl bg-black px-2 font-bold text-white">🙋 ขอแรงช่วยที่บ้าน</button>
-        <button onClick={() => onAdd("offer")} className="min-h-[56px] rounded-xl border-2 border-black bg-white px-2 font-bold">💪 ฉันว่าง ไปช่วยได้</button>
+        <button onClick={() => onAdd("need")} className="min-h-[56px] rounded-xl bg-black px-2 font-bold text-white">🙋 ขอแรง / ขอติดรถ / ฝากซื้อ</button>
+        <button onClick={() => onAdd("offer")} className="min-h-[56px] rounded-xl border-2 border-black bg-white px-2 font-bold">💪 ฉันช่วยได้ / มีรถออกไป</button>
       </div>
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1">
-        {[["need", `บ้านที่ขอแรง (${needs})`], ["offer", `อาสาที่พร้อมช่วย (${offers})`]].map(([k, t]) => (
+        {[["need", `ขอความช่วยเหลือ (${needs})`], ["offer", `พร้อมช่วย / มีรถ (${offers})`]].map(([k, t]) => (
           <button key={k} onClick={() => setKind(k)} aria-pressed={kind === k} className={`min-h-[44px] rounded-lg text-sm font-semibold ${kind === k ? "bg-white shadow" : "text-neutral-600"}`}>
             {t}
           </button>
@@ -521,7 +521,11 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
             <Badge cls={st.cls}>{j.kind === "offer" && j.status === "open" ? "ว่าง พร้อมช่วย" : st.label}</Badge>
-            {j.kind === "need" && <Badge cls="bg-neutral-100">👥 {j.helpers.length}/{j.people} คน</Badge>}
+            {(j.kind === "need" || j.type === "ride") && (
+              <Badge cls="bg-neutral-100">
+                {j.type === "ride" ? "🚗" : "👥"} {j.helpers.length}/{j.people} {j.type === "ride" && j.kind === "offer" ? "ที่นั่ง" : "คน"}
+              </Badge>
+            )}
             {mine && <Badge cls="bg-yellow-200">ของฉัน</Badge>}
           </span>
           <span className="mt-0.5 block font-bold">{typeText}</span>
@@ -541,7 +545,7 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
             <div className="flex gap-2">
               <input aria-label="ชื่อของคุณ" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} className={input} placeholder="ชื่อเล่นของคุณ" />
               <button onClick={join} disabled={joined} className="min-h-[44px] shrink-0 rounded-lg bg-black px-3 font-bold text-white disabled:opacity-50">
-                {joined ? "✓ ลงชื่อแล้ว" : j.kind === "need" ? "🙋 ฉันจะไปช่วย" : "🏠 ขอให้มาช่วยบ้านฉัน"}
+                {joined ? "✓ ลงชื่อแล้ว" : JOB_VERBS[j.type] ? JOB_VERBS[j.type][j.kind === "need" ? 0 : 1] : j.kind === "need" ? "🙋 ฉันจะไปช่วย" : "🏠 ขอให้มาช่วยบ้านฉัน"}
               </button>
             </div>
           )}
@@ -573,10 +577,10 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
   );
 }
 
-export function JobForm({ kind = "need", onDone }) {
+export function JobForm({ kind = "need", jobType = "", onDone }) {
   const c = savedContact();
   const [, addKey] = useKeys("jobKeys");
-  const [form, setForm] = useState({ kind, type: "", detail: "", soi: load("mySoi", ""), house: "", when: "", people: kind === "need" ? 2 : 1, name: c.name || "", phone: c.phone || "" });
+  const [form, setForm] = useState({ kind, type: jobType, detail: "", soi: load("mySoi", ""), house: "", when: "", people: kind === "need" ? 2 : 1, name: c.name || "", phone: c.phone || "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const set = (p) => setForm((f) => ({ ...f, ...p }));
@@ -600,7 +604,7 @@ export function JobForm({ kind = "need", onDone }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       <fieldset>
-        <legend className={label}>{need ? "อยากให้ช่วยอะไร *" : "ช่วยอะไรได้ *"}</legend>
+        <legend className={label}>{need ? "ต้องการอะไร *" : "ช่วยอะไรได้ *"}</legend>
         <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
           {Object.entries(JOB_TYPES).map(([k, [emoji, text]]) => (
             <button type="button" key={k} onClick={() => set({ type: k })} aria-pressed={form.type === k} className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.type === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}>
@@ -612,16 +616,31 @@ export function JobForm({ kind = "need", onDone }) {
       </fieldset>
       <div>
         <label className={label} htmlFor="job-detail">รายละเอียด *</label>
-        <textarea id="job-detail" required minLength={3} rows={3} maxLength={400} value={form.detail} onChange={(e) => set({ detail: e.target.value })} className={input} placeholder={need ? "เช่น ชั้นล่างมีโคลน 2 ห้อง ตู้เสื้อผ้าพัง ต้องยกออก มีน้ำยา/ไม้ถูให้" : "เช่น ว่างเสาร์-อาทิตย์ มีแรง 2 คน มีเครื่องฉีดน้ำ"} />
+        <textarea id="job-detail" required minLength={3} rows={3} maxLength={400} value={form.detail} onChange={(e) => set({ detail: e.target.value })} className={input} placeholder={
+            form.type === "ride"
+              ? need
+                ? "เช่น รถจมน้ำ ต้องไปหาหมอที่ รพ.นพรัตน์ พรุ่งนี้เช้า 2 คน"
+                : "เช่น จะออกไปโลตัส/ตลาด บ่าย 3 ขากลับรับได้"
+              : form.type === "errand"
+                ? need
+                  ? "เช่น ฝากซื้อยาความดัน + ถุงดำ ให้ยายซอย 6"
+                  : "เช่น จะไปแม็คโคร รับฝากซื้อของได้"
+                : form.type === "hire"
+                  ? "เช่น หาช่างไฟ ปลั๊กชั้นล่างจมน้ำ ยังไม่กล้าเปิดเบรกเกอร์ / ช่างดูปั๊มน้ำ"
+                  : need
+                    ? "เช่น ชั้นล่างมีโคลน 2 ห้อง ตู้เสื้อผ้าพัง ต้องยกออก มีน้ำยา/ไม้ถูให้"
+                    : "เช่น ว่างเสาร์-อาทิตย์ มีแรง 2 คน มีเครื่องฉีดน้ำ"
+          }
+        />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label className={label} htmlFor="job-when">{need ? "สะดวกวันไหน" : "ว่างวันไหน"}</label>
           <input id="job-when" maxLength={60} value={form.when} onChange={(e) => set({ when: e.target.value })} className={input} placeholder="เช่น เสาร์ 4 ต.ค. 9 โมง" />
         </div>
-        {need && (
+        {(need || form.type === "ride") && (
           <div>
-            <label className={label} htmlFor="job-people">ต้องการกี่คน</label>
+            <label className={label} htmlFor="job-people">{form.type === "ride" ? (need ? "กี่คนจะไป" : "ว่างกี่ที่นั่ง") : "ต้องการกี่คน"}</label>
             <input id="job-people" type="number" min={1} max={30} value={form.people} onChange={(e) => set({ people: e.target.value })} className={input} />
           </div>
         )}
@@ -875,6 +894,16 @@ export function IssueForm({ onDone }) {
 // =====================================================================
 const AFTER_FLOOD = [
   {
+    title: "🌧️ ฝนตกหนักอีกรอบ (เพิ่งแห้ง)",
+    items: [
+      "ยังไม่ต้องยกของลงชั้นล่าง เก็บของสำคัญ เอกสาร ยา ไว้ที่สูงต่อ",
+      "ขยะเปียกเก็บในถุงดำ ในบ้าน · ของพังชิ้นใหญ่อย่าวางขวางท่อระบายน้ำ",
+      "เคลียร์ใบไม้ ขยะ ที่ปิดท่อหน้าบ้าน ให้น้ำฝนระบายได้",
+      "เห็นน้ำขึ้นบนถนน หรือคลองใกล้ล้น แจ้งในกล่อง “เฝ้าระวังน้ำ” ด้านบน",
+      "ฝนฟ้าคะนอง อยู่ห่างเสาไฟ สายไฟ ต้นไม้ที่โยก",
+    ],
+  },
+  {
     title: "⚡ ก่อนเข้าบ้าน",
     items: [
       "ปิดเบรกเกอร์ไว้ก่อน ถ้าปลั๊ก/เต้ารับเคยจมน้ำ ให้ช่างไฟตรวจก่อนเปิด",
@@ -911,6 +940,24 @@ const AFTER_FLOOD = [
     ],
   },
   {
+    title: "🚗 รถจมน้ำ",
+    items: [
+      "อย่าสตาร์ท อย่าลองบิดกุญแจ (เครื่องดูดน้ำเข้า พังหนักกว่าเดิม)",
+      "ถ่ายรูปรถและระดับคราบน้ำ แล้วแจ้งประกันก่อน · ชั้น 1 ส่วนใหญ่คุ้มครองน้ำท่วม",
+      "ถอดขั้วแบตเตอรี่ · ให้ช่างเช็กน้ำมันเครื่อง กรองอากาศ ระบบไฟ ก่อนใช้",
+      "ต้องลากไปอู่ หาช่าง/รถยกในแท็บ “ช่าง · ร้าน” หมวดซ่อมรถ",
+      "ยังไม่มีรถใช้ ขอติดรถเพื่อนบ้านในแท็บ “ขอแรง · ติดรถ”",
+    ],
+  },
+  {
+    title: "🐾 สัตว์เลี้ยง",
+    items: [
+      "หมาแมวหาย ลงรูปในแท็บ “หาย · เจอ” เพื่อนบ้านช่วยกันดู",
+      "เจอสัตว์หลง ให้น้ำ อาหาร ถ่ายรูปลง “เจอ” · อย่าโอนเงินให้ใครก่อนเห็นตัวจริง",
+      "สัตว์ที่แช่น้ำ เช็ดตัวให้แห้ง สังเกตแผล ซึม ไม่กิน พาไปหาหมอ",
+    ],
+  },
+  {
     title: "🩺 สุขภาพ",
     items: [
       "มีแผลที่เท้า ล้างสบู่ เช็ดแห้ง ทายา อย่าลุยน้ำขัง",
@@ -921,6 +968,7 @@ const AFTER_FLOOD = [
   {
     title: "📝 ขอเงินเยียวยา",
     items: [
+      "ลงทะเบียนผ่านแอป “ทางรัฐ” ได้แล้ว (เปิดตั้งแต่ 2 ต.ค.)",
       "ถ่ายรูปความเสียหาย",
       "แจ้งความลงบันทึกประจำวันที่สถานีตำรวจ",
       "ยื่นเรื่องที่สำนักงานเขตบึงกุ่ม (หรือช่องทางออนไลน์ที่เขตประกาศ)",

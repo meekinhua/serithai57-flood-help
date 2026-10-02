@@ -661,7 +661,7 @@ async def startup():
     await db.ops_history.create_index([("ref", 1), ("at", -1)])
     await db.services.create_index([("category", 1), ("updated_at", -1)])
     await db.media.create_index("id", unique=True)
-    for coll in (db.lend_items, db.jobs, db.issues):
+    for coll in (db.lend_items, db.jobs, db.issues, db.lost):
         await coll.create_index("id", unique=True)
         await coll.create_index([("status", 1), ("updated_at", -1)])
     await db.media.create_index([("attached_to", 1), ("created_at", 1)])

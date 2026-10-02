@@ -1,20 +1,27 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, load, save, viewerId } from "./api";
-import { HOTLINE_GROUPS, VILLAGE_NAME, timeAgo } from "./config";
+import { HOTLINE_GROUPS, JOB_TYPES, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
 import Announcements from "./components/Announcements";
 import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
+import WatchPanel from "./components/WatchPanel";
+import { LostBoard, LostForm } from "./components/LostFound";
+import { WaterForm } from "./components/Forms";
+import { CanalForm, LeakForm, LeakList } from "./components/Canal";
 import { AfterFloodGuide, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
 
 // ซ่อมบ้าน mode (2 Oct 2026): the water is gone. Lend & borrow, ask for hands, tradesmen with neighbours'
 // reviews, soi problems for the district, and an after-flood checklist. The flood board is at /flood (read-only).
+// 2 Oct afternoon, heavy rain again: a water-watch panel sits on top (street level, canals, leaks — reporting
+// stays open), rides out / errands / hiring a tradesman go on the jobs board, and lost pets & things get a board.
 const REFRESH_MS = 30000;
 const TABS = {
   lend: ["🧰", "ยืม · ให้ยืม"],
-  jobs: ["🙋", "ขอแรง · อาสา"],
+  jobs: ["🙋", "ขอแรง · ติดรถ"],
   pros: ["🔧", "ช่าง · ร้าน"],
+  lost: ["🐾", "หาย · เจอ"],
   issues: ["📍", "ปัญหาซอย"],
   waste: ["♻️", "ขยะ · รถเก็บ"],
   guide: ["📋", "หลังน้ำลด"],
@@ -27,6 +34,9 @@ export default function RepairApp() {
   const [lend, setLend] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [issues, setIssues] = useState([]);
+  const [lost, setLost] = useState([]);
+  const [water, setWater] = useState([]);
+  const [canal, setCanal] = useState(null);
   const [services, setServices] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [weather, setWeather] = useState(null);
@@ -52,7 +62,19 @@ export default function RepairApp() {
   const refresh = useCallback(async () => {
     if (document.visibilityState === "visible") api("/presence", { method: "POST", body: JSON.stringify({ id: viewerId() }) }).catch(() => {});
     try {
-      const [l, j, i, s, a] = await Promise.all([api("/lend"), api("/jobs"), api("/issues"), api("/services"), api("/announcements")]);
+      const [l, j, i, s, a, lf, w, cn] = await Promise.all([
+        api("/lend"),
+        api("/jobs"),
+        api("/issues"),
+        api("/services"),
+        api("/announcements"),
+        api("/lost"),
+        api("/water").catch(() => []),
+        api("/canal").catch(() => null),
+      ]);
+      setLost(lf);
+      setWater(w);
+      if (cn) setCanal(cn);
       setLend(l);
       setJobs(j);
       setIssues(i);
@@ -91,8 +113,9 @@ export default function RepairApp() {
 
   const counts = {
     lend: lend.filter((x) => x.status !== "closed").length,
-    jobs: jobs.filter((x) => x.kind === "need" && x.status === "open").length,
+    jobs: jobs.filter((x) => x.kind === "need" && x.status === "open" && x.type !== "hire").length,
     pros: services.length,
+    lost: lost.length,
     issues: issues.length,
   };
 
@@ -148,6 +171,17 @@ export default function RepairApp() {
           <WeatherAlerts weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
         </div>
 
+        <div className="mb-3">
+          <WatchPanel
+            water={water}
+            canal={canal}
+            onWater={() => setSheet({ type: "water" })}
+            onCanal={() => setSheet({ type: "canal" })}
+            onLeak={() => setSheet({ type: "leakForm" })}
+            onLeaks={() => setSheet({ type: "leaks" })}
+          />
+        </div>
+
         <a
           href={`https://www.google.com/maps/search/?api=1&query=${HUB.lat},${HUB.lng}`}
           target="_blank"
@@ -162,7 +196,7 @@ export default function RepairApp() {
           <span className="shrink-0 font-semibold underline">นำทาง ›</span>
         </a>
 
-        <nav className="grid grid-cols-3 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-6" aria-label="หมวด">
+        <nav className="grid grid-cols-4 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-8" aria-label="หมวด">
           {Object.entries(TABS).map(([k, [emoji, text]]) => (
             <button
               key={k}
@@ -177,11 +211,17 @@ export default function RepairApp() {
               )}
             </button>
           ))}
+          <button onClick={() => setSheet({ type: "hotlines" })} className="flex min-h-[60px] flex-col items-center justify-center rounded-xl px-1 text-center text-xs font-semibold leading-tight text-red-700 active:bg-neutral-100 sm:text-sm">
+            <span className="text-2xl" aria-hidden="true">☎️</span>
+            เบอร์สำคัญ
+          </button>
         </nav>
 
         <div className="mt-3">
           {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
           {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} />}
+          {tab === "pros" && <HireStrip jobs={jobs} onOpen={() => pick("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />}
+          {tab === "lost" && <LostBoard items={lost} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />}
           {tab === "pros" && (
             <div className="rounded-xl bg-white p-3">
               <ServiceBoard repair services={services} setServices={setServices} posts={[]} admin={admin} onAdd={() => setSheet({ type: "serviceForm" })} onOpenPost={() => {}} />
@@ -237,11 +277,63 @@ export default function RepairApp() {
         <Sheet title={sheet.kind === "need" ? "🙋 ขอแรงช่วยที่บ้าน" : "💪 ลงชื่ออาสาไปช่วย"} onClose={() => setSheet(null)}>
           <JobForm
             kind={sheet.kind}
+            jobType={sheet.jobType}
             onDone={(j) => {
               setJobs((p) => [j, ...p]);
               setSheet(null);
               pick("jobs");
               setToast("ลงแล้ว ทุกคนเห็นแล้ว");
+            }}
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "lostForm" && (
+        <Sheet title="🐾 หาย · เจอ" onClose={() => setSheet(null)}>
+          <LostForm
+            kind={sheet.kind}
+            onDone={(x) => {
+              setLost((p) => [x, ...p]);
+              setSheet(null);
+              pick("lost");
+              setToast("ลงประกาศแล้ว เพื่อนบ้านช่วยกันดู");
+            }}
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "water" && (
+        <Sheet title="💧 แจ้งระดับน้ำ" onClose={() => setSheet(null)}>
+          <WaterForm
+            onDone={(w) => {
+              setWater((p) => [w, ...p]);
+              setSheet(null);
+              setToast("ขอบคุณที่แจ้งระดับน้ำ");
+            }}
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "canal" && (
+        <Sheet title="🌊 แจ้งระดับน้ำในคลอง" onClose={() => setSheet(null)}>
+          <CanalForm
+            onDone={(r) => {
+              setCanal((c) => ({ ...(c || { pumps: [], leaks: [] }), reports: [r, ...((c && c.reports) || [])] }));
+              setSheet(null);
+              setToast("ขอบคุณที่แจ้งระดับคลอง");
+            }}
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "leaks" && (
+        <Sheet title="🕳️ รูรั่วริมคลอง / เขื่อน" onClose={() => setSheet(null)}>
+          <LeakList leaks={canal?.leaks || []} onLeak={() => {}} onAdd={() => setSheet({ type: "leakForm" })} />
+        </Sheet>
+      )}
+      {sheet?.type === "leakForm" && (
+        <Sheet title="🕳️ แจ้งรูรั่ว" onClose={() => setSheet(null)}>
+          <LeakForm
+            onDone={(l) => {
+              setCanal((c) => ({ ...(c || { reports: [], pumps: [] }), leaks: [l, ...((c && c.leaks) || [])] }));
+              setSheet(null);
+              setToast("แจ้งรูรั่วแล้ว");
             }}
           />
         </Sheet>
@@ -303,5 +395,33 @@ export default function RepairApp() {
         </div>
       )}
     </div>
+  );
+}
+
+// Neighbours looking for a tradesman right now (jobs of type "hire"), shown above the contact board
+function HireStrip({ jobs, onOpen, onAdd }) {
+  const hires = jobs.filter((j) => j.type === "hire" && j.status !== "done");
+  return (
+    <section className="mb-3 rounded-xl border-2 border-black bg-yellow-50 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="min-w-0 flex-1 font-bold">
+          {JOB_TYPES.hire[0]} เพื่อนบ้านกำลังหาช่าง ({hires.length})
+          <span className="block text-sm font-normal text-neutral-600">ช่างที่ว่าง ดูแล้วติดต่อรับงานได้เลย</span>
+        </h3>
+        <button onClick={onAdd} className="min-h-[44px] rounded-lg bg-black px-3 font-semibold text-white">➕ ฉันหาช่าง</button>
+      </div>
+      {hires.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {hires.slice(0, 5).map((j) => (
+            <li key={j.id}>
+              <button onClick={onOpen} className="w-full rounded-lg bg-white p-2 text-left text-sm shadow-sm">
+                <b>{j.soi ? `ซ.${j.soi} · ` : ""}{j.detail}</b>
+                <span className="block text-xs text-neutral-500">{j.name} · {timeAgo(j.created_at)}{j.when && ` · ${j.when}`}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

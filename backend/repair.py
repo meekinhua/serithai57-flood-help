@@ -10,6 +10,11 @@ posts gets an edit key kept in their browser; phone numbers are revealed one ite
 - issues ปัญหาในซอย — trash piles waiting for the district truck, blocked drains, dead street lights,
           broken road, fallen trees, hanging wires; "me too" counts, status open → reported → fixed
 - reviews on the contact board (services): neighbours say a tradesman was good (or not) and why
+- lost   หาย · เจอ — lost dogs/cats/things and found ones, photos, sightings, "ได้คืนแล้ว"
+
+2 Oct afternoon: heavy rain again right after the water dried. Water levels, canal reports, leaks and pump
+status stay OPEN in repair mode (the watch panel on the home page), only the request board and the
+volunteer-ops tools are frozen. Jobs also cover rides out of the village, errands and hiring a tradesman.
 
 Site mode: settings {id: "site_mode", mode: "repair"|"flood"}. In repair mode the flood write routes
 answer 423 for everyone but admins; an admin can switch back to flood mode if the water returns.
@@ -29,14 +34,18 @@ LEND_CATEGORIES = [
 ]
 LendStatus = Literal["available", "lent", "closed"]  # ว่าง · มีคนยืมอยู่ · ปิด (คืนเจ้าของ/ให้ไปแล้ว/หาได้แล้ว)
 JobKind = Literal["need", "offer"]  # ขอแรง · อาสาพร้อมไปช่วย
-JOB_TYPES = ["clean", "move", "trash", "fix", "check", "elderly", "other"]
+JOB_TYPES = ["clean", "move", "trash", "fix", "check", "elderly", "ride", "errand", "hire", "other"]
 JobStatus = Literal["open", "scheduled", "done"]
 ISSUE_TYPES = ["trash", "drain", "light", "road", "tree", "wire", "water", "smell", "other"]
 IssueStatus = Literal["open", "reported", "fixed"]
 SiteMode = Literal["repair", "flood"]
+LostKind = Literal["lost", "found"]
+LOST_CATEGORIES = ["dog", "cat", "pet", "item", "document", "vehicle", "other"]
+LostStatus = Literal["open", "reunited"]
 
 # Writes that belong to the flood board: closed in repair mode (admins can still fix things).
-FLOOD_WRITES = ("/api/posts", "/api/water", "/api/canal", "/api/pumps", "/api/leaks", "/api/ops", "/api/team", "/api/staff", "/api/zones")
+# Water / canal / leak / pump reports stay open: the rain came back (2 Oct) and the village watches the water.
+FLOOD_WRITES = ("/api/posts", "/api/ops", "/api/team", "/api/staff", "/api/zones")
 HIDDEN = {"_id": 0, "edit_key_hash": 0, "phone": 0, "house": 0, "voters": 0}
 
 
@@ -86,6 +95,26 @@ class JobCreate(Contact):
     house: str = Field("", max_length=20)  # shown only with the phone
     when: str = Field("", max_length=60)  # "เสาร์นี้ 9 โมง"
     people: int = Field(2, ge=1, le=30)
+
+
+class LostCreate(Contact):
+    kind: LostKind = "lost"
+    category: str
+    title: str = Field(..., min_length=2, max_length=80)  # "หมาพันธุ์ไทย สีน้ำตาล ปลอกคอแดง ชื่อโบ้"
+    detail: str = Field("", max_length=400)
+    soi: str = Field("", max_length=12)
+    when_seen: str = Field("", max_length=60)  # "หายตั้งแต่ 29 ก.ย. ตอนน้ำขึ้น"
+    media_ids: list[str] = Field(default_factory=list, max_length=3)
+
+
+class Sighting(BaseModel):
+    name: str = Field("", max_length=60)
+    note: str = Field(..., min_length=2, max_length=200)  # "เห็นแถวปากซอย 24 เมื่อเช้า"
+
+
+class LostStatusBody(BaseModel):
+    status: LostStatus
+    note: str = Field("", max_length=160)
 
 
 class JobJoin(BaseModel):
@@ -359,7 +388,9 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         if any(h["name"] == who for h in doc.get("helpers", [])):
             return {k: v for k, v in doc.items() if k not in HIDDEN}
         helpers = doc.get("helpers", []) + [{"name": who, "at": now()}]
-        status = "scheduled" if doc["kind"] == "need" and len(helpers) >= doc.get("people", 1) else doc["status"]
+        # full: enough helpers for a request, or every seat taken on a ride someone offers
+        counted = doc["kind"] == "need" or doc.get("type") == "ride"
+        status = "scheduled" if counted and len(helpers) >= doc.get("people", 1) else doc["status"]
         doc = await db.jobs.find_one_and_update(
             {"id": job_id},
             {"$set": {"helpers": helpers, "status": status, "updated_at": now()}, "$push": {"history": log(who, "ไปช่วย" if doc["kind"] == "need" else "ขอให้มาช่วย")}},
@@ -386,6 +417,77 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     async def delete_job(job_id: str, request: Request, x_edit_key: str = Header("")):
         await owned(db.jobs, job_id, x_edit_key, request)
         await db.jobs.delete_one({"id": job_id})
+
+    # ---------------- lost & found: pets and things ----------------
+    @router.get("/lost")
+    async def list_lost(include_closed: bool = False):
+        q = {} if include_closed else {"status": "open"}
+        return await db.lost.find(q, HIDDEN).sort([("status", 1), ("updated_at", -1)]).to_list(1000)
+
+    @router.post("/lost", status_code=201)
+    async def create_lost(body: LostCreate, request: Request):
+        rate_limit(request, "lost", limit=15, window_s=600)
+        if body.category not in LOST_CATEGORIES:
+            raise HTTPException(422, "หมวดหมู่ไม่ถูกต้อง")
+        if len(body.phone.strip()) < 3:
+            raise HTTPException(422, "ใส่เบอร์โทรให้คนที่เจอติดต่อได้")
+        key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
+        doc = {
+            "id": item_id,
+            **_clean(body.model_dump(exclude={"media_ids"})),
+            "media": await claim_media(body.media_ids, f"lost:{item_id}", {"image"}),
+            "has_phone": True,
+            "sightings": [],
+            "status": "open",
+            "history": [log(body.name, "แจ้งของหาย" if body.kind == "lost" else "แจ้งเจอของ")],
+            "created_at": t,
+            "updated_at": t,
+            "edit_key_hash": _hash(key),
+        }
+        await db.lost.insert_one(dict(doc))
+        return {**{k: v for k, v in doc.items() if k not in HIDDEN}, "edit_key": key}
+
+    @router.get("/lost/{item_id}/contact")
+    async def lost_contact(item_id: str, request: Request):
+        rate_limit(request, "contact", limit=40, window_s=600)
+        doc = await db.lost.find_one({"id": item_id}, {"_id": 0, "phone": 1, "name": 1})
+        if not doc:
+            raise HTTPException(404, "ไม่พบรายการ")
+        return {"phone": doc.get("phone", ""), "name": doc.get("name", "")}
+
+    @router.post("/lost/{item_id}/seen")
+    async def lost_seen(item_id: str, body: Sighting, request: Request):
+        """'I saw it near soi 24 this morning' — public, so everyone looking can follow the trail."""
+        rate_limit(request, "lost-seen", limit=20, window_s=600)
+        entry = {"name": body.name.strip()[:60] or "ไม่ระบุชื่อ", "note": body.note.strip(), "at": now()}
+        doc = await db.lost.find_one_and_update(
+            {"id": item_id, "status": "open"},
+            {"$push": {"sightings": {"$each": [entry], "$slice": -30}}, "$set": {"updated_at": now()}},
+            projection=HIDDEN,
+            return_document=True,
+        )
+        if not doc:
+            raise HTTPException(404, "รายการนี้ปิดไปแล้ว")
+        return doc
+
+    @router.post("/lost/{item_id}/status")
+    async def lost_status(item_id: str, body: LostStatusBody, request: Request, x_edit_key: str = Header("")):
+        doc = await owned(db.lost, item_id, x_edit_key, request)
+        text = {"open": "ยังตามหาอยู่", "reunited": "ได้คืนแล้ว 🎉"}[body.status]
+        doc = await db.lost.find_one_and_update(
+            {"id": item_id},
+            {"$set": {"status": body.status, "updated_at": now()}, "$push": {"history": log(doc["name"], f"{text}{(' · ' + body.note.strip()) if body.note.strip() else ''}")}},
+            projection=HIDDEN,
+            return_document=True,
+        )
+        return doc
+
+    @router.delete("/lost/{item_id}", status_code=204)
+    async def delete_lost(item_id: str, request: Request, x_edit_key: str = Header("")):
+        doc = await owned(db.lost, item_id, x_edit_key, request)
+        await db.lost.delete_one({"id": item_id})
+        for m in doc.get("media", []):
+            await delete_media(m["id"])
 
     # ---------------- soi issues ----------------
     @router.get("/issues")
