@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, load, save, viewerId } from "./api";
 import { HOTLINE_GROUPS, JOB_TYPES, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
@@ -6,10 +6,10 @@ import Announcements from "./components/Announcements";
 import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
-import WatchPanel from "./components/WatchPanel";
+import WatchPanel, { WaterPill, WaterView } from "./components/WatchPanel";
 import { LostBoard, LostForm } from "./components/LostFound";
 import { WaterForm } from "./components/Forms";
-import { CanalForm, LeakForm, LeakList } from "./components/Canal";
+import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
 
 // ซ่อมบ้าน mode (2 Oct 2026): the water is gone. Lend & borrow, ask for hands, tradesmen with neighbours'
@@ -18,6 +18,7 @@ import { AfterFloodGuide, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, L
 // stays open), rides out / errands / hiring a tradesman go on the jobs board, and lost pets & things get a board.
 const REFRESH_MS = 30000;
 const TABS = {
+  water: ["💧", "ระดับน้ำ"],
   lend: ["🧰", "ยืม · ให้ยืม"],
   jobs: ["🙋", "ขอแรง · ติดรถ"],
   pros: ["🔧", "ช่าง · ร้าน"],
@@ -30,7 +31,7 @@ const TABS = {
 const HUB = { place: "ร้านมู้ด ซอย 5", lat: 13.789872, lng: 100.673517 };
 
 export default function RepairApp() {
-  const [tab, setTab] = useState(() => (TABS[window.location.hash.slice(1)] ? window.location.hash.slice(1) : load("repairTab", "lend")));
+  const [tab, setTab] = useState(() => (TABS[window.location.hash.slice(1)] ? window.location.hash.slice(1) : load("repairTab", "water")));
   const [lend, setLend] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [issues, setIssues] = useState([]);
@@ -50,6 +51,11 @@ export default function RepairApp() {
     setTab(t);
     save("repairTab", t);
     window.history.replaceState(null, "", `#${t}`);
+  };
+  const navRef = useRef(null);
+  const openWater = () => {
+    pick("water");
+    setTimeout(() => navRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   useEffect(() => {
@@ -147,8 +153,9 @@ export default function RepairApp() {
               {online ? `น้ำแห้งแล้ว · ช่วยกันฟื้นบ้าน · อัปเดต ${updatedAt ? timeAgo(updatedAt) : "…"}` : "⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่"}
             </p>
           </div>
-          <button onClick={() => setSheet({ type: "hotlines" })} className="min-h-[44px] shrink-0 rounded-lg bg-red-600 px-3 font-semibold active:bg-red-700">
-            ☎️ <span className="hidden min-[400px]:inline">เบอร์สำคัญ</span>
+          <WaterPill water={water} canal={canal} onOpen={openWater} />
+          <button onClick={() => setSheet({ type: "hotlines" })} aria-label="เบอร์สำคัญ" className="min-h-[44px] shrink-0 rounded-lg bg-red-600 px-3 font-semibold active:bg-red-700">
+            ☎️
           </button>
           <button onClick={share} aria-label="แชร์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">
             🔗
@@ -179,6 +186,7 @@ export default function RepairApp() {
             onCanal={() => setSheet({ type: "canal" })}
             onLeak={() => setSheet({ type: "leakForm" })}
             onLeaks={() => setSheet({ type: "leaks" })}
+            onMap={openWater}
           />
         </div>
 
@@ -196,7 +204,7 @@ export default function RepairApp() {
           <span className="shrink-0 font-semibold underline">นำทาง ›</span>
         </a>
 
-        <nav className="grid grid-cols-4 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-8" aria-label="หมวด">
+        <nav ref={navRef} className="scroll-mt-28 grid grid-cols-4 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-8" aria-label="หมวด">
           {Object.entries(TABS).map(([k, [emoji, text]]) => (
             <button
               key={k}
@@ -211,13 +219,22 @@ export default function RepairApp() {
               )}
             </button>
           ))}
-          <button onClick={() => setSheet({ type: "hotlines" })} className="flex min-h-[60px] flex-col items-center justify-center rounded-xl px-1 text-center text-xs font-semibold leading-tight text-red-700 active:bg-neutral-100 sm:text-sm">
-            <span className="text-2xl" aria-hidden="true">☎️</span>
-            เบอร์สำคัญ
-          </button>
         </nav>
 
         <div className="mt-3">
+          {tab === "water" && (
+            <WaterView
+              water={water}
+              canal={canal}
+              admin={admin}
+              onWater={() => setSheet({ type: "water" })}
+              onCanal={() => setSheet({ type: "canal" })}
+              onLeaks={() => setSheet({ type: "leaks" })}
+              onLeak={(leak) => setSheet({ type: "leak", leak })}
+              onPump={(pump) => setSheet({ type: "pump", pump })}
+              onPumps={() => setSheet({ type: "pumps" })}
+            />
+          )}
           {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
           {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} />}
           {tab === "pros" && <HireStrip jobs={jobs} onOpen={() => pick("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />}
@@ -324,7 +341,46 @@ export default function RepairApp() {
       )}
       {sheet?.type === "leaks" && (
         <Sheet title="🕳️ รูรั่วริมคลอง / เขื่อน" onClose={() => setSheet(null)}>
-          <LeakList leaks={canal?.leaks || []} onLeak={() => {}} onAdd={() => setSheet({ type: "leakForm" })} />
+          <LeakList leaks={canal?.leaks || []} onLeak={(leak) => setSheet({ type: "leak", leak })} onAdd={() => setSheet({ type: "leakForm" })} />
+        </Sheet>
+      )}
+      {sheet?.type === "leak" && (
+        <Sheet title="🕳️ รูรั่ว" onClose={() => setSheet(null)}>
+          <LeakSheet
+            leak={sheet.leak}
+            onDone={() => {
+              setSheet(null);
+              setToast("อัปเดตรูรั่วแล้ว");
+              refresh();
+            }}
+            onDelete={
+              admin
+                ? async (l) => {
+                    await api(`/admin/leaks/${l.id}`, { method: "DELETE" }).catch((e) => setToast(e.message));
+                    setSheet(null);
+                    refresh();
+                  }
+                : null
+            }
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "pumps" && (
+        <Sheet title="⚙️ เครื่องสูบน้ำ" onClose={() => setSheet(null)}>
+          <PumpList pumps={(canal?.pumps || []).filter((x) => x.status !== "removed")} onPump={(pump) => setSheet({ type: "pump", pump })} admin={!!admin} />
+        </Sheet>
+      )}
+      {sheet?.type === "pump" && (
+        <Sheet title={sheet.pump ? "⚙️ สถานะเครื่องสูบ" : "⚙️ เพิ่มเครื่องสูบ"} onClose={() => setSheet(null)}>
+          <PumpForm
+            pump={sheet.pump}
+            admin={!!admin}
+            onDone={() => {
+              setSheet(null);
+              setToast("บันทึกเครื่องสูบแล้ว");
+              refresh();
+            }}
+          />
         </Sheet>
       )}
       {sheet?.type === "leakForm" && (
