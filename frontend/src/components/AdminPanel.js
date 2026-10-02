@@ -122,6 +122,7 @@ function AnnouncementsAdmin({ admin, onPublicChange }) {
     <div className="space-y-6">
       <SiteMode />
       <HomeBlocks />
+      <FundAdmin />
       <form onSubmit={create} className="space-y-3 rounded-2xl bg-white p-4 shadow">
         <h3 className="text-lg font-bold">📢 สร้างประกาศใหม่</h3>
         <textarea
@@ -518,6 +519,61 @@ function HomeBlocks() {
         />
       </div>
       <button disabled={busy} onClick={() => save()} className={btnPrimary}>💾 บันทึกข้อความ</button>
+      {msg && <p className="text-sm">{msg}</p>}
+    </section>
+  );
+}
+
+// เงินสมทบ: the account shown on /fund, and the treasurer link (separate from the volunteer team link)
+function FundAdmin() {
+  const [acc, setAcc] = useState(null);
+  const [key, setKey] = useState("");
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    api("/fund")
+      .then((f) => setAcc(f.account || { on: true, bank: "", number: "", name: "", note: "" }))
+      .catch((e) => setMsg(e.message));
+    api("/admin/fund/key")
+      .then((r) => setKey(r.key))
+      .catch(() => {});
+  }, []);
+  if (!acc) return null;
+  const link = key ? `${window.location.origin}/fund#fk=${key}` : "";
+  async function saveAcc() {
+    setMsg("");
+    try {
+      setAcc(await api("/admin/fund/account", { method: "PUT", body: JSON.stringify(acc) }));
+      setMsg("บันทึกบัญชีแล้ว");
+    } catch (e) {
+      setMsg(e.message);
+    }
+  }
+  async function rotate() {
+    if (!window.confirm("เปลี่ยนลิงก์เหรัญญิก? ลิงก์เดิมจะใช้ไม่ได้ทันที")) return;
+    setKey((await api("/admin/fund/key/rotate", { method: "POST" })).key);
+  }
+  const set = (p) => setAcc({ ...acc, ...p });
+  return (
+    <section className="space-y-3 rounded-2xl bg-white p-4 shadow">
+      <h3 className="text-lg font-bold">💰 เงินสมทบทีมอาสา (/fund)</h3>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <input value={acc.bank} maxLength={40} onChange={(e) => set({ bank: e.target.value })} className={input} placeholder="ธนาคาร เช่น กรุงไทย" aria-label="ธนาคาร" />
+        <input value={acc.number} maxLength={30} onChange={(e) => set({ number: e.target.value })} className={input} placeholder="เลขบัญชี" aria-label="เลขบัญชี" />
+        <input value={acc.name} maxLength={80} onChange={(e) => set({ name: e.target.value })} className={input} placeholder="ชื่อบัญชี" aria-label="ชื่อบัญชี" />
+        <label className="flex min-h-[44px] items-center gap-2">
+          <input type="checkbox" checked={acc.on} onChange={(e) => set({ on: e.target.checked })} className="h-5 w-5" /> แสดงบัญชีบนหน้า /fund
+        </label>
+      </div>
+      <input value={acc.note} maxLength={300} onChange={(e) => set({ note: e.target.value })} className={input} placeholder="หมายเหตุ เช่น สมทบค่าอาหาร น้ำ กระสอบทราย · ผู้ดูแลยอด: คุณเอ็ม" aria-label="หมายเหตุบัญชี" />
+      <button onClick={saveAcc} className={btnPrimary}>💾 บันทึกบัญชี</button>
+      <div className="rounded-xl bg-amber-50 p-3 text-sm">
+        <p className="font-semibold">🔑 ลิงก์เหรัญญิก (ส่งให้คนดูแลยอดเท่านั้น · ตรวจยอด/บันทึกรายจ่ายได้)</p>
+        <p className="mt-1 break-all font-mono text-xs">{link || "…"}</p>
+        <div className="mt-2 flex gap-2">
+          <button onClick={() => navigator.clipboard?.writeText(link).then(() => setMsg("คัดลอกลิงก์แล้ว")).catch(() => {})} className={btnGhost}>คัดลอกลิงก์</button>
+          <button onClick={rotate} className={btnGhost}>เปลี่ยนลิงก์</button>
+        </div>
+      </div>
       {msg && <p className="text-sm">{msg}</p>}
     </section>
   );

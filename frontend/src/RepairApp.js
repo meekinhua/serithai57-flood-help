@@ -240,6 +240,14 @@ export default function RepairApp() {
         {home.hub?.on && home.hub.title && (
           <HubBox hub={home.hub} />
         )}
+        <a href="/fund" className="mb-3 flex min-h-[52px] items-center gap-3 rounded-xl border-2 border-emerald-600 bg-emerald-50 px-3 py-2">
+          <span className="text-2xl" aria-hidden="true">💰</span>
+          <span className="min-w-0 flex-1">
+            <b>เงินสมทบทีมอาสา · ยอดรับ-จ่ายเปิดให้ทุกคนดู</b>
+            <span className="block text-sm text-neutral-700">โอนแล้วแจ้งที่นี่ ไม่ต้องส่งสลิปในกลุ่ม LINE</span>
+          </span>
+          <span className="shrink-0 font-semibold underline">ดู ›</span>
+        </a>
 
         <nav ref={navRef} className="scroll-mt-28 grid grid-cols-3 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-9" aria-label="หมวด">
           {Object.entries(TABS).map(([k, [emoji, text]]) => (
