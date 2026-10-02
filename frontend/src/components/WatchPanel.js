@@ -2,6 +2,7 @@ import { CANAL_STATE, LEAK_STATUS, canalSummary } from "./Canal";
 import { WATER_WHERE, timeAgo, waterOf } from "../config";
 import { mediaUrl } from "../media";
 import MapView from "./MapView";
+import { TripsStrip } from "./Trips";
 
 // 2 Oct: heavy rain right after the village dried. Is the water coming back? Street levels reported in the
 // last 3 h, the canals against the flood wall, holes not sealed yet — and one tap to report.
@@ -111,13 +112,17 @@ export function WaterPill({ water, canal, onOpen }) {
 }
 
 // 💧 tab: the map in water mode (street dots, canals, pumps, leaks) and the latest reports.
-export function WaterView({ water, canal, onWater, onCanal, onLeaks, onLeak, onPump, onPumps, admin }) {
+export function WaterView({ water, canal, onWater, onCanal, onLeaks, onLeak, onPump, onPumps, admin, trips = [], focus, onFocusTrip, hubs = [] }) {
   return (
     <div className="space-y-3">
+      {trips.length > 0 && <TripsStrip trips={trips} onFocus={onFocusTrip} />}
       <div className="relative isolate h-[65vh] min-h-[320px] overflow-hidden rounded-xl border border-neutral-300 bg-white">
         <MapView
           posts={[]}
           water={water}
+          trips={trips}
+          focus={focus}
+          hubs={hubs}
           onSelect={() => {}}
           onReportWater={onWater}
           canal={canal}

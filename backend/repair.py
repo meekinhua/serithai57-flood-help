@@ -45,7 +45,8 @@ LostStatus = Literal["open", "reunited"]
 
 # Writes that belong to the flood board: closed in repair mode (admins can still fix things).
 # Water / canal / leak / pump reports stay open: the rain came back (2 Oct) and the village watches the water.
-FLOOD_WRITES = ("/api/posts", "/api/ops", "/api/team", "/api/staff", "/api/zones")
+# Staff stay open too (live tracking of the helpers' boats and trucks), except the LINE import into the request board.
+FLOOD_WRITES = ("/api/posts", "/api/ops", "/api/team", "/api/staff/import", "/api/zones")
 HIDDEN = {"_id": 0, "edit_key_hash": 0, "phone": 0, "house": 0, "voters": 0}
 
 

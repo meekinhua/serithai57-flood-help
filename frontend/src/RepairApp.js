@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { api, load, save, viewerId } from "./api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { API, api, load, save, viewerId } from "./api";
 import { HOTLINE_GROUPS, JOB_TYPES, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
 import Announcements from "./components/Announcements";
@@ -47,6 +47,9 @@ export default function RepairApp() {
   const [sheet, setSheet] = useState(null);
   const [toast, setToast] = useState("");
   const [online, setOnline] = useState(true);
+  const [viewers, setViewers] = useState(null);
+  const [trips, setTrips] = useState([]); // helpers' boats / trucks / staff on duty, live
+  const [focus, setFocus] = useState(null);
   const [updatedAt, setUpdatedAt] = useState(null);
 
   const pick = (t) => {
@@ -68,7 +71,10 @@ export default function RepairApp() {
   }, []);
 
   const refresh = useCallback(async () => {
-    if (document.visibilityState === "visible") api("/presence", { method: "POST", body: JSON.stringify({ id: viewerId() }) }).catch(() => {});
+    if (document.visibilityState === "visible")
+      api("/presence", { method: "POST", body: JSON.stringify({ id: viewerId() }) })
+        .then((r) => setViewers(r.online))
+        .catch(() => {});
     try {
       const [l, j, i, s, a, lf, w, cn, hm] = await Promise.all([
         api("/lend"),
@@ -111,6 +117,25 @@ export default function RepairApp() {
     };
   }, [refresh]);
 
+  // vehicles move: poll their positions every 10 s while the page is visible
+  useEffect(() => {
+    const loadTrips = () => document.visibilityState === "visible" && api("/trips").then(setTrips).catch(() => {});
+    loadTrips();
+    const t = setInterval(loadTrips, 10000);
+    document.addEventListener("visibilitychange", loadTrips);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", loadTrips);
+    };
+  }, []);
+
+  // leaving the page: drop off the "people viewing" counter right away
+  useEffect(() => {
+    const leave = () => navigator.sendBeacon?.(`${API}/presence/leave`, new Blob([JSON.stringify({ id: viewerId() })], { type: "application/json" }));
+    window.addEventListener("pagehide", leave);
+    return () => window.removeEventListener("pagehide", leave);
+  }, []);
+
   useEffect(() => {
     api("/weather").then(setWeather).catch(() => {});
     api("/auth/me")
@@ -123,6 +148,9 @@ export default function RepairApp() {
     const t = setTimeout(() => setToast(""), 3500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // the yellow box's place, also pinned on the map (same admin setting, so it moves with it)
+  const hubPins = useMemo(() => (home.hub?.on && home.hub.lat != null ? [{ ...home.hub, tag: "ศูนย์อาสา" }] : []), [home]);
 
   const counts = {
     lend: lend.filter((x) => x.status !== "closed").length,
@@ -157,7 +185,13 @@ export default function RepairApp() {
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-bold sm:text-xl">ซ่อมบ้าน เสรีไทย 57</h1>
             <p className="truncate text-xs text-neutral-400 sm:text-sm">
-              {online ? `น้ำแห้งแล้ว · ช่วยกันฟื้นบ้าน · อัปเดต ${updatedAt ? timeAgo(updatedAt) : "…"}` : "⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่"}
+              {online && viewers != null && (
+                <span className="mr-1 font-semibold text-emerald-400">
+                  <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle" aria-hidden="true" />
+                  {viewers.toLocaleString("th-TH")} คนกำลังดู ·{" "}
+                </span>
+              )}
+              {online ? `อัปเดต ${updatedAt ? timeAgo(updatedAt) : "…"}` : "⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่"}
             </p>
           </div>
           <WaterPill water={water} canal={canal} onOpen={openWater} />
@@ -224,6 +258,10 @@ export default function RepairApp() {
         <div className="mt-3">
           {tab === "water" && (
             <WaterView
+              trips={trips}
+              focus={focus}
+              hubs={hubPins}
+              onFocusTrip={(t) => setFocus({ lat: t.lat, lng: t.lng, t: Date.now() })}
               water={water}
               canal={canal}
               admin={admin}

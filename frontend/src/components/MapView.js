@@ -71,7 +71,7 @@ function clusterIcon(cluster) {
 
 // 1 Oct: the map opens on the water view; truck drop points are always on it; in the water view it also
 // shows the canal reports (how far below the flood wall) and the pumps.
-export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater, drops = [], canal = null, onReportCanal, onPump, onPumps, canAddPump = false, onLeak, onLeaks }) {
+export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater, drops = [], canal = null, onReportCanal, onPump, onPumps, canAddPump = false, onLeak, onLeaks, hubs = [] }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -180,6 +180,18 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
         .bindPopup(`<b>🚚 จุดลงของ ${escapeHtml(d.tag)}</b><br>${escapeHtml(d.place || "")}${d.person ? `<br>👤 ${escapeHtml(d.person)}` : ""}<br><a href="/zones">ดูแผนที่โซน</a>`)
         .addTo(layer);
     }
+    // volunteer centre / hand-out point (repair mode, set by admins): on both views
+    for (const h of hubs) {
+      if (h.lat == null || h.lng == null) continue;
+      L.marker([h.lat, h.lng], {
+        zIndexOffset: 1100,
+        icon: L.divIcon({ className: "", iconSize: [96, 30], iconAnchor: [48, 15], html: `<div class="drop-pin" style="--c:#facc15;color:#000">🤝 ${escapeHtml(h.tag || "ศูนย์อาสา")}</div>` }),
+      })
+        .bindPopup(
+          `<b>📍 ${escapeHtml(h.title || "")}</b>${h.sub ? `<br>${escapeHtml(h.sub)}` : ""}<br><a href="https://www.google.com/maps/search/?api=1&query=${h.lat},${h.lng}" target="_blank" rel="noreferrer">นำทาง ›</a>`
+        )
+        .addTo(layer);
+    }
     // leaks in the flood wall: on both views, they need hands now
     for (const lk of canal?.leaks || []) {
       if (lk.lat == null) continue;
@@ -242,7 +254,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
     }
     pinned.forEach((m) => m.addTo(layer));
     cluster.addLayers(grouped);
-  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak]);
+  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak, hubs]);
 
   // Staff boats / trucks / people on duty: big, pulsing, always above residents' pins
   useEffect(() => {
