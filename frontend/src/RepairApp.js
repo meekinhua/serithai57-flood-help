@@ -155,6 +155,8 @@ export default function RepairApp() {
     [home]
   );
 
+  const eventsOn = useMemo(() => (home.events || []).filter((e) => e.on), [home]);
+
   const counts = {
     lend: lend.filter((x) => x.status !== "closed").length,
     jobs: jobs.filter((x) => x.kind === "need" && x.status === "open" && x.type !== "hire").length,
@@ -237,6 +239,17 @@ export default function RepairApp() {
         </div>
         )}
 
+        {eventsOn.map((e, i) => (
+          <EventBox
+            key={i}
+            ev={e}
+            onMap={() => {
+              const [lat, lng] = eventSpot(e);
+              setFocus({ lat, lng, t: Date.now() });
+              pick("water");
+            }}
+          />
+        ))}
         {home.hub?.on && home.hub.title && (
           <HubBox hub={home.hub} />
         )}
@@ -272,6 +285,7 @@ export default function RepairApp() {
               trips={trips}
               focus={focus}
               hubs={hubPins}
+              events={eventsOn}
               onFocusTrip={(t) => setFocus({ lat: t.lat, lng: t.lng, t: Date.now() })}
               water={water}
               canal={canal}
@@ -529,6 +543,28 @@ function HireStrip({ jobs, onOpen, onAdd }) {
         </ul>
       )}
     </section>
+  );
+}
+
+// Where an event's sign goes: its meeting point, or the middle of its line
+export function eventSpot(e) {
+  if (e.lat != null && e.lng != null) return [e.lat, e.lng];
+  const l = e.line || [];
+  return l.length ? l[Math.floor((l.length - 1) / 2)] : [13.7945, 100.6737];
+}
+
+// Red call-out box for a volunteer work session; tap = show it on the map
+function EventBox({ ev, onMap }) {
+  return (
+    <button onClick={onMap} className="mb-3 flex min-h-[56px] w-full items-center gap-3 rounded-xl border-4 border-red-600 bg-red-50 px-3 py-2 text-left">
+      <span className="text-2xl" aria-hidden="true">🧱</span>
+      <span className="min-w-0 flex-1">
+        <b className="break-words">{ev.title}</b>
+        {ev.when && <span className="block font-semibold text-red-700">🕘 {ev.when}</span>}
+        {ev.sub && <span className="block text-sm text-neutral-700">{ev.sub}</span>}
+      </span>
+      <span className="shrink-0 font-semibold underline">ดูจุด ›</span>
+    </button>
   );
 }
 

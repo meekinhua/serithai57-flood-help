@@ -71,7 +71,7 @@ function clusterIcon(cluster) {
 
 // 1 Oct: the map opens on the water view; truck drop points are always on it; in the water view it also
 // shows the canal reports (how far below the flood wall) and the pumps.
-export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater, drops = [], canal = null, onReportCanal, onPump, onPumps, canAddPump = false, onLeak, onLeaks, hubs = [] }) {
+export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater, drops = [], canal = null, onReportCanal, onPump, onPumps, canAddPump = false, onLeak, onLeaks, hubs = [], events = [] }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -198,6 +198,28 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
         )
         .addTo(layer);
     }
+    // volunteer work calls (admins / Claude): the stretch of work in red, a sign at the meeting point
+    for (const ev of events) {
+      const line = (ev.line || []).filter((p) => p.length === 2);
+      const pop = `<b>🧱 ${escapeHtml(ev.title || "")}</b>${ev.when ? `<br>🕘 ${escapeHtml(ev.when)}` : ""}${ev.sub ? `<br>${escapeHtml(ev.sub)}` : ""}`;
+      if (line.length > 1) {
+        L.polyline(line, { color: "#fff", weight: 13, opacity: 0.9 }).addTo(layer);
+        L.polyline(line, { color: "#dc2626", weight: 8, opacity: 1, dashArray: "14 8", className: "event-line" }).bindPopup(pop).addTo(layer);
+      }
+      const at = ev.lat != null && ev.lng != null ? [ev.lat, ev.lng] : line[Math.floor((line.length - 1) / 2)];
+      if (!at) continue;
+      L.marker(at, {
+        zIndexOffset: 1200,
+        icon: L.divIcon({
+          className: "",
+          iconSize: [220, 58],
+          iconAnchor: [110, 58],
+          html: `<div class="hub-pin event"><div class="sign">🧱 ${escapeHtml((ev.title || "").slice(0, 32))}${ev.when ? `<small>${escapeHtml(ev.when)}</small>` : ""}</div><div class="tail"></div></div>`,
+        }),
+      })
+        .bindPopup(pop)
+        .addTo(layer);
+    }
     // leaks in the flood wall: on both views, they need hands now
     for (const lk of canal?.leaks || []) {
       if (lk.lat == null) continue;
@@ -260,7 +282,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
     }
     pinned.forEach((m) => m.addTo(layer));
     cluster.addLayers(grouped);
-  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak, hubs]);
+  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak, hubs, events]);
 
   // Staff boats / trucks / people on duty: big, pulsing, always above residents' pins
   useEffect(() => {

@@ -23,7 +23,7 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -224,11 +224,23 @@ class HubBlock(BaseModel):
     lng: Optional[float] = Field(None, ge=100.6, le=100.8)
 
 
+class EventBlock(BaseModel):
+    """A volunteer work call drawn on the home map, e.g. sandbagging a stretch of the canal bank."""
+    on: bool = True
+    title: str = Field(..., min_length=1, max_length=80)  # "นัดอาสาทำกระสอบทรายสันเขื่อน"
+    sub: str = Field("", max_length=200)  # where / what to bring
+    when: str = Field("", max_length=60)  # "เสาร์ 3 ต.ค. 09:00"
+    line: List[List[float]] = Field(default_factory=list, max_length=60)  # [[lat, lng], …] the stretch of work
+    lat: Optional[float] = Field(None, ge=13.7, le=13.9)  # meeting point; default = middle of the line
+    lng: Optional[float] = Field(None, ge=100.6, le=100.8)
+
+
 class HomeBody(BaseModel):
     watch_on: bool = True  # the "ฝนตกอีกรอบ · เฝ้าระวังน้ำ" panel
     watch_title: str = Field("", max_length=80)  # empty = the built-in heading
     hub: HubBlock = HubBlock()
     fund_on: bool = False  # the 💰 /fund card on the home page (off until the user says so)
+    events: List[EventBlock] = Field(default_factory=list, max_length=5)
 
 
 # The highlight boxes on top of the home page; admins switch them on/off and edit them on /admin.
@@ -237,6 +249,7 @@ HOME_DEFAULT = {
     "watch_title": "",
     "hub": {"on": True, "title": "ศูนย์อาสา · จุดแจกของ: ร้านมู้ด ซอย 5", "sub": "จุดแจกของที่ยังเปิดอยู่ 1 จุด · แตะเพื่อนำทาง", "lat": 13.789872, "lng": 100.673517},
     "fund_on": False,
+    "events": [],
 }
 
 
