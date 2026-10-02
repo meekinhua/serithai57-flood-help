@@ -182,8 +182,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             "id": doc_id,
             **{k: v.strip() if isinstance(v, str) else v for k, v in body.model_dump(exclude={"slip_id"}).items()},
             "slip": slip,
-            "reviewed_by": who,
-            "reviewed_at": now(),
+            **({"reviewed_by": who, "reviewed_at": now()} if body.status != "pending" else {"added_by": who}),
             "created_at": now(),
         }
         await db.fund_in.insert_one(dict(doc))

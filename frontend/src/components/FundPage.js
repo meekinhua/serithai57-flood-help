@@ -4,7 +4,8 @@ import { timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import MediaPicker, { mediaState } from "./MediaPicker";
 
-// /fund — เงินสมทบทีมอาสา: one public ledger instead of slips in the LINE group.
+// /fund — เงินสมทบทีมอาสา: one public ledger instead of slips in the LINE group. Nobody fills in a form:
+// the entries come from the running tallies people post in the village chat (tools/fund_sweep.py).
 // Treasurer link: /fund#fk=<key> (kept on this phone, sent as X-Fund-Key); admins are treasurers too.
 const PURPOSES = {
   food: "🍱 อาหาร / น้ำอาสา",
@@ -18,7 +19,6 @@ const STATUS = {
   rejected: { label: "❌ ไม่พบยอด", cls: "bg-red-100 text-red-800" },
 };
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
-const label = "mb-1 block font-medium";
 const baht = (n) => `${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })} บาท`;
 
 function fundKey() {
@@ -56,7 +56,6 @@ export default function FundPage() {
   const [data, setData] = useState(null);
   const [tre, setTre] = useState(null); // treasurer view, if allowed
   const [tab, setTab] = useState("in");
-  const [form, setForm] = useState(false);
   const [toast, setToast] = useState("");
   const [err, setErr] = useState("");
 
@@ -90,11 +89,11 @@ export default function FundPage() {
     const lines = [
       "💰 สรุปเงินสมทบทีมอาสา หมู่บ้านสหกรณ์ฯ 4",
       `ณ ${new Date().toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`,
-      `✅ ตรวจกับบัญชีแล้ว ${baht(t.received)} (${t.count_confirmed} รายการ)`,
-      t.count_pending ? `⏳ รอตรวจ ${baht(t.pending)} (${t.count_pending} รายการ)` : "",
-      `🧾 ใช้ไป ${baht(t.spent)} · คงเหลือ ${baht(t.left)}`,
+      `💰 ยอดสมทบ ${baht(t.received + t.pending)} (${t.count_confirmed + t.count_pending} รายการ)`,
+      t.count_pending ? `   ✅ ตรวจกับบัญชีแล้ว ${baht(t.received)} · ⏳ รอตรวจ ${baht(t.pending)}` : "   ✅ ตรวจกับบัญชีครบแล้ว",
+      `🧾 ใช้ไป ${baht(t.spent)} · 💵 คงเหลือ ${baht(t.received + t.pending - t.spent)}`,
       "",
-      "โอนแล้ว แจ้งที่ลิงก์นี้ ไม่ต้องส่งสลิปในกลุ่ม 🙏",
+      "ดูรายการรับ-จ่ายทั้งหมดได้ที่",
       `${window.location.origin}/fund`,
     ].filter((x) => x !== "");
     await copy(lines.join("\n"));
@@ -116,10 +115,10 @@ export default function FundPage() {
 
       <main className="mx-auto max-w-3xl space-y-3 px-3 pb-10 pt-3">
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Stat big label="✅ ได้รับแล้ว (ตรวจแล้ว)" value={baht(t.received)} sub={`${t.count_confirmed} รายการ`} />
-          <Stat label="⏳ รอตรวจกับบัญชี" value={baht(t.pending)} sub={`${t.count_pending} รายการ`} />
+          <Stat big label="💰 ยอดสมทบทั้งหมด" value={baht(t.received + t.pending)} sub={`${t.count_confirmed + t.count_pending} รายการ`} />
+          <Stat label="✅ ตรวจกับบัญชีแล้ว" value={baht(t.received)} sub={t.count_pending ? `รอตรวจอีก ${baht(t.pending)}` : "ครบแล้ว"} />
           <Stat label="🧾 ใช้ไปแล้ว" value={baht(t.spent)} />
-          <Stat big label="💵 คงเหลือ" value={baht(t.left)} />
+          <Stat big label="💵 คงเหลือ" value={baht(t.received + t.pending - t.spent)} />
         </section>
 
         {acc && (
@@ -136,22 +135,9 @@ export default function FundPage() {
           </section>
         )}
 
-        {form ? (
-          <ReportForm
-            onCancel={() => setForm(false)}
-            onDone={() => {
-              setForm(false);
-              setTab("in");
-              setToast("แจ้งแล้ว ขอบคุณมากครับ 🙏 เหรัญญิกจะตรวจกับบัญชีแล้วขึ้น ✅");
-              reload();
-            }}
-          />
-        ) : (
-          <button onClick={() => setForm(true)} className="min-h-[60px] w-full rounded-2xl bg-emerald-600 px-3 text-lg font-bold text-white shadow">
-            ✅ ฉันโอนแล้ว · แจ้งที่นี่
-            <span className="block text-sm font-normal">ไม่ต้องส่งสลิปในกลุ่ม LINE · สลิปเห็นเฉพาะเหรัญญิก</span>
-          </button>
-        )}
+        <p className="rounded-xl bg-white p-3 text-sm text-neutral-700">
+          ยอดในหน้านี้รวบรวมจากรายการรวมยอดในกลุ่ม LINE หมู่บ้าน อัปเดตเป็นรอบ ไม่ต้องกรอกเอง · ⏳ = รอเหรัญญิกตรวจกับบัญชี · ✅ = ตรวจแล้ว
+        </p>
 
         {tre && <Treasurer tre={tre} onChanged={reload} setToast={setToast} keyMode={!!key} />}
 
@@ -172,6 +158,7 @@ export default function FundPage() {
                   <span className="block text-xs text-neutral-500">
                     {PURPOSES[d.purpose]} · {d.transferred_at || timeAgo(d.created_at)}
                     {d.source === "cash" && " · เงินสด"}
+                    {d.source === "line" && " · จากกลุ่ม LINE"}
                   </span>
                 </span>
                 <span className={`rounded px-1.5 text-xs font-semibold ${STATUS[d.status].cls}`}>{STATUS[d.status].label}</span>
@@ -231,75 +218,6 @@ function Stat({ label: l, value, sub, big }) {
       <p className="text-lg font-black tabular-nums sm:text-xl">{value}</p>
       {sub && <p className={`text-xs ${big ? "text-neutral-300" : "text-neutral-500"}`}>{sub}</p>}
     </div>
-  );
-}
-
-function ReportForm({ onCancel, onDone }) {
-  const c = load("contact", {});
-  const [f, setF] = useState({ name: c.name || "", house: load("forumMe", {}).house || "", anonymous: false, amount: "", transferred_at: "", purpose: "food", note: "" });
-  const [slip, setSlip] = useState([]);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const st = mediaState(slip);
-  const set = (p) => setF((x) => ({ ...x, ...p }));
-  async function submit(e) {
-    e.preventDefault();
-    setBusy(true);
-    setErr("");
-    try {
-      await api("/fund/donations", { method: "POST", body: JSON.stringify({ ...f, amount: Number(f.amount), slip_id: st.ids[0] || null }) });
-      onDone();
-    } catch (e2) {
-      setErr(e2.message);
-      setBusy(false);
-    }
-  }
-  return (
-    <form onSubmit={submit} className="space-y-3 rounded-2xl border-2 border-emerald-600 bg-white p-3">
-      <p className="text-lg font-bold">✅ แจ้งโอนเงินสมทบ</p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className={label} htmlFor="f-amount">จำนวนเงิน (บาท) *</label>
-          <input id="f-amount" required type="number" inputMode="decimal" min="1" step="0.01" value={f.amount} onChange={(e) => set({ amount: e.target.value })} className={`${input} text-xl font-bold`} />
-        </div>
-        <div>
-          <label className={label} htmlFor="f-when">โอนเมื่อ</label>
-          <input id="f-when" maxLength={40} value={f.transferred_at} onChange={(e) => set({ transferred_at: e.target.value })} className={input} placeholder="เช่น 2 ต.ค. 19:14" />
-        </div>
-        <div>
-          <label className={label} htmlFor="f-name">ชื่อ *</label>
-          <input id="f-name" required maxLength={60} value={f.name} onChange={(e) => set({ name: e.target.value })} className={input} placeholder="ชื่อเล่น / ชื่อในสลิป" />
-        </div>
-        <div>
-          <label className={label} htmlFor="f-house">บ้านเลขที่ (เห็นเฉพาะเหรัญญิก)</label>
-          <input id="f-house" maxLength={20} value={f.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="4/xxx" />
-        </div>
-      </div>
-      <fieldset>
-        <legend className={label}>สมทบค่าอะไร</legend>
-        <div className="grid grid-cols-2 gap-2">
-          {Object.entries(PURPOSES).map(([k, v]) => (
-            <button type="button" key={k} onClick={() => set({ purpose: k })} aria-pressed={f.purpose === k} className={`min-h-[44px] rounded-lg border-2 px-2 text-sm ${f.purpose === k ? "border-black bg-black text-white" : "border-neutral-200"}`}>
-              {v}
-            </button>
-          ))}
-        </div>
-      </fieldset>
-      <div>
-        <p className={label}>สลิป (เห็นเฉพาะเหรัญญิก ช่วยให้ตรวจเร็วขึ้น)</p>
-        <MediaPicker items={slip} setItems={setSlip} max={1} allowVideo={false} />
-      </div>
-      <label className="flex min-h-[44px] items-center gap-2">
-        <input type="checkbox" checked={f.anonymous} onChange={(e) => set({ anonymous: e.target.checked })} className="h-5 w-5" /> ไม่ประสงค์ออกนาม (รายการสาธารณะไม่แสดงชื่อ)
-      </label>
-      {err && <p className="rounded-lg bg-red-50 p-2 text-red-700">{err}</p>}
-      <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={onCancel} className="min-h-[52px] rounded-xl border-2 border-black font-semibold">ยกเลิก</button>
-        <button disabled={busy || st.busy} className="min-h-[52px] rounded-xl bg-emerald-600 font-bold text-white disabled:opacity-60">
-          {busy ? "กำลังส่ง…" : st.busy ? "รอสลิปอัปโหลด…" : "ส่ง"}
-        </button>
-      </div>
-    </form>
   );
 }
 

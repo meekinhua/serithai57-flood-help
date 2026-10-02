@@ -244,7 +244,7 @@ export default function RepairApp() {
           <span className="text-2xl" aria-hidden="true">💰</span>
           <span className="min-w-0 flex-1">
             <b>เงินสมทบทีมอาสา · ยอดรับ-จ่ายเปิดให้ทุกคนดู</b>
-            <span className="block text-sm text-neutral-700">โอนแล้วแจ้งที่นี่ ไม่ต้องส่งสลิปในกลุ่ม LINE</span>
+            <span className="block text-sm text-neutral-700">รวบรวมจากกลุ่ม LINE · ได้รับ / ใช้ไป / คงเหลือ</span>
           </span>
           <span className="shrink-0 font-semibold underline">ดู ›</span>
         </a>
