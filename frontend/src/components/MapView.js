@@ -185,7 +185,13 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
       if (h.lat == null || h.lng == null) continue;
       L.marker([h.lat, h.lng], {
         zIndexOffset: 1100,
-        icon: L.divIcon({ className: "", iconSize: [96, 30], iconAnchor: [48, 15], html: `<div class="drop-pin" style="--c:#facc15;color:#000">🤝 ${escapeHtml(h.tag || "ศูนย์อาสา")}</div>` }),
+        // sign ~44 px tall + 12 px tail: the tail's tip (bottom centre) is the exact spot
+        icon: L.divIcon({
+          className: "",
+          iconSize: [150, 58],
+          iconAnchor: [75, 58],
+          html: `<div class="hub-pin"><div class="sign">🤝 ${escapeHtml(h.tag || "ศูนย์อาสา")}${h.place ? `<small>${escapeHtml(h.place)}</small>` : ""}</div><div class="tail"></div></div>`,
+        }),
       })
         .bindPopup(
           `<b>📍 ${escapeHtml(h.title || "")}</b>${h.sub ? `<br>${escapeHtml(h.sub)}` : ""}<br><a href="https://www.google.com/maps/search/?api=1&query=${h.lat},${h.lng}" target="_blank" rel="noreferrer">นำทาง ›</a>`

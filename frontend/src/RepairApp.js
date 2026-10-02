@@ -150,7 +150,10 @@ export default function RepairApp() {
   }, [toast]);
 
   // the yellow box's place, also pinned on the map (same admin setting, so it moves with it)
-  const hubPins = useMemo(() => (home.hub?.on && home.hub.lat != null ? [{ ...home.hub, tag: "ศูนย์อาสา" }] : []), [home]);
+  const hubPins = useMemo(
+    () => (home.hub?.on && home.hub.lat != null ? [{ ...home.hub, tag: "ศูนย์อาสา", place: (home.hub.title || "").split(":").pop().trim().slice(0, 24) }] : []),
+    [home]
+  );
 
   const counts = {
     lend: lend.filter((x) => x.status !== "closed").length,
