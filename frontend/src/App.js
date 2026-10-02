@@ -22,7 +22,7 @@ const WATER_NOW_HOURS = 3; // "now" = reports from the last 3 h
 const WATER_PREV_HOURS = 9; // compared with the 3–9 h before, for the trend
 const IS_ADMIN_PAGE = window.location.pathname.replace(/\/+$/, "") === "/admin";
 
-export default function App() {
+export default function App({ archived = false }) {
   const [posts, setPosts] = useState([]);
   const [water, setWater] = useState([]);
   const [canal, setCanal] = useState(null); // {reports, pumps}: canal level vs the flood wall, and the pumps
@@ -40,7 +40,7 @@ export default function App() {
       })
       .catch(() => {});
   }, []);
-  const [showDone, setShowDone] = useState(false);
+  const [showDone, setShowDone] = useState(archived); // the archive shows everything that happened
   const [filter, setFilter] = useState("all");
   const [tab, setTab] = useState("map"); // phones: map | list — the map with requests on it is what people need first
   const [sheet, setSheet] = useState(null); // {type: "form"|"water"|"detail"|"hotlines", ...}
@@ -49,7 +49,7 @@ export default function App() {
   const [updatedAt, setUpdatedAt] = useState(null);
   const [toast, setToast] = useState("");
   // First visit: show the animated how-to once (never on the admin page)
-  const [showGuide, setShowGuide] = useState(() => !IS_ADMIN_PAGE && !load("guideSeen", false));
+  const [showGuide, setShowGuide] = useState(() => !IS_ADMIN_PAGE && !archived && !load("guideSeen", false));
   const closeGuide = useCallback(() => {
     setShowGuide(false);
     save("guideSeen", true);
@@ -122,7 +122,7 @@ export default function App() {
     }
     try {
       const [p, w, a, sv, cn] = await Promise.all([
-        api(`/posts?include_done=${showDone}`),
+        api(`/posts?include_done=${showDone}${archived ? "&since_hours=1440" : ""}`),
         api("/water"),
         api("/announcements"),
         api("/services"),
@@ -143,7 +143,7 @@ export default function App() {
     } catch {
       setOnline(false);
     }
-  }, [showDone]);
+  }, [showDone, archived]);
 
   useEffect(() => {
     refresh();
@@ -338,7 +338,7 @@ export default function App() {
         <div className="mx-auto flex max-w-7xl items-center gap-2 px-3 py-2 sm:px-4">
           <Logo />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-bold sm:text-xl">ช่วยกันน้ำท่วม เสรีไทย 57</h1>
+            <h1 className="truncate text-lg font-bold sm:text-xl">{archived ? "📦 คลังภารกิจน้ำท่วม เสรีไทย 57" : "ช่วยกันน้ำท่วม เสรีไทย 57"}</h1>
             <p className="truncate text-xs text-neutral-400 sm:text-sm">
               {online && viewers != null && (
                 <span className="mr-1 font-semibold text-emerald-400">
@@ -395,12 +395,22 @@ export default function App() {
           )
         ) : (
         <>
+        {archived && (
+          <div className="mb-3 rounded-2xl bg-[#0b1622] p-4 text-white">
+            <p className="text-lg font-bold">📦 ภารกิจน้ำท่วม ก.ย.–ต.ค. 2569 · ปิดแล้ว</p>
+            <p className="text-sm text-neutral-300">น้ำแห้งแล้ว ระบบนี้เก็บไว้ให้ดูย้อนหลังอย่างเดียว · ทุกคำขอ ระดับน้ำ เครื่องสูบ รูรั่ว ยังอยู่บนแผนที่</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <a href="/credits.html" className="flex min-h-[48px] items-center justify-center rounded-xl bg-[#f2b872] px-3 font-bold text-[#0b1622]">🎬 ดู End credits ทีมอาสา</a>
+              <a href="/" className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-white px-3 font-bold">🧰 ไปหน้าซ่อมบ้าน (ใช้งานอยู่)</a>
+            </div>
+          </div>
+        )}
         <div className="mb-3 space-y-2 empty:hidden">
           <Announcements items={announcements} />
           <WeatherAlerts weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
         </div>
 
-        {reminder && (
+        {reminder && !archived && (
           <div role="status" className="anim-pop mb-3 rounded-xl border-2 border-black bg-yellow-100 p-3">
             <p className="font-bold">
               🙋 คุณรับช่วย “{categoryOf(reminder)[1]}”{reminder.place && ` (${reminder.place})`} ไว้ {Math.floor((Date.now() - load("myHelping", {})[reminder.id]) / 3.6e6)} ชม.แล้ว — เสร็จหรือยัง?
@@ -437,10 +447,10 @@ export default function App() {
                 onSelect={openDetail}
                 focus={focus}
                 filter={filter}
-                onReportWater={() => setSheet({ type: "water" })}
+                onReportWater={archived ? undefined : () => setSheet({ type: "water" })}
                 drops={drops}
                 canal={canal}
-                onReportCanal={() => setSheet({ type: "canal" })}
+                onReportCanal={archived ? undefined : () => setSheet({ type: "canal" })}
                 onPump={(pump) => setSheet({ type: "pump", pump })}
                 onPumps={() => setSheet({ type: "pumps" })}
                 canAddPump={!!admin}
@@ -451,7 +461,7 @@ export default function App() {
                 🗺️ โซน · 🚚 จุดลงของ
               </a>
             </div>
-            <UrgentNow posts={posts} onOpen={openDetail} />
+            {!archived && <UrgentNow posts={posts} onOpen={openDetail} />}
             <Legend />
           </section>
 
@@ -543,7 +553,7 @@ export default function App() {
         </div>
 
 
-        <div ref={actionsRef} className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {!archived && <div ref={actionsRef} className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
           <ActionButton color="bg-black text-white active:bg-neutral-800" onClick={() => setSheet({ type: "form", kind: "need" })}>
             🆘 ขอความช่วยเหลือ
           </ActionButton>
@@ -556,7 +566,7 @@ export default function App() {
           <ActionButton color="border-2 border-black bg-white text-black active:bg-neutral-100" onClick={() => setSheet({ type: "form", kind: "info" })}>
             📍 แจ้งข้อมูล / ถนน
           </ActionButton>
-        </div>
+        </div>}
 
         {/* zones A–I + truck drop points: for donors with trucks and for relief teams */}
         <a
@@ -610,7 +620,7 @@ export default function App() {
         <div className="mt-6">
           <WeatherCard weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
         </div>
-        <div className="mt-3">
+        <div className={archived ? "hidden" : "mt-3"}>
           <ServiceStrip
             services={services}
             paidNeeds={paidNeedCount}
@@ -819,7 +829,7 @@ export default function App() {
         </Sheet>
       )}
 
-      {!IS_ADMIN_PAGE && !sheet && !showGuide && showFab && (
+      {!IS_ADMIN_PAGE && !archived && !sheet && !showGuide && showFab && (
         <button
           onClick={() => setSheet({ type: "form", kind: "need" })}
           className="anim-pop fixed bottom-4 right-4 z-[950] flex min-h-[56px] items-center gap-2 rounded-full bg-black px-5 text-lg font-bold text-white shadow-lg ring-4 ring-white active:scale-95 lg:hidden"

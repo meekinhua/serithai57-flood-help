@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { api, load, save } from "../api";
-import { PRICING, SERVICE_CATEGORIES, categoryOf, paymentBadge, timeAgo } from "../config";
+import { PRICING, REPAIR_SERVICE_ORDER, SERVICE_CATEGORIES, categoryOf, paymentBadge, timeAgo } from "../config";
+
+// Repair mode lists the after-flood trades first and hides the flood-only ones (boats, food, pets...).
+const categoriesFor = (repair) => (repair ? REPAIR_SERVICE_ORDER.map((k) => [k, SERVICE_CATEGORIES[k]]) : Object.entries(SERVICE_CATEGORIES));
 
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
 const label = "mb-1 block font-medium";
@@ -58,7 +61,7 @@ export function ServiceStrip({ services, paidNeeds, onOpen, onAdd }) {
 }
 
 // ---------- One provider card ----------
-function ServiceCard({ s, admin, onChanged, onDeleted }) {
+function ServiceCard({ s, admin, onChanged, onDeleted, repair }) {
   const [emoji, catText] = SERVICE_CATEGORIES[s.category] || ["📞", s.category];
   const editKey = load("serviceKeys", {})[s.id];
   const [error, setError] = useState("");
@@ -126,6 +129,7 @@ function ServiceCard({ s, admin, onChanged, onDeleted }) {
           {s.reports > 0 && <p className="mt-1 text-sm text-red-700">⚠️ มีคนแจ้งว่าติดต่อไม่ได้ {s.reports} ครั้ง</p>}
         </div>
       </div>
+      {repair && <Reviews s={s} onChanged={onChanged} />}
 
       <div className="mt-2 grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
         <a href={telHref(s.phone)} className="flex min-h-[52px] items-center justify-center rounded-xl bg-black px-3 text-lg font-bold text-white active:bg-neutral-800">
@@ -178,7 +182,7 @@ function ServiceCard({ s, admin, onChanged, onDeleted }) {
 }
 
 // ---------- Full board (inside a sheet) ----------
-export function ServiceBoard({ services, setServices, posts, admin, initial = {}, onAdd, onOpenPost }) {
+export function ServiceBoard({ services, setServices, posts, admin, initial = {}, onAdd, onOpenPost, repair = false }) {
   const [tab, setTab] = useState(initial.tab || "providers");
   const [category, setCategory] = useState(initial.category || "all");
   const [query, setQuery] = useState("");
@@ -195,24 +199,24 @@ export function ServiceBoard({ services, setServices, posts, admin, initial = {}
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1" role="tablist">
+      {!repair && <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1" role="tablist">
         <button role="tab" aria-selected={tab === "providers"} onClick={() => setTab("providers")} className={`min-h-[44px] rounded-lg text-sm font-semibold ${tab === "providers" ? "bg-white shadow" : "text-neutral-600"}`}>
           📇 คนรับจ้าง / ให้บริการ ({services.length + paidOffers.length})
         </button>
         <button role="tab" aria-selected={tab === "hiring"} onClick={() => setTab("hiring")} className={`min-h-[44px] rounded-lg text-sm font-semibold ${tab === "hiring" ? "bg-white shadow" : "text-neutral-600"}`}>
           🙋 คนกำลังหาคนจ้าง ({paidNeeds.length})
         </button>
-      </div>
+      </div>}
 
       {tab === "providers" ? (
         <>
           <button onClick={onAdd} className="min-h-[48px] w-full rounded-xl border-2 border-dashed border-black font-semibold active:bg-neutral-50">
-            ➕ ลงชื่อรับงาน / ให้บริการ (ไม่ต้องสมัคร)
+            {repair ? "➕ ลงชื่อช่าง / ร้าน หรือแนะนำช่างที่เคยใช้" : "➕ ลงชื่อรับงาน / ให้บริการ (ไม่ต้องสมัคร)"}
           </button>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="🔍 ค้นหา เช่น ไฟ, กระบะ, ขนของ" className={input} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={repair ? "🔍 ค้นหา เช่น แอร์, ตู้เย็น, ทาสี" : "🔍 ค้นหา เช่น ไฟ, กระบะ, ขนของ"} className={input} />
           <div className="-mx-4 overflow-x-auto px-4 pb-1">
             <div className="flex w-max gap-2">
-              {[["all", ["", "ทั้งหมด"]], ...Object.entries(SERVICE_CATEGORIES)].map(([key, [emoji, text]]) => (
+              {[["all", ["", "ทั้งหมด"]], ...categoriesFor(repair)].map(([key, [emoji, text]]) => (
                 <button
                   key={key}
                   onClick={() => setCategory(key)}
@@ -226,7 +230,7 @@ export function ServiceBoard({ services, setServices, posts, admin, initial = {}
           </div>
           <ul className="space-y-2">
             {shown.map((s) => (
-              <ServiceCard key={s.id} s={s} admin={admin} onChanged={upsert} onDeleted={drop} />
+              <ServiceCard key={s.id} s={s} admin={admin} onChanged={upsert} onDeleted={drop} repair={repair} />
             ))}
           </ul>
           {shown.length === 0 && (
@@ -234,7 +238,7 @@ export function ServiceBoard({ services, setServices, posts, admin, initial = {}
               {services.length ? "ไม่พบในหมวด/คำค้นนี้" : "ยังไม่มีใครลงชื่อ ถ้าคุณรู้จักช่างหรือมีรถ/เรือ ช่วยลงชื่อให้เพื่อนบ้านได้เลย"}
             </p>
           )}
-          {paidOffers.length > 0 && (category === "all" || category === "other") && !q && (
+          {!repair && paidOffers.length > 0 && (category === "all" || category === "other") && !q && (
             <section>
               <h3 className="mb-1 mt-2 font-semibold">จากโพสต์ “ฉันช่วยได้” แบบรับจ้าง</h3>
               <ul className="space-y-2">
@@ -282,7 +286,7 @@ function PostRow({ post, onOpen }) {
 }
 
 // ---------- "List yourself" form ----------
-export function ServiceForm({ onDone, prefill = {} }) {
+export function ServiceForm({ onDone, prefill = {}, repair = false }) {
   const saved = load("contact", { name: "", phone: "" });
   const [form, setForm] = useState({
     category: prefill.category || "",
@@ -319,7 +323,7 @@ export function ServiceForm({ onDone, prefill = {} }) {
       <fieldset>
         <legend className={label}>ให้บริการอะไร *</legend>
         <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
-          {Object.entries(SERVICE_CATEGORIES).map(([key, [emoji, text]]) => (
+          {categoriesFor(repair).map(([key, [emoji, text]]) => (
             <button
               type="button"
               key={key}
@@ -382,5 +386,60 @@ export function ServiceForm({ onDone, prefill = {} }) {
         {busy ? "กำลังส่ง…" : "📇 ลงชื่อในบอร์ดติดต่อ"}
       </button>
     </form>
+  );
+}
+
+// ---------- Neighbours' reviews (repair mode) ----------
+function Reviews({ s, onChanged }) {
+  const [form, setForm] = useState(null);
+  const [err, setErr] = useState("");
+  const reviews = [...(s.reviews || [])].reverse();
+  async function send(e) {
+    e.preventDefault();
+    setErr("");
+    try {
+      onChanged(await api(`/services/${s.id}/review`, { method: "POST", body: JSON.stringify(form) }));
+      save("contact", { ...load("contact", {}), name: form.name });
+      setForm(null);
+    } catch (e2) {
+      setErr(e2.message);
+    }
+  }
+  return (
+    <div className="mt-2 rounded-lg bg-neutral-50 p-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <b>เพื่อนบ้านว่า</b>
+        <span>👍 {s.good || 0}</span>
+        <span>👎 {s.bad || 0}</span>
+        {!form && (
+          <button onClick={() => setForm({ name: load("contact", {}).name || "", good: true, text: "" })} className="ml-auto min-h-[40px] underline">
+            ✍️ เคยใช้ เล่าให้ฟัง
+          </button>
+        )}
+      </div>
+      {reviews.slice(0, 3).map((r, i) => (
+        <p key={i} className="mt-1 break-words">
+          {r.good ? "👍" : "👎"} <b>{r.name}</b> {r.text} <span className="text-xs text-neutral-400">{timeAgo(r.at)}</span>
+        </p>
+      ))}
+      {form && (
+        <form onSubmit={send} className="mt-2 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            {[[true, "👍 ดี แนะนำ"], [false, "👎 ไม่แนะนำ"]].map(([v, t]) => (
+              <button type="button" key={t} onClick={() => setForm({ ...form, good: v })} aria-pressed={form.good === v} className={`min-h-[44px] rounded-lg border-2 font-semibold ${form.good === v ? "border-black bg-black text-white" : "border-neutral-300 bg-white"}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <input required maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={input} placeholder="ชื่อเล่นของคุณ" />
+          <input maxLength={200} value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} className={input} placeholder="เช่น มาตรงเวลา ราคา 800 ล้างแอร์ 2 เครื่อง งานเรียบร้อย" />
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setForm(null)} className="min-h-[44px] rounded-lg border-2 border-black">ยกเลิก</button>
+            <button className="min-h-[44px] rounded-lg bg-black font-bold text-white">ส่ง</button>
+          </div>
+        </form>
+      )}
+      {err && <p className="mt-1 text-red-700">{err}</p>}
+    </div>
   );
 }

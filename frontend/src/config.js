@@ -124,7 +124,74 @@ export const SERVICE_CATEGORIES = {
   food: ["🍱", "ส่งอาหาร / น้ำดื่ม"],
   supplies: ["🛒", "ของใช้ / กระสอบทราย"],
   pets: ["🐾", "รับฝากสัตว์เลี้ยง"],
+  // after the flood (repair mode)
+  ac: ["❄️", "ล้าง / ซ่อมแอร์"],
+  appliance: ["🧺", "ซ่อมตู้เย็น เครื่องซักผ้า"],
+  carpenter: ["🪚", "ช่างไม้ / บิวต์อิน / ประตู"],
+  painter: ["🎨", "ทาสี / ฉาบ / กันเชื้อรา"],
+  roof: ["🏠", "หลังคา / กันซึม"],
+  pest: ["🐜", "กำจัดปลวก / แมลง"],
+  vehicle: ["🚗", "ซ่อมรถ / มอไซค์จมน้ำ"],
+  junk: ["🚛", "รับขนขยะ / ของพัง"],
   other: ["📞", "อื่นๆ"],
+};
+// Flood-era categories stay for old listings; the repair-mode form offers these first.
+export const REPAIR_SERVICE_ORDER = ["electrician", "plumber", "ac", "appliance", "carpenter", "painter", "roof", "pest", "vehicle", "cleaning", "junk", "repair", "truck", "porter", "other"];
+
+// ---------- repair mode (after the flood). Keys must match backend/repair.py ----------
+export const LEND_KINDS = {
+  lend: { emoji: "🤝", label: "ให้ยืม", verb: "มีของให้ยืม" },
+  give: { emoji: "🎁", label: "ให้ฟรี", verb: "มีของให้ฟรี" },
+  want: { emoji: "🔎", label: "ตามหา / อยากยืม", verb: "ตามหาของ" },
+};
+export const LEND_CATEGORIES = {
+  washer: ["💦", "เครื่องฉีดน้ำแรงดันสูง"],
+  pump: ["⚙️", "ปั๊มน้ำ / ไดโว่"],
+  vacuum: ["🌀", "เครื่องดูดฝุ่น-ดูดน้ำ"],
+  dryer: ["🌬️", "พัดลม / เครื่องลดความชื้น"],
+  ladder: ["🪜", "บันได"],
+  cleaning: ["🧹", "ไม้ถู แปรง ถัง สายยาง"],
+  tools: ["🧰", "เครื่องมือช่าง"],
+  cart: ["🛒", "รถเข็น / รถลาก"],
+  power: ["🔌", "ปลั๊กพ่วง / เครื่องปั่นไฟ"],
+  furniture: ["🪑", "เฟอร์นิเจอร์ / ของใช้"],
+  supplies: ["🧴", "น้ำยา / ถุงดำ / ถุงมือ"],
+  other: ["📦", "อื่นๆ"],
+};
+export const LEND_STATUS = {
+  available: { label: "ว่าง", cls: "bg-emerald-100 text-emerald-800" },
+  lent: { label: "มีคนยืมอยู่", cls: "bg-amber-100 text-amber-900" },
+  closed: { label: "ปิดแล้ว", cls: "bg-neutral-200 text-neutral-600" },
+};
+export const JOB_TYPES = {
+  clean: ["🧽", "ช่วยล้างบ้าน / ขัดโคลน"],
+  move: ["📦", "ช่วยยกของ / ย้ายเฟอร์นิเจอร์"],
+  trash: ["🗑️", "ช่วยขนของพังไปทิ้ง"],
+  fix: ["🛠️", "ช่วยซ่อมเล็กๆ น้อยๆ"],
+  check: ["⚡", "ช่วยดูไฟ / ปลั๊ก ก่อนเปิดใช้"],
+  elderly: ["🧓", "บ้านผู้สูงอายุ / อยู่คนเดียว"],
+  other: ["🙋", "อื่นๆ"],
+};
+export const JOB_STATUS = {
+  open: { label: "ยังต้องการคน", cls: "bg-red-100 text-red-800" },
+  scheduled: { label: "ได้คนแล้ว / นัดแล้ว", cls: "bg-amber-100 text-amber-900" },
+  done: { label: "เสร็จแล้ว", cls: "bg-emerald-100 text-emerald-800" },
+};
+export const ISSUE_TYPES = {
+  trash: ["🗑️", "กองขยะรอเก็บ"],
+  drain: ["🕳️", "ท่อ / ร่องน้ำตัน"],
+  light: ["💡", "ไฟถนนดับ"],
+  road: ["🚧", "ถนนพัง / หลุม"],
+  tree: ["🌳", "ต้นไม้ล้ม / กิ่งขวาง"],
+  wire: ["⚠️", "สายไฟห้อย / เสาเอียง"],
+  water: ["🚰", "น้ำประปาไม่ไหล / ขุ่น"],
+  smell: ["🦟", "น้ำขัง / กลิ่น / ยุง"],
+  other: ["📍", "อื่นๆ"],
+};
+export const ISSUE_STATUS = {
+  open: { label: "ยังไม่ได้แก้", cls: "bg-red-100 text-red-800" },
+  reported: { label: "แจ้งเขตแล้ว", cls: "bg-amber-100 text-amber-900" },
+  fixed: { label: "แก้แล้ว", cls: "bg-emerald-100 text-emerald-800" },
 };
 
 export const PRICING = {

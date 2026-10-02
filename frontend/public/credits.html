@@ -1,0 +1,707 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>เครดิตปิดฉาก เสรีไทย 57</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chonburi&family=Trirong:wght@400;500;600&family=Bai+Jamjuree:wght@400;600&display=swap">
+<style>
+/* Layout: full-bleed night canvas (rain, village, flood water that drains to dawn); one centred credit column rolls over it; three end cards close the show. Single dark look by choice. */
+:root {
+  --night: #0b1622;
+  --deep: #12324a;
+  --ink: #eef2ef;
+  --mute: #9fb4bf;
+  --amber: #f2b872;
+  --line: rgba(238, 242, 239, .18);
+  --f-display: "Chonburi", "Trirong", "Noto Serif Thai", serif;
+  --f-name: "Trirong", "Noto Serif Thai", Georgia, serif;
+  --f-label: "Bai Jamjuree", "Noto Sans Thai", "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--night); color: var(--ink); font-family: var(--f-name); overflow: hidden; }
+#stage { position: fixed; inset: 0; overflow: hidden; }
+#sky { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.shade { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent 0, rgba(11,22,34,.0) 20%, rgba(11,22,34,.45) 50%, rgba(11,22,34,.0) 80%, transparent 100%); }
+
+#roll { position: absolute; left: 0; right: 0; top: 0; padding-inline: 16px; will-change: transform; transform: translateY(100vh); }
+.col { max-width: 40rem; margin-inline: auto; display: flex; flex-direction: column; gap: 4.5rem; text-align: center; padding-block: 2rem; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+section { display: flex; flex-direction: column; gap: .6rem; }
+.role { font-family: var(--f-label); font-weight: 600; font-size: .8rem; letter-spacing: .22em; color: var(--amber); margin: 0; }
+.eyebrow { font-family: var(--f-label); font-size: .85rem; letter-spacing: .18em; color: var(--mute); margin: 0; }
+h1, .big { font-family: var(--f-display); font-weight: 400; margin: 0; line-height: 1.35; text-wrap: balance; }
+h1 { font-size: clamp(2.2rem, 7vw, 3.6rem); }
+.big { font-size: clamp(1.7rem, 5vw, 2.5rem); }
+.sub { font-family: var(--f-name); font-size: 1.25rem; color: var(--mute); margin: 0; }
+.names { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .2rem; font-size: 1.6rem; font-weight: 500; }
+.names.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .5rem 1rem; font-size: 1.3rem; }
+.names small, .zones small { display: block; font-family: var(--f-label); font-size: .85rem; color: var(--mute); font-weight: 400; letter-spacing: .04em; }
+.zones { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem 1.5rem; margin: 0; align-items: baseline; }
+.zones dt { text-align: right; font-family: var(--f-label); font-weight: 600; color: var(--mute); letter-spacing: .12em; font-size: .95rem; }
+.zones dd { text-align: left; margin: 0; font-size: 1.35rem; font-weight: 500; min-width: 0; }
+.ledger dd { font-variant-numeric: tabular-nums; }
+.note { font-family: var(--f-label); color: var(--mute); font-size: .95rem; margin: 0; }
+.finale p { margin: 0; }
+.finale .say { font-size: 1.3rem; color: var(--ink); }
+
+/* opening card, end cards, controls */
+.card { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2rem; padding-inline: 16px; text-align: center; }
+#intro { background: radial-gradient(ellipse at center, rgba(11,22,34,.55), rgba(11,22,34,.85)); transition: opacity .9s ease; }
+#intro.gone { opacity: 0; pointer-events: none; }
+#intro p { margin: 0; }
+.play { font-family: var(--f-label); font-weight: 600; font-size: 1.1rem; letter-spacing: .08em; color: var(--night); background: var(--amber); border: 0; border-radius: 999px; padding: .85rem 2rem; cursor: pointer; }
+.play:hover { filter: brightness(1.08); }
+.play:focus-visible, .ghost:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+.ghost { font-family: var(--f-label); font-size: .85rem; color: var(--ink); background: rgba(11,22,34,.5); border: 1px solid var(--line); border-radius: 999px; padding: .5rem 1rem; cursor: pointer; }
+#end { pointer-events: none; gap: .4rem; }
+#end .e { font-family: var(--f-display); margin: 0; opacity: 0; transform: translateY(12px); transition: opacity 1.1s ease, transform 1.1s ease; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+#end .e.on { opacity: 1; transform: none; }
+#e1 { font-size: clamp(2rem, 7vw, 3.4rem); }
+#e2 { font-size: clamp(1.4rem, 4.5vw, 2.2rem); color: var(--ink); }
+#e3 { font-size: clamp(2.6rem, 10vw, 5rem); color: var(--amber); }
+#e3.on { animation: thud .5s cubic-bezier(.3,1.6,.5,1); }
+@keyframes thud { 0% { transform: scale(1.5); opacity: 0; } 100% { transform: none; opacity: 1; } }
+#again { pointer-events: auto; margin-top: 2rem; }
+.studio *, .studio *::before { transition: none !important; animation: none !important; }
+.studio .play, .studio #intro .note, .studio .hud { visibility: hidden; }
+.hud { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 12px; display: flex; gap: .5rem; }
+@media (max-width: 480px) {
+  .zones { grid-template-columns: 1fr; gap: .2rem; }
+  .zones dt, .zones dd { text-align: center; }
+  .zones dd { margin-bottom: .8rem; }
+  .names { font-size: 1.4rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #end .e, #intro { transition: none; }
+  #e3.on { animation: none; }
+}
+</style>
+
+<div id="stage">
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <div class="shade"></div>
+
+  <div id="roll" aria-live="off">
+    <div class="col">
+      <section>
+        <p class="eyebrow">ภารกิจน้ำท่วม · กันยายน – ตุลาคม 2569</p>
+        <h1>หมู่บ้านสหกรณ์ฯ 4</h1>
+        <p class="sub">เสรีไทย 57 · บึงกุ่ม</p>
+      </section>
+
+      <section>
+        <p class="role">นำแสดงโดย</p>
+        <p class="big">ทีมจิตอาสา GEN Y</p>
+      </section>
+
+      <section>
+        <p class="role">ผู้ประสานงาน</p>
+        <ul class="names">
+          <li>พี่เอ็ม</li><li>เฟย์</li><li>ต้อง</li><li>แป้ง</li><li>บอมบ์</li><li>มีจัง</li>
+          <li>หนึ่ง<small>โต๊ะหน้าหมู่บ้าน</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">จุดลงของ</p>
+        <dl class="zones">
+          <dt>จุด A · B</dt><dd>พี่โอ · พี่เขม · Arita</dd>
+          <dt>จุด C</dt><dd>คุณสงกรานต์ · Pinky<br>คุณอุ้ม · คุณกวาง</dd>
+          <dt>จุด D</dt><dd>ยาสและเพื่อนๆ · กิต · จี้</dd>
+          <dt>จุด E</dt><dd>แอ๊นท์</dd>
+          <dt>จุด F</dt><dd>พี่ไจ๋</dd>
+          <dt>จุด G · H</dt><dd>ตูน</dd>
+          <dt>จุด I</dt><dd>ไอซ์ · เปรียว</dd>
+        </dl>
+      </section>
+
+      <section>
+        <p class="role">ลุยน้ำ ขนของ แบกทราย แจกข้าว</p>
+        <ul class="names grid">
+          <li>ต้น</li><li>ซู</li><li>ยู</li><li>ฮะ</li><li>อาดำ</li><li>พี่บัง</li>
+          <li>ปลื้ม</li><li>แพรว</li><li>เขมธัช</li><li>น้องบุญ</li><li>น้องผึ้ง</li><li>ทีมน้องจ๋าย</li>
+          <li>Odaily</li><li>Mascot Jack</li><li>111</li><li>MaPrang</li><li>3igJoe</li><li>nuttfoto</li>
+          <li>HANOI</li><li>Pansan</li><li>AWH</li><li>เอมอร · อุ๊</li><li>สาธิต · อู๊ด</li><li>K.Aor</li>
+          <li>SMithjy</li><li>หยุย</li><li>Benz</li><li>sirirat</li><li>Emthida</li><li>lucky</li>
+          <li>DKY</li><li>จัสจัส</li><li>panseaka</li><li>Patt</li><li>PaoLop</li><li>จิ๋ง</li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ยาและสุขภาพ</p>
+        <ul class="names">
+          <li>โบว์<small>ตามหายาป้องกันฉี่หนูทั้งเมือง</small></li>
+          <li>โค้ชปิ๋ม<small>TorYod Bio · น้ำยาแช่เท้า</small></li>
+          <li>สบายดีคลินิก<small>หมอปุ้ย · หมอพล</small></li>
+          <li>คุณอภิรักษ์ · น้องติ๊บ<small>จัดซื้อและส่งยาถึงหมู่บ้าน</small></li>
+          <li>พี่แซม<small>บริจาคยา</small></li>
+          <li>ศูนย์บริการสาธารณสุข 50<small>ศูนย์สุขภาพชุมชน ซ.47</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">เรือ และรถ</p>
+        <ul class="names">
+          <li>ทีมเรือคายัค<small>กองการกีฬา ดินแดง</small></li>
+          <li>เรือพร้อมฝีพาย จากผู้ว่าฯ กทม.<small>ประสานโดยคุณหม่อน</small></li>
+          <li>ทีมเบญจกิติ<small>ไล่แจกของทางเรือถึงซอยใน 36</small></li>
+          <li>คุณเบญจรัตน์<small>เรือพายคุณหมอน · คุณบุญลา</small></li>
+          <li>ดอน<small>เรือรับส่งฟรี</small></li>
+          <li>คุณหน่อย<small>เจ้าของเรือ</small></li>
+          <li>ฝ่ายโยธา เขตบึงกุ่ม<small>เรือให้ยืม</small></li>
+          <li>มศว<small>รถ 6 ล้อ และสองแถว รับส่งหน้า–ท้ายหมู่บ้าน</small></li>
+          <li>คุณเฮง<small>รถ 10 ล้อ</small></li>
+          <li>คุณสาโรจน์<small>รถตู้</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">กระสอบทราย อุดรูรั่ว สูบน้ำ</p>
+        <ul class="names">
+          <li>คุณ first และทีม</li>
+          <li>อ.ชาญวิทย์ · อ.เสกสรร<small>คุณวัลลภ · คุณเล็ก</small></li>
+          <li>คุณประสงค์</li>
+          <li>คุณบิ๊ก<small>ทีมงาน สส.ปราม · ขนทรายมาช่วย</small></li>
+          <li>จิตอาสาชุมชนโต๊ะบาง</li>
+          <li>ร้านดินแดน<small>ทราย</small></li>
+          <li>คุณพ่อนิวัฒน์ ซอย 30<small>ทีมตัดต้นกล้วยอุดท่อ</small></li>
+          <li>สำนักการระบายน้ำ<small>เจ้าหน้าที่ประจำเครื่องสูบ</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ครัวและเสบียง</p>
+        <ul class="names">
+          <li>ครัวสโมสร ซอย 2<small>คุณหนุ่ย</small></li>
+          <li>ร้านสเต๊ก 59<small>คุณแสง · ทำข้าวแจกทุกวัน</small></li>
+          <li>ครัวคุณหญิง · ครัวสหกรณ์<small>คุณมนทิรา</small></li>
+          <li>ร้านป้าแก้ว<small>และท่าน ดร. ซอย 2 ที่เหมาแกงมาแจก</small></li>
+          <li>ทีมอาสาจากพะเยา<small>แจกท้ายหมู่บ้านจนมืดค่ำ</small></li>
+          <li>พี่ๆ ร้านข้าวสาร ซอย 30<small>ชุดยายังชีพให้ทีมอาสา</small></li>
+          <li>ร้านบัง</li>
+          <li>คุณ Bee Huerta<small>ส่งอาหารไว้ที่เต็นท์หลัก</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ร้านที่เปิดหน้าร้านให้เป็นจุดลงของ</p>
+        <ul class="names grid">
+          <li>ร้านมู้ด คอฟฟี่</li><li>ร้านสายชล</li><li>ร้านเพื่อนบ้าน</li>
+          <li>ร้านไทยอีสาน</li><li>ร้านมอไซค์ · ลูกชิ้น ซ.21</li><li>บริษัท Amata</li>
+          <li>ร้านไอซ์มาร์ท</li><li>Triple wood Cafe</li><li>ร้านแหนมเนือง ซ.71</li>
+          <li>ร้านตัดผมวินเทจ</li><li>ร้านวิโรจน์</li><li>ร้าน 108</li>
+          <li>เบเกอรี่ LOVE KETO</li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">หน่วยงาน</p>
+        <ul class="names">
+          <li>ผู้ว่าฯ กทม. และทีมงาน</li>
+          <li>สำนักงานเขตบึงกุ่ม<small>คุณปอ · ฝ่ายโยธา · ฝ่ายรักษาความสะอาด</small></li>
+          <li>หน่วยทหารที่ดูแลเขตบึงกุ่ม</li>
+          <li>การไฟฟ้านครหลวง มีนบุรี<small>คุณเอลฟ์ และช่างที่ลุยน้ำมาตัดไฟ</small></li>
+          <li>ปภ.</li><li>สภากาชาดไทย</li>
+          <li>มูลนิธิเด็กและเยาวชน</li><li>สสส.</li>
+          <li>กรมส่งเสริมการเกษตร · กรมส่งเสริมสหกรณ์</li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">คนในหมู่บ้าน</p>
+        <ul class="names">
+          <li>คหบาล<small>อ.ณรงค์ · คุณมนทิรา · คุณนพวรรณ</small></li>
+          <li>รปภ. ป้อมยามหน้าหมู่บ้าน</li>
+          <li>เพจสหกรณ์ต้องรอด</li>
+          <li>ชุมชนโต๊ะบาง</li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ชุดให้อาสาได้ใส่</p>
+        <ul class="names">
+          <li>ร้านอาหารตามสั่ง ซอย 8</li>
+          <li>คุณ Yada Srit</li>
+          <li>คุณ Sara Neyra</li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ช่วยค่ารองเท้าบู๊ท</p>
+        <ul class="names"><li>คุณ Lily Sakaothip</li></ul>
+      </section>
+
+      <section>
+        <p class="role">ผู้ใจดี</p>
+        <p class="say">ทุกคนที่ส่งข้าว น้ำ ไข่ ยา ถุงดำ รองเท้าบู๊ท<br>ชุดเอี๊ยม ผ้าอนามัย และเงินช่วย<br>ทั้งที่บอกชื่อ และไม่ประสงค์ออกนาม</p>
+        <p class="note">คุณธีร์ · คุณโบ · และอีกมากที่นับไม่ทัน</p>
+      </section>
+
+      <section>
+        <p class="role">ระบบ serithai57.com</p>
+        <ul class="names">
+          <li>Claude<small>กวาดแชท LINE · อ่านอย่างเดียว ไม่เคยตอบ</small></li>
+        </ul>
+      </section>
+
+
+      <section class="ledger">
+        <p class="role">บันทึกการถ่ายทำ</p>
+        <dl class="zones">
+          <dt>ซอยที่วัดระดับน้ำ</dt><dd>67 ซอย</dd>
+          <dt>จุดลงของ</dt><dd>7 จุด</dd>
+          <dt>เครื่องสูบน้ำ</dt><dd>5 เครื่อง</dd>
+          <dt>รูรั่วที่อุดแล้ว</dt><dd>ซ.15 · ซ.27</dd>
+          <dt>ข้าวกล่อง</dt><dd>นับไม่ทัน</dd>
+          <dt>ชั่วโมงนอนของอาสา</dt><dd>ไม่ขอเปิดเผย</dd>
+        </dl>
+        <p class="note">ระหว่างการถ่ายทำ ไม่มีอาสาคนไหนได้นอนครบ 8 ชั่วโมง</p>
+      </section>
+
+      <section>
+        <p class="role">ขอบคุณสปอนเซอร์</p>
+        <ul class="names">
+          <li>พี่แมน stockmanday</li>
+          <li>คุณลูกศิษย์ advisee<small>ผู้ซื้อ Claude Max ให้ใช้ทำงาน</small></li>
+        </ul>
+        <p class="note">ใช้คุ้มมาก บอกเลย ไม่งั้นตายไปแล้ว ไม่ต้องเรียนจบ</p>
+      </section>
+
+      <section class="finale">
+        <p class="role">และที่สำคัญที่สุด</p>
+        <p class="big">ลูกบ้านทุกคน</p>
+        <p class="say">ที่ส่งข้าว ส่งข่าว ส่งทราย ส่งกำลังใจ</p>
+        <p class="big">และลูกเพจทุกคน</p>
+        <p class="say">ที่อาจตกหล่นในรายชื่อนี้<br>ที่ส่งข้อมูลสำคัญ และขอร่วมบริจาคทาง inbox</p>
+        <p class="note">น้ำแห้งแล้ว · 1 ตุลาคม 2569</p>
+      </section>
+
+      <section class="thief">
+        <p class="role">ผู้ชิงเครดิตคนสุดท้าย</p>
+        <p class="big">แอดมินเพจ</p>
+        <p class="say">หมู่บ้านสหกรณ์เคหะสถาน ถนนเสรีไทย</p>
+        <p class="note">เอาแต่พายเรือยางตีกรรเชียงเล่น ไม่ยอมไปช่วยส่งของ<br>แถมขโมยหมูปิ้งอาสามากิน 3 ไม้ · ทรายแมว 1 ถุง · อาหารแมว 1 ห่อ</p>
+        <p class="note">ฮ่าๆ</p>
+      </section>
+    </div>
+  </div>
+
+  <div id="end" class="card" aria-live="polite">
+    <p class="e" id="e1">ไม่สร้างภาคสอง</p>
+    <p class="e" id="e2">ไม่ต้องรอชม</p>
+    <p class="e" id="e3">ปิดมุข</p>
+    <button class="ghost" id="again" type="button" hidden>↺ ดูอีกรอบ</button>
+  </div>
+
+  <div id="intro" class="card">
+    <p class="eyebrow">ขอบคุณทุกคนในทีมอาสา</p>
+    <h1>น้ำลดแล้ว</h1>
+    <p class="sub">หมู่บ้านสหกรณ์ฯ 4 · เสรีไทย 57</p>
+    <button class="play" id="play" type="button">▶ เริ่ม · เปิดเสียง</button>
+    <p class="note">ราว 3 นาทีครึ่ง · ดนตรีสังเคราะห์สดในเบราว์เซอร์</p>
+  </div>
+
+  <div class="hud"><button class="ghost" id="mute" type="button" hidden>🔊 เสียง</button></div>
+</div>
+
+<script>
+(() => {
+  // ---------- music: tempo, harmony, melody ----------
+  const BPM = 78, BEAT = 60 / BPM, BAR = BEAT * 4, EIGHTH = BEAT / 2;
+  const BARS = 64;                    // 8 sections of 8 bars
+  const LEN = BARS * BAR;             // the credit roll lasts exactly as long as the score
+  // D  A/C#  Bm  G  D/F#  G  Em7  A   (bass first, then the voicing)
+  const CH = [
+    [38, 57, 62, 66], [37, 57, 61, 64], [35, 54, 59, 62], [43, 55, 59, 62],
+    [42, 57, 62, 66], [43, 55, 59, 64], [40, 55, 59, 62], [45, 57, 61, 64],
+  ];
+  const A1 = [
+    [[78, 2], [76, 1], [74, 1]], [[73, 2], [74, 1], [76, 1]],
+    [[78, 1.5], [81, .5], [83, 1], [81, 1]], [[79, 2], [78, 1], [76, 1]],
+    [[74, 1], [78, 1], [81, 2]], [[83, 1], [81, 1], [79, 1], [78, 1]],
+    [[76, 1], [79, 1], [78, 1], [76, 1]], [[76, 3], [null, 1]],
+  ];
+  const A2 = A1.slice(0, 7).concat([[[81, 1], [79, 1], [76, 1], [73, 1]]]);
+  const MEL = A1.concat(A2);          // 16-bar tune
+  const ARP = [0, 1, 2, 3, 2, 1, 2, 1];
+  // per section: [arp, melody, bass, drums, octave]
+  const PLAN = [
+    [.6, 0, 0, 0, 0], [.8, 1, 0, 0, 0], [1, 1, 1, 1, 0],
+    [1, 1, 1, 1, 1], [.5, 1, .7, 0, 0], [1, 1, 1, 1, 0],
+    [1, 1, 1, 1, 1], [.6, 1, .7, 0, 1],
+  ];
+  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  let ac = null, master, dry, verb, delay, noise, timer = null, step = 0, nextT = 0, t0 = 0, muted = false;
+
+  function impulse(sec, decay) {
+    const n = Math.floor(ac.sampleRate * sec), b = ac.createBuffer(2, n, ac.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = b.getChannelData(c);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, decay);
+    }
+    return b;
+  }
+  function initAudio(ctx) {
+    if (ctx) ac = ctx;
+    else {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ac = new AC();
+    }
+    master = ac.createGain(); master.gain.value = .9;
+    const comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -16; comp.ratio.value = 3;
+    master.connect(comp); comp.connect(ac.destination);
+    dry = ac.createGain(); dry.connect(master);
+    verb = ac.createConvolver(); verb.buffer = impulse(3.4, 2.4);
+    const vg = ac.createGain(); vg.gain.value = .42; verb.connect(vg); vg.connect(master);
+    delay = ac.createDelay(2); delay.delayTime.value = BEAT * .75;
+    const fb = ac.createGain(); fb.gain.value = .33;
+    const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2400;
+    delay.connect(lp); lp.connect(fb); fb.connect(delay);
+    const dg = ac.createGain(); dg.gain.value = .5; lp.connect(dg); dg.connect(master); dg.connect(verb);
+    noise = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const nd = noise.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  }
+  function out(node, v = 0, d = 0) {
+    node.connect(dry);
+    if (v) { const g = ac.createGain(); g.gain.value = v; node.connect(g); g.connect(verb); }
+    if (d) { const g = ac.createGain(); g.gain.value = d; node.connect(g); g.connect(delay); }
+  }
+  function env(g, t, a, peak, hold, rel) {
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + a);
+    g.gain.setValueAtTime(peak, t + a + hold);
+    g.gain.exponentialRampToValueAtTime(.0001, t + a + hold + rel);
+    return t + a + hold + rel + .05;
+  }
+  // warm pad: two detuned saws per note through a soft lowpass
+  function pad(notes, t, dur, vol = .022) {
+    const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 950; f.Q.value = .6;
+    const g = ac.createGain(); f.connect(g); out(g, .9);
+    const end = env(g, t, 1.1, 1, Math.max(.1, dur - 1.1), 1.8);
+    for (const m of notes) for (const det of [-7, 7]) {
+      const o = ac.createOscillator(); o.type = "sawtooth"; o.frequency.value = mtof(m); o.detune.value = det;
+      const og = ac.createGain(); og.gain.value = vol; o.connect(og); og.connect(f);
+      o.start(t); o.stop(end);
+    }
+  }
+  // soft pluck for the arpeggio
+  function pluck(m, t, vol) {
+    const o = ac.createOscillator(); o.type = "triangle"; o.frequency.value = mtof(m);
+    const f = ac.createBiquadFilter(); f.type = "lowpass";
+    f.frequency.setValueAtTime(2600, t); f.frequency.exponentialRampToValueAtTime(500, t + .6);
+    const g = ac.createGain(); o.connect(f); f.connect(g); out(g, .35, .3);
+    const end = env(g, t, .006, .07 * vol, 0, 1.1);
+    o.start(t); o.stop(end);
+  }
+  // FM electric-piano bell for the tune
+  function bell(m, t, d, vol = .11) {
+    const fr = mtof(m);
+    const c = ac.createOscillator(); c.frequency.value = fr;
+    const mod = ac.createOscillator(); mod.frequency.value = fr * 2;
+    const mg = ac.createGain();
+    mg.gain.setValueAtTime(fr * 1.3, t); mg.gain.exponentialRampToValueAtTime(fr * .04, t + 1.3);
+    mod.connect(mg); mg.connect(c.frequency);
+    const g = ac.createGain(); c.connect(g); out(g, .55, .22);
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + .012);
+    g.gain.exponentialRampToValueAtTime(vol * .4, t + .45);
+    g.gain.exponentialRampToValueAtTime(.0001, t + d + 1.7);
+    c.start(t); mod.start(t); c.stop(t + d + 1.8); mod.stop(t + d + 1.8);
+  }
+  function bass(m, t, d, vol = .2) {
+    const o = ac.createOscillator(); o.type = "triangle"; o.frequency.value = mtof(m);
+    const s = ac.createOscillator(); s.frequency.value = mtof(m);
+    const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 420;
+    const g = ac.createGain(); o.connect(f); s.connect(f); f.connect(g); out(g, .1);
+    const end = env(g, t, .02, vol, d * .6, d * .6);
+    o.start(t); s.start(t); o.stop(end); s.stop(end);
+  }
+  function kick(t, vol = .38) {
+    const o = ac.createOscillator();
+    o.frequency.setValueAtTime(115, t); o.frequency.exponentialRampToValueAtTime(42, t + .14);
+    const g = ac.createGain(); o.connect(g); out(g, .05);
+    const end = env(g, t, .004, vol, 0, .34);
+    o.start(t); o.stop(end);
+  }
+  function hiss(t, vol, hp, dec, bp) {
+    const n = ac.createBufferSource(); n.buffer = noise;
+    const f = ac.createBiquadFilter(); f.type = "highpass"; f.frequency.value = hp;
+    const g = ac.createGain(); n.connect(f);
+    if (bp) { const b = ac.createBiquadFilter(); b.type = "bandpass"; b.frequency.value = bp; b.Q.value = .8; f.connect(b); b.connect(g); }
+    else f.connect(g);
+    out(g, .25);
+    const end = env(g, t, .003, vol, 0, dec);
+    n.start(t, Math.random() * .5); n.stop(end);
+  }
+  function tom(t, from, to, vol = .45) {
+    const o = ac.createOscillator();
+    o.frequency.setValueAtTime(from, t); o.frequency.exponentialRampToValueAtTime(to, t + .2);
+    const g = ac.createGain(); o.connect(g); out(g, .2);
+    const end = env(g, t, .003, vol, 0, .3);
+    o.start(t); o.stop(end);
+  }
+  function rimshot(t) {           // ba-dum-tss
+    tom(t, 210, 150); hiss(t, .05, 2500, .08);
+    tom(t + .2, 140, 95); hiss(t + .2, .05, 2500, .08);
+    kick(t + .42, .35); hiss(t + .42, .22, 6500, 1.6, 9000);
+  }
+
+  function playStep(s, t) {
+    const b = Math.floor(s / 8), e = s % 8, ch = CH[b % 8];
+    const [arp, mel, bs, dr, oct] = PLAN[Math.floor(b / 8)];
+    if (e === 0) {
+      pad(ch.slice(1), t, BAR + .4, b < 4 ? .016 + b * .002 : .022);
+      if (mel && b >= 8) {
+        let off = 0;
+        for (const [m, d] of MEL[(b - 8) % 16]) {
+          if (m) {
+            bell(m, t + off * BEAT, d * BEAT);
+            if (oct) bell(m + 12, t + off * BEAT, d * BEAT, .035);
+          }
+          off += d;
+        }
+      }
+    }
+    if (bs && (e === 0 || e === 4)) bass(ch[0], t, BEAT * 1.8, .2 * bs);
+    if (bs && e === 7) bass(ch[0] + 12, t, BEAT * .4, .08 * bs);
+    if (arp) {
+      const tones = ch.slice(1).concat([ch[1] + 12]).map((m) => m + 12);
+      pluck(tones[ARP[e]], t, arp);
+    }
+    if (dr) {
+      if (e === 0 || e === 4) kick(t);
+      hiss(t, e % 2 ? .035 : .015, 7000, .05);
+    }
+  }
+  function finale(t) {
+    pad([50, 57, 62, 66, 69], t, 5, .022);
+    bass(38, t, 4, .2);
+    [74, 78, 81, 86].forEach((m, i) => bell(m, t + i * .14, 3.5, .09));
+    rimshot(t + LEN_END.e3 - .45);
+  }
+  function tick() {
+    while (nextT < ac.currentTime + .3) {
+      if (step >= BARS * 8) { finale(nextT); clearInterval(timer); timer = null; return; }
+      playStep(step, nextT); step++; nextT += EIGHTH;
+    }
+  }
+
+  // ---------- picture ----------
+  const cv = document.getElementById("sky"), cx = cv.getContext("2d");
+  const roll = document.getElementById("roll");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let W = 0, H = 0, dpr = 1, houses = [], stars = [], rain = [];
+  const LEN_END = { e1: 1.2, e2: 3.2, e3: 5.4, again: 8.5 };
+
+  function seeded(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+  function resize() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const r = seeded(57);
+    houses = [];
+    for (let x = -20; x < W + 20;) {
+      const w = 46 + r() * 70, h = H * (.1 + r() * .14);
+      houses.push({ x, w, h, roof: 10 + r() * 20, lit: [r() < .35, r() < .25, r() < .3] });
+      x += w + 2 + r() * 10;
+    }
+    stars = Array.from({ length: 90 }, () => [r() * W, r() * H * .55, r() * 1.3 + .3, r() * 6]);
+    rain = Array.from({ length: 240 }, () => [r() * W, r() * H, 9 + r() * 9, 520 + r() * 300]);
+  }
+  const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+  const rgb = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+  const smooth = (a, b, x) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
+
+  let lastT = 0;
+  function draw(p, t) {
+    const dt = Math.min(.05, t - lastT); lastT = t;
+    const dawn = smooth(.45, 1, p);
+    // sky: monsoon night to dry morning
+    const g = cx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, rgb(mix([9, 18, 30], [44, 62, 98], dawn)));
+    g.addColorStop(.65, rgb(mix([16, 40, 60], [190, 140, 120], dawn)));
+    g.addColorStop(1, rgb(mix([18, 50, 74], [242, 184, 114], dawn)));
+    cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+    const sa = Math.max(0, 1 - p * 1.8) * (1 - smooth(0, .3, 1 - p) * .6);
+    for (const [x, y, s, ph] of stars) {
+      cx.fillStyle = `rgba(230,236,240,${sa * (.5 + .5 * Math.sin(t * 1.3 + ph))})`;
+      cx.fillRect(x, y, s, s);
+    }
+    if (dawn > 0) {
+      const sun = cx.createRadialGradient(W * .5, H * 1.02, 0, W * .5, H * 1.02, H * .9);
+      sun.addColorStop(0, `rgba(255,214,150,${.75 * dawn})`);
+      sun.addColorStop(1, "rgba(255,214,150,0)");
+      cx.fillStyle = sun; cx.fillRect(0, 0, W, H);
+    }
+    // village row
+    const base = H;
+    const body = mix([7, 14, 22], [52, 44, 54], dawn);
+    for (const hs of houses) {
+      const top = base - hs.h;
+      cx.fillStyle = rgb(body);
+      cx.fillRect(hs.x, top, hs.w, hs.h);
+      cx.beginPath(); cx.moveTo(hs.x - 4, top); cx.lineTo(hs.x + hs.w / 2, top - hs.roof); cx.lineTo(hs.x + hs.w + 4, top); cx.fill();
+      hs.lit.forEach((on, i) => {
+        if (!on) return;
+        cx.fillStyle = `rgba(255,196,120,${.8 * (1 - dawn * .7)})`;
+        cx.fillRect(hs.x + 8 + i * (hs.w - 22) / 2, top + 10, 8, 10);
+      });
+    }
+    // flood water draining from 60 cm to dry
+    const full = H * .36, level = full * (1 - smooth(.04, .9, p));
+    if (level > .5) {
+      const top = base - level, wv = reduce ? 0 : 1;
+      cx.beginPath(); cx.moveTo(0, H);
+      for (let x = 0; x <= W; x += 8) cx.lineTo(x, top + wv * (Math.sin(x * .012 + t * 1.1) * 4 + Math.sin(x * .033 - t * .7) * 2));
+      cx.lineTo(W, H); cx.closePath();
+      const wg = cx.createLinearGradient(0, top, 0, H);
+      wg.addColorStop(0, rgb(mix([50, 120, 156], [120, 150, 160], dawn), .82));
+      wg.addColorStop(1, rgb(mix([14, 40, 60], [70, 70, 80], dawn), .95));
+      cx.fillStyle = wg; cx.fill();
+      cx.strokeStyle = `rgba(255,255,255,${.16 + .2 * dawn})`; cx.lineWidth = 1.5;
+      cx.beginPath();
+      for (let x = 0; x <= W; x += 8) {
+        const y = top + wv * (Math.sin(x * .012 + t * 1.1) * 4 + Math.sin(x * .033 - t * .7) * 2);
+        x ? cx.lineTo(x, y) : cx.moveTo(x, y);
+      }
+      cx.stroke();
+    }
+    // staff gauge, like the ones on the canal wall
+    if (W >= 560) {
+      const gx = W - 54, cm = 60 * level / full, px = full / 60;
+      cx.fillStyle = "rgba(238,242,239,.85)"; cx.fillRect(gx, base - full - 8, 6, full + 8);
+      cx.font = "600 11px 'Bai Jamjuree', sans-serif"; cx.textAlign = "right";
+      for (let c = 0; c <= 60; c += 10) {
+        const y = base - c * px;
+        cx.fillRect(gx - 8, y - 1, 8, 2);
+        if (c) { cx.fillStyle = "rgba(238,242,239,.75)"; cx.fillText(c, gx - 12, y + 4); cx.fillStyle = "rgba(238,242,239,.85)"; }
+      }
+      cx.textAlign = "center"; cx.fillStyle = "#f2b872";
+      cx.font = "600 12px 'Bai Jamjuree', sans-serif";
+      cx.fillText("ระดับน้ำ (ซม.)", gx, base - full - 34);
+      cx.font = "600 20px 'Bai Jamjuree', sans-serif";
+      cx.fillText(cm < .5 ? "แห้ง" : Math.round(cm), gx, base - full - 14);
+    }
+    // rain stops early
+    const ra = 1 - smooth(.08, .4, p);
+    if (ra > 0 && !reduce) {
+      cx.strokeStyle = `rgba(175,205,225,${.38 * ra})`; cx.lineWidth = 1;
+      cx.beginPath();
+      const n = Math.floor(rain.length * ra);
+      for (let i = 0; i < n; i++) {
+        const d = rain[i];
+        d[1] += d[3] * dt; d[0] -= d[3] * dt * .12;
+        if (d[1] > H) { d[1] = -20; d[0] = Math.random() * (W + 60); }
+        cx.moveTo(d[0], d[1]); cx.lineTo(d[0] - d[2] * .12, d[1] + d[2]);
+      }
+      cx.stroke();
+    }
+  }
+
+  // ---------- timeline ----------
+  const intro = document.getElementById("intro"), muteBtn = document.getElementById("mute");
+  const e1 = document.getElementById("e1"), e2 = document.getElementById("e2"), e3 = document.getElementById("e3"), again = document.getElementById("again");
+  let running = false, wall0 = 0, rollH = 0;
+  const now = () => (ac ? ac.currentTime : performance.now() / 1000);
+  function elapsed() { return running ? now() - t0 : 0; }
+
+  function start() {
+    if (!ac) initAudio();
+    if (ac && ac.state === "suspended") ac.resume();
+    [e1, e2, e3].forEach((x) => x.classList.remove("on"));
+    again.hidden = true;
+    intro.classList.add("gone");
+    muteBtn.hidden = !ac;
+    rollH = roll.offsetHeight;
+    t0 = now() + .15; step = 0; nextT = t0; running = true;
+    if (ac) { if (timer) clearInterval(timer); timer = setInterval(tick, 40); tick(); }
+  }
+  function frame() {
+    if (studio) return;
+    const t = performance.now() / 1000, el = Math.max(0, elapsed());
+    const p = running ? Math.min(1, el / LEN) : 0;
+    draw(p, t);
+    roll.style.transform = `translateY(${H - (H + rollH) * p}px)`;
+    if (running && el > LEN) {
+      const k = el - LEN;
+      if (k > LEN_END.e1) e1.classList.add("on");
+      if (k > LEN_END.e2) e2.classList.add("on");
+      if (k > LEN_END.e3) e3.classList.add("on");
+      if (k > LEN_END.again) again.hidden = false;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // jump ahead for rehearsals: __seek(seconds) moves picture and score together
+  window.__seek = (sec) => {
+    t0 -= sec;
+    if (ac && timer) { step = Math.min(BARS * 8, Math.ceil((ac.currentTime + .05 - t0) / EIGHTH)); nextT = t0 + step * EIGHTH; }
+  };
+  document.getElementById("play").addEventListener("click", start);
+  again.addEventListener("click", start);
+  muteBtn.addEventListener("click", () => {
+    muted = !muted;
+    master.gain.setTargetAtTime(muted ? 0 : .9, ac.currentTime, .05);
+    muteBtn.textContent = muted ? "🔇 ปิดเสียง" : "🔊 เสียง";
+  });
+  addEventListener("resize", () => { resize(); rollH = roll.offsetHeight; });
+  // ---------- studio: frame-exact rendering for the vertical video ----------
+  const INTRO = 3.5;
+  let studio = false;
+  const clamp = (x) => Math.min(1, Math.max(0, x));
+  window.__studio = {
+    INTRO, LEN, total: INTRO + LEN + 11.5,
+    at(vt) {
+      if (!studio) { studio = true; document.documentElement.classList.add("studio"); rollH = roll.offsetHeight; }
+      const el = vt - INTRO, p = clamp(el / LEN);
+      intro.style.opacity = 1 - smooth(INTRO - 1, INTRO, vt);
+      draw(p, vt);
+      roll.style.transform = `translateY(${H - (H + rollH) * p}px)`;
+      const k = el - LEN;
+      [[e1, LEN_END.e1], [e2, LEN_END.e2]].forEach(([n, at]) => {
+        const a = clamp((k - at) / 1.1);
+        n.style.opacity = a; n.style.transform = `translateY(${12 * (1 - a)}px)`;
+      });
+      const a3 = clamp((k - LEN_END.e3) / .35);
+      e3.style.opacity = a3; e3.style.transform = `scale(${1 + .5 * (1 - a3) * (1 - a3)})`;
+    },
+    async audio() {
+      const SR = 44100, total = this.total;
+      initAudio(new OfflineAudioContext(2, Math.ceil(SR * total), SR));
+      for (let s = 0; s < BARS * 8; s++) playStep(s, INTRO + s * EIGHTH);
+      finale(INTRO + LEN);
+      const buf = await ac.startRendering();
+      const n = buf.length, L = buf.getChannelData(0), R = buf.getChannelData(1);
+      let peak = 0;
+      for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i]));
+      const gain = peak > 0 ? .95 / Math.max(peak, .5) : 1;
+      const wav = new DataView(new ArrayBuffer(44 + n * 4));
+      const w = (o, str) => [...str].forEach((c, i) => wav.setUint8(o + i, c.charCodeAt(0)));
+      w(0, "RIFF"); wav.setUint32(4, 36 + n * 4, true); w(8, "WAVEfmt ");
+      wav.setUint32(16, 16, true); wav.setUint16(20, 1, true); wav.setUint16(22, 2, true);
+      wav.setUint32(24, SR, true); wav.setUint32(28, SR * 4, true); wav.setUint16(32, 4, true); wav.setUint16(34, 16, true);
+      w(36, "data"); wav.setUint32(40, n * 4, true);
+      for (let i = 0, o = 44; i < n; i++, o += 4) {
+        wav.setInt16(o, Math.max(-1, Math.min(1, L[i] * gain)) * 32767, true);
+        wav.setInt16(o + 2, Math.max(-1, Math.min(1, R[i] * gain)) * 32767, true);
+      }
+      this.wav = new Uint8Array(wav.buffer);
+      return this.wav.length;
+    },
+    chunk(i, size) {
+      let s = ""; const part = this.wav.subarray(i, i + size);
+      for (let j = 0; j < part.length; j += 8192) s += String.fromCharCode.apply(null, part.subarray(j, j + 8192));
+      return btoa(s);
+    },
+  };
+  resize();
+  rollH = roll.offsetHeight;
+  requestAnimationFrame(frame);
+})();
+</script>

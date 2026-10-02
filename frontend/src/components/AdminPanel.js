@@ -120,6 +120,7 @@ function AnnouncementsAdmin({ admin, onPublicChange }) {
 
   return (
     <div className="space-y-6">
+      <SiteMode />
       <form onSubmit={create} className="space-y-3 rounded-2xl bg-white p-4 shadow">
         <h3 className="text-lg font-bold">📢 สร้างประกาศใหม่</h3>
         <textarea
@@ -414,5 +415,46 @@ export default function AdminPanel({ admin, onPublicChange }) {
       {tab === "audit" && <AuditAdmin />}
       {tab === "account" && <AccountAdmin />}
     </div>
+  );
+}
+
+// Home page mode: ซ่อมบ้าน (flood board archived, read-only) or back to the flood board if the water returns.
+function SiteMode() {
+  const [mode, setMode] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    api("/site")
+      .then((r) => setMode(r.mode))
+      .catch((e) => setError(e.message));
+  }, []);
+  async function change(next) {
+    const text = next === "flood" ? "เปิดระบบน้ำท่วมกลับมาเป็นหน้าแรก? (ทุกคนแจ้งน้ำ/ขอความช่วยเหลือได้อีกครั้ง)" : "ปิดระบบน้ำท่วม เก็บเป็นคลัง แล้วใช้หน้าซ่อมบ้าน?";
+    if (!window.confirm(text)) return;
+    setBusy(true);
+    setError("");
+    try {
+      setMode((await api("/admin/site", { method: "PUT", body: JSON.stringify({ mode: next }) })).mode);
+    } catch (e) {
+      setError(e.message);
+    }
+    setBusy(false);
+  }
+  return (
+    <section className="space-y-3 rounded-2xl border-4 border-black bg-white p-4 shadow">
+      <h3 className="text-lg font-bold">🏠 โหมดหน้าแรก</h3>
+      <p className="text-sm text-neutral-600">
+        ตอนนี้: <b>{mode === "flood" ? "🌊 ระบบน้ำท่วม (เปิดรับแจ้ง)" : mode === "repair" ? "🧰 ซ่อมบ้าน · ระบบน้ำท่วมเป็นคลังดูอย่างเดียวที่ /flood" : "…"}</b>
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <button disabled={busy || mode === "repair"} onClick={() => change("repair")} className={btnPrimary}>
+          🧰 ใช้โหมดซ่อมบ้าน
+        </button>
+        <button disabled={busy || mode === "flood"} onClick={() => change("flood")} className={btnGhost}>
+          🌊 น้ำมาอีก: เปิดระบบน้ำท่วม
+        </button>
+      </div>
+      {error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+    </section>
   );
 }

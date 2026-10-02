@@ -17,9 +17,11 @@ from pydantic import BaseModel, Field
 SERVICE_CATEGORIES = [
     "electrician", "plumber", "truck", "rental", "boat", "porter",
     "cleaning", "repair", "food", "supplies", "pets", "other",
+    # after the flood (repair mode)
+    "ac", "appliance", "carpenter", "painter", "roof", "pest", "vehicle", "junk",
 ]
 Pricing = Literal["paid", "free", "ask"]
-HIDDEN = {"_id": 0, "edit_key_hash": 0, "reporters": 0}
+HIDDEN = {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews.who": 0}
 
 
 def _now():

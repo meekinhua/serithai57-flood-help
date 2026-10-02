@@ -35,6 +35,7 @@ import staff  # noqa: E402
 import trips  # noqa: E402
 import zonelog  # noqa: E402
 import ops  # noqa: E402
+import repair  # noqa: E402
 import team  # noqa: E402
 import weather  # noqa: E402
 
@@ -607,8 +608,23 @@ app.include_router(zonelog.build_router(db, rate_limit, current_admin, {z["id"] 
 team_router, is_team = team.build_router(db, rate_limit, current_admin, require_admin, locate_house, staff.ZONES, staff.needs_of, staff.zone_of_soi)
 app.include_router(team_router)
 app.include_router(ops.build_router(db, rate_limit, current_admin, {z["id"] for z in staff.ZONES["zones"]}, is_team))
+app.include_router(repair.build_router(db, rate_limit, current_admin, require_admin, audit, client_ip, claim_media, delete_media))
 app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media, staff.SOIS, staff.ZONES["main_road"]))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
+@app.middleware("http")
+async def flood_archive_guard(request: Request, call_next):
+    """Repair mode: the flood board is an archive. Its write routes answer 423 for everyone but admins."""
+    path = request.url.path
+    if request.method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith(repair.FLOOD_WRITES):
+        if await repair.site_mode(db) == "repair":
+            admin = await current_admin(request)
+            if not (admin and admin.get("role", "admin") == "admin"):
+                from fastapi.responses import JSONResponse
+
+                return JSONResponse({"detail": "ระบบน้ำท่วมปิดแล้ว (ดูย้อนหลังได้อย่างเดียว) · ตอนนี้เป็นโหมดซ่อมบ้าน"}, status_code=423)
+    return await call_next(request)
+
+
 app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 
@@ -645,6 +661,9 @@ async def startup():
     await db.ops_history.create_index([("ref", 1), ("at", -1)])
     await db.services.create_index([("category", 1), ("updated_at", -1)])
     await db.media.create_index("id", unique=True)
+    for coll in (db.lend_items, db.jobs, db.issues):
+        await coll.create_index("id", unique=True)
+        await coll.create_index([("status", 1), ("updated_at", -1)])
     await db.media.create_index([("attached_to", 1), ("created_at", 1)])
 
     async def media_housekeeping():
