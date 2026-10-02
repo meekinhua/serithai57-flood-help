@@ -1,25 +1,30 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, load, save } from "../api";
-import { timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import MediaPicker, { mediaState } from "./MediaPicker";
 
-// /fund — เงินสมทบทีมอาสา: one public ledger instead of slips in the LINE group. Nobody fills in a form:
-// the entries come from the running tallies people post in the village chat (tools/fund_sweep.py).
-// Treasurer link: /fund#fk=<key> (kept on this phone, sent as X-Fund-Key); admins are treasurers too.
+// /fund — เงินสมทบทีมอาสา: a dashboard anyone can read in five seconds and check line by line.
+// Top: the four numbers that matter (in, out, left, how much is checked against the bank). Then the flow over
+// time, where the money came from / went, how complete the checking is, and the full ledger with evidence.
+// Treasurer link: /fund#fk=<key> (kept on this phone); admins are treasurers too.
 const PURPOSES = {
-  food: "🍱 อาหาร / น้ำอาสา",
-  sand: "🧱 กระสอบทราย",
-  labor: "💪 ค่าแรง",
-  general: "🤝 ทั่วไป",
+  food: ["🍱", "อาหาร / น้ำดื่ม"],
+  sand: ["🧱", "กระสอบทราย"],
+  labor: ["💪", "ค่าแรง"],
+  supplies: ["🧰", "อุปกรณ์ / ของใช้"],
+  general: ["🤝", "ทั่วไป"],
 };
 const STATUS = {
-  pending: { label: "⏳ รอตรวจกับบัญชี", cls: "bg-amber-100 text-amber-900" },
-  confirmed: { label: "✅ ตรวจแล้ว", cls: "bg-emerald-100 text-emerald-800" },
-  rejected: { label: "❌ ไม่พบยอด", cls: "bg-red-100 text-red-800" },
+  confirmed: { label: "ตรวจแล้ว", icon: "✅", cls: "bg-emerald-100 text-emerald-800" },
+  pending: { label: "รอตรวจ", icon: "⏳", cls: "bg-amber-100 text-amber-900" },
+  rejected: { label: "ไม่พบยอด", icon: "❌", cls: "bg-red-100 text-red-800" },
 };
+const SOURCES = { slip: "สลิป", cash: "เงินสด", transfer: "เห็นในบัญชี", line: "จากรายการในกลุ่ม" };
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
-const baht = (n) => `${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })} บาท`;
+const fmt = (n) => Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 });
+const baht = (n) => `${fmt(n)} บาท`;
+const when = (iso) => (iso ? new Date(iso).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—");
+const tOf = (d) => new Date(d.paid_at || d.created_at).getTime();
 
 function fundKey() {
   const m = window.location.hash.match(/[#&]fk=([A-Za-z0-9_-]{16,})/);
@@ -39,7 +44,6 @@ function fapi(path, options = {}) {
 async function copy(text) {
   try {
     await navigator.clipboard.writeText(text);
-    return true;
   } catch {
     const ta = document.createElement("textarea");
     ta.value = text;
@@ -47,17 +51,21 @@ async function copy(text) {
     ta.select();
     document.execCommand("copy");
     ta.remove();
-    return true;
   }
 }
 
+function sumBy(list, key) {
+  const out = {};
+  for (const d of list) out[d[key] || "general"] = (out[d[key] || "general"] || 0) + d.amount;
+  return out;
+}
+
 export default function FundPage() {
-  const [key] = useState(() => fundKey());
+  useState(() => fundKey());
   const [data, setData] = useState(null);
-  const [tre, setTre] = useState(null); // treasurer view, if allowed
-  const [tab, setTab] = useState("in");
-  const [toast, setToast] = useState("");
+  const [tre, setTre] = useState(null);
   const [err, setErr] = useState("");
+  const [toast, setToast] = useState("");
 
   const reload = useCallback(async () => {
     try {
@@ -81,21 +89,44 @@ export default function FundPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  if (!data) return <p className="p-6 text-center text-neutral-500">{err || "กำลังโหลด…"}</p>;
-  const t = data.totals;
-  const acc = data.account;
+  const m = useMemo(() => {
+    if (!data) return null;
+    const ins = data.donations;
+    const live = ins.filter((d) => d.status !== "rejected");
+    const ok = ins.filter((d) => d.status === "confirmed");
+    const wait = ins.filter((d) => d.status === "pending");
+    const total = live.reduce((s, d) => s + d.amount, 0);
+    const confirmed = ok.reduce((s, d) => s + d.amount, 0);
+    const spent = data.expenses.reduce((s, d) => s + d.amount, 0);
+    return {
+      total,
+      confirmed,
+      spent,
+      left: total - spent,
+      n: live.length,
+      nOk: ok.length,
+      nWait: wait.length,
+      nRejected: ins.length - live.length,
+      nSlip: live.filter((d) => d.has_slip).length,
+      nRef: live.filter((d) => d.ref_tail).length,
+      nReceipt: data.expenses.filter((x) => x.receipts?.length).length,
+      inBy: sumBy(live, "purpose"),
+      outBy: sumBy(data.expenses, "purpose"),
+    };
+  }, [data]);
+
+  if (!data || !m) return <p className="p-6 text-center text-neutral-500">{err || "กำลังโหลด…"}</p>;
 
   async function copySummary() {
     const lines = [
       "💰 สรุปเงินสมทบทีมอาสา หมู่บ้านสหกรณ์ฯ 4",
-      `ณ ${new Date().toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`,
-      `💰 ยอดสมทบ ${baht(t.received + t.pending)} (${t.count_confirmed + t.count_pending} รายการ)`,
-      t.count_pending ? `   ✅ ตรวจกับบัญชีแล้ว ${baht(t.received)} · ⏳ รอตรวจ ${baht(t.pending)}` : "   ✅ ตรวจกับบัญชีครบแล้ว",
-      `🧾 ใช้ไป ${baht(t.spent)} · 💵 คงเหลือ ${baht(t.received + t.pending - t.spent)}`,
+      `ณ ${when(new Date().toISOString())}`,
+      `รับ ${baht(m.total)} (${m.n} รายการ) · ตรวจกับบัญชีแล้ว ${baht(m.confirmed)}`,
+      `ใช้ไป ${baht(m.spent)} · คงเหลือ ${baht(m.left)}`,
       "",
-      "ดูรายการรับ-จ่ายทั้งหมดได้ที่",
+      "ดูทุกรายการ พร้อมหลักฐาน:",
       `${window.location.origin}/fund`,
-    ].filter((x) => x !== "");
+    ];
     await copy(lines.join("\n"));
     setToast("คัดลอกสรุปแล้ว วางในกลุ่ม LINE ได้เลย");
   }
@@ -103,103 +134,70 @@ export default function FundPage() {
   return (
     <div className="min-h-screen bg-stone-100 text-neutral-900">
       <header className="sticky top-0 z-[900] bg-black text-white shadow">
-        <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2">
-          <a href="/" className="min-h-[44px] min-w-[44px] rounded-lg bg-white/10 px-3 text-xl leading-[44px]" aria-label="กลับหน้าแรก">‹</a>
+        <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 py-2">
+          <a href="/" className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-white/10 text-xl" aria-label="กลับหน้าแรก">‹</a>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-bold">💰 เงินสมทบทีมอาสา</h1>
-            <p className="truncate text-xs text-neutral-400">หมู่บ้านสหกรณ์ฯ 4 · บัญชีเดียว ยอดเดียว ทุกคนเห็น</p>
+            <p className="truncate text-xs text-neutral-400">หมู่บ้านสหกรณ์ฯ 4 · อัปเดตล่าสุด {when(data.updated_at)}</p>
           </div>
           <button onClick={copySummary} className="min-h-[44px] shrink-0 rounded-lg bg-white/10 px-3 text-sm font-semibold">📋 สรุปไป LINE</button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-3 px-3 pb-10 pt-3">
-        <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Stat big label="💰 ยอดสมทบทั้งหมด" value={baht(t.received + t.pending)} sub={`${t.count_confirmed + t.count_pending} รายการ`} />
-          <Stat label="✅ ตรวจกับบัญชีแล้ว" value={baht(t.received)} sub={t.count_pending ? `รอตรวจอีก ${baht(t.pending)}` : "ครบแล้ว"} />
-          <Stat label="🧾 ใช้ไปแล้ว" value={baht(t.spent)} />
-          <Stat big label="💵 คงเหลือ" value={baht(t.received + t.pending - t.spent)} />
+      <main className="mx-auto max-w-5xl space-y-4 px-3 pb-12 pt-3">
+        {/* 1. the four numbers */}
+        <section className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label="สรุปยอด">
+          <Kpi tone="dark" label="รับเข้าทั้งหมด" value={baht(m.total)} sub={`${m.n} รายการ`} />
+          <Kpi label="ใช้ไปแล้ว" value={baht(m.spent)} sub={`${data.expenses.length} รายการ`} />
+          <Kpi tone="green" label="คงเหลือ" value={baht(m.left)} sub={m.total ? `${Math.round((m.left / m.total) * 100)}% ของยอดรับ` : ""} />
+          <Kpi label="ตรวจกับบัญชีแล้ว" value={`${m.total ? Math.round((m.confirmed / m.total) * 100) : 0}%`} sub={`${baht(m.confirmed)} · รอตรวจ ${m.nWait}`} bar={m.total ? m.confirmed / m.total : 0} />
         </section>
 
-        {acc && (
-          <section className="rounded-2xl border-4 border-black bg-white p-3">
-            <p className="text-sm font-semibold text-neutral-600">บัญชีรับเงินสมทบ</p>
-            <p className="text-lg font-bold">{acc.bank} · {acc.name}</p>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="select-all text-2xl font-black tabular-nums tracking-wide">{acc.number}</span>
-              <button onClick={() => copy(acc.number.replace(/\D/g, "")).then(() => setToast("คัดลอกเลขบัญชีแล้ว"))} className="min-h-[40px] rounded-lg border-2 border-black px-3 text-sm font-semibold">
-                คัดลอกเลขบัญชี
-              </button>
-            </div>
-            {acc.note && <p className="mt-1 text-sm text-neutral-700">{acc.note}</p>}
-          </section>
-        )}
+        {/* 2. flow over time */}
+        <Card title="เงินเข้า – ออก ตามเวลา" note="ยอดสะสม">
+          <FlowChart donations={data.donations.filter((d) => d.status !== "rejected")} expenses={data.expenses} />
+        </Card>
 
-        <p className="rounded-xl bg-white p-3 text-sm text-neutral-700">
-          ยอดในหน้านี้รวบรวมจากรายการรวมยอดในกลุ่ม LINE หมู่บ้าน อัปเดตเป็นรอบ ไม่ต้องกรอกเอง · ⏳ = รอเหรัญญิกตรวจกับบัญชี · ✅ = ตรวจแล้ว
-        </p>
-
-        {tre && <Treasurer tre={tre} onChanged={reload} setToast={setToast} keyMode={!!key} />}
-
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1">
-          {[["in", `รายการรับ (${data.donations.length})`], ["out", `รายการจ่าย (${data.expenses.length})`]].map(([k, txt]) => (
-            <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className={`min-h-[44px] rounded-lg text-sm font-semibold ${tab === k ? "bg-white shadow" : "text-neutral-600"}`}>
-              {txt}
-            </button>
-          ))}
+        {/* 3. where from / where to + how complete the checking is */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card title="รับเข้า ตามวัตถุประสงค์">
+            <Bars data={m.inBy} total={m.total} color="bg-neutral-900" />
+          </Card>
+          <Card title="ใช้ไป ตามหมวด">
+            {m.spent ? <Bars data={m.outBy} total={m.spent} color="bg-amber-500" /> : <p className="text-sm text-neutral-500">ยังไม่มีรายจ่าย</p>}
+          </Card>
+          <Card title="ความครบถ้วนของการตรวจสอบ">
+            <Check ok={m.nOk} of={m.n} label="ตรวจกับบัญชีธนาคารแล้ว" />
+            <Check ok={m.nSlip} of={m.n} label="มีสลิปเป็นหลักฐาน" />
+            <Check ok={m.nRef} of={m.n} label="มีเลขที่รายการ (กันลงซ้ำ)" />
+            <Check ok={m.nReceipt} of={data.expenses.length} label="รายจ่ายมีใบเสร็จ" />
+            {m.nRejected > 0 && <p className="mt-1 text-sm text-red-700">❌ ไม่พบยอดในบัญชี {m.nRejected} รายการ (ไม่นับรวม)</p>}
+          </Card>
         </div>
 
-        {tab === "in" ? (
-          <ul className="divide-y divide-neutral-200 rounded-xl bg-white">
-            {data.donations.map((d) => (
-              <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-                <span className="min-w-0 flex-1">
-                  <b className="break-words">{d.name}</b>
-                  <span className="block text-xs text-neutral-500">
-                    {PURPOSES[d.purpose]} · {d.transferred_at || timeAgo(d.created_at)}
-                    {d.source === "cash" && " · เงินสด"}
-                    {d.source === "line" && " · จากกลุ่ม LINE"}
-                  </span>
-                </span>
-                <span className={`rounded px-1.5 text-xs font-semibold ${STATUS[d.status].cls}`}>{STATUS[d.status].label}</span>
-                <b className="w-28 text-right tabular-nums">{baht(d.amount)}</b>
-              </li>
-            ))}
-            {!data.donations.length && <li className="p-4 text-center text-neutral-500">ยังไม่มีรายการ</li>}
-          </ul>
-        ) : (
-          <ul className="space-y-2">
-            {data.expenses.map((x) => (
-              <li key={x.id} className="rounded-xl bg-white p-3">
-                <div className="flex items-start gap-2">
-                  <span className="min-w-0 flex-1">
-                    <b className="break-words">{x.item}</b>
-                    <span className="block text-xs text-neutral-500">
-                      {PURPOSES[x.purpose]} · {x.spent_at || timeAgo(x.created_at)}
-                      {x.paid_by && ` · จ่ายโดย ${x.paid_by}`}
-                    </span>
-                    {x.note && <span className="block text-sm">{x.note}</span>}
-                  </span>
-                  <b className="tabular-nums">{baht(x.amount)}</b>
-                </div>
-                {x.receipts?.length > 0 && (
-                  <div className="mt-2 flex gap-2">
-                    {x.receipts.map((m) => (
-                      <a key={m.id} href={mediaUrl(m.id)} target="_blank" rel="noreferrer">
-                        <img src={mediaUrl(m.id, "thumb")} alt="ใบเสร็จ" loading="lazy" className="h-16 w-16 rounded object-cover" />
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </li>
-            ))}
-            {!data.expenses.length && <li className="rounded-xl bg-white p-4 text-center text-neutral-500">ยังไม่มีรายการจ่าย</li>}
-          </ul>
+        {tre && <Treasurer tre={tre} onChanged={reload} setToast={setToast} />}
+
+        {/* 4. the ledger */}
+        <Ledger data={data} />
+
+        {data.account && (
+          <Card title="บัญชีรับเงินสมทบ">
+            <p className="font-semibold">{data.account.bank} · {data.account.name}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="select-all text-xl font-black tabular-nums">{data.account.number}</span>
+              <button onClick={() => copy(data.account.number.replace(/\D/g, "")).then(() => setToast("คัดลอกเลขบัญชีแล้ว"))} className="min-h-[40px] rounded-lg border-2 border-black px-3 text-sm font-semibold">
+                คัดลอก
+              </button>
+            </div>
+            {data.account.note && <p className="text-sm text-neutral-600">{data.account.note}</p>}
+          </Card>
         )}
 
-        <p className="text-xs text-neutral-500">
-          เว็บนี้ไม่ได้รับหรือโอนเงิน เป็นสมุดบัญชีให้ทุกคนเห็นตรงกัน · ระวังมิจฉาชีพ: โอนเฉพาะบัญชีที่แสดงในหน้านี้ ถ้ามีคนส่งเลขบัญชีอื่นมา ให้ถามทีมอาสาก่อน
-        </p>
+        <section className="rounded-xl bg-white p-3 text-sm text-neutral-600">
+          <b className="text-neutral-900">ตรวจสอบยอดของตัวเอง:</b> หาชื่อหรือเวลาโอนในตารางรายรับ แล้วดูเลขท้าย 4 ตัวของเลขที่รายการให้ตรงกับสลิปของคุณ ·
+          ✅ = เหรัญญิกเห็นยอดในบัญชีแล้ว · ⏳ = รอตรวจ · สลิปและบ้านเลขที่เห็นเฉพาะเหรัญญิก · เว็บนี้ไม่ได้รับหรือโอนเงิน ·
+          ระวังมิจฉาชีพ: โอนเฉพาะบัญชีที่ทีมอาสาประกาศ
+        </section>
       </main>
 
       {toast && (
@@ -211,22 +209,251 @@ export default function FundPage() {
   );
 }
 
-function Stat({ label: l, value, sub, big }) {
+function Card({ title, note, children }) {
   return (
-    <div className={`rounded-xl p-2 ${big ? "bg-black text-white" : "bg-white"}`}>
-      <p className={`text-xs ${big ? "text-neutral-300" : "text-neutral-500"}`}>{l}</p>
-      <p className="text-lg font-black tabular-nums sm:text-xl">{value}</p>
-      {sub && <p className={`text-xs ${big ? "text-neutral-300" : "text-neutral-500"}`}>{sub}</p>}
+    <section className="rounded-2xl bg-white p-3 shadow-sm">
+      <h2 className="mb-2 flex items-baseline gap-2 font-bold">
+        {title}
+        {note && <span className="text-xs font-normal text-neutral-500">{note}</span>}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function Kpi({ label, value, sub, tone, bar }) {
+  const cls = tone === "dark" ? "bg-black text-white" : tone === "green" ? "bg-emerald-700 text-white" : "bg-white";
+  const muted = tone ? "text-white/70" : "text-neutral-500";
+  return (
+    <div className={`rounded-2xl p-3 shadow-sm ${cls}`}>
+      <p className={`text-xs font-semibold ${muted}`}>{label}</p>
+      <p className="text-xl font-black tabular-nums sm:text-2xl">{value}</p>
+      {bar != null && (
+        <div className="mt-1 h-2 overflow-hidden rounded-full bg-neutral-200" aria-hidden="true">
+          <div className="h-full rounded-full bg-emerald-600" style={{ width: `${Math.round(bar * 100)}%` }} />
+        </div>
+      )}
+      {sub && <p className={`mt-0.5 text-xs ${muted}`}>{sub}</p>}
     </div>
   );
 }
 
-// ---------- treasurer: check reports against the bank app, add cash, record spending ----------
-function Treasurer({ tre, onChanged, setToast, keyMode }) {
+function Bars({ data, total, color }) {
+  const rows = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  if (!rows.length) return <p className="text-sm text-neutral-500">ยังไม่มีข้อมูล</p>;
+  return (
+    <ul className="space-y-2">
+      {rows.map(([k, v]) => (
+        <li key={k}>
+          <div className="flex justify-between gap-2 text-sm">
+            <span>{PURPOSES[k]?.[0]} {PURPOSES[k]?.[1] || k}</span>
+            <span className="tabular-nums">
+              {fmt(v)} <span className="text-neutral-500">({Math.round((v / total) * 100)}%)</span>
+            </span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-neutral-100" aria-hidden="true">
+            <div className={`h-full rounded-full ${color}`} style={{ width: `${(v / total) * 100}%` }} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Check({ ok, of, label }) {
+  const done = of > 0 && ok === of;
+  return (
+    <div className="mb-2">
+      <div className="flex justify-between gap-2 text-sm">
+        <span>{done ? "✅" : "⬜"} {label}</span>
+        <span className="font-semibold tabular-nums">{ok}/{of}</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100" aria-hidden="true">
+        <div className={`h-full rounded-full ${done ? "bg-emerald-600" : "bg-amber-400"}`} style={{ width: of ? `${(ok / of) * 100}%` : "0%" }} />
+      </div>
+    </div>
+  );
+}
+
+// Cumulative money in (black) and out (amber) over time, one scale, labelled at the ends.
+function FlowChart({ donations, expenses }) {
+  const ev = [...donations.map((d) => ({ t: tOf(d), in: d.amount, out: 0 })), ...expenses.map((x) => ({ t: tOf(x), in: 0, out: x.amount }))].sort((a, b) => a.t - b.t);
+  if (!ev.length) return <p className="text-sm text-neutral-500">ยังไม่มีรายการ</p>;
+  const W = 640, H = 180, L = 56, R = 12, T = 12, B = 26;
+  const t0 = ev[0].t;
+  const t1 = Math.max(ev[ev.length - 1].t, t0 + 60000);
+  const pts = [];
+  let cin = 0;
+  let cout = 0;
+  for (const e of ev) {
+    cin += e.in;
+    cout += e.out;
+    pts.push({ t: e.t, cin, cout });
+  }
+  const maxY = Math.max(cin, 1);
+  const x = (t) => L + ((t - t0) / (t1 - t0)) * (W - L - R);
+  const y = (v) => T + (1 - v / maxY) * (H - T - B);
+  const step = (key) => pts.reduce((p, q, i) => p + (i ? ` H${x(q.t).toFixed(1)}` : `M${x(q.t).toFixed(1)},${y(0)}`) + ` V${y(q[key]).toFixed(1)}`, "") + ` H${x(t1)}`;
+  const ticks = [0, maxY / 2, maxY];
+  const tl = (t) => new Date(t).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full max-w-full" role="img" aria-label={`ยอดสะสม รับ ${fmt(cin)} บาท ใช้ ${fmt(cout)} บาท`}>
+        {ticks.map((v) => (
+          <g key={v}>
+            <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke="#e5e5e5" />
+            <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#737373">{fmt(Math.round(v))}</text>
+          </g>
+        ))}
+        <path d={step("cin")} fill="none" stroke="#111" strokeWidth="2.5" />
+        {cout > 0 && <path d={step("cout")} fill="none" stroke="#f59e0b" strokeWidth="2.5" />}
+        <circle cx={x(t1)} cy={y(cin)} r="4" fill="#111" />
+        <text x={L} y={H - 6} fontSize="11" fill="#737373">{tl(t0)}</text>
+        <text x={W - R} y={H - 6} fontSize="11" fill="#737373" textAnchor="end">{tl(t1)}</text>
+      </svg>
+      <p className="mt-1 flex flex-wrap gap-x-4 text-sm">
+        <span><span className="mr-1 inline-block h-2.5 w-4 rounded bg-neutral-900 align-middle" />รับสะสม {baht(cin)}</span>
+        <span><span className="mr-1 inline-block h-2.5 w-4 rounded bg-amber-500 align-middle" />ใช้สะสม {baht(cout)}</span>
+      </p>
+    </div>
+  );
+}
+
+function Ledger({ data }) {
+  const [tab, setTab] = useState("in");
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("all");
+  const [sort, setSort] = useState("time");
+  const query = q.trim().toLowerCase();
+  const ins = data.donations
+    .filter((d) => (status === "all" || d.status === status) && (!query || `${d.name} ${d.ref_tail} ${fmt(d.amount)} ${d.amount}`.toLowerCase().includes(query)))
+    .sort((a, b) => (sort === "amount" ? b.amount - a.amount : tOf(b) - tOf(a)));
+  const outs = data.expenses
+    .filter((x) => !query || `${x.item} ${x.paid_by} ${x.amount}`.toLowerCase().includes(query))
+    .sort((a, b) => (sort === "amount" ? b.amount - a.amount : tOf(b) - tOf(a)));
+
+  function csv() {
+    const rows = [["ประเภท", "เวลา", "ชื่อ/รายการ", "ยอด", "วัตถุประสงค์", "สถานะ", "เลขที่รายการ (ท้าย)", "หลักฐาน"]];
+    for (const d of data.donations) rows.push(["รับ", when(d.paid_at || d.created_at), d.name, d.amount, PURPOSES[d.purpose]?.[1] || "", STATUS[d.status].label, d.ref_tail, d.has_slip ? "สลิป" : ""]);
+    for (const x of data.expenses) rows.push(["จ่าย", when(x.paid_at || x.created_at), x.item, x.amount, PURPOSES[x.purpose]?.[1] || "", "", "", x.receipts?.length ? "ใบเสร็จ" : ""]);
+    const text = "﻿" + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+    a.download = "เงินสมทบทีมอาสา.csv";
+    a.click();
+  }
+
+  return (
+    <Card title="บัญชีรายการ">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1">
+        {[["in", `รายรับ (${data.donations.length})`], ["out", `รายจ่าย (${data.expenses.length})`]].map(([k, t]) => (
+          <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className={`min-h-[44px] rounded-lg text-sm font-semibold ${tab === k ? "bg-white shadow" : "text-neutral-600"}`}>{t}</button>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <input value={q} onChange={(e) => setQ(e.target.value)} className={`${input} w-full`} placeholder="🔍 ค้นหาชื่อ / ยอด / เลขท้าย 4 ตัว" aria-label="ค้นหา" />
+        {tab === "in" && (
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className="min-h-[44px] flex-1 rounded-lg border border-neutral-300 px-2" aria-label="สถานะ">
+            <option value="all">ทุกสถานะ</option>
+            {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+          </select>
+        )}
+        <select value={sort} onChange={(e) => setSort(e.target.value)} className="min-h-[44px] flex-1 rounded-lg border border-neutral-300 px-2" aria-label="เรียง">
+          <option value="time">ล่าสุดก่อน</option>
+          <option value="amount">ยอดมากก่อน</option>
+        </select>
+        <button onClick={csv} className="min-h-[44px] rounded-lg border-2 border-black px-3 text-sm font-semibold">⬇️ CSV</button>
+      </div>
+      <div className="-mx-3 mt-2 overflow-x-auto px-3">
+        {tab === "in" ? (
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs text-neutral-500">
+              <tr className="border-b">
+                <th className="py-2 pr-2 font-semibold">เวลาโอน</th>
+                <th className="py-2 pr-2 font-semibold">ชื่อ</th>
+                <th className="py-2 pr-2 text-right font-semibold">ยอด (บาท)</th>
+                <th className="hidden py-2 pr-2 font-semibold sm:table-cell">สถานะ</th>
+                <th className="hidden py-2 font-semibold sm:table-cell">หลักฐาน</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ins.map((d) => (
+                <tr key={d.id} className={`border-b last:border-0 ${d.status === "rejected" ? "text-neutral-400 line-through" : ""}`}>
+                  <td className="whitespace-nowrap py-2 pr-2 tabular-nums">{when(d.paid_at || d.created_at)}</td>
+                  <td className="py-2 pr-2">
+                    {d.name}
+                    <span className="block text-xs text-neutral-500">{PURPOSES[d.purpose]?.[1]} · {SOURCES[d.source] || ""}</span>
+                    <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs sm:hidden">
+                      <span className={`rounded px-1.5 font-semibold ${STATUS[d.status].cls}`}>{STATUS[d.status].icon} {STATUS[d.status].label}</span>
+                      {d.has_slip && "📎"}
+                      {d.ref_tail && <span className="font-mono text-neutral-600">…{d.ref_tail}</span>}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-2 text-right font-semibold tabular-nums">{fmt(d.amount)}</td>
+                  <td className="hidden py-2 pr-2 sm:table-cell"><span className={`whitespace-nowrap rounded px-1.5 text-xs font-semibold ${STATUS[d.status].cls}`}>{STATUS[d.status].icon} {STATUS[d.status].label}</span></td>
+                  <td className="hidden whitespace-nowrap py-2 text-xs sm:table-cell">{d.has_slip ? "📎 สลิป" : "—"}{d.ref_tail && <span className="ml-1 font-mono text-neutral-600">…{d.ref_tail}</span>}</td>
+                </tr>
+              ))}
+              {!ins.length && <tr><td colSpan={5} className="py-4 text-center text-neutral-500">ไม่มีรายการ</td></tr>}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-black font-bold">
+                <td colSpan={2} className="py-2">รวม {ins.length} รายการ{status === "all" ? " (ไม่นับ ❌)" : ""}</td>
+                <td className="py-2 pr-2 text-right tabular-nums">{fmt(ins.filter((d) => d.status !== "rejected").reduce((s, d) => s + d.amount, 0))}</td>
+                <td colSpan={2} className="hidden sm:table-cell" />
+              </tr>
+            </tfoot>
+          </table>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs text-neutral-500">
+              <tr className="border-b">
+                <th className="py-2 pr-2 font-semibold">เวลา</th>
+                <th className="py-2 pr-2 font-semibold">รายการ</th>
+                <th className="py-2 pr-2 text-right font-semibold">ยอด (บาท)</th>
+                <th className="py-2 font-semibold">ใบเสร็จ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {outs.map((x) => (
+                <tr key={x.id} className="border-b last:border-0">
+                  <td className="whitespace-nowrap py-2 pr-2 tabular-nums">{when(x.paid_at || x.created_at)}</td>
+                  <td className="py-2 pr-2">
+                    {x.item}
+                    <span className="block text-xs text-neutral-500">{PURPOSES[x.purpose]?.[1]}{x.paid_by && ` · จ่ายโดย ${x.paid_by}`}{x.note && ` · ${x.note}`}</span>
+                  </td>
+                  <td className="py-2 pr-2 text-right font-semibold tabular-nums">{fmt(x.amount)}</td>
+                  <td className="py-2">
+                    <span className="flex gap-1">
+                      {(x.receipts || []).map((r) => (
+                        <a key={r.id} href={mediaUrl(r.id)} target="_blank" rel="noreferrer"><img src={mediaUrl(r.id, "thumb")} alt="ใบเสร็จ" className="h-10 w-10 rounded object-cover" /></a>
+                      ))}
+                      {!x.receipts?.length && "—"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {!outs.length && <tr><td colSpan={4} className="py-4 text-center text-neutral-500">ยังไม่มีรายจ่าย</td></tr>}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-black font-bold">
+                <td colSpan={2} className="py-2">รวม {outs.length} รายการ</td>
+                <td className="py-2 pr-2 text-right tabular-nums">{fmt(outs.reduce((s, x) => s + x.amount, 0))}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+// ---------- treasurer: add with evidence, check against the bank app, record spending ----------
+function Treasurer({ tre, onChanged, setToast }) {
   const [name, setName] = useState(() => load("fundName", ""));
+  const [form, setForm] = useState(null); // {mode: "in"|"out", edit?}
   const [show, setShow] = useState("pending");
-  const [add, setAdd] = useState(null); // "in" | "out"
-  const [edit, setEdit] = useState({}); // id -> amount text
   const [err, setErr] = useState("");
   const run = async (fn, ok) => {
     setErr("");
@@ -238,83 +465,70 @@ function Treasurer({ tre, onChanged, setToast, keyMode }) {
       setErr(e.message);
     }
   };
-  const list = tre.donations.filter((d) => show === "all" || d.status === show);
-  const added = (msg) => {
-    setAdd(null);
+  const saved = (msg) => {
+    setForm(null);
     onChanged();
     setToast(msg);
   };
-  const review = (d, status) =>
-    run(
-      () => fapi(`/fund/donations/${d.id}/review`, { method: "POST", body: JSON.stringify({ status, amount: edit[d.id] ? Number(edit[d.id]) : null }) }),
-      status === "confirmed" ? "✅ ตรวจแล้ว" : status === "rejected" ? "บันทึกว่าไม่พบยอด" : "ย้ายกลับไปรอตรวจ"
-    );
+  const setStatus = (d, status, msg) => run(() => fapi(`/fund/donations/${d.id}`, { method: "PATCH", body: JSON.stringify({ status }) }), msg);
+  const list = tre.donations.filter((d) => show === "all" || d.status === show);
+  const counts = tre.donations.reduce((c, d) => ({ ...c, [d.status]: (c[d.status] || 0) + 1 }), {});
   return (
     <section className="space-y-3 rounded-2xl border-4 border-amber-500 bg-amber-50 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="min-w-0 flex-1 text-lg font-bold">🔑 โหมดเหรัญญิก {tre.who && <span className="text-sm font-normal">· {tre.who}</span>}</h2>
-        {keyMode && (
-          <input
-            aria-label="ชื่อเหรัญญิก"
-            maxLength={40}
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              save("fundName", e.target.value);
-            }}
-            className="min-h-[40px] w-40 rounded-lg border border-neutral-300 px-2 text-sm"
-            placeholder="ชื่อคุณ (บันทึกว่าใครตรวจ)"
-          />
-        )}
+        <h2 className="min-w-0 flex-1 text-lg font-bold">🔑 เหรัญญิก · {tre.who}</h2>
+        <input
+          aria-label="ชื่อคุณ"
+          maxLength={40}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            save("fundName", e.target.value);
+          }}
+          className="min-h-[40px] w-44 rounded-lg border border-neutral-300 px-2 text-sm"
+          placeholder="ชื่อคุณ (บันทึกว่าใครตรวจ)"
+        />
       </div>
-      <p className="text-sm">เปิดแอปธนาคาร เทียบทีละรายการ: เจอยอดตรงกด ✅ · ไม่เจอกด ❌ · ยอดไม่ตรง แก้ตัวเลขก่อนกด ✅</p>
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={() => setForm({ mode: "in" })} className="min-h-[48px] rounded-xl bg-black font-bold text-white">➕ ลงรายรับ + สลิป</button>
+        <button onClick={() => setForm({ mode: "out" })} className="min-h-[48px] rounded-xl border-2 border-black bg-white font-bold">🧾 ลงรายจ่าย + ใบเสร็จ</button>
+      </div>
+      {form?.mode === "in" && <DonationForm key={form.edit?.id || "new"} edit={form.edit} onClose={() => setForm(null)} onSaved={saved} />}
+      {form?.mode === "out" && <ExpenseForm onClose={() => setForm(null)} onSaved={saved} />}
+      <p className="text-sm">เปิดแอปธนาคาร เทียบทีละรายการ (ยอด + เวลา + เลขที่รายการ) → ✅ เจอ · ❌ ไม่เจอ · ✏️ แก้ถ้าพิมพ์ผิด</p>
       <div className="flex flex-wrap gap-2">
-        {[["pending", `⏳ รอตรวจ (${tre.totals.count_pending})`], ["confirmed", "✅ ตรวจแล้ว"], ["rejected", "❌ ไม่พบ"], ["all", "ทั้งหมด"]].map(([k, txt]) => (
-          <button key={k} onClick={() => setShow(k)} aria-pressed={show === k} className={`min-h-[40px] rounded-full px-3 text-sm ${show === k ? "bg-black font-semibold text-white" : "border border-neutral-400 bg-white"}`}>
-            {txt}
-          </button>
+        {[["pending", `⏳ รอตรวจ (${counts.pending || 0})`], ["confirmed", `✅ (${counts.confirmed || 0})`], ["rejected", `❌ (${counts.rejected || 0})`], ["all", "ทั้งหมด"]].map(([k, t]) => (
+          <button key={k} onClick={() => setShow(k)} aria-pressed={show === k} className={`min-h-[40px] rounded-full px-3 text-sm ${show === k ? "bg-black font-semibold text-white" : "border border-neutral-400 bg-white"}`}>{t}</button>
         ))}
-        <button onClick={() => setAdd(add === "in" ? null : "in")} className="min-h-[40px] rounded-full border-2 border-black bg-white px-3 text-sm font-semibold">➕ รับเงินสด / ยอดที่ไม่มีคนแจ้ง</button>
-        <button onClick={() => setAdd(add === "out" ? null : "out")} className="min-h-[40px] rounded-full border-2 border-black bg-white px-3 text-sm font-semibold">🧾 บันทึกรายจ่าย</button>
       </div>
-      {add && (add === "in" ? <AddDonation onDone={() => added("บันทึกรายรับแล้ว")} /> : <AddExpense onDone={() => added("บันทึกรายจ่ายแล้ว")} />)}
       <ul className="space-y-2">
         {list.map((d) => (
-          <li key={d.id} className="rounded-xl bg-white p-2">
-            <div className="flex flex-wrap items-start gap-2">
-              {d.slip?.[0] ? (
-                <a href={mediaUrl(d.slip[0].id)} target="_blank" rel="noreferrer" className="shrink-0">
-                  <img src={mediaUrl(d.slip[0].id, "thumb")} alt="สลิป" className="h-20 w-16 rounded object-cover" />
-                </a>
-              ) : (
-                <span className="flex h-20 w-16 shrink-0 items-center justify-center rounded bg-neutral-100 text-xs text-neutral-500">ไม่มีสลิป</span>
-              )}
-              <div className="min-w-0 flex-1 text-sm">
-                <p className="text-lg font-black tabular-nums">{baht(d.amount)}</p>
-                <p>
-                  <b>{d.name}</b>
-                  {d.anonymous && " (ไม่ออกนาม)"}
-                  {d.house && ` · ${d.house}`}
-                </p>
-                <p className="text-neutral-600">
-                  {PURPOSES[d.purpose]} · โอน {d.transferred_at || "-"} · แจ้ง {timeAgo(d.created_at)}
-                  {d.source !== "form" && ` · ${d.source === "cash" ? "เงินสด" : "เหรัญญิกบันทึก"}`}
-                </p>
-                {d.note && <p>{d.note}</p>}
-                {d.reviewed_by && <p className="text-xs text-neutral-500">{STATUS[d.status].label} โดย {d.reviewed_by}</p>}
-              </div>
+          <li key={d.id} className="flex flex-wrap items-start gap-2 rounded-xl bg-white p-2">
+            {d.slip?.[0] ? (
+              <a href={mediaUrl(d.slip[0].id)} target="_blank" rel="noreferrer" className="shrink-0">
+                <img src={mediaUrl(d.slip[0].id, "thumb")} alt="สลิป" className="h-24 rounded object-cover" style={{ width: "4.5rem" }} />
+              </a>
+            ) : (
+              <span className="flex h-24 shrink-0 items-center justify-center rounded bg-neutral-100 px-1 text-center text-xs text-neutral-500" style={{ width: "4.5rem" }}>ไม่มีสลิป</span>
+            )}
+            <div className="min-w-0 flex-1 text-sm">
+              <p className="text-lg font-black tabular-nums">{baht(d.amount)}</p>
+              <p>
+                <b>{d.name}</b>
+                {d.house && ` · ${d.house}`}
+                {d.anonymous && " · ไม่ออกนาม"}
+              </p>
+              <p className="text-neutral-600">{when(d.paid_at)} · {d.bank || "-"} · {SOURCES[d.source]}</p>
+              {d.ref && <p className="break-all font-mono text-xs">#{d.ref}</p>}
+              {d.note && <p className="text-xs">{d.note}</p>}
+              {d.reviewed_by && <p className="text-xs text-neutral-500">{STATUS[d.status].icon} โดย {d.reviewed_by}</p>}
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <input aria-label="แก้ยอด" inputMode="decimal" value={edit[d.id] ?? ""} onChange={(e) => setEdit({ ...edit, [d.id]: e.target.value })} className="min-h-[40px] w-28 rounded-lg border border-neutral-300 px-2 text-sm" placeholder="แก้ยอด" />
-              {d.status !== "confirmed" && <button onClick={() => review(d, "confirmed")} className="min-h-[40px] rounded-lg bg-emerald-600 px-3 font-bold text-white">✅ เจอยอด</button>}
-              {d.status !== "rejected" && <button onClick={() => review(d, "rejected")} className="min-h-[40px] rounded-lg bg-red-600 px-3 font-bold text-white">❌ ไม่พบ</button>}
-              {d.status !== "pending" && <button onClick={() => review(d, "pending")} className="min-h-[40px] rounded-lg border border-black px-3">↩️ รอตรวจ</button>}
-              <button
-                onClick={() => window.confirm(`ลบรายการ ${d.name} ${baht(d.amount)}? (ใช้กับรายการซ้ำ/แจ้งผิด)`) && run(() => fapi(`/fund/donations/${d.id}`, { method: "DELETE" }), "ลบแล้ว")}
-                className="min-h-[40px] px-2 text-sm text-red-700 underline"
-              >
-                ลบ (ซ้ำ)
-              </button>
+            <div className="flex w-full flex-wrap gap-2">
+              {d.status !== "confirmed" && <button onClick={() => setStatus(d, "confirmed", "✅ ตรวจแล้ว")} className="min-h-[40px] rounded-lg bg-emerald-600 px-3 font-bold text-white">✅ เจอยอด</button>}
+              {d.status !== "rejected" && <button onClick={() => setStatus(d, "rejected", "บันทึกว่าไม่พบยอด")} className="min-h-[40px] rounded-lg bg-red-600 px-3 font-bold text-white">❌ ไม่พบ</button>}
+              {d.status !== "pending" && <button onClick={() => setStatus(d, "pending")} className="min-h-[40px] rounded-lg border border-black px-3">↩️ รอตรวจ</button>}
+              <button onClick={() => setForm({ mode: "in", edit: d })} className="min-h-[40px] rounded-lg border border-black px-3">✏️ แก้ / แนบสลิป</button>
+              <button onClick={() => window.confirm(`ลบ ${d.name} ${baht(d.amount)}?`) && run(() => fapi(`/fund/donations/${d.id}`, { method: "DELETE" }), "ลบแล้ว")} className="min-h-[40px] px-2 text-sm text-red-700 underline">ลบ</button>
             </div>
           </li>
         ))}
@@ -325,72 +539,117 @@ function Treasurer({ tre, onChanged, setToast, keyMode }) {
   );
 }
 
-function AddDonation({ onDone }) {
-  const [f, setF] = useState({ name: "", house: "", amount: "", transferred_at: "", purpose: "food", source: "cash", note: "" });
+const toLocalInput = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+
+function DonationForm({ edit, onClose, onSaved }) {
+  const [f, setF] = useState(() => ({
+    name: edit?.name || "",
+    house: edit?.house || "",
+    anonymous: edit?.anonymous || false,
+    amount: edit?.amount || "",
+    paid_at: toLocalInput(edit?.paid_at),
+    bank: edit?.bank || "",
+    ref: edit?.ref || "",
+    purpose: edit?.purpose || "food",
+    note: edit?.note || "",
+    status: edit?.status || "pending",
+    source: edit?.source || "slip",
+  }));
+  const [slip, setSlip] = useState([]);
   const [err, setErr] = useState("");
+  const st = mediaState(slip);
   const set = (p) => setF((x) => ({ ...x, ...p }));
   async function submit(e) {
     e.preventDefault();
+    setErr("");
+    const body = { ...f, amount: Number(f.amount), paid_at: f.paid_at ? new Date(f.paid_at).toISOString() : null };
+    if (st.ids[0]) body.slip_id = st.ids[0];
+    if (edit) delete body.source;
     try {
-      await fapi("/fund/treasurer/donations", { method: "POST", body: JSON.stringify({ ...f, amount: Number(f.amount), status: "confirmed" }) });
-      onDone();
+      await fapi(edit ? `/fund/donations/${edit.id}` : "/fund/donations", { method: edit ? "PATCH" : "POST", body: JSON.stringify(body) });
+      onSaved(edit ? "แก้ไขแล้ว" : "ลงรายรับแล้ว");
     } catch (e2) {
       setErr(e2.message);
     }
   }
   return (
-    <form onSubmit={submit} className="grid gap-2 rounded-xl bg-white p-2 sm:grid-cols-2">
-      <input required maxLength={60} value={f.name} onChange={(e) => set({ name: e.target.value })} className={input} placeholder="ชื่อผู้ให้" aria-label="ชื่อผู้ให้" />
-      <input required type="number" inputMode="decimal" min="1" value={f.amount} onChange={(e) => set({ amount: e.target.value })} className={input} placeholder="จำนวนเงิน" aria-label="จำนวนเงิน" />
-      <select value={f.source} onChange={(e) => set({ source: e.target.value })} className={input} aria-label="ช่องทาง">
-        <option value="cash">เงินสด</option>
-        <option value="transfer">โอน (เห็นในแอปธนาคาร)</option>
-        <option value="line">จากรายการในกลุ่ม LINE</option>
-      </select>
-      <select value={f.purpose} onChange={(e) => set({ purpose: e.target.value })} className={input} aria-label="สมทบค่าอะไร">
-        {Object.entries(PURPOSES).map(([k, v]) => (
-          <option key={k} value={k}>{v}</option>
-        ))}
-      </select>
-      <input maxLength={40} value={f.transferred_at} onChange={(e) => set({ transferred_at: e.target.value })} className={input} placeholder="เมื่อไหร่" aria-label="เมื่อไหร่" />
-      <button className="min-h-[44px] rounded-lg bg-black font-bold text-white">บันทึกรายรับ (ตรวจแล้ว)</button>
-      {err && <p className="text-red-700 sm:col-span-2">{err}</p>}
+    <form onSubmit={submit} className="space-y-2 rounded-xl border-2 border-black bg-white p-3">
+      <p className="font-bold">{edit ? "✏️ แก้รายการรับ" : "➕ ลงรายรับพร้อมหลักฐาน"}</p>
+      <div>
+        <p className="mb-1 text-sm font-medium">สลิป {edit?.slip?.length ? "(มีแล้ว · แนบใหม่เพื่อแทน)" : ""}</p>
+        <MediaPicker items={slip} setItems={setSlip} max={1} allowVideo={false} />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <input required inputMode="decimal" type="number" min="0.01" step="0.01" value={f.amount} onChange={(e) => set({ amount: e.target.value })} className={`${input} text-lg font-bold`} placeholder="ยอด (บาท) *" aria-label="ยอด" />
+        <input type="datetime-local" value={f.paid_at} onChange={(e) => set({ paid_at: e.target.value })} className={input} aria-label="เวลาโอนตามสลิป" />
+        <input required maxLength={60} value={f.name} onChange={(e) => set({ name: e.target.value })} className={input} placeholder="ชื่อตามสลิป / ในกลุ่ม *" aria-label="ชื่อ" />
+        <input maxLength={60} value={f.ref} onChange={(e) => set({ ref: e.target.value })} className={`${input} font-mono`} placeholder="เลขที่รายการ (กันลงซ้ำ)" aria-label="เลขที่รายการ" />
+        <input maxLength={30} value={f.bank} onChange={(e) => set({ bank: e.target.value })} className={input} placeholder="ธนาคารผู้โอน" aria-label="ธนาคาร" />
+        <input maxLength={20} value={f.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="บ้านเลขที่ (เห็นเฉพาะเหรัญญิก)" aria-label="บ้านเลขที่" />
+        <select value={f.purpose} onChange={(e) => set({ purpose: e.target.value })} className={input} aria-label="วัตถุประสงค์">
+          {Object.entries(PURPOSES).map(([k, [i, t]]) => <option key={k} value={k}>{i} {t}</option>)}
+        </select>
+        <select value={f.status} onChange={(e) => set({ status: e.target.value })} className={input} aria-label="สถานะ">
+          {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+        </select>
+        {!edit && (
+          <select value={f.source} onChange={(e) => set({ source: e.target.value })} className={input} aria-label="ที่มา">
+            {Object.entries(SOURCES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        )}
+        <input maxLength={200} value={f.note} onChange={(e) => set({ note: e.target.value })} className={input} placeholder="หมายเหตุ / บันทึกช่วยจำในสลิป" aria-label="หมายเหตุ" />
+      </div>
+      <label className="flex min-h-[40px] items-center gap-2 text-sm">
+        <input type="checkbox" checked={f.anonymous} onChange={(e) => set({ anonymous: e.target.checked })} className="h-5 w-5" /> ไม่ประสงค์ออกนาม
+      </label>
+      {err && <p className="rounded-lg bg-red-50 p-2 text-red-700">{err}</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={onClose} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">ยกเลิก</button>
+        <button disabled={st.busy} className="min-h-[48px] rounded-xl bg-black font-bold text-white disabled:opacity-60">{st.busy ? "รอสลิป…" : "บันทึก"}</button>
+      </div>
     </form>
   );
 }
 
-function AddExpense({ onDone }) {
-  const [f, setF] = useState({ item: "", amount: "", purpose: "food", paid_by: load("fundName", ""), spent_at: "", note: "" });
+function ExpenseForm({ onClose, onSaved }) {
+  const [f, setF] = useState({ item: "", amount: "", purpose: "food", paid_by: load("fundName", ""), paid_at: toLocalInput(new Date().toISOString()), note: "" });
   const [rc, setRc] = useState([]);
   const [err, setErr] = useState("");
   const st = mediaState(rc);
   const set = (p) => setF((x) => ({ ...x, ...p }));
   async function submit(e) {
     e.preventDefault();
+    setErr("");
     try {
-      await fapi("/fund/expenses", { method: "POST", body: JSON.stringify({ ...f, amount: Number(f.amount), receipt_ids: st.ids }) });
-      onDone();
+      await fapi("/fund/expenses", { method: "POST", body: JSON.stringify({ ...f, amount: Number(f.amount), paid_at: f.paid_at ? new Date(f.paid_at).toISOString() : null, receipt_ids: st.ids }) });
+      onSaved("ลงรายจ่ายแล้ว");
     } catch (e2) {
       setErr(e2.message);
     }
   }
   return (
-    <form onSubmit={submit} className="space-y-2 rounded-xl bg-white p-2">
+    <form onSubmit={submit} className="space-y-2 rounded-xl border-2 border-black bg-white p-3">
+      <p className="font-bold">🧾 ลงรายจ่ายพร้อมใบเสร็จ</p>
+      <MediaPicker items={rc} setItems={setRc} max={4} allowVideo={false} />
       <div className="grid gap-2 sm:grid-cols-2">
-        <input required minLength={2} maxLength={120} value={f.item} onChange={(e) => set({ item: e.target.value })} className={input} placeholder="ซื้ออะไร เช่น ข้าวกล่อง 100 กล่อง" aria-label="ซื้ออะไร" />
-        <input required type="number" inputMode="decimal" min="1" value={f.amount} onChange={(e) => set({ amount: e.target.value })} className={input} placeholder="จำนวนเงิน" aria-label="จำนวนเงิน" />
+        <input required minLength={2} maxLength={120} value={f.item} onChange={(e) => set({ item: e.target.value })} className={input} placeholder="ซื้ออะไร เช่น ข้าวกล่อง 100 กล่อง *" aria-label="ซื้ออะไร" />
+        <input required inputMode="decimal" type="number" min="0.01" step="0.01" value={f.amount} onChange={(e) => set({ amount: e.target.value })} className={`${input} font-bold`} placeholder="ยอด (บาท) *" aria-label="ยอด" />
         <select value={f.purpose} onChange={(e) => set({ purpose: e.target.value })} className={input} aria-label="หมวด">
-          {Object.entries(PURPOSES).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
+          {Object.entries(PURPOSES).map(([k, [i, t]]) => <option key={k} value={k}>{i} {t}</option>)}
         </select>
+        <input type="datetime-local" value={f.paid_at} onChange={(e) => set({ paid_at: e.target.value })} className={input} aria-label="เวลาจ่าย" />
         <input maxLength={60} value={f.paid_by} onChange={(e) => set({ paid_by: e.target.value })} className={input} placeholder="ใครจ่าย" aria-label="ใครจ่าย" />
-        <input maxLength={40} value={f.spent_at} onChange={(e) => set({ spent_at: e.target.value })} className={input} placeholder="เมื่อไหร่" aria-label="เมื่อไหร่" />
         <input maxLength={200} value={f.note} onChange={(e) => set({ note: e.target.value })} className={input} placeholder="หมายเหตุ" aria-label="หมายเหตุ" />
       </div>
-      <MediaPicker items={rc} setItems={setRc} max={3} allowVideo={false} />
-      <button disabled={st.busy} className="min-h-[44px] w-full rounded-lg bg-black font-bold text-white disabled:opacity-60">{st.busy ? "รอรูปใบเสร็จ…" : "บันทึกรายจ่าย"}</button>
-      {err && <p className="text-red-700">{err}</p>}
+      {err && <p className="rounded-lg bg-red-50 p-2 text-red-700">{err}</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={onClose} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">ยกเลิก</button>
+        <button disabled={st.busy} className="min-h-[48px] rounded-xl bg-black font-bold text-white disabled:opacity-60">{st.busy ? "รอใบเสร็จ…" : "บันทึก"}</button>
+      </div>
     </form>
   );
 }

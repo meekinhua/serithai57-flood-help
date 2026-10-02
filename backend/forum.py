@@ -179,8 +179,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         if not await can_edit(topic, x_edit_key, request):
             raise HTTPException(403, "ลบได้เฉพาะคนตั้งกระทู้ (จากเครื่องที่ตั้ง)")
         replies = await db.forum_replies.find({"topic_id": topic_id}, {"_id": 0, "media": 1}).to_list(1000)
-        for m in topic.get("media", []) + [m for r in replies for m in r.get("media", [])]:
-            await delete_media(m["id"])
+        await delete_media([m["id"] for m in topic.get("media", []) + [m for r in replies for m in r.get("media", [])]])
         await db.forum_replies.delete_many({"topic_id": topic_id})
         await db.forum_topics.delete_one({"id": topic_id})
         admin = await current_admin(request)
@@ -194,8 +193,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             raise HTTPException(404, "ไม่พบคำตอบ")
         if not await can_edit(reply, x_edit_key, request):
             raise HTTPException(403, "ลบได้เฉพาะคนตอบ (จากเครื่องที่ตอบ)")
-        for m in reply.get("media", []):
-            await delete_media(m["id"])
+        await delete_media([m["id"] for m in reply.get("media", [])])
         await db.forum_replies.delete_one({"id": reply_id})
         await db.forum_topics.update_one({"id": reply["topic_id"]}, {"$inc": {"reply_count": -1}})
         await db.forum_topics.update_one({"id": reply["topic_id"], "solved_reply": reply_id}, {"$set": {"solved_reply": None}})

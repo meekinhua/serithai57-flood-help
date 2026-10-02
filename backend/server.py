@@ -668,6 +668,7 @@ async def startup():
     await db.fund_in.create_index("id", unique=True)
     await db.fund_in.create_index([("status", 1), ("created_at", -1)])
     await db.fund_out.create_index("id", unique=True)
+    await db.fund_in.create_index("ref_norm")
     await db.forum_topics.create_index("id", unique=True)
     await db.forum_topics.create_index([("hidden", 1), ("pinned", -1), ("last_at", -1)])
     await db.forum_replies.create_index("id", unique=True)

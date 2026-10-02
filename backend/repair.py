@@ -377,8 +377,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     async def delete_lend(item_id: str, request: Request, x_edit_key: str = Header("")):
         doc = await owned(db.lend_items, item_id, x_edit_key, request)
         await db.lend_items.delete_one({"id": item_id})
-        for m in doc.get("media", []):
-            await delete_media(m["id"])
+        await delete_media([m["id"] for m in doc.get("media", [])])
 
     # ---------------- jobs: ask for hands / volunteer ----------------
     @router.get("/jobs")
@@ -525,8 +524,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     async def delete_lost(item_id: str, request: Request, x_edit_key: str = Header("")):
         doc = await owned(db.lost, item_id, x_edit_key, request)
         await db.lost.delete_one({"id": item_id})
-        for m in doc.get("media", []):
-            await delete_media(m["id"])
+        await delete_media([m["id"] for m in doc.get("media", [])])
 
     # ---------------- soi issues ----------------
     @router.get("/issues")
@@ -584,8 +582,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         doc = await db.issues.find_one_and_delete({"id": issue_id})
         if not doc:
             raise HTTPException(404, "ไม่พบรายการ")
-        for m in doc.get("media", []):
-            await delete_media(m["id"])
+        await delete_media([m["id"] for m in doc.get("media", [])])
         await audit(admin, "delete_issue", issue_id, doc.get("detail", ""))
 
     # ---------------- reviews on the contact board ----------------
