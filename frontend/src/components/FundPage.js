@@ -19,7 +19,7 @@ const STATUS = {
   pending: { label: "รอตรวจ", icon: "⏳", cls: "bg-amber-100 text-amber-900" },
   rejected: { label: "ไม่พบยอด", icon: "❌", cls: "bg-red-100 text-red-800" },
 };
-const SOURCES = { slip: "สลิป", cash: "เงินสด", transfer: "เห็นในบัญชี", line: "จากรายการในกลุ่ม" };
+const SOURCES = { slip: "สลิป", cash: "เงินสด", transfer: "เห็นในบัญชี", line: "จากรายการในกลุ่ม", self: "แจ้งเอง" };
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
 const fmt = (n) => Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 });
 const baht = (n) => `${fmt(n)} บาท`;
@@ -153,6 +153,15 @@ export default function FundPage() {
           <Kpi label="ตรวจกับบัญชีแล้ว" value={`${m.total ? Math.round((m.confirmed / m.total) * 100) : 0}%`} sub={`${baht(m.confirmed)} · รอตรวจ ${m.nWait}`} bar={m.total ? m.confirmed / m.total : 0} />
         </section>
 
+        {data.options?.self_report && (
+          <SelfReport
+            onDone={() => {
+              reload();
+              setToast("แจ้งแล้ว ขอบคุณมากครับ 🙏 เหรัญญิกจะตรวจกับบัญชีแล้วขึ้น ✅");
+            }}
+          />
+        )}
+
         {/* 2. flow over time */}
         <Card title="เงินเข้า – ออก ตามเวลา" note="ยอดสะสม">
           <FlowChart donations={data.donations.filter((d) => d.status !== "rejected")} expenses={data.expenses} />
@@ -195,7 +204,7 @@ export default function FundPage() {
 
         <section className="rounded-xl bg-white p-3 text-sm text-neutral-600">
           <b className="text-neutral-900">ตรวจสอบยอดของตัวเอง:</b> หาชื่อหรือเวลาโอนในตารางรายรับ แล้วดูเลขท้าย 4 ตัวของเลขที่รายการให้ตรงกับสลิปของคุณ ·
-          ✅ = เหรัญญิกเห็นยอดในบัญชีแล้ว · ⏳ = รอตรวจ · สลิปและบ้านเลขที่เห็นเฉพาะเหรัญญิก · เว็บนี้ไม่ได้รับหรือโอนเงิน ·
+          ✅ = เหรัญญิกเห็นยอดในบัญชีแล้ว · ⏳ = รอตรวจ · แตะรูปสลิปเพื่อดูเต็ม · บ้านเลขที่และเลขที่รายการเต็มเห็นเฉพาะเหรัญญิก · เว็บนี้ไม่ได้รับหรือโอนเงิน ·
           ระวังมิจฉาชีพ: โอนเฉพาะบัญชีที่ทีมอาสาประกาศ
         </section>
       </main>
@@ -385,13 +394,19 @@ function Ledger({ data }) {
                     <span className="block text-xs text-neutral-500">{PURPOSES[d.purpose]?.[1]} · {SOURCES[d.source] || ""}</span>
                     <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs sm:hidden">
                       <span className={`rounded px-1.5 font-semibold ${STATUS[d.status].cls}`}>{STATUS[d.status].icon} {STATUS[d.status].label}</span>
-                      {d.has_slip && "📎"}
+                      <SlipLink d={d} />
                       {d.ref_tail && <span className="font-mono text-neutral-600">…{d.ref_tail}</span>}
                     </span>
                   </td>
                   <td className="py-2 pr-2 text-right font-semibold tabular-nums">{fmt(d.amount)}</td>
                   <td className="hidden py-2 pr-2 sm:table-cell"><span className={`whitespace-nowrap rounded px-1.5 text-xs font-semibold ${STATUS[d.status].cls}`}>{STATUS[d.status].icon} {STATUS[d.status].label}</span></td>
-                  <td className="hidden whitespace-nowrap py-2 text-xs sm:table-cell">{d.has_slip ? "📎 สลิป" : "—"}{d.ref_tail && <span className="ml-1 font-mono text-neutral-600">…{d.ref_tail}</span>}</td>
+                  <td className="hidden whitespace-nowrap py-2 text-xs sm:table-cell">
+                    <span className="flex items-center gap-1">
+                      <SlipLink d={d} big />
+                      {!d.has_slip && "—"}
+                      {d.ref_tail && <span className="font-mono text-neutral-600">…{d.ref_tail}</span>}
+                    </span>
+                  </td>
                 </tr>
               ))}
               {!ins.length && <tr><td colSpan={5} className="py-4 text-center text-neutral-500">ไม่มีรายการ</td></tr>}
@@ -649,6 +664,79 @@ function ExpenseForm({ onClose, onSaved }) {
       <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={onClose} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">ยกเลิก</button>
         <button disabled={st.busy} className="min-h-[48px] rounded-xl bg-black font-bold text-white disabled:opacity-60">{st.busy ? "รอใบเสร็จ…" : "บันทึก"}</button>
+      </div>
+    </form>
+  );
+}
+
+// The slip itself, when the ledger shows slips publicly: a thumbnail that opens the full picture.
+function SlipLink({ d, big = false }) {
+  const m = d.slip?.[0];
+  if (!m) return d.has_slip ? <span>📎</span> : null;
+  return (
+    <a href={mediaUrl(m.id)} target="_blank" rel="noreferrer" title="ดูสลิป" className="shrink-0">
+      <img src={mediaUrl(m.id, "thumb")} alt={`สลิป ${d.name}`} loading="lazy" className={`${big ? "h-12 w-9" : "h-10 w-8"} rounded border object-cover`} />
+    </a>
+  );
+}
+
+// Donors report their own transfer with the slip (only when the treasurer has switched it on).
+function SelfReport({ onDone }) {
+  const [open, setOpen] = useState(false);
+  const c = load("contact", {});
+  const [f, setF] = useState({ name: c.name || "", house: "", anonymous: false, amount: "", paid_at: "", bank: "", ref: "", purpose: "food", note: "" });
+  const [slip, setSlip] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const st = mediaState(slip);
+  const set = (p) => setF((x) => ({ ...x, ...p }));
+  async function submit(e) {
+    e.preventDefault();
+    if (!st.ids[0]) return setErr("แนบรูปสลิปก่อน");
+    setBusy(true);
+    setErr("");
+    try {
+      await api("/fund/report", { method: "POST", body: JSON.stringify({ ...f, amount: Number(f.amount), paid_at: f.paid_at ? new Date(f.paid_at).toISOString() : null, slip_id: st.ids[0] }) });
+      setOpen(false);
+      setSlip([]);
+      setF((x) => ({ ...x, amount: "", paid_at: "", ref: "", note: "" }));
+      onDone();
+    } catch (e2) {
+      setErr(e2.message);
+    }
+    setBusy(false);
+  }
+  if (!open)
+    return (
+      <button onClick={() => setOpen(true)} className="min-h-[56px] w-full rounded-2xl bg-emerald-600 px-3 text-lg font-bold text-white shadow">
+        ✅ โอนแล้ว · แนบสลิปที่นี่
+        <span className="block text-sm font-normal">ยอดจะขึ้นเป็น ⏳ รอตรวจ จนเหรัญญิกเห็นในบัญชี</span>
+      </button>
+    );
+  return (
+    <form onSubmit={submit} className="space-y-2 rounded-2xl border-2 border-emerald-600 bg-white p-3">
+      <p className="text-lg font-bold">✅ แจ้งโอนเงินสมทบ</p>
+      <div>
+        <p className="mb-1 text-sm font-medium">รูปสลิป *</p>
+        <MediaPicker items={slip} setItems={setSlip} max={1} allowVideo={false} />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <input required inputMode="decimal" type="number" min="1" step="0.01" value={f.amount} onChange={(e) => set({ amount: e.target.value })} className={`${input} text-lg font-bold`} placeholder="ยอดที่โอน (บาท) *" aria-label="ยอด" />
+        <input type="datetime-local" value={f.paid_at} onChange={(e) => set({ paid_at: e.target.value })} className={input} aria-label="เวลาโอน" />
+        <input required maxLength={60} value={f.name} onChange={(e) => set({ name: e.target.value })} className={input} placeholder="ชื่อ *" aria-label="ชื่อ" />
+        <input maxLength={20} value={f.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="บ้านเลขที่ (เห็นเฉพาะเหรัญญิก)" aria-label="บ้านเลขที่" />
+        <input maxLength={60} value={f.ref} onChange={(e) => set({ ref: e.target.value })} className={`${input} font-mono`} placeholder="เลขที่รายการในสลิป (ถ้ามี)" aria-label="เลขที่รายการ" />
+        <select value={f.purpose} onChange={(e) => set({ purpose: e.target.value })} className={input} aria-label="สมทบค่าอะไร">
+          {Object.entries(PURPOSES).map(([k, [i, t]]) => <option key={k} value={k}>{i} {t}</option>)}
+        </select>
+      </div>
+      <label className="flex min-h-[40px] items-center gap-2 text-sm">
+        <input type="checkbox" checked={f.anonymous} onChange={(e) => set({ anonymous: e.target.checked })} className="h-5 w-5" /> ไม่ประสงค์ออกนาม
+      </label>
+      {err && <p className="rounded-lg bg-red-50 p-2 text-red-700">{err}</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => setOpen(false)} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">ยกเลิก</button>
+        <button disabled={busy || st.busy} className="min-h-[48px] rounded-xl bg-emerald-600 font-bold text-white disabled:opacity-60">{busy ? "กำลังส่ง…" : st.busy ? "รอสลิปอัปโหลด…" : "ส่ง"}</button>
       </div>
     </form>
   );

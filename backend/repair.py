@@ -228,6 +228,7 @@ class HomeBody(BaseModel):
     watch_on: bool = True  # the "ฝนตกอีกรอบ · เฝ้าระวังน้ำ" panel
     watch_title: str = Field("", max_length=80)  # empty = the built-in heading
     hub: HubBlock = HubBlock()
+    fund_on: bool = False  # the 💰 /fund card on the home page (off until the user says so)
 
 
 # The highlight boxes on top of the home page; admins switch them on/off and edit them on /admin.
@@ -235,6 +236,7 @@ HOME_DEFAULT = {
     "watch_on": True,
     "watch_title": "",
     "hub": {"on": True, "title": "ศูนย์อาสา · จุดแจกของ: ร้านมู้ด ซอย 5", "sub": "จุดแจกของที่ยังเปิดอยู่ 1 จุด · แตะเพื่อนำทาง", "lat": 13.789872, "lng": 100.673517},
+    "fund_on": False,
 }
 
 
@@ -283,7 +285,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     @router.get("/home")
     async def get_home():
         doc = await db.settings.find_one({"id": "home"}, {"_id": 0, "id": 0})
-        return doc or HOME_DEFAULT
+        return {**HOME_DEFAULT, **(doc or {})}
 
     @router.put("/admin/home")
     async def set_home(body: HomeBody, admin: dict = Depends(require_admin)):

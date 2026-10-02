@@ -29,7 +29,10 @@ from pydantic import BaseModel, Field
 
 Purpose = Literal["food", "sand", "labor", "supplies", "general"]  # อาหาร/น้ำ · กระสอบทราย · ค่าแรง · อุปกรณ์ · ทั่วไป
 InStatus = Literal["pending", "confirmed", "rejected"]
-Source = Literal["slip", "cash", "transfer", "line"]  # slip in hand · cash · seen in the bank app · from a chat tally
+Source = Literal["slip", "cash", "transfer", "line", "self"]  # slip · cash · seen in the bank app · chat tally · reported by the donor
+# Switched from the chat with Claude (tools/site.py fund …) or /admin: show slip photos to everyone, let donors report
+# their own transfer with a slip. Both start as the user decided on 2 Oct: slips visible, self-report off.
+OPTIONS_DEFAULT = {"public_slips": True, "self_report": False}
 
 
 def now():
@@ -77,6 +80,25 @@ class DonationEdit(BaseModel):
     slip_id: Optional[str] = None  # attach / replace the slip
 
 
+class SelfReport(BaseModel):
+    """A donor tells the ledger "I transferred" — slip required, lands as ⏳ for the treasurer."""
+    name: str = Field(..., min_length=1, max_length=60)
+    house: str = Field("", max_length=20)
+    anonymous: bool = False
+    amount: float = Field(..., gt=0, le=1_000_000)
+    paid_at: Optional[datetime] = None
+    bank: str = Field("", max_length=30)
+    ref: str = Field("", max_length=60)
+    purpose: Purpose = "general"
+    note: str = Field("", max_length=200)
+    slip_id: str
+
+
+class Options(BaseModel):
+    public_slips: bool = True
+    self_report: bool = False
+
+
 class ExpenseIn(BaseModel):
     item: str = Field(..., min_length=2, max_length=120)  # "ข้าวกล่อง 100 กล่อง ร้านป้าแก้ว"
     amount: float = Field(..., gt=0, le=1_000_000)
@@ -110,11 +132,17 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             rate_limit(request, "fundkey-miss", limit=20, window_s=600)
         raise HTTPException(403, "สำหรับผู้ดูแลยอดเงินเท่านั้น (ลิงก์เหรัญญิก)")
 
-    def public_in(d: dict) -> dict:
-        out = {k: v for k, v in d.items() if k not in ("_id", "slip", "house", "ref", "ref_norm")}
+    async def options() -> dict:
+        doc = await db.settings.find_one({"id": "fund_options"}, {"_id": 0, "id": 0})
+        return {**OPTIONS_DEFAULT, **(doc or {})}
+
+    def public_in(d: dict, show_slips: bool) -> dict:
+        out = {k: v for k, v in d.items() if k not in ("_id", "slip", "house", "ref", "ref_norm", "ip")}
         if d.get("anonymous"):
             out["name"] = "ไม่ประสงค์ออกนาม"
         out["has_slip"] = bool(d.get("slip"))
+        if show_slips and d.get("slip"):
+            out["slip"] = d["slip"]
         out["ref_tail"] = d["ref_norm"][-4:] if d.get("ref_norm") else ""
         return out
 
@@ -134,12 +162,38 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         ins = await db.fund_in.find({}, {"_id": 0}).sort([("paid_at", -1), ("created_at", -1)]).to_list(5000)
         outs = await db.fund_out.find({}, {"_id": 0}).sort([("paid_at", -1), ("created_at", -1)]).to_list(5000)
         last = max([d.get("updated_at") or d["created_at"] for d in ins + outs], default=None)
+        opts = await options()
         return {
             "account": acc if acc and acc.get("on") else None,
-            "donations": [public_in(d) for d in ins],
+            "options": opts,
+            "donations": [public_in(d, opts["public_slips"]) for d in ins],
             "expenses": [public_out(d) for d in outs],
             "updated_at": last,
         }
+
+    @router.post("/fund/report", status_code=201)
+    async def self_report(body: SelfReport, request: Request):
+        if not (await options())["self_report"]:
+            raise HTTPException(403, "ตอนนี้ยังไม่เปิดให้แจ้งโอนเอง")
+        rate_limit(request, "fund-report", limit=6, window_s=600)
+        dup = await ref_taken(body.ref)
+        if dup:
+            raise HTTPException(409, "สลิปนี้ลงไว้แล้ว ขอบคุณครับ 🙏")
+        doc_id = str(uuid.uuid4())
+        slip = await claim_media([body.slip_id], f"fund-slip:{doc_id}", {"image"})
+        doc = {
+            "id": doc_id,
+            **{k: v.strip() if isinstance(v, str) else v for k, v in body.model_dump(exclude={"slip_id"}).items()},
+            "ref_norm": norm_ref(body.ref),
+            "slip": slip,
+            "status": "pending",
+            "source": "self",
+            "added_by": "แจ้งเอง",
+            "ip": hashlib.sha256(client_ip(request).encode()).hexdigest(),
+            "created_at": now(),
+        }
+        await db.fund_in.insert_one(dict(doc))
+        return public_in(doc, True)
 
     # ---------------- treasurer ----------------
     @router.get("/fund/treasurer")
@@ -230,6 +284,13 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         data = {k: v.strip() if isinstance(v, str) else v for k, v in body.model_dump().items()}
         await db.settings.update_one({"id": "fund_account"}, {"$set": {"id": "fund_account", **data, "by": admin["name"], "at": now()}}, upsert=True)
         await audit(admin, "fund_account", "fund", f"{data['bank']} {data['number']} {data['name']} on={data['on']}")
+        return data
+
+    @router.put("/admin/fund/options")
+    async def set_options(body: Options, admin: dict = Depends(require_admin)):
+        data = body.model_dump()
+        await db.settings.update_one({"id": "fund_options"}, {"$set": {"id": "fund_options", **data}}, upsert=True)
+        await audit(admin, "fund_options", "fund", str(data))
         return data
 
     @router.get("/admin/fund/key")
