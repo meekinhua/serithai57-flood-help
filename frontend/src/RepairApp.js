@@ -5,6 +5,7 @@ import Sheet from "./components/Sheet";
 import Announcements from "./components/Announcements";
 import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
+import WasteBoard from "./components/WasteBoard";
 import { AfterFloodGuide, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
 
 // ซ่อมบ้าน mode (2 Oct 2026): the water is gone. Lend & borrow, ask for hands, tradesmen with neighbours'
@@ -14,7 +15,8 @@ const TABS = {
   lend: ["🧰", "ยืม · ให้ยืม"],
   jobs: ["🙋", "ขอแรง · อาสา"],
   pros: ["🔧", "ช่าง · ร้าน"],
-  issues: ["🗑️", "ปัญหาซอย"],
+  issues: ["📍", "ปัญหาซอย"],
+  waste: ["♻️", "ขยะ · รถเก็บ"],
   guide: ["📋", "หลังน้ำลด"],
 };
 // The volunteers' one remaining hand-out point (2 Oct, after the other drop points closed)
@@ -160,13 +162,13 @@ export default function RepairApp() {
           <span className="shrink-0 font-semibold underline">นำทาง ›</span>
         </a>
 
-        <nav className="grid grid-cols-5 gap-1 rounded-2xl bg-white p-1 shadow-sm" aria-label="หมวด">
+        <nav className="grid grid-cols-3 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-6" aria-label="หมวด">
           {Object.entries(TABS).map(([k, [emoji, text]]) => (
             <button
               key={k}
               onClick={() => pick(k)}
               aria-current={tab === k ? "page" : undefined}
-              className={`relative flex min-h-[64px] flex-col items-center justify-center rounded-xl px-1 text-center text-[11px] font-semibold leading-tight sm:text-sm ${tab === k ? "bg-black text-white" : "text-neutral-700 active:bg-neutral-100"}`}
+              className={`relative flex min-h-[60px] flex-col items-center justify-center rounded-xl px-1 text-center text-xs font-semibold leading-tight sm:text-sm ${tab === k ? "bg-black text-white" : "text-neutral-700 active:bg-neutral-100"}`}
             >
               <span className="text-2xl" aria-hidden="true">{emoji}</span>
               {text}
@@ -186,6 +188,7 @@ export default function RepairApp() {
             </div>
           )}
           {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
+          {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
           {tab === "guide" && <AfterFloodGuide />}
         </div>
 

@@ -120,6 +120,72 @@ class ReviewBody(BaseModel):
     text: str = Field("", max_length=200)
 
 
+class WasteRound(BaseModel):
+    when: str = Field(..., min_length=1, max_length=60)  # "ทุกวันอังคาร 8:00" / "เสาร์ 4 ต.ค. เช้า"
+    area: str = Field("", max_length=80)  # "ซอย 1–35" / "ทั้งหมู่บ้าน"
+    kind: str = Field("", max_length=60)  # "ขยะชิ้นใหญ่" / "ขยะทั่วไป"
+    note: str = Field("", max_length=160)
+
+
+class WasteSection(BaseModel):
+    title: str = Field(..., min_length=1, max_length=60)
+    items: list[str] = Field(default_factory=list, max_length=12)
+
+
+class WasteContact(BaseModel):
+    label: str = Field(..., min_length=1, max_length=80)
+    phone: str = Field("", max_length=40)
+
+
+class WasteBody(BaseModel):
+    notice: str = Field("", max_length=300)
+    schedule: list[WasteRound] = Field(default_factory=list, max_length=40)
+    guide: list[WasteSection] = Field(default_factory=list, max_length=15)
+    contacts: list[WasteContact] = Field(default_factory=list, max_length=10)
+
+
+# How to sort flood waste until the district's own guidance arrives; admins edit it on the page.
+WASTE_DEFAULT = {
+    "notice": "ยังไม่มีตารางรถเก็บขยะของเขต จะอัปเดตเมื่อได้ข้อมูล · ระหว่างนี้แยกขยะตามด้านล่าง กองหน้าบ้านให้เรียบร้อย",
+    "schedule": [],
+    "guide": [
+        {"title": "🛋️ ขยะชิ้นใหญ่ (ฟูก โซฟา ตู้ เฟอร์นิเจอร์พัง)", "items": [
+            "วางหน้าบ้านริมถนน ไม่ขวางทางรถและไม่ทับฝาท่อระบายน้ำ",
+            "รวมกองกับเพื่อนบ้านในซอยเดียวกัน รถเก็บได้เร็วขึ้น",
+            "ห้ามเผา",
+        ]},
+        {"title": "🍱 ขยะเปียก เศษอาหาร ของเน่าเสีย", "items": [
+            "ใส่ถุงดำ มัดปากให้แน่น แยกจากกองชิ้นใหญ่ (กลิ่น หนู แมลงวัน)",
+            "ทิ้งตามรอบรถเก็บขยะปกติ อย่ากองค้างไว้หลายวัน",
+        ]},
+        {"title": "☣️ ขยะอันตราย", "items": [
+            "หลอดไฟ ถ่าน แบตเตอรี่ กระป๋องสเปรย์ น้ำยาเคมี ยาหมดอายุ",
+            "แยกใส่ถุงหรือกล่อง เขียนว่า “ขยะอันตราย” อย่าปนกับกองใหญ่",
+        ]},
+        {"title": "📺 เครื่องใช้ไฟฟ้าเสีย", "items": [
+            "ตู้เย็น ทีวี แอร์ เครื่องซักผ้า แยกกองไว้ต่างหาก",
+            "ตู้เย็นเทน้ำออก ปิดประตูและมัดไว้ (กันเด็กเข้าไปติด)",
+            "ร้านรับซื้อของเก่าบางร้านรับ ลองถามก่อนทิ้ง",
+        ]},
+        {"title": "🧱 เศษวัสดุ (ฝ้า ไม้ กระเบื้อง ยิปซัม)", "items": [
+            "แยกกอง ใส่กระสอบ ไม่ปนกับขยะเปียก",
+            "ปริมาณมาก อาจต้องจ้างรถขน ดูในแท็บ “ช่าง · ร้าน” หมวดรับขนขยะ",
+        ]},
+        {"title": "♻️ ขายได้ / รีไซเคิล", "items": [
+            "ขวด กระป๋อง เหล็ก สายไฟ กระดาษที่แห้ง แยกไว้ให้ซาเล้งหรือร้านรับซื้อ",
+        ]},
+        {"title": "🔪 ของมีคม", "items": [
+            "แก้วแตก กระจก ตะปู ห่อหนังสือพิมพ์หรือใส่กล่อง เขียนว่า “ของมีคม”",
+        ]},
+        {"title": "🧤 ป้องกันตัวเอง", "items": [
+            "ใส่ถุงมือ รองเท้าบู๊ท หน้ากาก ตอนขนขยะ ล้างมือทุกครั้ง",
+            "กองขยะค้างนาน แจ้งในแท็บ “ปัญหาซอย” เพื่อนบ้านช่วยกดว่าเจอด้วย",
+        ]},
+    ],
+    "contacts": [{"label": "กทม. สายด่วน (แจ้งขยะค้าง)", "phone": "1555"}],
+}
+
+
 class SiteBody(BaseModel):
     mode: SiteMode
 
@@ -398,5 +464,22 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             {"$set": {"reviews": reviews, "good": sum(r["good"] for r in reviews), "bad": sum(not r["good"] for r in reviews)}},
         )
         return await db.services.find_one({"id": service_id}, {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews.who": 0})
+
+    # ---------------- waste: truck rounds + how to sort (admins edit it on the page) ----------------
+    @router.get("/waste")
+    async def get_waste():
+        doc = await db.settings.find_one({"id": "waste"}, {"_id": 0, "id": 0})
+        return doc or {**WASTE_DEFAULT, "updated_at": None, "by": ""}
+
+    @router.put("/admin/waste")
+    async def set_waste(body: WasteBody, admin: dict = Depends(require_admin)):
+        data = body.model_dump()
+        data["schedule"] = [_clean(r) for r in data["schedule"]]
+        data["guide"] = [{"title": g["title"].strip(), "items": [i.strip()[:200] for i in g["items"] if i.strip()]} for g in data["guide"]]
+        data["contacts"] = [_clean(c) for c in data["contacts"]]
+        doc = {**data, "notice": data["notice"].strip(), "updated_at": now(), "by": admin["name"]}
+        await db.settings.update_one({"id": "waste"}, {"$set": {"id": "waste", **doc}}, upsert=True)
+        await audit(admin, "update_waste", "waste", f"{len(doc['schedule'])} rounds, {len(doc['guide'])} sections")
+        return doc
 
     return router
