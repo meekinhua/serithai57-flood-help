@@ -36,6 +36,7 @@ import trips  # noqa: E402
 import zonelog  # noqa: E402
 import ops  # noqa: E402
 import repair  # noqa: E402
+import forum  # noqa: E402
 import team  # noqa: E402
 import weather  # noqa: E402
 
@@ -609,6 +610,7 @@ team_router, is_team = team.build_router(db, rate_limit, current_admin, require_
 app.include_router(team_router)
 app.include_router(ops.build_router(db, rate_limit, current_admin, {z["id"] for z in staff.ZONES["zones"]}, is_team))
 app.include_router(repair.build_router(db, rate_limit, current_admin, require_admin, audit, client_ip, claim_media, delete_media))
+app.include_router(forum.build_router(db, rate_limit, current_admin, require_admin, audit, client_ip, claim_media, delete_media))
 app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media, staff.SOIS, staff.ZONES["main_road"]))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 @app.middleware("http")
@@ -661,6 +663,10 @@ async def startup():
     await db.ops_history.create_index([("ref", 1), ("at", -1)])
     await db.services.create_index([("category", 1), ("updated_at", -1)])
     await db.media.create_index("id", unique=True)
+    await db.forum_topics.create_index("id", unique=True)
+    await db.forum_topics.create_index([("hidden", 1), ("pinned", -1), ("last_at", -1)])
+    await db.forum_replies.create_index("id", unique=True)
+    await db.forum_replies.create_index([("topic_id", 1), ("created_at", 1)])
     for coll in (db.lend_items, db.jobs, db.issues, db.lost):
         await coll.create_index("id", unique=True)
         await coll.create_index([("status", 1), ("updated_at", -1)])

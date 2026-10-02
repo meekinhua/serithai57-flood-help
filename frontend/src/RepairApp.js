@@ -6,6 +6,7 @@ import Announcements from "./components/Announcements";
 import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
+import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView } from "./components/WatchPanel";
 import { LostBoard, LostForm } from "./components/LostFound";
 import { WaterForm } from "./components/Forms";
@@ -19,6 +20,7 @@ import { AfterFloodGuide, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, L
 const REFRESH_MS = 30000;
 const TABS = {
   water: ["💧", "ระดับน้ำ"],
+  forum: ["💬", "ถาม-ตอบ"],
   lend: ["🧰", "ยืม · ให้ยืม"],
   jobs: ["🙋", "ขอแรง · ติดรถ"],
   pros: ["🔧", "ช่าง · ร้าน"],
@@ -144,7 +146,7 @@ export default function RepairApp() {
     <div className="min-h-screen bg-stone-100 text-neutral-900">
       <header className="sticky top-0 z-[900] bg-black text-white shadow">
         <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 py-2 sm:px-4">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
+          <span className="hidden h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white min-[400px]:flex">
             <img src={`${process.env.PUBLIC_URL}/logo-mark.png`} alt="Sahakorn Serithai 57" className="h-full w-full object-contain" />
           </span>
           <div className="min-w-0 flex-1">
@@ -204,7 +206,7 @@ export default function RepairApp() {
           <span className="shrink-0 font-semibold underline">นำทาง ›</span>
         </a>
 
-        <nav ref={navRef} className="scroll-mt-28 grid grid-cols-4 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-8" aria-label="หมวด">
+        <nav ref={navRef} className="scroll-mt-28 grid grid-cols-3 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-9" aria-label="หมวด">
           {Object.entries(TABS).map(([k, [emoji, text]]) => (
             <button
               key={k}
@@ -235,6 +237,7 @@ export default function RepairApp() {
               onPumps={() => setSheet({ type: "pumps" })}
             />
           )}
+          {tab === "forum" && <Forum admin={admin} />}
           {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
           {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} />}
           {tab === "pros" && <HireStrip jobs={jobs} onOpen={() => pick("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />}
