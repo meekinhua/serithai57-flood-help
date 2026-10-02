@@ -7,7 +7,7 @@ import MapView from "./MapView";
 // last 3 h, the canals against the flood wall, holes not sealed yet — and one tap to report.
 const RECENT_H = 3;
 
-export default function WatchPanel({ water, canal, onWater, onCanal, onLeak, onLeaks, onMap }) {
+export default function WatchPanel({ water, canal, onWater, onCanal, onLeak, onLeaks, onMap, title = "" }) {
   const t = Date.now();
   const recent = water.filter((w) => t - new Date(w.created_at).getTime() <= RECENT_H * 3.6e6);
   const worst = recent.reduce((m, w) => (m == null || w.level > m.level ? w : m), null);
@@ -19,7 +19,7 @@ export default function WatchPanel({ water, canal, onWater, onCanal, onLeak, onL
   return (
     <section className={`rounded-2xl border-4 p-3 ${alarm ? "border-red-600 bg-red-50" : "border-sky-600 bg-sky-50"}`} aria-label="เฝ้าระวังน้ำ">
       <div className="flex flex-wrap items-baseline gap-x-2">
-        <h2 className="text-lg font-black">{alarm ? "🚨 น้ำกลับมา? เฝ้าระวัง" : "🌧️ ฝนตกอีกรอบ · เฝ้าระวังน้ำ"}</h2>
+        <h2 className="text-lg font-black">{alarm ? "🚨 น้ำกลับมา? เฝ้าระวัง" : title || "🌧️ ฝนตกอีกรอบ · เฝ้าระวังน้ำ"}</h2>
         <span className="text-sm text-neutral-600">รายงานจากเพื่อนบ้าน {RECENT_H} ชม.ล่าสุด</span>
       </div>
 

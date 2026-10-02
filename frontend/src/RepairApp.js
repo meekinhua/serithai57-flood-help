@@ -29,8 +29,6 @@ const TABS = {
   waste: ["♻️", "ขยะ · รถเก็บ"],
   guide: ["📋", "หลังน้ำลด"],
 };
-// The volunteers' one remaining hand-out point (2 Oct, after the other drop points closed)
-const HUB = { place: "ร้านมู้ด ซอย 5", lat: 13.789872, lng: 100.673517 };
 
 export default function RepairApp() {
   const [tab, setTab] = useState(() => (TABS[window.location.hash.slice(1)] ? window.location.hash.slice(1) : load("repairTab", "water")));
@@ -40,6 +38,8 @@ export default function RepairApp() {
   const [lost, setLost] = useState([]);
   const [water, setWater] = useState([]);
   const [canal, setCanal] = useState(null);
+  // highlight boxes (water watch, volunteer hand-out point): admins switch them on /admin, no redeploy
+  const [home, setHome] = useState(() => load("homeBlocks", { watch_on: true, watch_title: "", hub: { on: false } }));
   const [services, setServices] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [weather, setWeather] = useState(null);
@@ -70,7 +70,7 @@ export default function RepairApp() {
   const refresh = useCallback(async () => {
     if (document.visibilityState === "visible") api("/presence", { method: "POST", body: JSON.stringify({ id: viewerId() }) }).catch(() => {});
     try {
-      const [l, j, i, s, a, lf, w, cn] = await Promise.all([
+      const [l, j, i, s, a, lf, w, cn, hm] = await Promise.all([
         api("/lend"),
         api("/jobs"),
         api("/issues"),
@@ -79,8 +79,13 @@ export default function RepairApp() {
         api("/lost"),
         api("/water").catch(() => []),
         api("/canal").catch(() => null),
+        api("/home").catch(() => null),
       ]);
       setLost(lf);
+      if (hm) {
+        setHome(hm);
+        save("homeBlocks", hm);
+      }
       setWater(w);
       if (cn) setCanal(cn);
       setLend(l);
@@ -180,8 +185,10 @@ export default function RepairApp() {
           <WeatherAlerts weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
         </div>
 
+        {home.watch_on && (
         <div className="mb-3">
           <WatchPanel
+            title={home.watch_title}
             water={water}
             canal={canal}
             onWater={() => setSheet({ type: "water" })}
@@ -191,20 +198,11 @@ export default function RepairApp() {
             onMap={openWater}
           />
         </div>
+        )}
 
-        <a
-          href={`https://www.google.com/maps/search/?api=1&query=${HUB.lat},${HUB.lng}`}
-          target="_blank"
-          rel="noreferrer"
-          className="mb-3 flex min-h-[56px] items-center gap-3 rounded-xl border-4 border-yellow-400 bg-yellow-50 px-3 py-2"
-        >
-          <span className="text-2xl" aria-hidden="true">📍</span>
-          <span className="min-w-0 flex-1">
-            <b>ศูนย์อาสา · จุดแจกของ: {HUB.place}</b>
-            <span className="block text-sm text-neutral-700">จุดแจกของที่ยังเปิดอยู่ 1 จุด · แตะเพื่อนำทาง</span>
-          </span>
-          <span className="shrink-0 font-semibold underline">นำทาง ›</span>
-        </a>
+        {home.hub?.on && home.hub.title && (
+          <HubBox hub={home.hub} />
+        )}
 
         <nav ref={navRef} className="scroll-mt-28 grid grid-cols-3 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-9" aria-label="หมวด">
           {Object.entries(TABS).map(([k, [emoji, text]]) => (
@@ -482,5 +480,27 @@ function HireStrip({ jobs, onOpen, onAdd }) {
         </ul>
       )}
     </section>
+  );
+}
+
+// Yellow highlight box (the volunteers' hand-out point); with a pin it opens navigation
+function HubBox({ hub }) {
+  const body = (
+    <>
+      <span className="text-2xl" aria-hidden="true">📍</span>
+      <span className="min-w-0 flex-1">
+        <b className="break-words">{hub.title}</b>
+        {hub.sub && <span className="block text-sm text-neutral-700">{hub.sub}</span>}
+      </span>
+    </>
+  );
+  const cls = "mb-3 flex min-h-[56px] items-center gap-3 rounded-xl border-4 border-yellow-400 bg-yellow-50 px-3 py-2";
+  return hub.lat != null && hub.lng != null ? (
+    <a href={`https://www.google.com/maps/search/?api=1&query=${hub.lat},${hub.lng}`} target="_blank" rel="noreferrer" className={cls}>
+      {body}
+      <span className="shrink-0 font-semibold underline">นำทาง ›</span>
+    </a>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }

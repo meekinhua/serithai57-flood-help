@@ -121,6 +121,7 @@ function AnnouncementsAdmin({ admin, onPublicChange }) {
   return (
     <div className="space-y-6">
       <SiteMode />
+      <HomeBlocks />
       <form onSubmit={create} className="space-y-3 rounded-2xl bg-white p-4 shadow">
         <h3 className="text-lg font-bold">📢 สร้างประกาศใหม่</h3>
         <textarea
@@ -455,6 +456,69 @@ function SiteMode() {
         </button>
       </div>
       {error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+    </section>
+  );
+}
+
+// Highlight boxes on top of the ซ่อมบ้าน home page: on/off and wording, live for everyone on save.
+function HomeBlocks() {
+  const [h, setH] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    api("/home")
+      .then(setH)
+      .catch((e) => setMsg(e.message));
+  }, []);
+  if (!h) return null;
+  const setHub = (patch) => setH({ ...h, hub: { ...h.hub, ...patch } });
+  async function save(next = h) {
+    setBusy(true);
+    setMsg("");
+    try {
+      setH(await api("/admin/home", { method: "PUT", body: JSON.stringify(next) }));
+      setMsg("บันทึกแล้ว · ทุกคนเห็นภายในครึ่งนาที");
+    } catch (e) {
+      setMsg(e.message);
+    }
+    setBusy(false);
+  }
+  const toggle = (on) => (on ? "bg-emerald-600 text-white" : "bg-neutral-200 text-neutral-700");
+  return (
+    <section className="space-y-3 rounded-2xl bg-white p-4 shadow">
+      <h3 className="text-lg font-bold">🟨 กล่องไฮไลต์บนหน้าแรก (โหมดซ่อมบ้าน)</h3>
+      <div className="space-y-2 rounded-xl border p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <b className="min-w-0 flex-1">🌧️ กล่องเฝ้าระวังน้ำ</b>
+          <button disabled={busy} onClick={() => save({ ...h, watch_on: !h.watch_on })} className={`min-h-[44px] rounded-lg px-4 font-bold ${toggle(h.watch_on)}`}>
+            {h.watch_on ? "แสดงอยู่ · กดเพื่อซ่อน" : "ซ่อนอยู่ · กดเพื่อแสดง"}
+          </button>
+        </div>
+        <input maxLength={80} value={h.watch_title} onChange={(e) => setH({ ...h, watch_title: e.target.value })} className={input} placeholder="หัวข้อ (เว้นว่าง = 🌧️ ฝนตกอีกรอบ · เฝ้าระวังน้ำ)" aria-label="หัวข้อกล่องเฝ้าระวังน้ำ" />
+        <p className="text-xs text-neutral-500">ป้ายระดับน้ำมุมขวาบน และแท็บ 💧 ระดับน้ำ ยังอยู่เสมอ</p>
+      </div>
+      <div className="space-y-2 rounded-xl border p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <b className="min-w-0 flex-1">📍 กล่องเหลือง (จุดแจกของ / ศูนย์อาสา)</b>
+          <button disabled={busy} onClick={() => save({ ...h, hub: { ...h.hub, on: !h.hub.on } })} className={`min-h-[44px] rounded-lg px-4 font-bold ${toggle(h.hub.on)}`}>
+            {h.hub.on ? "แสดงอยู่ · กดเพื่อซ่อน" : "ซ่อนอยู่ · กดเพื่อแสดง"}
+          </button>
+        </div>
+        <input maxLength={80} value={h.hub.title} onChange={(e) => setHub({ title: e.target.value })} className={input} placeholder="ข้อความหลัก" aria-label="ข้อความหลักกล่องเหลือง" />
+        <input maxLength={160} value={h.hub.sub} onChange={(e) => setHub({ sub: e.target.value })} className={input} placeholder="บรรทัดรอง" aria-label="บรรทัดรองกล่องเหลือง" />
+        <input
+          value={h.hub.lat != null ? `${h.hub.lat}, ${h.hub.lng}` : ""}
+          onChange={(e) => {
+            const m = e.target.value.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+            setHub(m ? { lat: +m[1], lng: +m[2] } : { lat: null, lng: null });
+          }}
+          className={input}
+          placeholder="พิกัดสำหรับปุ่มนำทาง เช่น 13.789872, 100.673517 (เว้นว่าง = ไม่มีปุ่ม)"
+          aria-label="พิกัดกล่องเหลือง"
+        />
+      </div>
+      <button disabled={busy} onClick={() => save()} className={btnPrimary}>💾 บันทึกข้อความ</button>
+      {msg && <p className="text-sm">{msg}</p>}
     </section>
   );
 }

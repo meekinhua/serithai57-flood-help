@@ -215,6 +215,28 @@ WASTE_DEFAULT = {
 }
 
 
+class HubBlock(BaseModel):
+    on: bool = True
+    title: str = Field("", max_length=80)  # "ศูนย์อาสา · จุดแจกของ: ร้านมู้ด ซอย 5"
+    sub: str = Field("", max_length=160)  # "จุดแจกของที่ยังเปิดอยู่ 1 จุด · แตะเพื่อนำทาง"
+    lat: Optional[float] = Field(None, ge=13.7, le=13.9)
+    lng: Optional[float] = Field(None, ge=100.6, le=100.8)
+
+
+class HomeBody(BaseModel):
+    watch_on: bool = True  # the "ฝนตกอีกรอบ · เฝ้าระวังน้ำ" panel
+    watch_title: str = Field("", max_length=80)  # empty = the built-in heading
+    hub: HubBlock = HubBlock()
+
+
+# The highlight boxes on top of the home page; admins switch them on/off and edit them on /admin.
+HOME_DEFAULT = {
+    "watch_on": True,
+    "watch_title": "",
+    "hub": {"on": True, "title": "ศูนย์อาสา · จุดแจกของ: ร้านมู้ด ซอย 5", "sub": "จุดแจกของที่ยังเปิดอยู่ 1 จุด · แตะเพื่อนำทาง", "lat": 13.789872, "lng": 100.673517},
+}
+
+
 class SiteBody(BaseModel):
     mode: SiteMode
 
@@ -255,6 +277,22 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         await db.settings.update_one({"id": "site_mode"}, {"$set": {"id": "site_mode", "mode": body.mode, "by": admin["name"], "at": now()}}, upsert=True)
         await audit(admin, "site_mode", body.mode)
         return {"mode": body.mode}
+
+    # ---------------- highlight boxes on the home page ----------------
+    @router.get("/home")
+    async def get_home():
+        doc = await db.settings.find_one({"id": "home"}, {"_id": 0, "id": 0})
+        return doc or HOME_DEFAULT
+
+    @router.put("/admin/home")
+    async def set_home(body: HomeBody, admin: dict = Depends(require_admin)):
+        data = body.model_dump()
+        data["watch_title"] = data["watch_title"].strip()
+        data["hub"]["title"] = data["hub"]["title"].strip()
+        data["hub"]["sub"] = data["hub"]["sub"].strip()
+        await db.settings.update_one({"id": "home"}, {"$set": {"id": "home", **data, "by": admin["name"], "at": now()}}, upsert=True)
+        await audit(admin, "home_blocks", "home", f"watch={data['watch_on']} hub={data['hub']['on']} {data['hub']['title']}")
+        return data
 
     # ---------------- lend / borrow / give ----------------
     @router.get("/lend")
