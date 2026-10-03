@@ -83,6 +83,18 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
                 out.append({**s, "count": count})
         return out
 
+    @router.get("/surveys/{key}/check")
+    async def check(key: str, house: str, request: Request):
+        """Has this house signed? Answers yes/no + when only (no phone / name)."""
+        rate_limit(request, "survey-check", limit=40, window_s=600)
+        house = house.strip().replace(" ", "")
+        if not HOUSE_RE.match(house):
+            raise HTTPException(422, "ใส่บ้านเลขที่แบบ 4/917")
+        r = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0, "updated_at": 1, "picks": 1, "source": 1})
+        if not r:
+            return {"signed": False, "house": house}
+        return {"signed": True, "house": house, "at": r["updated_at"], "picks": r.get("picks", []), "via": "LINE" if r.get("source") == "line" else "เว็บ"}
+
     @router.post("/surveys/{key}", status_code=201)
     async def answer(key: str, body: Answer, request: Request):
         s = next((x for x in await surveys() if x["key"] == key and x.get("on")), None)

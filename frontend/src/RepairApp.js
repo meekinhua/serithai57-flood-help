@@ -259,9 +259,6 @@ export default function RepairApp() {
             }}
           />
         ))}
-        {home.hub?.on && home.hub.title && (
-          <HubBox hub={home.hub} />
-        )}
         {home.fund_on && <a href="/fund" className="mb-3 flex min-h-[52px] items-center gap-3 rounded-xl border-2 border-emerald-600 bg-emerald-50 px-3 py-2">
           <span className="text-2xl" aria-hidden="true">💰</span>
           <span className="min-w-0 flex-1">
@@ -345,7 +342,12 @@ export default function RepairApp() {
           {tab === "guide" && <AfterFloodGuide />}
         </div>
 
-        <section className="mt-8 grid gap-2 sm:grid-cols-2">
+        {home.hub?.on && home.hub.title && (
+          <div className="mt-8">
+            <HubBox hub={home.hub} />
+          </div>
+        )}
+        <section className="mt-3 grid gap-2 sm:grid-cols-2">
           <a href="/flood" className="flex min-h-[64px] items-center gap-3 rounded-xl border-2 border-neutral-400 bg-white px-3 py-2">
             <span className="text-2xl" aria-hidden="true">📦</span>
             <span>
