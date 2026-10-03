@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../api";
+import { API, api } from "../api";
 import { ANNOUNCEMENT_LEVELS, timeAgo } from "../config";
 import Announcements from "./Announcements";
 
@@ -123,6 +123,7 @@ function AnnouncementsAdmin({ admin, onPublicChange }) {
       <SiteMode />
       <HomeBlocks />
       <FundAdmin />
+      <SurveysAdmin />
       <form onSubmit={create} className="space-y-3 rounded-2xl bg-white p-4 shadow">
         <h3 className="text-lg font-bold">📢 สร้างประกาศใหม่</h3>
         <textarea
@@ -575,6 +576,58 @@ function FundAdmin() {
         </div>
       </div>
       {msg && <p className="text-sm">{msg}</p>}
+    </section>
+  );
+}
+
+// Sign-up lists for the team (e.g. electricians' house list): on/off, and who signed (CSV for the team)
+function SurveysAdmin() {
+  const [list, setList] = useState(null);
+  const [rows, setRows] = useState({});
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    api("/admin/surveys")
+      .then((r) => setList(r.surveys))
+      .catch((e) => setMsg(e.message));
+  }, []);
+  if (!list) return msg ? <p className="text-red-700">{msg}</p> : null;
+  async function toggle(i) {
+    const next = list.map((s, j) => (j === i ? { ...s, on: !s.on } : s));
+    try {
+      setList((await api("/admin/surveys", { method: "PUT", body: JSON.stringify({ surveys: next }) })).surveys);
+    } catch (e) {
+      setMsg(e.message);
+    }
+  }
+  async function show(key) {
+    setRows({ ...rows, [key]: await api(`/admin/surveys/${key}`) });
+  }
+  return (
+    <section className="rounded-2xl border bg-white p-4">
+      <h2 className="text-lg font-bold">⚡ แบบสำรวจ / ลงชื่อ</h2>
+      {list.map((s, i) => (
+        <div key={s.key} className="mt-2 rounded-lg border p-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <b className="flex-1">{s.title}</b>
+            <button onClick={() => toggle(i)} className={`min-h-[40px] rounded-lg px-3 font-semibold ${s.on ? "bg-green-600 text-white" : "border-2 border-black"}`}>
+              {s.on ? "เปิดอยู่ · กดปิด" : "ปิดอยู่ · กดเปิด"}
+            </button>
+            <button onClick={() => show(s.key)} className="min-h-[40px] rounded-lg border-2 border-black px-3">ดูรายชื่อ</button>
+            <a href={`${API}/admin/surveys/${s.key}/csv`} className="min-h-[40px] rounded-lg border-2 border-black px-3 py-2">CSV</a>
+          </div>
+          {rows[s.key] && (
+            <ol className="mt-2 list-decimal space-y-1 pl-6 text-sm">
+              {rows[s.key].map((r) => (
+                <li key={r.house}>
+                  ซ.{r.soi} · {r.house} · {r.name} · {r.phone} · {(r.picks || []).join(", ")} {r.note && `· ${r.note}`}
+                </li>
+              ))}
+              {rows[s.key].length === 0 && <li className="list-none text-neutral-500">ยังไม่มีใครลงชื่อ</li>}
+            </ol>
+          )}
+        </div>
+      ))}
+      {msg && <p className="mt-2 text-red-700">{msg}</p>}
     </section>
   );
 }

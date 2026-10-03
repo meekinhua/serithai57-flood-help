@@ -6,6 +6,7 @@ import Announcements from "./components/Announcements";
 import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
+import SurveyBoxes from "./components/SurveyBox";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView } from "./components/WatchPanel";
 import { LostBoard, LostForm } from "./components/LostFound";
@@ -239,6 +240,7 @@ export default function RepairApp() {
         </div>
         )}
 
+        <SurveyBoxes />
         {eventsOn.map((e, i) => (
           <EventBox
             key={i}
