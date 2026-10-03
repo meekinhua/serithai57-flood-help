@@ -270,6 +270,7 @@ export default function RepairApp() {
           <span className="shrink-0 font-semibold underline">ดู ›</span>
         </a>}
 
+        {home.tabs_on && (<>
         <nav ref={navRef} className="scroll-mt-28 grid grid-cols-3 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-6" aria-label="หมวด">
           {Object.entries(MAIN_TABS).map(([k, [emoji, text]]) => (
             <button
@@ -343,6 +344,7 @@ export default function RepairApp() {
           {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
           {tab === "guide" && <AfterFloodGuide />}
         </div>
+        </>)}
 
         {home.hub?.on && home.hub.title && (
           <div className="mt-8">

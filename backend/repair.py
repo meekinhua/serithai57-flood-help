@@ -245,6 +245,7 @@ class HomeBody(BaseModel):
     watch_title: str = Field("", max_length=80)  # empty = the built-in heading
     hub: HubBlock = HubBlock()
     fund_on: bool = False  # the 💰 /fund card on the home page (off until the user says so)
+    tabs_on: bool = False  # the board tabs (ช่าง·ร้าน, ยืม, ขอแรง…); hidden until the team is ready to answer them
     events: List[EventBlock] = Field(default_factory=list, max_length=5)
 
 
@@ -254,6 +255,7 @@ HOME_DEFAULT = {
     "watch_title": "",
     "hub": {"on": True, "title": "ศูนย์อาสา · จุดแจกของ: ร้านมู้ด ซอย 5", "sub": "จุดแจกของที่ยังเปิดอยู่ 1 จุด · แตะเพื่อนำทาง", "lat": 13.789872, "lng": 100.673517},
     "fund_on": False,
+    "tabs_on": False,
     "events": [],
 }
 
