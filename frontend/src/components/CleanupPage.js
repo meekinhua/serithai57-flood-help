@@ -28,6 +28,9 @@ const WATER = [
   { n: 3, color: "#16a34a", text: "ซอยเลขคู่ โซน E–F", pick: [["E", even], ["F", even]] },
   { n: 4, color: "#9333ea", text: "ซอยเลขคู่ โซน G–H–I", pick: [["G", even], ["H", even], ["I", even]] },
 ];
+// the inner roads (parallel to the main road, through the middle of the sois) each water truck drives,
+// as marked by the team on the plan — geometry © OpenStreetMap contributors (ODbL)
+const INNER = {"1": [[[13.792372, 100.672938], [13.79288, 100.67269], [13.793362, 100.672462], [13.793874, 100.672222]], [[13.794319, 100.672671], [13.793604, 100.672978]], [[13.798637, 100.67029], [13.798803, 100.670206], [13.79917, 100.670033], [13.79949, 100.66989], [13.799827, 100.669761], [13.800185, 100.66967], [13.800592, 100.669556], [13.800689, 100.669526]]], "2": [[[13.787343, 100.672801], [13.787856, 100.672496], [13.788077, 100.672365], [13.788109, 100.672344], [13.788553, 100.672054], [13.789013, 100.671776], [13.789478, 100.671483], [13.789958, 100.671234], [13.790444, 100.670939], [13.790892, 100.670659], [13.791356, 100.670356], [13.791801, 100.670084], [13.792263, 100.669789], [13.792691, 100.66948], [13.793014, 100.669291]]], "3": [[[13.793107, 100.669236], [13.793475, 100.669107], [13.793851, 100.668999], [13.794179, 100.668879], [13.794395, 100.668796], [13.794496, 100.668758], [13.794857, 100.668637], [13.794908, 100.668619], [13.795182, 100.66852], [13.795409, 100.668437], [13.795556, 100.668378], [13.795882, 100.668256]], [[13.795882, 100.668256], [13.795928, 100.668241], [13.796389, 100.668058], [13.796745, 100.667916]]], "4": [[[13.796745, 100.667916], [13.797099, 100.667787], [13.797432, 100.667667], [13.797801, 100.667544], [13.798156, 100.667437], [13.798697, 100.667318], [13.799204, 100.667218], [13.799723, 100.667123], [13.800124, 100.667025], [13.800302, 100.666995], [13.800483, 100.666954], [13.800844, 100.6669], [13.801219, 100.666807], [13.801342, 100.666782], [13.801567, 100.666745], [13.801872, 100.666687], [13.801949, 100.666666], [13.802309, 100.666601], [13.802397, 100.666594], [13.802913, 100.666483]]]};
 const circled = (n) => "①②③④⑤⑥⑦⑧"[n - 1];
 
 function waterSois(zones) {
@@ -88,6 +91,19 @@ function WaterMap({ data }) {
           L.marker(longest[Math.floor(longest.length / 2)], { interactive: false, icon: L.divIcon({ className: "", iconSize: [66, 24], iconAnchor: [33, 12], html: `<div class="soi-tag" style="--c:${w.color};font-size:12px">💧${w.n} ซ.${esc(s)}</div>` }) }).addTo(map);
         }
       }
+    // the inner road each water truck runs along (vertical lines the team drew on the plan)
+    for (const w of ws) {
+      const roads = INNER[w.n] || [];
+      for (const road of roads) {
+        L.polyline(road, { color: "#fff", weight: 13, opacity: 0.95, interactive: false }).addTo(map);
+        L.polyline(road, { color: w.color, weight: 8, opacity: 1, dashArray: "14 8", interactive: false }).addTo(map);
+      }
+      if (!roads.length) continue;
+      const longest = roads.reduce((a, b) => (b.length > a.length ? b : a));
+      const at = longest[Math.floor(longest.length / 2)];
+      // one tag per truck, beside its road (to the outer side, away from the soi tags)
+      L.marker(at, { interactive: false, zIndexOffset: 500, icon: L.divIcon({ className: "", iconSize: [96, 24], iconAnchor: [w.n === 1 ? -8 : 104, 12], html: `<div class="soi-tag" style="--c:${w.color};font-size:13px;background:${w.color};color:#fff">💧${w.n} ถนนใน</div>` }) }).addTo(map);
+    }
   };
   useMap(el, data, draw);
   return <div ref={el} className="h-[70vh] min-h-[420px] w-full rounded-xl border" />;
@@ -161,7 +177,7 @@ export default function CleanupPage() {
         )}
         {data && (POSTER || view === "water") && (
           <section className="space-y-2">
-            <h2 className="text-lg font-bold">💧 รถน้ำ 4 คัน · ล้างซอยใน (สีตามคัน · ซอยสีเทา = ไม่มีรถน้ำเข้า)</h2>
+            <h2 className="text-lg font-bold">💧 รถน้ำ 4 คัน · วิ่งถนนใน (เส้นประหนา) แล้วล้างซอยตามสีคัน · ซอยสีเทา = ไม่มีรถน้ำเข้า</h2>
             <WaterMap data={data} />
             {waterTable}
           </section>
