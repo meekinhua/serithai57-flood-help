@@ -611,6 +611,11 @@ function EventBox({ ev, onMap }) {
           ))}
         </ol>
       )}
+      {ev.link && (
+        <a href={ev.link} className="mt-2 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-3 text-center text-lg font-bold text-white">
+          {ev.link_label || "ดูรายละเอียด ›"}
+        </a>
+      )}
       {linked && (
         <button onClick={onMap} className="mt-2 min-h-[44px] w-full rounded-lg border-2 border-red-600 bg-white font-semibold text-red-800">
           {ev.tab ? "ดูรายละเอียดเพิ่ม ›" : "ดูจุดบนแผนที่ ›"}
