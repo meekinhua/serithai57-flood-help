@@ -1,0 +1,177 @@
+import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import { api } from "../api";
+import { createBaseMap } from "./MapView";
+
+// /cleanup — Big Cleaning Day (Sun 4 Oct 2026): which truck takes which zone, from the team's
+// hand-written plan. 8 rubbish trucks by zone (A+B share truck 1), 4 water trucks by odd/even inner sois.
+// /cleanup?poster=1 — the same without buttons, for a LINE image.
+const POSTER = new URLSearchParams(window.location.search).has("poster");
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const TRUCKS = [
+  { n: 1, zones: ["A", "B"], sois: "1–12" },
+  { n: 2, zones: ["C"], sois: "13–17" },
+  { n: 3, zones: ["D"], sois: "18–21" },
+  { n: 4, zones: ["E"], sois: "22–33" },
+  { n: 5, zones: ["F"], sois: "30–45" },
+  { n: 6, zones: ["G"], sois: "36–57" },
+  { n: 7, zones: ["H"], sois: "42–67" },
+  { n: 8, zones: ["I"], sois: "52–83" },
+];
+const odd = (s) => parseInt(s, 10) % 2 === 1;
+const even = (s) => !odd(s);
+// water trucks: "ซอยใน" by odd / even numbers in these zones (the plan's wording)
+const WATER = [
+  { n: 1, color: "#dc2626", text: "ซอยเลขคี่ โซน G และโซน C–D", pick: [["G", odd], ["C", odd], ["D", odd]] },
+  { n: 2, color: "#2563eb", text: "ซอยเลขคู่ โซน A–D", pick: [["A", even], ["B", even], ["C", even], ["D", even]] },
+  { n: 3, color: "#16a34a", text: "ซอยเลขคู่ โซน E–F", pick: [["E", even], ["F", even]] },
+  { n: 4, color: "#9333ea", text: "ซอยเลขคู่ โซน G–H–I", pick: [["G", even], ["H", even], ["I", even]] },
+];
+const circled = (n) => "①②③④⑤⑥⑦⑧"[n - 1];
+
+function waterSois(zones) {
+  const byId = Object.fromEntries(zones.map((z) => [z.id, z]));
+  return WATER.map((w) => ({ ...w, sois: w.pick.flatMap(([id, f]) => (byId[id]?.sois || []).filter(f)) }));
+}
+
+function useMap(el, data, draw) {
+  useEffect(() => {
+    if (!data || !el.current) return;
+    const map = createBaseMap(el.current, { zoom: 16 });
+    map.options.zoomSnap = 0.25;
+    if (POSTER) {
+      map.eachLayer((l) => l instanceof L.TileLayer && map.removeLayer(l));
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, maxNativeZoom: 18, attribution: "&copy; OpenStreetMap" }).addTo(map);
+    }
+    L.polyline(data.main_road, { color: "#111", weight: 12, opacity: 0.35, interactive: false }).addTo(map);
+    L.polyline(data.main_road, { color: "#facc15", weight: 5, opacity: 0.95, interactive: false }).addTo(map);
+    draw(map);
+    const pts = data.houses.map(([lat, lng]) => [lat, lng]);
+    map.fitBounds(L.latLngBounds(pts), { padding: [12, 12] });
+    return () => map.remove();
+  }, [data, el, draw]);
+}
+
+function TruckMap({ data }) {
+  const el = useRef(null);
+  const draw = (map) => {
+    for (const [lat, lng, zi] of data.houses) L.circleMarker([lat, lng], { radius: 3, stroke: false, fillColor: data.zones[zi].color, fillOpacity: 0.85, interactive: false }).addTo(map);
+    for (const z of data.zones) for (const s of z.sois) for (const line of data.soiLines[s] || []) L.polyline(line, { color: z.color, weight: 4, opacity: 0.9, interactive: false }).addTo(map);
+    for (const t of TRUCKS) {
+      const zs = t.zones.map((id) => data.zones.find((z) => z.id === id)).filter(Boolean);
+      const w = zs.reduce((a, z) => a + z.houses, 0) || 1;
+      const c = [0, 1].map((k) => zs.reduce((a, z) => a + z.center[k] * z.houses, 0) / w);
+      L.marker(c, {
+        interactive: false,
+        icon: L.divIcon({ className: "", iconSize: [110, 40], iconAnchor: [55, 20], html: `<div class="zone-label" style="--c:${zs[0].color};font-size:16px;padding:2px 8px">🚛${circled(t.n)} ${esc(t.zones.join("+"))}</div>` }),
+      }).addTo(map);
+    }
+  };
+  useMap(el, data, draw);
+  return <div ref={el} className="h-[70vh] min-h-[420px] w-full rounded-xl border" />;
+}
+
+function WaterMap({ data }) {
+  const el = useRef(null);
+  const draw = (map) => {
+    const ws = waterSois(data.zones);
+    const owner = {};
+    ws.forEach((w) => w.sois.forEach((s) => (owner[s] = w)));
+    for (const z of data.zones)
+      for (const s of z.sois) {
+        const w = owner[s];
+        const lines = data.soiLines[s] || [];
+        for (const line of lines) L.polyline(line, { color: w ? w.color : "#9ca3af", weight: w ? 7 : 3, opacity: w ? 0.95 : 0.5, interactive: false }).addTo(map);
+        if (w && lines.length) {
+          const longest = lines.reduce((a, b) => (b.length > a.length ? b : a));
+          L.marker(longest[Math.floor(longest.length / 2)], { interactive: false, icon: L.divIcon({ className: "", iconSize: [66, 24], iconAnchor: [33, 12], html: `<div class="soi-tag" style="--c:${w.color};font-size:12px">💧${w.n} ซ.${esc(s)}</div>` }) }).addTo(map);
+        }
+      }
+  };
+  useMap(el, data, draw);
+  return <div ref={el} className="h-[70vh] min-h-[420px] w-full rounded-xl border" />;
+}
+
+export default function CleanupPage() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState("");
+  const [view, setView] = useState(window.location.hash === "#water" ? "water" : "trucks");
+  useEffect(() => {
+    document.title = "แผนรถ Big Cleaning Day · เสรีไทย 57";
+    Promise.all([api("/zones"), api("/sois")])
+      .then(([z, s]) => setData({ ...z, soiLines: Object.fromEntries(Object.entries(s.sois).map(([k, v]) => [k, v.lines])) }))
+      .catch((e) => setError(e.message));
+  }, []);
+  const ws = data ? waterSois(data.zones) : [];
+  const zoneColor = (id) => data?.zones.find((z) => z.id === id)?.color || "#000";
+
+  const trucksTable = (
+    <ol className="grid gap-1 sm:grid-cols-2">
+      {TRUCKS.map((t) => (
+        <li key={t.n} className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5">
+          <span className="text-xl font-bold">🚛{circled(t.n)}</span>
+          {t.zones.map((id) => (
+            <span key={id} className="rounded px-2 font-bold text-white" style={{ background: zoneColor(id) }}>
+              {id}
+            </span>
+          ))}
+          <span className="font-semibold">ซอย {t.sois}</span>
+        </li>
+      ))}
+    </ol>
+  );
+  const waterTable = (
+    <ol className="space-y-1">
+      {ws.map((w) => (
+        <li key={w.n} className="rounded-lg bg-white px-2 py-1.5">
+          <b style={{ color: w.color }}>💧 รถน้ำคันที่ {w.n}</b> · {w.text}
+          <span className="block text-sm text-neutral-700">ซ. {w.sois.join(", ")}</span>
+        </li>
+      ))}
+    </ol>
+  );
+
+  return (
+    <div className="min-h-screen bg-stone-100 p-3 text-neutral-900">
+      <div className="mx-auto max-w-5xl space-y-3">
+        <header className="rounded-xl bg-black p-3 text-white">
+          <h1 className="text-xl font-bold">🧹 แผนรถ Big Cleaning Day · หมู่บ้านสหกรณ์ เสรีไทย 57</h1>
+          <p className="text-sm text-neutral-300">อาทิตย์ 4 ต.ค. 2569 · เริ่ม 9:00 น. · รถขยะ 8 คันตามโซน + รถน้ำ 4 คันตามซอยคู่/คี่ · เส้นเหลือง = ถนนเมน</p>
+        </header>
+        {error && <p className="rounded-lg bg-red-50 p-2 text-red-700">{error}</p>}
+        {!POSTER && (
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-white p-1">
+            {[
+              ["trucks", "🚛 รถขยะ 8 คัน"],
+              ["water", "💧 รถน้ำ 4 คัน"],
+            ].map(([k, t]) => (
+              <button key={k} onClick={() => setView(k)} className={`min-h-[48px] rounded-lg font-bold ${view === k ? "bg-black text-white" : ""}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
+        {data && (POSTER || view === "trucks") && (
+          <section className="space-y-2">
+            <h2 className="text-lg font-bold">🚛 รถขยะ 8 คัน · เก็บขยะชิ้นใหญ่ที่ริมถนนเมน แยกตามโซน</h2>
+            <TruckMap data={data} />
+            {trucksTable}
+          </section>
+        )}
+        {data && (POSTER || view === "water") && (
+          <section className="space-y-2">
+            <h2 className="text-lg font-bold">💧 รถน้ำ 4 คัน · ล้างซอยใน (สีตามคัน · ซอยสีเทา = ไม่มีรถน้ำเข้า)</h2>
+            <WaterMap data={data} />
+            {waterTable}
+          </section>
+        )}
+        {!POSTER && (
+          <a href="/" className="block text-center underline">
+            ← กลับหน้าหลัก
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
