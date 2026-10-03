@@ -1,5 +1,22 @@
 <!doctype html>
 <meta charset="utf-8">
+<script>
+// a newer copy pushed from the chat (tools/site.py credits push) replaces this built-in page, no deploy needed
+(function () {
+  if (window.__creditsSwapped || /[?&]builtin\b/.test(location.search)) return;
+  try {
+    var x = new XMLHttpRequest();
+    x.open("GET", "/api/credits", false);
+    x.send();
+    var j = x.status === 200 ? JSON.parse(x.responseText) : null;
+    if (j && j.html) {
+      window.__creditsSwapped = true;
+      // still parsing: write the stored page here, then swallow the rest of this built-in file as hidden text
+      document.write(j.html + '<plaintext hidden style="display:none">');
+    }
+  } catch (e) {}
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>เครดิตปิดฉาก เสรีไทย 57</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
