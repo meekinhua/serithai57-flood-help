@@ -38,25 +38,47 @@ function waterSois(zones) {
   return WATER.map((w) => ({ ...w, sois: w.pick.flatMap(([id, f]) => (byId[id]?.sois || []).filter(f)) }));
 }
 
-function useMap(el, data, draw) {
+function useMap(el, data, draw, visible = true) {
+  const mapRef = useRef(null);
+  useEffect(() => {
+    // a map created while hidden has no size: measure again and re-fit when its tab is shown
+    if (visible && mapRef.current)
+      setTimeout(() => {
+        const m = mapRef.current;
+        if (!m) return;
+        m.invalidateSize();
+        if (m._fit) m.fitBounds(m._fit, { padding: [12, 12], animate: false });
+      }, 50);
+  }, [visible]);
+  const drawRef = useRef(draw);
+  drawRef.current = draw;
   useEffect(() => {
     if (!data || !el.current) return;
     const map = createBaseMap(el.current, { zoom: 16 });
     map.options.zoomSnap = 0.25;
+    map.options.zoomAnimation = !POSTER;
     if (POSTER) {
       map.eachLayer((l) => l instanceof L.TileLayer && map.removeLayer(l));
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, maxNativeZoom: 18, attribution: "&copy; OpenStreetMap" }).addTo(map);
     }
     L.polyline(data.main_road, { color: "#111", weight: 12, opacity: 0.35, interactive: false }).addTo(map);
     L.polyline(data.main_road, { color: "#facc15", weight: 5, opacity: 0.95, interactive: false }).addTo(map);
-    draw(map);
+    mapRef.current = map;
+    drawRef.current(map);
     const pts = data.houses.map(([lat, lng]) => [lat, lng]);
-    map.fitBounds(L.latLngBounds(pts), { padding: [12, 12] });
-    return () => map.remove();
-  }, [data, el, draw]);
+    // no zoom animation: switching tabs removes the map, and Leaflet crashes if an animation is still running
+    map._fit = L.latLngBounds(pts);
+    map.fitBounds(map._fit, { padding: [12, 12], animate: false });
+    return () => {
+      mapRef.current = null;
+      map.stop();
+      map.off();
+      map.remove();
+    };
+  }, [data, el]); // draw once per data: re-creating the map on every render broke its zoom
 }
 
-function TruckMap({ data }) {
+function TruckMap({ data, visible }) {
   const el = useRef(null);
   const draw = (map) => {
     for (const [lat, lng, zi] of data.houses) L.circleMarker([lat, lng], { radius: 3, stroke: false, fillColor: data.zones[zi].color, fillOpacity: 0.85, interactive: false }).addTo(map);
@@ -71,11 +93,11 @@ function TruckMap({ data }) {
       }).addTo(map);
     }
   };
-  useMap(el, data, draw);
+  useMap(el, data, draw, visible);
   return <div ref={el} className="h-[70vh] min-h-[420px] w-full rounded-xl border" />;
 }
 
-function WaterMap({ data }) {
+function WaterMap({ data, visible }) {
   const el = useRef(null);
   const draw = (map) => {
     const ws = waterSois(data.zones);
@@ -105,7 +127,7 @@ function WaterMap({ data }) {
       L.marker(at, { interactive: false, zIndexOffset: 500, icon: L.divIcon({ className: "", iconSize: [96, 24], iconAnchor: [w.n === 1 ? -8 : 104, 12], html: `<div class="soi-tag" style="--c:${w.color};font-size:13px;background:${w.color};color:#fff">💧${w.n} ถนนใน</div>` }) }).addTo(map);
     }
   };
-  useMap(el, data, draw);
+  useMap(el, data, draw, visible);
   return <div ref={el} className="h-[70vh] min-h-[420px] w-full rounded-xl border" />;
 }
 
@@ -168,17 +190,17 @@ export default function CleanupPage() {
             ))}
           </div>
         )}
-        {data && (POSTER || view === "trucks") && (
-          <section className="space-y-2">
+        {data && (
+          <section className="space-y-2" hidden={!POSTER && view !== "trucks"}>
             <h2 className="text-lg font-bold">🚛 รถขยะ 8 คัน · เก็บขยะชิ้นใหญ่ที่ริมถนนเมน แยกตามโซน</h2>
-            <TruckMap data={data} />
+            <TruckMap data={data} visible={POSTER || view === "trucks"} />
             {trucksTable}
           </section>
         )}
-        {data && (POSTER || view === "water") && (
-          <section className="space-y-2">
+        {data && (
+          <section className="space-y-2" hidden={!POSTER && view !== "water"}>
             <h2 className="text-lg font-bold">💧 รถน้ำ 4 คัน · วิ่งถนนใน (เส้นประหนา) แล้วล้างซอยตามสีคัน · ซอยสีเทา = ไม่มีรถน้ำเข้า</h2>
-            <WaterMap data={data} />
+            <WaterMap data={data} visible={POSTER || view === "water"} />
             {waterTable}
           </section>
         )}
