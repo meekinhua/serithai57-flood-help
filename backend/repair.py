@@ -233,6 +233,7 @@ class EventBlock(BaseModel):
     line: List[List[float]] = Field(default_factory=list, max_length=60)  # [[lat, lng], …] the stretch of work
     lat: Optional[float] = Field(None, ge=13.7, le=13.9)  # meeting point; default = middle of the line
     lng: Optional[float] = Field(None, ge=100.6, le=100.8)
+    tab: str = Field("", max_length=20)  # the box opens this tab (e.g. "waste") instead of the map
 
 
 class HomeBody(BaseModel):

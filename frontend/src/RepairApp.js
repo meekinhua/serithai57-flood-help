@@ -253,6 +253,7 @@ export default function RepairApp() {
             key={i}
             ev={e}
             onMap={() => {
+              if (e.tab && TABS[e.tab]) return pick(e.tab);
               const [lat, lng] = eventSpot(e);
               setFocus({ lat, lng, t: Date.now() });
               pick("water");
@@ -597,7 +598,7 @@ function EventBox({ ev, onMap }) {
         {ev.when && <span className="block font-semibold text-red-700">🕘 {ev.when}</span>}
         {ev.sub && <span className="block text-sm text-neutral-700">{ev.sub}</span>}
       </span>
-      <span className="shrink-0 font-semibold underline">ดูจุด ›</span>
+      <span className="shrink-0 font-semibold underline">{ev.tab ? "รายละเอียด ›" : "ดูจุด ›"}</span>
     </button>
   );
 }
