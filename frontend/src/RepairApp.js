@@ -227,6 +227,18 @@ export default function RepairApp() {
       </header>
 
       <main className="mx-auto max-w-5xl px-3 pb-10 pt-3 sm:px-4">
+        {eventsOn.map((e, i) => (
+          <EventBox
+            key={i}
+            ev={e}
+            onMap={() => {
+              if (e.tab && TABS[e.tab]) return pick(e.tab);
+              const [lat, lng] = eventSpot(e);
+              setFocus({ lat, lng, t: Date.now() });
+              pick("water");
+            }}
+          />
+        ))}
         <SurveyBoxes />
         <div className="mb-3 space-y-2 empty:hidden">
           <Announcements items={announcements} />
@@ -248,18 +260,6 @@ export default function RepairApp() {
         </div>
         )}
 
-        {eventsOn.map((e, i) => (
-          <EventBox
-            key={i}
-            ev={e}
-            onMap={() => {
-              if (e.tab && TABS[e.tab]) return pick(e.tab);
-              const [lat, lng] = eventSpot(e);
-              setFocus({ lat, lng, t: Date.now() });
-              pick("water");
-            }}
-          />
-        ))}
         {home.fund_on && <a href="/fund" className="mb-3 flex min-h-[52px] items-center gap-3 rounded-xl border-2 border-emerald-600 bg-emerald-50 px-3 py-2">
           <span className="text-2xl" aria-hidden="true">💰</span>
           <span className="min-w-0 flex-1">
@@ -590,16 +590,33 @@ export function eventSpot(e) {
 
 // Red call-out box for a volunteer work session; tap = show it on the map
 function EventBox({ ev, onMap }) {
+  const linked = ev.tab || ev.line?.length || ev.lat != null;
   return (
-    <button onClick={onMap} className="mb-3 flex min-h-[56px] w-full items-center gap-3 rounded-xl border-4 border-red-600 bg-red-50 px-3 py-2 text-left">
-      <span className="text-2xl" aria-hidden="true">🧱</span>
-      <span className="min-w-0 flex-1">
-        <b className="break-words">{ev.title}</b>
-        {ev.when && <span className="block font-semibold text-red-700">🕘 {ev.when}</span>}
-        {ev.sub && <span className="block text-sm text-neutral-700">{ev.sub}</span>}
-      </span>
-      <span className="shrink-0 font-semibold underline">{ev.tab ? "รายละเอียด ›" : "ดูจุด ›"}</span>
-    </button>
+    <section className="mb-3 rounded-xl border-4 border-red-600 bg-red-50 px-3 py-2">
+      <div className="flex items-start gap-3">
+        <span className="pt-1 text-3xl" aria-hidden="true">{ev.icon || "🧱"}</span>
+        <div className="min-w-0 flex-1">
+          <h2 className="break-words text-lg font-bold leading-snug">{ev.title}</h2>
+          {ev.when && <p className="font-semibold text-red-700">🕘 {ev.when}</p>}
+          {ev.sub && <p className="text-sm text-neutral-700">{ev.sub}</p>}
+        </div>
+      </div>
+      {ev.items?.length > 0 && (
+        <ol className="mt-2 space-y-1.5">
+          {ev.items.map((t, i) => (
+            <li key={i} className="flex gap-2 rounded-lg bg-white px-2 py-1.5 text-[15px] leading-snug">
+              <span className="font-bold text-red-700">{i + 1}.</span>
+              <span>{t}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {linked && (
+        <button onClick={onMap} className="mt-2 min-h-[44px] w-full rounded-lg border-2 border-red-600 bg-white font-semibold text-red-800">
+          {ev.tab ? "ดูรายละเอียดเพิ่ม ›" : "ดูจุดบนแผนที่ ›"}
+        </button>
+      )}
+    </section>
   );
 }
 

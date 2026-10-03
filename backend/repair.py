@@ -234,6 +234,8 @@ class EventBlock(BaseModel):
     lat: Optional[float] = Field(None, ge=13.7, le=13.9)  # meeting point; default = middle of the line
     lng: Optional[float] = Field(None, ge=100.6, le=100.8)
     tab: str = Field("", max_length=20)  # the box opens this tab (e.g. "waste") instead of the map
+    items: List[str] = Field(default_factory=list, max_length=12)  # "what to do" bullets shown in full on the home page
+    icon: str = Field("", max_length=8)  # 🧹 / 🧱 …
 
 
 class HomeBody(BaseModel):
