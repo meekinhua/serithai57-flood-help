@@ -7,6 +7,7 @@ import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
 import SurveyBoxes from "./components/SurveyBox";
+import RecoveryStart from "./components/RecoveryStart";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView } from "./components/WatchPanel";
 import { LostBoard, LostForm } from "./components/LostFound";
@@ -19,20 +20,26 @@ import { AfterFloodGuide, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, L
 // 2 Oct afternoon, heavy rain again: a water-watch panel sits on top (street level, canals, leaks — reporting
 // stays open), rides out / errands / hiring a tradesman go on the jobs board, and lost pets & things get a board.
 const REFRESH_MS = 30000;
-const TABS = {
-  water: ["💧", "ระดับน้ำ"],
-  forum: ["💬", "ถาม-ตอบ"],
-  lend: ["🧰", "ยืม · ให้ยืม"],
-  jobs: ["🙋", "ขอแรง · ติดรถ"],
+// 3 Oct: the water is gone, people only care about getting the house back — recovery first,
+// the rest (water levels, lost & found, soi issues) one tap further under "อื่นๆ".
+const MAIN_TABS = {
+  start: ["🏠", "ฟื้นฟูบ้าน"],
   pros: ["🔧", "ช่าง · ร้าน"],
-  lost: ["🐾", "หาย · เจอ"],
-  issues: ["📍", "ปัญหาซอย"],
+  lend: ["🧰", "ยืม · ให้ยืม"],
+  jobs: ["🙋", "ขอแรง"],
   waste: ["♻️", "ขยะ · รถเก็บ"],
-  guide: ["📋", "หลังน้ำลด"],
+  forum: ["💬", "ถาม-ตอบ"],
 };
+const MORE_TABS = {
+  guide: ["📋", "เช็กลิสต์"],
+  issues: ["📍", "ปัญหาซอย"],
+  lost: ["🐾", "หาย · เจอ"],
+  water: ["💧", "ระดับน้ำ · แผนที่"],
+};
+const TABS = { ...MAIN_TABS, ...MORE_TABS };
 
 export default function RepairApp() {
-  const [tab, setTab] = useState(() => (TABS[window.location.hash.slice(1)] ? window.location.hash.slice(1) : load("repairTab", "water")));
+  const [tab, setTab] = useState(() => (TABS[window.location.hash.slice(1)] ? window.location.hash.slice(1) : load("repairTab2", "start")));
   const [lend, setLend] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [issues, setIssues] = useState([]);
@@ -55,7 +62,7 @@ export default function RepairApp() {
 
   const pick = (t) => {
     setTab(t);
-    save("repairTab", t);
+    save("repairTab2", t);
     window.history.replaceState(null, "", `#${t}`);
   };
   const navRef = useRef(null);
@@ -264,8 +271,8 @@ export default function RepairApp() {
           <span className="shrink-0 font-semibold underline">ดู ›</span>
         </a>}
 
-        <nav ref={navRef} className="scroll-mt-28 grid grid-cols-3 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-9" aria-label="หมวด">
-          {Object.entries(TABS).map(([k, [emoji, text]]) => (
+        <nav ref={navRef} className="scroll-mt-28 grid grid-cols-3 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-6" aria-label="หมวด">
+          {Object.entries(MAIN_TABS).map(([k, [emoji, text]]) => (
             <button
               key={k}
               onClick={() => pick(k)}
@@ -280,6 +287,20 @@ export default function RepairApp() {
             </button>
           ))}
         </nav>
+        <div className="mt-1 flex flex-wrap items-center gap-1 px-1 text-sm" aria-label="หมวดอื่นๆ">
+          <span className="text-neutral-500">อื่นๆ:</span>
+          {Object.entries(MORE_TABS).map(([k, [emoji, text]]) => (
+            <button
+              key={k}
+              onClick={() => pick(k)}
+              aria-current={tab === k ? "page" : undefined}
+              className={`min-h-[36px] rounded-full px-3 ${tab === k ? "bg-black text-white" : "bg-white text-neutral-700 active:bg-neutral-100"}`}
+            >
+              <span aria-hidden="true">{emoji}</span> {text}
+              {counts[k] > 0 && <span className="ml-1 text-xs text-neutral-500">({counts[k]})</span>}
+            </button>
+          ))}
+        </div>
 
         <div className="mt-3">
           {tab === "water" && (
@@ -298,6 +319,15 @@ export default function RepairApp() {
               onLeak={(leak) => setSheet({ type: "leak", leak })}
               onPump={(pump) => setSheet({ type: "pump", pump })}
               onPumps={() => setSheet({ type: "pumps" })}
+            />
+          )}
+          {tab === "start" && (
+            <RecoveryStart
+              counts={counts}
+              onTab={pick}
+              onJob={(jobType) => setSheet({ type: "jobForm", kind: "need", jobType })}
+              onLend={(kind) => setSheet({ type: "lendForm", kind })}
+              onIssue={() => setSheet({ type: "issueForm" })}
             />
           )}
           {tab === "forum" && <Forum admin={admin} />}
