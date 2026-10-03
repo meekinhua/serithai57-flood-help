@@ -220,6 +220,7 @@ export default function RepairApp() {
       </header>
 
       <main className="mx-auto max-w-5xl px-3 pb-10 pt-3 sm:px-4">
+        <SurveyBoxes />
         <div className="mb-3 space-y-2 empty:hidden">
           <Announcements items={announcements} />
           <WeatherAlerts weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
@@ -240,7 +241,6 @@ export default function RepairApp() {
         </div>
         )}
 
-        <SurveyBoxes />
         {eventsOn.map((e, i) => (
           <EventBox
             key={i}

@@ -43,6 +43,17 @@ class Survey(BaseModel):
     options: List[str] = Field(default_factory=list, max_length=15)
 
 
+class TeamEntry(BaseModel):
+    """Added by the team / Claude from a LINE message (phone may be missing there)."""
+    house: str = Field(..., max_length=20)
+    soi: str = Field("", max_length=20)
+    name: str = Field("", max_length=60)
+    phone: str = Field("", max_length=20)
+    picks: List[str] = Field(default_factory=list, max_length=15)
+    note: str = Field("", max_length=300)
+    source: str = Field("line", max_length=20)
+
+
 class SurveysBody(BaseModel):
     surveys: List[Survey] = Field(default_factory=list, max_length=10)
 
@@ -112,6 +123,30 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         await audit(admin, "surveys", "surveys", ", ".join(f"{s['key']}={'on' if s['on'] else 'off'}" for s in data))
         return {"surveys": data}
 
+    @router.post("/admin/surveys/{key}/entries", status_code=201)
+    async def team_entry(key: str, body: TeamEntry, admin: dict = Depends(require_admin)):
+        s = next((x for x in await surveys() if x["key"] == key), None)
+        if not s:
+            raise HTTPException(404, "ไม่มีแบบสำรวจนี้")
+        house = body.house.strip().replace(" ", "")
+        if not HOUSE_RE.match(house):
+            raise HTTPException(422, "บ้านเลขที่ไม่ถูกต้อง")
+        old = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0})
+        picks = [p for p in body.picks if p in s.get("options", [])]
+        if old:  # never overwrite what the resident typed themselves; only fill gaps / add problems
+            upd = {k: v for k, v in {"soi": body.soi.strip(), "name": body.name.strip(), "phone": re.sub(r"[^\d+]", "", body.phone)}.items() if v and not old.get(k)}
+            upd["picks"] = old.get("picks", []) + [p for p in picks if p not in old.get("picks", [])]
+            if body.note.strip() and body.note.strip() not in old.get("note", ""):
+                upd["note"] = (old.get("note", "") + " | " + body.note.strip()).strip(" |")[:600]
+            await db.survey_resp.update_one({"survey": key, "house": house}, {"$set": upd})
+            return {"ok": True, "updated": True}
+        await db.survey_resp.insert_one({
+            "id": str(uuid.uuid4()), "survey": key, "house": house, "soi": body.soi.strip(), "name": body.name.strip(),
+            "phone": re.sub(r"[^\d+]", "", body.phone), "picks": picks, "note": body.note.strip(), "source": body.source,
+            "added_by": admin.get("name", ""), "created_at": now(), "updated_at": now(),
+        })
+        return {"ok": True, "updated": False}
+
     def soi_key(r):
         m = re.match(r"\d+", r.get("soi") or "")
         return (int(m.group()) if m else 999, r.get("soi") or "", r["house"])
@@ -126,9 +161,9 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         rows = sorted(await db.survey_resp.find({"survey": key}, {"_id": 0, "ip": 0}).to_list(5000), key=soi_key)
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow(["ซอย", "บ้านเลขที่", "ชื่อ", "เบอร์", "อาการ", "หมายเหตุ", "ลงชื่อเมื่อ"])
+        w.writerow(["ซอย", "บ้านเลขที่", "ชื่อ", "เบอร์", "อาการ", "หมายเหตุ", "มาจาก", "ลงชื่อเมื่อ"])
         for r in rows:
-            w.writerow([r.get("soi", ""), r["house"], r.get("name", ""), r["phone"], " / ".join(r.get("picks", [])), r.get("note", ""), r["updated_at"].strftime("%Y-%m-%d %H:%M")])
+            w.writerow([r.get("soi", ""), r["house"], r.get("name", ""), r["phone"], " / ".join(r.get("picks", [])), r.get("note", ""), "LINE" if r.get("source") == "line" else "เว็บ", r["updated_at"].strftime("%Y-%m-%d %H:%M")])
         return Response("﻿" + buf.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="survey-{key}.csv"'})
 
     return router
