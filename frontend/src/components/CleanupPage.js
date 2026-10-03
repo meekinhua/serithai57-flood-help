@@ -94,7 +94,7 @@ function TruckMap({ data, visible }) {
     }
   };
   useMap(el, data, draw, visible);
-  return <div ref={el} className="h-[70vh] min-h-[420px] w-full rounded-xl border" />;
+  return <div ref={el} className="h-[65vh] min-h-[380px] w-full rounded-xl border" />;
 }
 
 function WaterMap({ data, visible }) {
@@ -128,15 +128,14 @@ function WaterMap({ data, visible }) {
     }
   };
   useMap(el, data, draw, visible);
-  return <div ref={el} className="h-[70vh] min-h-[420px] w-full rounded-xl border" />;
+  return <div ref={el} className="h-[65vh] min-h-[380px] w-full rounded-xl border" />;
 }
 
-export default function CleanupPage() {
+export function CleanupPlan({ embedded = false }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [view, setView] = useState(window.location.hash === "#water" ? "water" : "trucks");
   useEffect(() => {
-    document.title = "แผนรถ Big Cleaning Day · เสรีไทย 57";
     Promise.all([api("/zones"), api("/sois")])
       .then(([z, s]) => setData({ ...z, soiLines: Object.fromEntries(Object.entries(s.sois).map(([k, v]) => [k, v.lines])) }))
       .catch((e) => setError(e.message));
@@ -171,12 +170,12 @@ export default function CleanupPage() {
   );
 
   return (
-    <div className="min-h-screen bg-stone-100 p-3 text-neutral-900">
+    <div className={embedded ? "space-y-3" : "min-h-screen bg-stone-100 p-3 text-neutral-900"}>
       <div className="mx-auto max-w-5xl space-y-3">
-        <header className="rounded-xl bg-black p-3 text-white">
+        {!embedded && <header className="rounded-xl bg-black p-3 text-white">
           <h1 className="text-xl font-bold">🧹 แผนรถ Big Cleaning Day · หมู่บ้านสหกรณ์ เสรีไทย 57</h1>
           <p className="text-sm text-neutral-300">อาทิตย์ 4 ต.ค. 2569 · เริ่ม 9:00 น. · รถขยะ 8 คันตามโซน + รถน้ำ 4 คันตามซอยคู่/คี่ · เส้นเหลือง = ถนนเมน</p>
-        </header>
+        </header>}
         {error && <p className="rounded-lg bg-red-50 p-2 text-red-700">{error}</p>}
         {!POSTER && (
           <div className="grid grid-cols-2 gap-1 rounded-xl bg-white p-1">
@@ -204,7 +203,7 @@ export default function CleanupPage() {
             {waterTable}
           </section>
         )}
-        {!POSTER && (
+        {!POSTER && !embedded && (
           <a href="/" className="block text-center underline">
             ← กลับหน้าหลัก
           </a>
@@ -212,4 +211,11 @@ export default function CleanupPage() {
       </div>
     </div>
   );
+}
+
+export default function CleanupPage() {
+  useEffect(() => {
+    document.title = "แผนรถ Big Cleaning Day · เสรีไทย 57";
+  }, []);
+  return <CleanupPlan />;
 }

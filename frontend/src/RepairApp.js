@@ -8,6 +8,7 @@ import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
 import SurveyBoxes from "./components/SurveyBox";
 import RecoveryStart from "./components/RecoveryStart";
+import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView } from "./components/WatchPanel";
 import { LostBoard, LostForm } from "./components/LostFound";
@@ -590,6 +591,8 @@ export function eventSpot(e) {
 
 // Red call-out box for a volunteer work session; tap = show it on the map
 function EventBox({ ev, onMap }) {
+  const [plan, setPlan] = useState(false);
+  const [planMounted, setPlanMounted] = useState(false); // keep the maps once drawn: removing a Leaflet map mid-zoom crashes it
   const linked = ev.tab || ev.line?.length || ev.lat != null;
   return (
     <section className="mb-3 rounded-xl border-4 border-red-600 bg-red-50 px-3 py-2">
@@ -611,10 +614,24 @@ function EventBox({ ev, onMap }) {
           ))}
         </ol>
       )}
-      {ev.link && (
-        <a href={ev.link} className="mt-2 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-3 text-center text-lg font-bold text-white">
-          {ev.link_label || "ดูรายละเอียด ›"}
-        </a>
+      {ev.link === "/cleanup" ? (
+        <>
+          <button onClick={() => { setPlanMounted(true); setPlan((o) => !o); }} aria-expanded={plan} className="mt-2 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-3 text-center text-lg font-bold text-white">
+            {plan ? "▲ ซ่อนแผนรถ" : ev.link_label || "🗺️ ดูแผนรถตามโซน ▼"}
+          </button>
+          {planMounted && (
+            <div className="mt-2" hidden={!plan}>
+              <CleanupPlan embedded />
+              <a href="/cleanup" className="mt-2 block text-center text-sm underline">เปิดแผนเต็มจอ ↗</a>
+            </div>
+          )}
+        </>
+      ) : (
+        ev.link && (
+          <a href={ev.link} className="mt-2 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-3 text-center text-lg font-bold text-white">
+            {ev.link_label || "ดูรายละเอียด ›"}
+          </a>
+        )
       )}
       {linked && (
         <button onClick={onMap} className="mt-2 min-h-[44px] w-full rounded-lg border-2 border-red-600 bg-white font-semibold text-red-800">
