@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
 import { api, load, save } from "../api";
 import { timeAgo } from "../config";
+import { createBaseMap } from "./MapView";
 
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
 // phones' number pad has no "/": "917", "4.917" and "4-917" all mean 4/917 (every house here is 4/…)
@@ -211,6 +213,7 @@ function Progress({ prog, showSois, onToggle }) {
         {t.again ? `ต้องกลับไปอีก ${t.again} หลัง · ` : ""}
         รอตรวจ {t.todo || 0} หลัง{prog.last ? ` · อัปเดต ${timeAgo(prog.last)}` : ""}
       </p>
+      {showSois && <ProgressMap sois={prog.sois} />}
       {showSois && (
         <div className="mt-2 flex flex-wrap gap-1">
           {prog.sois.map((b) => (
@@ -220,6 +223,55 @@ function Progress({ prog, showSois, onToggle }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Map of the rounds: one circle per soi, "done/all" — green = all checked, orange = some, red = none yet.
+function ProgressMap({ sois }) {
+  const el = useRef(null);
+  const layerRef = useRef(null);
+  const [geo, setGeo] = useState(null);
+  useEffect(() => {
+    Promise.all([api("/zones"), api("/sois")])
+      .then(([z, s]) => setGeo({ road: z.main_road, houses: z.houses, centers: s.sois }))
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!geo || !el.current) return;
+    const map = createBaseMap(el.current, { zoom: 16 });
+    map.options.zoomAnimation = false; // hiding the box removes the map; Leaflet crashes if a zoom is still animating
+    L.polyline(geo.road, { color: "#facc15", weight: 5, opacity: 0.9, interactive: false }).addTo(map);
+    map.fitBounds(L.latLngBounds(geo.houses.map(([a, b]) => [a, b])), { padding: [6, 6], animate: false });
+    layerRef.current = L.layerGroup().addTo(map);
+    return () => {
+      layerRef.current = null;
+      map.stop();
+      map.off();
+      map.remove();
+    };
+  }, [geo]);
+  useEffect(() => {
+    const layer = layerRef.current;
+    if (!layer || !geo) return;
+    layer.clearLayers();
+    for (const b of sois) {
+      const c = geo.centers[b.soi];
+      if (!c) continue;
+      const color = b.done >= b.all ? "#16a34a" : b.done ? "#f59e0b" : "#dc2626";
+      const icon = L.divIcon({
+        className: "",
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+        html: `<div style="width:34px;height:34px;border-radius:9999px;background:${color};color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;font:700 10px/1.1 sans-serif">${b.done}/${b.all}<span style="font-size:8px;font-weight:600">ซ.${b.soi}</span></div>`,
+      });
+      L.marker(c.center, { icon, interactive: false }).addTo(layer);
+    }
+  }, [sois, geo]);
+  return (
+    <div className="mt-2">
+      <div ref={el} className="h-[340px] w-full overflow-hidden rounded-xl" />
+      <p className="mt-1 text-xs text-neutral-600">ตัวเลข = ตรวจแล้ว/ลงชื่อไว้ ในซอยนั้น · 🟢 ครบแล้ว · 🟠 ตรวจไปบางหลัง · 🔴 ยังไม่ได้เริ่ม</p>
     </div>
   );
 }
