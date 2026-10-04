@@ -19,6 +19,13 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 HOUSE_RE = re.compile(r"^\d{1,3}/\d{1,5}(/\d{1,3})?$")  # 4/917
+
+
+def norm_house(h: str) -> str:
+    """Phones' number pad has no "/": accept "917", "4.917", "4-917" and turn them into "4/917"."""
+    h = re.sub(r"\s", "", h or "")
+    h = re.sub(r"^(\d{1,3})[.\-](\d)", lambda m: m.group(1) + "/" + m.group(2), h)
+    return "4/" + h if re.fullmatch(r"\d{1,5}", h) else h
 KEY_RE = r"^[a-z0-9-]{2,30}$"
 
 # the first survey: Ministry of Defence electricians, 5–7 Oct 2026
@@ -87,7 +94,7 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
     async def check(key: str, house: str, request: Request):
         """Has this house signed? Answers yes/no + when only (no phone / name)."""
         rate_limit(request, "survey-check", limit=40, window_s=600)
-        house = house.strip().replace(" ", "")
+        house = norm_house(house)
         if not HOUSE_RE.match(house):
             raise HTTPException(422, "ใส่บ้านเลขที่แบบ 4/917")
         r = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0, "updated_at": 1, "picks": 1, "source": 1})
@@ -101,7 +108,7 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         if not s:
             raise HTTPException(404, "แบบสำรวจนี้ปิดแล้ว")
         rate_limit(request, "survey", limit=10, window_s=600)
-        house = body.house.strip().replace(" ", "")
+        house = norm_house(body.house)
         if not HOUSE_RE.match(house):
             raise HTTPException(422, "ใส่บ้านเลขที่แบบ 4/917")
         phone = re.sub(r"[^\d+]", "", body.phone)
@@ -140,7 +147,7 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         s = next((x for x in await surveys() if x["key"] == key), None)
         if not s:
             raise HTTPException(404, "ไม่มีแบบสำรวจนี้")
-        house = body.house.strip().replace(" ", "")
+        house = norm_house(body.house)
         if not HOUSE_RE.match(house):
             raise HTTPException(422, "บ้านเลขที่ไม่ถูกต้อง")
         old = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0})

@@ -3,7 +3,11 @@ import { api, load, save } from "../api";
 import { timeAgo } from "../config";
 
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
-const cleanHouse = (h) => (h || "").replace(/\s/g, "");
+// phones' number pad has no "/": "917", "4.917" and "4-917" all mean 4/917 (every house here is 4/…)
+const cleanHouse = (h) => {
+  const x = (h || "").replace(/\s/g, "").replace(/^(\d{1,3})[.-](\d)/, "$1/$2");
+  return /^\d{1,5}$/.test(x) ? `4/${x}` : x;
+};
 
 // Active sign-up lists (e.g. "ลงชื่อขอช่างไฟตรวจบ้าน") at the top of the home page, open by default.
 export default function SurveyBoxes() {
@@ -107,7 +111,7 @@ function SurveyBox({ s, onCount }) {
           {mode === "check" && (
             <form onSubmit={lookup} className="space-y-2">
               <div className="flex gap-2">
-                <input required value={q} onChange={(e) => setQ(e.target.value)} className={input} placeholder="บ้านเลขที่ (4/917)" aria-label="บ้านเลขที่ที่จะเช็ก" inputMode="numeric" />
+                <input required value={q} onChange={(e) => setQ(e.target.value)} className={input} placeholder="บ้านเลขที่ เช่น 917 หรือ 4/917" aria-label="บ้านเลขที่ที่จะเช็ก" inputMode="decimal" />
                 <button className="min-h-[44px] shrink-0 rounded-lg bg-blue-700 px-4 font-bold text-white">เช็ก</button>
               </div>
               {found && (
@@ -128,7 +132,7 @@ function SurveyBox({ s, onCount }) {
           {mode === "sign" && (
             <form onSubmit={submit} className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
-                <input required value={f.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="บ้านเลขที่ * (4/917)" aria-label="บ้านเลขที่" inputMode="numeric" />
+                <input required value={f.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="บ้านเลขที่ * เช่น 917" aria-label="บ้านเลขที่" inputMode="decimal" />
                 <input required value={f.soi} onChange={(e) => set({ soi: e.target.value })} className={input} placeholder="ซอย/แยก *" aria-label="ซอย" />
                 <input value={f.name} onChange={(e) => set({ name: e.target.value })} className={input} placeholder="ชื่อ" aria-label="ชื่อ" maxLength={60} />
                 <input required value={f.phone} onChange={(e) => set({ phone: e.target.value })} className={input} placeholder="เบอร์โทร *" aria-label="เบอร์โทร" inputMode="tel" />
