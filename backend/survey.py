@@ -25,6 +25,13 @@ from pydantic import BaseModel, Field
 HOUSE_RE = re.compile(r"^\d{1,3}/\d{1,5}(/\d{1,3})?$")  # 4/917
 
 
+def norm_soi(s: str) -> str:
+    """"แยก2/2", "ซ.2/2", "ซอย 2/2" → "2/2" (people type the prefix; the list groups by the soi number)."""
+    t = re.sub(r"\s", "", s or "")
+    t = re.sub(r"^(ซอย|ซ\.?|แยก)+", "", t)
+    return t if re.fullmatch(r"\d{1,3}(/\d{1,2})?", t) else (s or "").strip()
+
+
 def norm_house(h: str) -> str:
     """Phones' number pad has no "/": accept "917", "4.917", "4-917" and turn them into "4/917"."""
     h = re.sub(r"\s", "", h or "")
@@ -132,7 +139,7 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
                 last = at
             total["all"] += 1
             total[st] = total.get(st, 0) + 1
-            m = re.match(r"\d+", r.get("soi") or "")
+            m = re.search(r"\d+", r.get("soi") or "")
             k = m.group() if m else (r.get("soi") or "?")
             b = by.setdefault(k, {"soi": k, "all": 0, "done": 0})
             b["all"] += 1
@@ -157,7 +164,7 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         doc = {
             "survey": key,
             "house": house,
-            "soi": body.soi.strip(),
+            "soi": norm_soi(body.soi),
             "name": body.name.strip(),
             "phone": phone,
             "picks": picks,
@@ -192,14 +199,14 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         old = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0})
         picks = [p for p in body.picks if p in s.get("options", [])]
         if old:  # never overwrite what the resident typed themselves; only fill gaps / add problems
-            upd = {k: v for k, v in {"soi": body.soi.strip(), "name": body.name.strip(), "phone": re.sub(r"[^\d+]", "", body.phone)}.items() if v and not old.get(k)}
+            upd = {k: v for k, v in {"soi": norm_soi(body.soi), "name": body.name.strip(), "phone": re.sub(r"[^\d+]", "", body.phone)}.items() if v and not old.get(k)}
             upd["picks"] = old.get("picks", []) + [p for p in picks if p not in old.get("picks", [])]
             if body.note.strip() and body.note.strip() not in old.get("note", ""):
                 upd["note"] = (old.get("note", "") + " | " + body.note.strip()).strip(" |")[:600]
             await db.survey_resp.update_one({"survey": key, "house": house}, {"$set": upd})
             return {"ok": True, "updated": True}
         await db.survey_resp.insert_one({
-            "id": str(uuid.uuid4()), "survey": key, "house": house, "soi": body.soi.strip(), "name": body.name.strip(),
+            "id": str(uuid.uuid4()), "survey": key, "house": house, "soi": norm_soi(body.soi), "name": body.name.strip(),
             "phone": re.sub(r"[^\d+]", "", body.phone), "picks": picks, "note": body.note.strip(), "source": body.source,
             "added_by": admin.get("name", ""), "created_at": now(), "updated_at": now(),
         })
