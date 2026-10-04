@@ -13,7 +13,7 @@ import io
 import re
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Literal
 
 from urllib.parse import unquote
@@ -84,6 +84,13 @@ class JobUpdate(BaseModel):
     house: str = Field(..., max_length=20)
     status: JobStatus
     note: str = Field("", max_length=300)
+
+
+class TechPos(BaseModel):
+    on: bool = True  # False = "ปิดตำแหน่ง": remove me from the maps now
+    lat: float = Field(0, ge=13.5, le=14.1)
+    lng: float = Field(0, ge=100.4, le=100.9)
+    acc: float = Field(0, ge=0, le=5000)
 
 
 class Answer(BaseModel):
@@ -270,6 +277,35 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         if not res.matched_count:
             raise HTTPException(404, f"ไม่มีบ้าน {house} ในรายชื่อ")
         return {"house": house, "job": job}
+
+    # Where the teams are: a technician who turns on "📍 ตำแหน่งฉัน" shares the phone's position (only while it is on,
+    # forgotten after POS_TTL). The tech page and the public home map both show the teams, by team name only.
+    POS_TTL = timedelta(minutes=20)
+
+    async def positions(key: str) -> list:
+        since = now() - POS_TTL
+        rows = await db.tech_pos.find({"survey": key, "at": {"$gte": since}}, {"_id": 0, "survey": 0}).to_list(100)
+        return [{**r, "lat": round(r["lat"], 5), "lng": round(r["lng"], 5)} for r in rows]
+
+    @router.post("/tech/{key}/pos")
+    async def tech_pos(key: str, body: TechPos, request: Request):
+        who = await tech(request)
+        rate_limit(request, "tech-pos", limit=120, window_s=600)
+        if not body.on:
+            await db.tech_pos.delete_one({"survey": key, "name": who})
+            return {"ok": True}
+        await db.tech_pos.update_one({"survey": key, "name": who}, {"$set": {"survey": key, "name": who, "lat": body.lat, "lng": body.lng, "acc": body.acc, "at": now()}}, upsert=True)
+        return {"ok": True}
+
+    @router.get("/tech/{key}/pos")
+    async def tech_positions(key: str, request: Request):
+        await tech(request)
+        return await positions(key)
+
+    @router.get("/surveys/{key}/techs")
+    async def public_positions(key: str):
+        """Public: which teams are out and where (team name + position, nothing about the houses)."""
+        return [{k: r[k] for k in ("name", "lat", "lng", "at")} for r in await positions(key)]
 
     @router.get("/admin/tech/key")
     async def get_tech_key(admin: dict = Depends(require_admin)):

@@ -3,6 +3,7 @@ import L from "leaflet";
 import { api, load, save } from "../api";
 import { timeAgo } from "../config";
 import { createBaseMap } from "./MapView";
+import { drawTeams } from "./teamMarkers";
 
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
 // phones' number pad has no "/": "917", "4.917" and "4-917" all mean 4/917 (every house here is 4/…)
@@ -231,7 +232,9 @@ function Progress({ prog, showSois, onToggle }) {
 function ProgressMap({ sois }) {
   const el = useRef(null);
   const layerRef = useRef(null);
+  const teamsRef = useRef(null);
   const [geo, setGeo] = useState(null);
+  const [teams, setTeams] = useState([]);
   useEffect(() => {
     Promise.all([api("/zones"), api("/sois")])
       .then(([z, s]) => setGeo({ road: z.main_road, houses: z.houses, centers: s.sois }))
@@ -244,13 +247,16 @@ function ProgressMap({ sois }) {
     L.polyline(geo.road, { color: "#facc15", weight: 5, opacity: 0.9, interactive: false }).addTo(map);
     map.fitBounds(L.latLngBounds(geo.houses.map(([a, b]) => [a, b])), { padding: [6, 6], animate: false });
     layerRef.current = L.layerGroup().addTo(map);
+    teamsRef.current = L.layerGroup().addTo(map);
+    drawTeams(teamsRef.current, teams);
     return () => {
       layerRef.current = null;
+      teamsRef.current = null;
       map.stop();
       map.off();
       map.remove();
     };
-  }, [geo]);
+  }, [geo]); // eslint-disable-line react-hooks/exhaustive-deps -- teams are redrawn by their own effect
   useEffect(() => {
     const layer = layerRef.current;
     if (!layer || !geo) return;
@@ -268,10 +274,20 @@ function ProgressMap({ sois }) {
       L.marker(c.center, { icon, interactive: false }).addTo(layer);
     }
   }, [sois, geo]);
+  useEffect(() => {
+    const go = () => api("/surveys/electric/techs").then(setTeams).catch(() => {});
+    go();
+    const t = setInterval(go, 30000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    if (teamsRef.current) drawTeams(teamsRef.current, teams);
+  }, [teams]);
   return (
     <div className="mt-2">
+      {teams.length > 0 && <p className="mb-1 text-sm font-semibold">👷 ทีมช่างกำลังทำงาน {teams.length} ทีม: {teams.map((t) => t.name).join(" · ")}</p>}
       <div ref={el} className="h-[340px] w-full overflow-hidden rounded-xl" />
-      <p className="mt-1 text-xs text-neutral-600">ตัวเลข = ตรวจแล้ว/ลงชื่อไว้ ในซอยนั้น · 🟢 ครบแล้ว · 🟠 ตรวจไปบางหลัง · 🔴 ยังไม่ได้เริ่ม</p>
+      <p className="mt-1 text-xs text-neutral-600">ตัวเลข = ตรวจแล้ว/ลงชื่อไว้ ในซอยนั้น · 🟢 ครบแล้ว · 🟠 ตรวจไปบางหลัง · 🔴 ยังไม่ได้เริ่ม · 👷 = ทีมช่าง (ตำแหน่งล่าสุด)</p>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { api, load, save } from "../api";
 import { createBaseMap } from "./MapView";
+import { drawTeams } from "./teamMarkers";
 
 const SURVEY = "electric";
 const STATUS = {
@@ -201,7 +202,7 @@ export default function TechPage() {
               save("techZone", z);
             }}
           />
-          <TechMap zones={zones} rows={rows} zone={zone} soi={soi} onSoi={(s) => setSoi((cur) => (cur === s ? "" : s))} />
+          <TechMap zones={zones} rows={rows} zone={zone} soi={soi} me={me} onSoi={(s) => setSoi((cur) => (cur === s ? "" : s))} />
 
           <div className="my-3 space-y-2">
             <div className="grid grid-cols-4 gap-1 rounded-xl bg-white p-1 text-sm">
@@ -403,11 +404,13 @@ function ZonePicker({ zones, rows, zone, onZone }) {
 }
 
 // One circle per soi: the number of houses still to visit; red = still open, green = all done. Tap = show that soi.
-function TechMap({ zones, rows, zone, soi, onSoi }) {
+function TechMap({ zones, rows, zone, soi, me, onSoi }) {
   const el = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
   const meRef = useRef(null); // GPS dot + accuracy circle
+  const teamsRef = useRef(null); // other teams' positions
+  const sentRef = useRef(0); // last time this phone shared its position
   const watchRef = useRef(null);
   const [sois, setSois] = useState(null);
   const [gps, setGps] = useState(""); // "" | "wait" | "on" | error text
@@ -421,10 +424,14 @@ function TechMap({ zones, rows, zone, soi, onSoi }) {
     L.polyline(zones.main_road, { color: "#facc15", weight: 5, opacity: 0.9, interactive: false }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
     meRef.current = L.layerGroup().addTo(map);
+    teamsRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     return () => {
       mapRef.current = null;
-      if (watchRef.current != null) navigator.geolocation?.clearWatch(watchRef.current);
+      if (watchRef.current != null) {
+        navigator.geolocation?.clearWatch(watchRef.current);
+        share({ on: false });
+      }
       map.stop();
       map.off();
       map.remove();
@@ -479,6 +486,20 @@ function TechMap({ zones, rows, zone, soi, onSoi }) {
     if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [10, 10], animate: false });
   }, [rows, sois, soi, zones, zone]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // where the other teams are (every 20 s)
+  useEffect(() => {
+    if (!zones) return;
+    const go = () =>
+      tapi(`/tech/${SURVEY}/pos`)
+        .then((list) => teamsRef.current && drawTeams(teamsRef.current, list.filter((t) => t.name !== me || watchRef.current == null), me))
+        .catch(() => {});
+    go();
+    const t = setInterval(go, 20000);
+    return () => clearInterval(t);
+  }, [zones, me]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const share = (body) => tapi(`/tech/${SURVEY}/pos`, { method: "POST", body: JSON.stringify(body) }).catch(() => {});
+
   function locate() {
     const map = mapRef.current;
     if (!navigator.geolocation) return setGps("มือถือนี้ไม่รองรับ GPS");
@@ -486,6 +507,7 @@ function TechMap({ zones, rows, zone, soi, onSoi }) {
       navigator.geolocation.clearWatch(watchRef.current);
       watchRef.current = null;
       meRef.current?.clearLayers();
+      share({ on: false });
       return setGps("");
     }
     setGps("wait");
@@ -498,6 +520,10 @@ function TechMap({ zones, rows, zone, soi, onSoi }) {
         me.clearLayers();
         L.circle(ll, { radius: Math.min(pos.coords.accuracy || 20, 150), color: "#2563eb", weight: 1, fillOpacity: 0.12, interactive: false }).addTo(me);
         L.circleMarker(ll, { radius: 8, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).bindTooltip("คุณอยู่ตรงนี้").addTo(me);
+        if (Date.now() - sentRef.current > 20000) {
+          sentRef.current = Date.now();
+          share({ on: true, lat: ll[0], lng: ll[1], acc: pos.coords.accuracy || 0 });
+        }
         if (first) map.setView(ll, Math.max(map.getZoom(), 17), { animate: false });
         first = false;
         setGps("on");
@@ -520,7 +546,7 @@ function TechMap({ zones, rows, zone, soi, onSoi }) {
         </button>
       </div>
       {gps && !["wait", "on"].includes(gps) && <p className="mt-1 rounded bg-amber-100 p-2 text-xs">{gps}</p>}
-      <p className="mt-1 text-xs text-neutral-600">จุดเล็กสี = บ้านในแต่ละโซน · วงกลม = จำนวนบ้านที่ยังต้องไปในซอยนั้น (🔴 มีบ้านด่วน · 🟠 รอตรวจ · 🟢 เสร็จหมด) · แตะวงกลม = ดูเฉพาะซอยนั้น · 📍 = ตำแหน่งมือถือคุณ (จุดสีน้ำเงิน)</p>
+      <p className="mt-1 text-xs text-neutral-600">จุดเล็กสี = บ้านในแต่ละโซน · วงกลม = จำนวนบ้านที่ยังต้องไปในซอยนั้น (🔴 มีบ้านด่วน · 🟠 รอตรวจ · 🟢 เสร็จหมด) · แตะวงกลม = ดูเฉพาะซอยนั้น · 📍 = ตำแหน่งมือถือคุณ (จุดสีน้ำเงิน) · 👷 = ทีมช่างที่เปิดตำแหน่งอยู่ · เมื่อเปิด 📍 ทีมอื่นและหน้าเว็บหมู่บ้านจะเห็นชื่อทีมคุณบนแผนที่ (ปิดแล้วหายทันที)</p>
     </div>
   );
 }
