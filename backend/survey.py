@@ -29,6 +29,7 @@ def norm_house(h: str) -> str:
     """Phones' number pad has no "/": accept "917", "4.917", "4-917" and turn them into "4/917"."""
     h = re.sub(r"\s", "", h or "")
     h = re.sub(r"^(\d{1,3})[.\-](\d)", lambda m: m.group(1) + "/" + m.group(2), h)
+    h = re.sub(r"^4/4[./\-]", "4/", h)  # the form pre-fills "4/" and some type it again
     return "4/" + h if re.fullmatch(r"\d{1,5}", h) else h
 KEY_RE = r"^[a-z0-9-]{2,30}$"
 
@@ -110,10 +111,35 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         house = norm_house(house)
         if not HOUSE_RE.match(house):
             raise HTTPException(422, "ใส่บ้านเลขที่แบบ 4/917")
-        r = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0, "updated_at": 1, "picks": 1, "source": 1})
+        r = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0, "updated_at": 1, "picks": 1, "source": 1, "job": 1})
         if not r:
             return {"signed": False, "house": house}
-        return {"signed": True, "house": house, "at": r["updated_at"], "picks": r.get("picks", []), "via": "LINE" if r.get("source") == "line" else "เว็บ"}
+        job = r.get("job") or {}
+        return {"signed": True, "house": house, "at": r["updated_at"], "picks": r.get("picks", []), "via": "LINE" if r.get("source") == "line" else "เว็บ",
+                "job": {"status": job.get("status", "todo"), "at": job.get("at")}}
+
+    @router.get("/surveys/{key}/progress")
+    async def progress(key: str):
+        """Public follow-up for everyone: how many houses the technicians have done, per soi (no names, no phones)."""
+        rows = await db.survey_resp.find({"survey": key}, {"_id": 0, "soi": 1, "job": 1}).to_list(5000)
+        total = {"all": 0, "todo": 0, "claimed": 0, "done": 0, "absent": 0, "again": 0}
+        by = {}
+        last = None
+        for r in rows:
+            st = (r.get("job") or {}).get("status", "todo")
+            at = (r.get("job") or {}).get("at")
+            if at and (last is None or at > last):
+                last = at
+            total["all"] += 1
+            total[st] = total.get(st, 0) + 1
+            m = re.match(r"\d+", r.get("soi") or "")
+            k = m.group() if m else (r.get("soi") or "?")
+            b = by.setdefault(k, {"soi": k, "all": 0, "done": 0})
+            b["all"] += 1
+            if st in ("done", "absent"):
+                b["done"] += 1
+        sois = sorted(by.values(), key=lambda b: (int(b["soi"]) if b["soi"].isdigit() else 999, b["soi"]))
+        return {"total": total, "sois": sois, "last": last}
 
     @router.post("/surveys/{key}", status_code=201)
     async def answer(key: str, body: Answer, request: Request):

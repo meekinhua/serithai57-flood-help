@@ -5,7 +5,8 @@ import { timeAgo } from "../config";
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
 // phones' number pad has no "/": "917", "4.917" and "4-917" all mean 4/917 (every house here is 4/…)
 const cleanHouse = (h) => {
-  const x = (h || "").replace(/\s/g, "").replace(/^(\d{1,3})[.-](\d)/, "$1/$2");
+  // the field starts as "4/" on tap: someone typing "4/917" again would give "4/4/917"
+  const x = (h || "").replace(/\s/g, "").replace(/^(\d{1,3})[.-](\d)/, "$1/$2").replace(/^4\/4[./-]/, "4/");
   return /^\d{1,5}$/.test(x) ? `4/${x}` : x;
 };
 
@@ -29,6 +30,14 @@ function SurveyBox({ s, onCount }) {
   const [f, setF] = useState(() => mine || { house: "", soi: "", name: c.name || "", phone: c.phone || "", picks: [], note: "" });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [prog, setProg] = useState(null); // technicians' follow-up, public: counts per soi only
+  const [showSois, setShowSois] = useState(false);
+  useEffect(() => {
+    const go = () => api(`/surveys/${s.key}/progress`).then(setProg).catch(() => {});
+    go();
+    const t = setInterval(go, 60000);
+    return () => clearInterval(t);
+  }, [s.key]);
   const [dup, setDup] = useState(null); // the house already signed: ask before overwriting
   const [q, setQ] = useState(mine?.house || "");
   const [found, setFound] = useState(null);
@@ -93,6 +102,7 @@ function SurveyBox({ s, onCount }) {
         </span>
         <span className="shrink-0 font-semibold underline">{open ? "ย่อ" : mine ? "ดู / แก้ไข ›" : "ลงชื่อ ›"}</span>
       </button>
+      {prog && prog.total.all > 0 && <Progress prog={prog} showSois={showSois} onToggle={() => setShowSois((v) => !v)} />}
       {msg && !open && <p className="pb-1 text-sm font-semibold text-blue-800">{msg}</p>}
       {open && (
         <div className="space-y-2 pb-2 pt-1">
@@ -111,13 +121,13 @@ function SurveyBox({ s, onCount }) {
           {mode === "check" && (
             <form onSubmit={lookup} className="space-y-2">
               <div className="flex gap-2">
-                <input required value={q} onChange={(e) => setQ(e.target.value)} className={input} placeholder="บ้านเลขที่ เช่น 917 หรือ 4/917" aria-label="บ้านเลขที่ที่จะเช็ก" inputMode="decimal" />
+                <input required value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => !q && setQ("4/")} className={input} placeholder="บ้านเลขที่ เช่น 4/917" aria-label="บ้านเลขที่ที่จะเช็ก" inputMode="text" autoComplete="off" />
                 <button className="min-h-[44px] shrink-0 rounded-lg bg-blue-700 px-4 font-bold text-white">เช็ก</button>
               </div>
               {found && (
                 <p className={`rounded-lg p-2 font-semibold ${found.signed ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900"}`}>
                   {found.signed
-                    ? `✅ บ้าน ${found.house} ลงชื่อแล้ว (${timeAgo(found.at)} ทาง${found.via})${found.picks?.length ? ` · ${found.picks.join(", ")}` : ""}`
+                    ? `✅ บ้าน ${found.house} ลงชื่อแล้ว (${timeAgo(found.at)} ทาง${found.via})${found.picks?.length ? ` · ${found.picks.join(", ")}` : ""} · ${jobText(found.job)}`
                     : `ยังไม่มีชื่อบ้าน ${found.house} — กด "ลงชื่อ" ได้เลย`}
                 </p>
               )}
@@ -132,7 +142,7 @@ function SurveyBox({ s, onCount }) {
           {mode === "sign" && (
             <form onSubmit={submit} className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
-                <input required value={f.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="บ้านเลขที่ * เช่น 917" aria-label="บ้านเลขที่" inputMode="decimal" />
+                <input required value={f.house} onChange={(e) => set({ house: e.target.value })} onFocus={() => !f.house && set({ house: "4/" })} className={input} placeholder="บ้านเลขที่ * เช่น 4/917" aria-label="บ้านเลขที่" inputMode="text" autoComplete="off" />
                 <input required value={f.soi} onChange={(e) => set({ soi: e.target.value })} className={input} placeholder="ซอย/แยก *" aria-label="ซอย" />
                 <input value={f.name} onChange={(e) => set({ name: e.target.value })} className={input} placeholder="ชื่อ" aria-label="ชื่อ" maxLength={60} />
                 <input required value={f.phone} onChange={(e) => set({ phone: e.target.value })} className={input} placeholder="เบอร์โทร *" aria-label="เบอร์โทร" inputMode="tel" />
@@ -173,5 +183,43 @@ function SurveyBox({ s, onCount }) {
         </div>
       )}
     </section>
+  );
+}
+
+const JOB = { todo: "ยังไม่ได้ตรวจ", claimed: "ช่างรับงานแล้ว กำลังไป", done: "ช่างตรวจเสร็จแล้ว ✅", absent: "ช่างไปแล้วแต่ไม่มีคนอยู่บ้าน", again: "ช่างจะกลับมาอีกรอบ" };
+export const jobText = (job) => JOB[job?.status || "todo"];
+
+// Public follow-up of the electricians' rounds: how many houses are done, soi by soi. No names, no phone numbers.
+function Progress({ prog, showSois, onToggle }) {
+  const t = prog.total;
+  const done = (t.done || 0) + (t.absent || 0);
+  const pct = Math.round((done / t.all) * 100);
+  return (
+    <div className="pb-2">
+      <div className="flex items-baseline justify-between gap-2 text-sm">
+        <b>🔧 ช่างตรวจแล้ว {done} / {t.all} หลัง</b>
+        <button onClick={onToggle} className="shrink-0 font-semibold underline">
+          {showSois ? "ซ่อนรายซอย" : "ดูรายซอย ›"}
+        </button>
+      </div>
+      <div className="my-1 h-2.5 overflow-hidden rounded-full bg-white">
+        <div className="h-full bg-emerald-600" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="text-xs text-neutral-600">
+        {t.claimed ? `กำลังไป ${t.claimed} หลัง · ` : ""}
+        {t.absent ? `ไม่มีคนอยู่ ${t.absent} หลัง · ` : ""}
+        {t.again ? `ต้องกลับไปอีก ${t.again} หลัง · ` : ""}
+        รอตรวจ {t.todo || 0} หลัง{prog.last ? ` · อัปเดต ${timeAgo(prog.last)}` : ""}
+      </p>
+      {showSois && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {prog.sois.map((b) => (
+            <span key={b.soi} className={`rounded-full px-2 py-1 text-xs font-semibold ${b.done >= b.all ? "bg-emerald-600 text-white" : b.done ? "bg-amber-200 text-amber-900" : "bg-white text-neutral-700"}`}>
+              ซ.{b.soi} {b.done}/{b.all}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
