@@ -71,10 +71,7 @@ export default function TechPage() {
   const soiZone = zones?.soi_zone || {};
   const zoneOf = (r) => soiZone[mainSoi(r.soi)] || "?";
 
-  async function setStatus(r, status) {
-    let note = "";
-    if (status === "done" || status === "again" || status === "absent") note = window.prompt(status === "done" ? "บันทึกสั้นๆ (ถ้ามี) เช่น เปลี่ยนเบรกเกอร์ / ปลอดภัยแล้ว" : "หมายเหตุ (ถ้ามี)", r.job?.note || "") ?? null;
-    if (note === null) return;
+  async function setStatus(r, status, note = "") {
     setBusy(r.house);
     try {
       const res = await tapi(`/tech/${SURVEY}/jobs`, { method: "POST", body: JSON.stringify({ house: r.house, status, note }) });
@@ -156,12 +153,11 @@ export default function TechPage() {
       right={
         <button
           onClick={() => {
-            const n = window.prompt("เปลี่ยนชื่อช่าง", me);
-            if (n && n.trim()) {
-              save("techName", n.trim());
-              setMe(n.trim());
-            }
+            save("techName", "");
+            setNameDraft(me);
+            setMe("");
           }}
+          title="เปลี่ยนชื่อช่าง"
           className="rounded-full bg-white/15 px-3 py-1 text-sm"
         >
           👷 {me}
@@ -250,7 +246,7 @@ export default function TechPage() {
                 </h3>
                 <div className="space-y-2">
                   {list.map((r) => (
-                    <Job key={r.house} r={r} me={me} busy={busy === r.house} onStatus={(st) => setStatus(r, st)} />
+                    <Job key={r.house} r={r} me={me} busy={busy === r.house} onStatus={(st, note) => setStatus(r, st, note)} />
                   ))}
                 </div>
               </section>
@@ -278,7 +274,20 @@ function Shell({ children, right }) {
   );
 }
 
+const ASK = {
+  done: ["บันทึกสั้นๆ (ถ้ามี) เช่น เปลี่ยนเบรกเกอร์ / ปลอดภัยแล้ว", "✅ ยืนยัน ตรวจเสร็จ", "bg-emerald-600 text-white"],
+  absent: ["หมายเหตุ (ถ้ามี) เช่น โทรแล้วไม่รับ", "🚪 ยืนยัน ไม่อยู่บ้าน", "bg-neutral-700 text-white"],
+  again: ["ต้องกลับมาทำอะไร (ถ้ามี)", "↩︎ ยืนยัน ต้องกลับมาอีก", "bg-violet-700 text-white"],
+};
+
 function Job({ r, me, busy, onStatus }) {
+  const [ask, setAsk] = useState(""); // which status is waiting for a note
+  const [note, setNote] = useState("");
+  const pick = (st) => {
+    if (!ASK[st]) return onStatus(st, "");
+    setNote(r.job?.note || "");
+    setAsk(st);
+  };
   const st = statusOf(r);
   const s = STATUS[st];
   const urgent = isUrgent(r) && !["done", "absent"].includes(st);
@@ -307,33 +316,54 @@ function Job({ r, me, busy, onStatus }) {
           {r.job.note ? ` · ${r.job.note}` : ""}
         </p>
       )}
+      {ask ? (
+        <form
+          className="mt-2 space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onStatus(ask, note.trim());
+            setAsk("");
+          }}
+        >
+          <textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} rows={2} placeholder={ASK[ask][0]} className="w-full rounded-lg border border-neutral-300 px-3 py-2" />
+          <div className="flex gap-1">
+            <button disabled={busy} className={`${btn} ${ASK[ask][2]}`}>
+              {ASK[ask][1]}
+            </button>
+            <button type="button" onClick={() => setAsk("")} className={`${btn} max-w-[30%] border-2 border-neutral-300`}>
+              ยกเลิก
+            </button>
+          </div>
+        </form>
+      ) : (
       <div className="mt-2 flex gap-1">
         {st === "todo" || st === "again" ? (
-          <button disabled={busy} onClick={() => onStatus("claimed")} className={`${btn} bg-amber-400`}>
+          <button disabled={busy} onClick={() => pick("claimed")} className={`${btn} bg-amber-400`}>
             🙋 รับงาน
           </button>
         ) : null}
         {st !== "done" && (
-          <button disabled={busy} onClick={() => onStatus("done")} className={`${btn} bg-emerald-600 text-white`}>
+          <button disabled={busy} onClick={() => pick("done")} className={`${btn} bg-emerald-600 text-white`}>
             ✅ ตรวจเสร็จ
           </button>
         )}
         {(st === "claimed" || st === "todo") && (
-          <button disabled={busy} onClick={() => onStatus("absent")} className={`${btn} border-2 border-neutral-400`}>
+          <button disabled={busy} onClick={() => pick("absent")} className={`${btn} border-2 border-neutral-400`}>
             🚪 ไม่อยู่
           </button>
         )}
         {(st === "done" || st === "absent") && (
-          <button disabled={busy} onClick={() => onStatus("again")} className={`${btn} border-2 border-violet-500 text-violet-800`}>
+          <button disabled={busy} onClick={() => pick("again")} className={`${btn} border-2 border-violet-500 text-violet-800`}>
             ↩︎ ต้องกลับมาอีก
           </button>
         )}
         {st === "claimed" && mine && (
-          <button disabled={busy} onClick={() => onStatus("todo")} className={`${btn} border-2 border-neutral-300 text-neutral-600`}>
+          <button disabled={busy} onClick={() => pick("todo")} className={`${btn} border-2 border-neutral-300 text-neutral-600`}>
             คืนงาน
           </button>
         )}
       </div>
+      )}
     </article>
   );
 }
