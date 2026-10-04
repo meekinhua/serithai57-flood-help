@@ -8,11 +8,15 @@ many houses have signed. The team gets the list (and a CSV) as admin.
 """
 import csv
 import hashlib
+import hmac
 import io
 import re
+import secrets
 import uuid
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Literal
+
+from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
@@ -63,6 +67,15 @@ class TeamEntry(BaseModel):
 
 class SurveysBody(BaseModel):
     surveys: List[Survey] = Field(default_factory=list, max_length=10)
+
+
+JobStatus = Literal["todo", "claimed", "done", "absent", "again"]  # ยังไม่ทำ · รับงานแล้ว · ตรวจเสร็จ · ไม่อยู่บ้าน · ต้องกลับมาอีก
+
+
+class JobUpdate(BaseModel):
+    house: str = Field(..., max_length=20)
+    status: JobStatus
+    note: str = Field("", max_length=300)
 
 
 class Answer(BaseModel):
@@ -184,5 +197,56 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         for r in rows:
             w.writerow([r.get("soi", ""), r["house"], r.get("name", ""), r["phone"], " / ".join(r.get("picks", [])), r.get("note", ""), "LINE" if r.get("source") == "line" else "เว็บ", r["updated_at"].strftime("%Y-%m-%d %H:%M")])
         return Response("﻿" + buf.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="survey-{key}.csv"'})
+
+    # ---------------- technicians (5 Oct 2026): the electricians' worklist ----------------
+    # The page /tech#tk=<key> is shared with the technicians only (it shows phone numbers). Each technician types their
+    # name once on the phone; claiming / finishing a house records who and when, so the team can split the village
+    # and see at a glance how many houses are done.
+
+    async def tech_key() -> str:
+        doc = await db.settings.find_one({"id": "tech_key"})
+        if not doc:
+            await db.settings.update_one({"id": "tech_key"}, {"$setOnInsert": {"id": "tech_key", "key": secrets.token_urlsafe(18), "created_at": now()}}, upsert=True)
+            doc = await db.settings.find_one({"id": "tech_key"})
+        return doc["key"]
+
+    async def tech(request: Request) -> str:
+        given = request.headers.get("x-tech-key", "")
+        if given and hmac.compare_digest(given, await tech_key()):
+            return unquote(request.headers.get("x-tech-name", ""))[:40] or "ช่าง"
+        if given:
+            rate_limit(request, "techkey-miss", limit=20, window_s=600)
+        raise HTTPException(403, "สำหรับทีมช่างเท่านั้น (ใช้ลิงก์ที่ทีมอาสาส่งให้)")
+
+    @router.get("/tech/{key}/jobs")
+    async def tech_jobs(key: str, request: Request):
+        await tech(request)
+        rows = await db.survey_resp.find({"survey": key}, {"_id": 0, "ip": 0, "id": 0}).to_list(5000)
+        return sorted(rows, key=soi_key)
+
+    @router.post("/tech/{key}/jobs")
+    async def tech_update(key: str, body: JobUpdate, request: Request):
+        who = await tech(request)
+        house = norm_house(body.house)
+        at = now()
+        job = {"status": body.status, "tech": who if body.status != "todo" else "", "at": at, "note": body.note.strip()}
+        res = await db.survey_resp.update_one(
+            {"survey": key, "house": house},
+            {"$set": {"job": job}, "$push": {"job_log": {"$each": [{"status": body.status, "by": who, "at": at, "note": job["note"]}], "$slice": -20}}},
+        )
+        if not res.matched_count:
+            raise HTTPException(404, f"ไม่มีบ้าน {house} ในรายชื่อ")
+        return {"house": house, "job": job}
+
+    @router.get("/admin/tech/key")
+    async def get_tech_key(admin: dict = Depends(require_admin)):
+        return {"key": await tech_key()}
+
+    @router.post("/admin/tech/key/rotate")
+    async def rotate_tech_key(admin: dict = Depends(require_admin)):
+        key = secrets.token_urlsafe(18)
+        await db.settings.update_one({"id": "tech_key"}, {"$set": {"key": key, "created_at": now(), "rotated_by": admin["name"]}}, upsert=True)
+        await audit(admin, "rotate_tech_key", "tech")
+        return {"key": key}
 
     return router
