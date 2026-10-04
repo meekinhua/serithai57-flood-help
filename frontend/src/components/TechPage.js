@@ -191,7 +191,17 @@ export default function TechPage() {
             )}
           </section>
 
-          <TechMap zones={zones} rows={rows} soi={soi} onSoi={(s) => setSoi((cur) => (cur === s ? "" : s))} />
+          <ZonePicker
+            zones={zones}
+            rows={rows}
+            zone={zone}
+            onZone={(z) => {
+              setZone(z);
+              setSoi("");
+              save("techZone", z);
+            }}
+          />
+          <TechMap zones={zones} rows={rows} zone={zone} soi={soi} onSoi={(s) => setSoi((cur) => (cur === s ? "" : s))} />
 
           <div className="my-3 space-y-2">
             <div className="grid grid-cols-4 gap-1 rounded-xl bg-white p-1 text-sm">
@@ -214,20 +224,6 @@ export default function TechPage() {
               ))}
             </div>
             <div className="flex flex-wrap gap-1">
-              {["", ...(zones?.zones || []).map((z) => z.id)].map((z) => (
-                <button
-                  key={z || "all"}
-                  onClick={() => {
-                    setZone(z);
-                    setSoi("");
-                    save("techZone", z);
-                  }}
-                  className={`min-h-[36px] min-w-[44px] rounded-full border-2 px-3 text-sm font-bold ${zone === z ? "border-black bg-black text-white" : "border-neutral-300 bg-white"}`}
-                  style={z && zone !== z ? { borderColor: (zones.zones.find((x) => x.id === z) || {}).color } : undefined}
-                >
-                  {z ? `โซน ${z}` : "ทุกโซน"}
-                </button>
-              ))}
               {soi && (
                 <button onClick={() => setSoi("")} className="min-h-[36px] rounded-full bg-amber-200 px-3 text-sm font-bold">
                   ซอย {soi} ✕
@@ -368,12 +364,53 @@ function Job({ r, me, busy, onStatus }) {
   );
 }
 
+// "ซ.1–6": zones are named A–I on the plans, but technicians know the soi numbers
+export function zoneRange(z) {
+  const n = (z.sois || []).map((x) => parseInt(x, 10)).filter((x) => !Number.isNaN(x));
+  return n.length ? `ซ.${Math.min(...n)}–${Math.max(...n)}` : "";
+}
+
+function ZonePicker({ zones, rows, zone, onZone }) {
+  if (!zones) return null;
+  const open = {};
+  for (const r of rows) {
+    if (["done", "absent"].includes(statusOf(r))) continue;
+    const z = zones.soi_zone[mainSoi(r.soi)] || "?";
+    open[z] = (open[z] || 0) + 1;
+  }
+  const all = Object.values(open).reduce((x, y) => x + y, 0);
+  const cell = (on) => `flex min-h-[52px] flex-col items-center justify-center rounded-xl border-2 px-1 text-center leading-tight ${on ? "border-black bg-black text-white" : "bg-white"}`;
+  return (
+    <div className="mb-2">
+      <p className="mb-1 text-sm font-semibold">เลือกโซนที่จะไป (แผนที่และรายการจะเหลือเฉพาะโซนนั้น)</p>
+      <div className="grid grid-cols-5 gap-1">
+        <button onClick={() => onZone("")} className={cell(zone === "")}>
+          <b>ทุกโซน</b>
+          <span className="text-[11px]">เหลือ {all}</span>
+        </button>
+        {zones.zones.map((z) => (
+          <button key={z.id} onClick={() => onZone(z.id)} className={cell(zone === z.id)} style={zone === z.id ? undefined : { borderColor: z.color }}>
+            <b>
+              <span style={{ color: zone === z.id ? "#fff" : z.color }}>●</span> {z.id}
+            </b>
+            <span className="text-[11px]">{zoneRange(z)}</span>
+            <span className="text-[11px] opacity-80">เหลือ {open[z.id] || 0}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // One circle per soi: the number of houses still to visit; red = still open, green = all done. Tap = show that soi.
-function TechMap({ zones, rows, soi, onSoi }) {
+function TechMap({ zones, rows, zone, soi, onSoi }) {
   const el = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
+  const meRef = useRef(null); // GPS dot + accuracy circle
+  const watchRef = useRef(null);
   const [sois, setSois] = useState(null);
+  const [gps, setGps] = useState(""); // "" | "wait" | "on" | error text
   useEffect(() => {
     api("/sois").then((d) => setSois(d.sois)).catch(() => {});
   }, []);
@@ -382,24 +419,45 @@ function TechMap({ zones, rows, soi, onSoi }) {
     const map = createBaseMap(el.current, { zoom: 16 });
     map.options.zoomAnimation = false; // removing a map mid-animation crashes Leaflet
     L.polyline(zones.main_road, { color: "#facc15", weight: 5, opacity: 0.9, interactive: false }).addTo(map);
-    map.fitBounds(L.latLngBounds(zones.houses.map(([a, b]) => [a, b])), { padding: [8, 8], animate: false });
     layerRef.current = L.layerGroup().addTo(map);
+    meRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     return () => {
       mapRef.current = null;
+      if (watchRef.current != null) navigator.geolocation?.clearWatch(watchRef.current);
       map.stop();
       map.off();
       map.remove();
     };
   }, [zones]);
   useEffect(() => {
+    const map = mapRef.current;
     const layer = layerRef.current;
-    if (!layer || !sois) return;
+    if (!map || !layer || !sois) return;
     layer.clearLayers();
+    const zi = zones.zones.findIndex((z) => z.id === zone);
+    // every house as a small dot in its zone colour: shows where each zone is on the ground
+    const pts = [];
+    for (const [lat, lng, i] of zones.houses) {
+      if (zone && i !== zi) continue;
+      pts.push([lat, lng]);
+      L.circleMarker([lat, lng], { radius: zone ? 3 : 2, weight: 0, fillOpacity: zone ? 0.55 : 0.35, fillColor: zones.zones[i].color, interactive: false }).addTo(layer);
+    }
+    if (!zone)
+      for (const z of zones.zones)
+        L.marker(z.center, {
+          interactive: false,
+          icon: L.divIcon({
+            className: "",
+            iconSize: [60, 24],
+            iconAnchor: [30, 12],
+            html: `<div style="text-align:center;font:700 13px/1 sans-serif;color:${z.color};text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff">${z.id}<br><span style="font-size:9px">${zoneRange(z)}</span></div>`,
+          }),
+        }).addTo(layer);
     const by = {};
     for (const r of rows) {
       const k = mainSoi(r.soi);
-      if (!sois[k]) continue;
+      if (!sois[k] || (zone && zones.soi_zone[k] !== zone)) continue;
       by[k] = by[k] || { open: 0, all: 0, urgent: 0 };
       by[k].all++;
       if (!["done", "absent"].includes(statusOf(r))) {
@@ -408,7 +466,6 @@ function TechMap({ zones, rows, soi, onSoi }) {
       }
     }
     for (const [k, v] of Object.entries(by)) {
-      const [lat, lng] = sois[k].center;
       const color = v.open === 0 ? "#16a34a" : v.urgent ? "#dc2626" : "#f59e0b";
       const size = k === soi ? 40 : 30;
       const icon = L.divIcon({
@@ -417,13 +474,53 @@ function TechMap({ zones, rows, soi, onSoi }) {
         iconAnchor: [size / 2, size / 2],
         html: `<div style="width:${size}px;height:${size}px;border-radius:9999px;background:${color};color:#fff;border:3px solid ${k === soi ? "#000" : "#fff"};box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;font:700 11px/1 sans-serif">${v.open || "✓"}<span style="font-size:8px;font-weight:600">ซ.${k}</span></div>`,
       });
-      L.marker([lat, lng], { icon }).on("click", () => onSoi(k)).addTo(layer);
+      L.marker(sois[k].center, { icon, zIndexOffset: 500 }).on("click", () => onSoi(k)).addTo(layer);
     }
-  }, [rows, sois, soi, zones]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [10, 10], animate: false });
+  }, [rows, sois, soi, zones, zone]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function locate() {
+    const map = mapRef.current;
+    if (!navigator.geolocation) return setGps("มือถือนี้ไม่รองรับ GPS");
+    if (watchRef.current != null) {
+      navigator.geolocation.clearWatch(watchRef.current);
+      watchRef.current = null;
+      meRef.current?.clearLayers();
+      return setGps("");
+    }
+    setGps("wait");
+    let first = true;
+    watchRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const ll = [pos.coords.latitude, pos.coords.longitude];
+        const me = meRef.current;
+        if (!me || !mapRef.current) return;
+        me.clearLayers();
+        L.circle(ll, { radius: Math.min(pos.coords.accuracy || 20, 150), color: "#2563eb", weight: 1, fillOpacity: 0.12, interactive: false }).addTo(me);
+        L.circleMarker(ll, { radius: 8, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).bindTooltip("คุณอยู่ตรงนี้").addTo(me);
+        if (first) map.setView(ll, Math.max(map.getZoom(), 17), { animate: false });
+        first = false;
+        setGps("on");
+      },
+      (e) => {
+        setGps(e.code === 1 ? "ยังไม่ได้อนุญาตให้ใช้ตำแหน่ง · กดอนุญาตตำแหน่งในเบราว์เซอร์ หรือเปิดลิงก์ใน Chrome/Safari" : "หาตำแหน่งไม่ได้ ลองใหม่อีกครั้ง (อยู่กลางแจ้งจะแม่นกว่า)");
+        if (watchRef.current != null) navigator.geolocation.clearWatch(watchRef.current);
+        watchRef.current = null;
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 },
+    );
+  }
+
   return (
     <div>
-      <div ref={el} className="h-[45vh] min-h-[300px] w-full overflow-hidden rounded-2xl" />
-      <p className="mt-1 text-xs text-neutral-600">วงกลม = จำนวนบ้านที่ยังต้องไปในซอยนั้น · 🔴 มีบ้านด่วน · 🟠 รอตรวจ · 🟢 เสร็จหมด · แตะวงกลมเพื่อดูเฉพาะซอยนั้น</p>
+      <div className="relative">
+        <div ref={el} className="h-[45vh] min-h-[300px] w-full overflow-hidden rounded-2xl" />
+        <button onClick={locate} className={`absolute bottom-3 right-3 z-[500] rounded-full px-4 py-2 text-sm font-bold shadow-lg ${gps === "on" ? "bg-blue-600 text-white" : "bg-white text-black"}`}>
+          {gps === "wait" ? "กำลังหา…" : gps === "on" ? "📍 ปิดตำแหน่ง" : "📍 ตำแหน่งฉัน"}
+        </button>
+      </div>
+      {gps && !["wait", "on"].includes(gps) && <p className="mt-1 rounded bg-amber-100 p-2 text-xs">{gps}</p>}
+      <p className="mt-1 text-xs text-neutral-600">จุดเล็กสี = บ้านในแต่ละโซน · วงกลม = จำนวนบ้านที่ยังต้องไปในซอยนั้น (🔴 มีบ้านด่วน · 🟠 รอตรวจ · 🟢 เสร็จหมด) · แตะวงกลม = ดูเฉพาะซอยนั้น · 📍 = ตำแหน่งมือถือคุณ (จุดสีน้ำเงิน)</p>
     </div>
   );
 }
