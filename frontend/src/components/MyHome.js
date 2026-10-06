@@ -90,9 +90,9 @@ function WaterRow({ info, water, onAsk, sent, onTap }) {
   );
 }
 
-function Row({ icon, title, children }) {
+function Row({ icon, title, children, hi }) {
   return (
-    <div className="border-t border-[#E6EBE7] py-3">
+    <div className={`border-t border-[#E6EBE7] py-3 ${hi ? "-mx-4 bg-[#FFF8E1] px-4" : ""}`}>
       <p className="text-base font-bold text-[#15201A]">
         {icon && <span aria-hidden="true">{icon} </span>}
         {title}
@@ -174,6 +174,7 @@ function Electricians({ services, onAll }) {
 // ---------- questions the team asks every house from the chat (backend myhome.py Question, tools/site.py ask) ----------
 function QuestionRow({ q, info, services, onAnswered, onPros, onIssue, onAsk, setErr }) {
   const [again, setAgain] = useState(false);
+  const t = useT();
   async function answer(a) {
     setErr("");
     try {
@@ -185,8 +186,10 @@ function QuestionRow({ q, info, services, onAnswered, onPros, onIssue, onAsk, se
   }
   if (q.answer === "no" && !again) return null;
   const group = PRO_GROUPS.find((g) => g.key === q.group);
+  const open = !q.answer || again;
   return (
-    <Row icon={q.icon} title={q.q}>
+    <Row icon={q.icon} title={q.q} hi={open}>
+      {open && <p className="-mt-1 text-sm text-[#7A4104]">{t("myhome.q.from", "คำถามจากทีมอาสา · กดตอบครั้งเดียว")}</p>}
       {q.answer === "yes" && !again ? (
         <>
           {q.tip && <p className="whitespace-pre-line text-[15px] leading-relaxed">{q.tip}</p>}
@@ -238,6 +241,7 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, setEr
   const e = info.electric;
   const [pick, setPick] = useState(false); // choosing again
   const sorted = e.want && e.want !== "free" && !pick;
+  const deciding = !e.want || pick;
   const [safe, setSafe] = useState(false);
   const [ticks, setTicks] = useState(() => load(`safe:${info.house}`, []));
   async function send(want) {
@@ -265,8 +269,8 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, setEr
 
   return (
     <Row icon="⚡" title={t("myhome.electric.title", "ตรวจไฟฟ้าหลังน้ำท่วม")}>
-      <p className={`text-base font-bold ${e.signed ? ELECTRIC[e.status]?.[1] || "" : ""}`}>{e.signed ? ELECTRIC[e.status]?.[0] || "ลงชื่อไว้แล้ว" : "บ้านนี้ยังไม่ได้ตรวจไฟ"}</p>
-      {!sorted && (
+      {deciding && <p className={`text-base font-bold ${e.signed ? ELECTRIC[e.status]?.[1] || "" : ""}`}>{e.signed ? ELECTRIC[e.status]?.[0] || "ลงชื่อไว้แล้ว" : "บ้านนี้ยังไม่ได้ตรวจไฟ"}</p>}
+      {deciding && (
         <p className="text-[15px] text-[#33403A]">{info.soi && e.soi_waiting > 0 ? `ใน ซ.${info.soi} ยังรอช่างอีก ${e.soi_waiting} หลัง` : `ทั้งหมู่บ้านยังรอช่างอีก ${e.village_waiting} หลัง`}</p>
       )}
 
@@ -277,7 +281,7 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, setEr
           <div className="mt-2 flex gap-2">
             {e.want === "free" && !info.has_contact && (
               <button onClick={onContact} className="min-h-[46px] flex-1 rounded-xl bg-[#1E6B47] px-2 text-[15px] font-bold text-white">
-                {t("myhome.electric.leave_contact", "ฝากเบอร์/LINE ให้ทีมแจ้ง")}
+                {t("myhome.electric.leave_contact", "ฝากเบอร์ให้ทีมแจ้ง")}
               </button>
             )}
             <button onClick={() => setPick(true)} className="min-h-[46px] rounded-xl border border-[#C9D1CB] bg-white px-4 text-[15px] font-bold">
@@ -309,7 +313,7 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, setEr
       {!sorted && (
         <>
           <button onClick={() => setSafe((v) => !v)} aria-expanded={safe} className="min-h-[48px] w-full rounded-xl bg-[#FFF6DA] px-3 text-left text-[15px] font-bold">
-            {t("myhome.electric.safe", "ระหว่างรอ: เช็กเองแบบปลอดภัย 5 ข้อ")} {ticks.length ? `(${ticks.length}/5)` : ""}
+            {t("myhome.electric.safe", "ระหว่างรอ: เช็กความปลอดภัย · เบอร์ช่าง")} {ticks.length ? `(${ticks.length}/5)` : ""} <span aria-hidden="true">{safe ? "▴" : "▾"}</span>
           </button>
           {safe && (
             <ul className="space-y-1.5">
@@ -323,9 +327,11 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, setEr
               ))}
             </ul>
           )}
-          <button onClick={onElectricians} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-[15px] font-bold">
-            {t("myhome.electric.list", "ดูเบอร์ช่างไฟที่เพื่อนบ้านแนะนำ")}
-          </button>
+          {safe && (
+            <button onClick={onElectricians} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-[15px] font-bold">
+              {t("myhome.electric.list", "ดูเบอร์ช่างไฟที่เพื่อนบ้านแนะนำ")}
+            </button>
+          )}
         </>
       )}
     </Row>
@@ -548,7 +554,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <Row icon="🛠️" title={t("myhome.office.title", "ส่งเรื่องให้สำนักงานหมู่บ้านแก้") + (info.soi ? ` · ซ.${info.soi}` : "")}>
             <p className="text-[15px]">{info.issues_open ? `ในซอยนี้มีเรื่องรอแก้ ${info.issues_open} เรื่อง` : "ในซอยนี้ยังไม่มีเรื่องค้าง"}</p>
             <div className="flex gap-2">
-              <button onClick={onIssue} className="min-h-[50px] flex-1 rounded-xl bg-[#1E6B47] text-[15px] font-bold text-white">
+              <button onClick={onIssue} className="min-h-[50px] flex-1 rounded-xl border-2 border-[#1E6B47] bg-white text-[15px] font-bold text-[#154D33]">
                 {t("myhome.office.send", "ส่งเรื่อง ฝาท่อ ไฟถนน ขยะ (ถ่ายรูปได้)")}
               </button>
               {info.issues_open > 0 && (
