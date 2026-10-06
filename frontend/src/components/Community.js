@@ -61,11 +61,22 @@ const pretty = (s) => {
 const ageDays = (iso) => Math.floor((Date.now() - new Date(iso).getTime()) / 864e5);
 const ageText = (iso) => (ageDays(iso) >= 1 ? `ลงไว้ ${ageDays(iso)} วันแล้ว` : timeAgo(iso));
 
-function CallButton({ phone, label }) {
+// remembered on the phone so บ้านฉัน can ask "how was it?" later (HomePlus ReviewPrompt)
+export function rememberCall(s) {
+  if (!s?.id) return;
+  const calls = load("calls", []).filter((c) => c.id !== s.id);
+  save("calls", [...calls.slice(-20), { id: s.id, name: s.name, at: Date.now() }]);
+}
+
+function CallButton({ phone, label, onCall }) {
   if (!phone) return null;
   if (!isPhone(phone)) return <p className="flex-1 rounded-xl bg-[#F2F4F1] px-3 py-2 text-[15px]">ติดต่อ: {phone}</p>;
   return (
-    <a href={`tel:${digits(phone)}`} className="flex min-h-[50px] flex-1 items-center justify-center gap-2 rounded-xl bg-[#15201A] px-3 text-[17px] font-bold text-white active:bg-black">
+    <a
+      href={`tel:${digits(phone)}`}
+      onClick={onCall}
+      className="flex min-h-[50px] flex-1 items-center justify-center gap-2 rounded-xl bg-[#15201A] px-3 text-[17px] font-bold text-white active:bg-black"
+    >
       <PhoneIcon /> {label || `โทร ${pretty(phone)}`}
     </a>
   );
@@ -281,7 +292,7 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
               {x.k === "pros" && <Trust s={x.svc} />}
               {x.k === "pros" && (
                 <div className="flex gap-2">
-                  <CallButton phone={x.svc.phone} />
+                  <CallButton phone={x.svc.phone} onCall={() => rememberCall(x.svc)} />
                 </div>
               )}
               {x.k === "need" && (
@@ -401,7 +412,7 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
               <Trust s={s} />
               {s.reports > 0 && <p className="text-sm text-[#B42318]">มีคนแจ้งว่าโทรไม่ติด {s.reports} ครั้ง</p>}
               <div className="flex gap-2 pt-1">
-                <CallButton phone={s.phone} />
+                <CallButton phone={s.phone} onCall={() => rememberCall(s)} />
                 {s.line_id && !/search|ค้นหา/i.test(s.line_id) && (
                   <a
                     href={`https://line.me/R/ti/p/~${encodeURIComponent(s.line_id)}`}

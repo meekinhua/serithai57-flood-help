@@ -41,6 +41,7 @@ import survey  # noqa: E402
 import credits  # noqa: E402
 import myhome  # noqa: E402
 import nearby  # noqa: E402
+import homeplus  # noqa: E402
 import fund  # noqa: E402
 import team  # noqa: E402
 import weather  # noqa: E402
@@ -619,7 +620,16 @@ app.include_router(forum.build_router(db, rate_limit, current_admin, require_adm
 app.include_router(fund.build_router(db, rate_limit, current_admin, require_admin, audit, client_ip, claim_media, delete_media))
 app.include_router(survey.build_router(db, rate_limit, require_admin, audit, client_ip))
 app.include_router(credits.build_router(db, require_admin, audit))
-app.include_router(myhome.build_router(db, rate_limit, require_admin, locate_house, learn_address, survey.norm_house, staff.SOIS, staff.BUILDINGS["buildings"]))
+def _house(h: str) -> str:
+    x = survey.norm_house(h)
+    if not myhome.HOUSE_RE.match(x):
+        raise HTTPException(422, "ใส่บ้านเลขที่แบบ 4/917")
+    return x
+
+
+homeplus_router, homeplus_extras = homeplus.build(db, rate_limit, require_admin, locate_house, _house)
+app.include_router(homeplus_router)
+app.include_router(myhome.build_router(db, rate_limit, require_admin, locate_house, learn_address, survey.norm_house, staff.SOIS, staff.BUILDINGS["buildings"], extras=homeplus_extras))
 app.include_router(nearby.build_router(db, rate_limit, client_ip, require_admin, locate_house, survey.norm_house))
 app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media, staff.SOIS, staff.ZONES["main_road"]))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.

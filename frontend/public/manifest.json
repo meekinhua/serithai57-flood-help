@@ -1,0 +1,15 @@
+{
+  "name": "บ้านฉัน · เสรีไทย 57",
+  "short_name": "บ้านฉัน",
+  "description": "บ้านฉัน เสรีไทย 57: วันรถขยะ ไฟดับ น้ำหน้าบ้าน เพื่อนบ้านใกล้ๆ ช่าง·ร้านที่เพื่อนบ้านแนะนำ",
+  "lang": "th",
+  "start_url": "/?src=homescreen",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F2F4F1",
+  "theme_color": "#15201A",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

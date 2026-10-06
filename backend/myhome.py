@@ -145,9 +145,11 @@ class ContactBody(BaseModel):
     email: str = Field("", max_length=120)
     ig: str = Field("", max_length=60)
     news: bool = True  # wants the village news by these channels
+    # fragile households, for the team when something happens (check-in): elder · bedridden · child · alone · disabled
+    vulnerable: List[Literal["elder", "bedridden", "child", "alone", "disabled"]] = Field(default_factory=list, max_length=5)
 
 
-def build_router(db, rate_limit, require_admin, locate_house, learn_address, norm_house, sois: dict, buildings: list) -> APIRouter:
+def build_router(db, rate_limit, require_admin, locate_house, learn_address, norm_house, sois: dict, buildings: list, extras=None) -> APIRouter:
     router = APIRouter(prefix="/api")
 
     def clean(house: str) -> str:
@@ -279,7 +281,10 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             q["answer"] = mine.get(q["id"])
             q["soi_yes"] = await db.myhome_answers.count_documents({"qid": q["id"], "answer": "yes", "soi": soi, "house": {"$ne": h}}) if soi else 0
         rounds = {**WASTE_ROUNDS, **((await db.settings.find_one({"id": "waste"}, {"_id": 0, "rounds": 1}) or {}).get("rounds") or {})}
+        more = await extras(h, soi) if extras else {}
+        coming = sorted(await soon(soi, rounds) + more.pop("_soon", []), key=lambda x: x["date"])
         return {
+            **more,
             "house": h,
             "soi": soi,
             "lat": loc["lat"],
@@ -298,7 +303,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             "waste": {"parity": parity, "days": rounds.get(parity)} if parity else None,
             "issues_open": open_issues,
             "questions": qs,
-            "soon": await soon(soi, rounds),
+            "soon": coming,
             "has_contact": bool(await db.households.find_one({"house": h}, {"_id": 1})),
         }
 

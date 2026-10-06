@@ -4,7 +4,8 @@ import LocationPicker from "./LocationPicker";
 import Nearby from "./Nearby";
 import { useT } from "./Texts";
 import { MYHOME_CHANGED } from "./SurveyBox";
-import { PRO_GROUPS } from "./Community";
+import { PRO_GROUPS, rememberCall } from "./Community";
+import { AidRow, CheckinCard, InstallCard, OutageRow, PlanRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
 import { waterOf } from "../config";
 
 // บ้านฉัน (7 Oct 2026): a house number typed once (or taken from the electricians' sign-up on this phone) and
@@ -156,7 +157,12 @@ function ProsPick({ services, cats, title, none, all, add, onAll }) {
                   {digits.length < 9 && x.phone && <p className="text-[15px]">ติดต่อ: {x.phone}</p>}
                 </div>
                 {digits.length >= 9 && (
-                  <a href={`tel:${digits}`} aria-label={`โทร ${x.name} ${x.phone}`} className="flex min-h-[48px] shrink-0 items-center rounded-xl bg-[#15201A] px-4 text-base font-bold text-white">
+                  <a
+                    href={`tel:${digits}`}
+                    onClick={() => rememberCall(x)}
+                    aria-label={`โทร ${x.name} ${x.phone}`}
+                    className="flex min-h-[48px] shrink-0 items-center rounded-xl bg-[#15201A] px-4 text-base font-bold text-white"
+                  >
                     📞 โทร
                   </a>
                 )}
@@ -280,6 +286,34 @@ function ContactForm({ contact, setContact, onSave }) {
           + เพิ่มอีเมล / IG / Facebook (ไม่บังคับ)
         </button>
       )}
+      <fieldset>
+        <legend className="text-[15px] font-bold">
+          ในบ้านมี
+          <span className="ml-1 text-xs font-normal text-[#45504A]">ไม่บังคับ · ทีมใช้ดูแลก่อนตอนเกิดเหตุ</span>
+        </legend>
+        <div className="mt-1 flex flex-wrap gap-2">
+          {[
+            ["elder", "ผู้สูงอายุ"],
+            ["bedridden", "ผู้ป่วยติดเตียง"],
+            ["child", "เด็กเล็ก"],
+            ["alone", "อยู่คนเดียว"],
+            ["disabled", "ผู้พิการ"],
+          ].map(([k, label]) => {
+            const on = (contact.vulnerable || []).includes(k);
+            return (
+              <button
+                type="button"
+                key={k}
+                aria-pressed={on}
+                onClick={() => setContact({ ...contact, vulnerable: on ? contact.vulnerable.filter((x) => x !== k) : [...(contact.vulnerable || []), k] })}
+                className={`min-h-[44px] rounded-full border-2 px-3 text-[15px] font-bold ${on ? "border-[#1E6B47] bg-[#1E6B47] text-white" : "border-[#C9D1CB] bg-white"}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
       <label className="flex min-h-[44px] items-center gap-3 text-[15px]">
         <input type="checkbox" checked={contact.news !== false} onChange={(e) => setContact({ ...contact, news: e.target.checked })} className="h-5 w-5 accent-[#1E6B47]" />
         ส่งข่าวด่วนของหมู่บ้านให้ฉันด้วย
@@ -506,7 +540,11 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, conta
 
 export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros }) {
   const fromSurvey = load("survey:electric", null)?.house || "";
-  const [house, setHouse] = useState(() => load("myHouse", "") || fromSurvey);
+  const [house, setHouse] = useState(() => takeFamilyParam() || load("myHouse", "") || fromSurvey);
+  const [houses, setHouses] = useState(() => load("myHouses", []));
+  const [outageOpen, setOutageOpen] = useState(false);
+  const [plusOpen, setPlusOpen] = useState([]); // settled extras opened again (plan / aid)
+  const reload = () => setReloadN((n) => n + 1);
   const [typing, setTyping] = useState(!house);
   const [input, setInput] = useState(house || "4/");
   const [info, setInfo] = useState(null);
@@ -532,6 +570,12 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
       .then((d) => {
         setInfo(d);
         save("myHouse", d.house);
+        setHouses((list) => {
+          if (list.some((x) => x.house === d.house)) return list;
+          const next = [...list.filter((x) => x.label !== "บ้านฉัน"), { house: d.house, label: "บ้านฉัน" }];
+          save("myHouses", next);
+          return next;
+        });
         if (d.soi) save("mySoi", d.soi);
       })
       .catch((e) => setErr(e.message));
@@ -608,6 +652,12 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           .map((q) => ({ key: q.id, icon: q.icon, label: q.short || (q.q.length > 22 ? q.q.slice(0, 20) + "…" : q.q), answer: q.no })),
         ...(elSettled && !opened.includes("electric") ? [{ key: "electric", icon: "⚡", label: "ตรวจไฟ", answer: el.status === "done" ? "ช่างตรวจแล้ว" : elWant[el.want] || "ตอบแล้ว" }] : []),
       ];
+  const plan = info?.plan;
+  const planDone = !!plan && !Object.values(plan).includes("todo");
+  const planSettled = planDone && !plusOpen.includes("plan");
+  if (info && planSettled) settled.push({ key: "plan", icon: "🔧", label: "แผนซ่อม", answer: Object.keys(plan).length ? `ครบ ${Object.keys(plan).length} อย่าง 🎉` : "ไม่ต้องซ่อม" });
+  for (const a of info?.aid || [])
+    if (a.mine === "received") settled.push({ key: `aid_${a.id}`, icon: "💰", label: a.title.length > 18 ? a.title.slice(0, 16) + "…" : a.title, answer: "ได้เงินแล้ว" });
   const isFolded = (k) => settled.some((x) => x.key === k);
   if (typing || !house)
     return (
@@ -637,7 +687,9 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   return (
     <section className="mb-3 rounded-[20px] border border-[#DCE2DD] bg-white px-4 pt-4" style={frame}>
       <div className="flex items-center gap-3">
-        <h2 className="font-display min-w-0 flex-1 text-xl font-bold">บ้านฉัน {info?.house || house}</h2>
+        <h2 className="font-display min-w-0 flex-1 text-xl font-bold">
+          {houses.find((x) => x.house === (info?.house || house))?.label || "บ้านฉัน"} {info?.house || house}
+        </h2>
         {info?.precision === "house" && !pinning && (
           <button onClick={() => setPinning({ pos: null, soi: info.soi || "" })} className="min-h-[44px] shrink-0 text-[15px] font-bold text-[#45504A] underline">
             ย้ายหมุด
@@ -653,6 +705,24 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           เปลี่ยนบ้าน
         </button>
       </div>
+      {houses.length > 1 && (
+        <div className="-mx-4 mt-1 flex gap-2 overflow-x-auto px-4 pb-1" aria-label="บ้านที่ติดตาม">
+          {houses.map((x) => (
+            <button
+              key={x.house}
+              onClick={() => {
+                if (x.house === house) return;
+                setInfo(null);
+                setHouse(x.house);
+              }}
+              aria-pressed={x.house === house}
+              className={`min-h-[40px] shrink-0 rounded-full px-3 text-[15px] ${x.house === house ? "bg-[#15201A] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}
+            >
+              {x.label} {x.house}
+            </button>
+          ))}
+        </div>
+      )}
       {info && (
         <p className="text-[15px] text-[#33403A]">
           {info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย"}
@@ -673,6 +743,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         <p className="py-3 text-[15px] text-[#45504A]">กำลังโหลด…</p>
       ) : (
         <>
+          <CheckinCard info={info} onSaved={setInfo} onContact={() => setContact({ name: load("myName", ""), from: "news" })} setErr={setErr} />
           <Soon items={info.soon} />
 
           {pinning ? (
@@ -778,6 +849,13 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
             }
           />
 
+          <div id="myhome-outage">
+            <OutageRow info={info} forced={outageOpen} onFold={() => setOutageOpen(false)} onChanged={reload} setErr={setErr} />
+          </div>
+          <AidRow info={info} onChanged={reload} setErr={setErr} />
+          {!planSettled && <PlanRow info={info} services={services} onPros={onPros} onSaved={setInfo} onFold={() => setPlusOpen((o) => o.filter((x) => x !== "plan"))} setErr={setErr} />}
+          <ReviewPrompt services={services} />
+
           <div ref={nearRef}>
             <Nearby info={info} form={nearForm} setForm={setNearForm} setErr={setErr} />
           </div>
@@ -811,6 +889,16 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
                 ["🙏", t("myhome.tools.ask", "ฝากเพื่อนบ้าน"), t("myhome.tools.ask_sub", "ช่วยดูบ้าน รับของ"), () => startNear("ask")],
                 ["⚠️", t("myhome.tools.alert", "เตือนเพื่อนบ้าน"), t("myhome.tools.alert_sub", "ฝาท่อแตก ของหาย"), () => startNear("alert")],
                 ["🛠️", t("myhome.tools.office", "แจ้งสำนักงาน"), t("myhome.tools.office_sub", "ไฟถนน ขยะ ถ่ายรูปได้"), onIssue],
+                [
+                  "⚡",
+                  t("myhome.tools.outage", "ไฟดับ น้ำไม่ไหล"),
+                  t("myhome.tools.outage_sub", "แจ้ง · ดูว่าแถวบ้านเป็นไหม"),
+                  () => {
+                    setOutageOpen(true);
+                    setTimeout(() => document.getElementById("myhome-outage")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                  },
+                ],
+                ["👨‍👩‍👧", t("myhome.tools.family", "ส่งให้ลูกหลาน"), t("myhome.tools.family_sub", "ดูบ้านนี้จากที่ไหนก็ได้"), () => shareFamily(info.house)],
                 info.has_contact
                   ? [
                       "📨",
@@ -831,9 +919,12 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
             </div>
           </div>
 
+          <InstallCard />
+
           <Settled
             items={settled}
             onOpen={(k) => {
+              if (k === "plan") setPlusOpen((o) => [...o, "plan"]);
               openIt(k);
               setTimeout(() => document.getElementById(`myhome-${k}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
             }}

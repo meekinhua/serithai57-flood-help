@@ -133,7 +133,7 @@ export default function RepairApp() {
   const openWater = () => goPage("map");
 
   useEffect(() => {
-    document.title = "ซ่อมบ้าน เสรีไทย 57";
+    document.title = "บ้านฉัน · เสรีไทย 57";
   }, []);
 
   const refresh = useCallback(async () => {
