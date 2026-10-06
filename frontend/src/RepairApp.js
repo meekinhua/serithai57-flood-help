@@ -381,7 +381,8 @@ export default function RepairApp() {
   return (
     <TextsContext.Provider value={home.texts || {}}>
       <div className="min-h-screen bg-[#F2F4F1] text-[#15201A]">
-        <header className="sticky top-0 z-[900] bg-[#15201A] text-white shadow">
+        <BottomNav page={page} dot={newest > seenAt} onGo={(p) => (p === "pros" ? openPros("") : goPage(p, p === "community" ? tab : undefined))} onHotline={() => setSheet({ type: "hotlines" })} />
+        <header className="fixed inset-x-0 bottom-0 z-[900] bg-[#15201A] pb-[env(safe-area-inset-bottom)] text-white shadow-[0_-2px_8px_rgba(0,0,0,0.25)]">
           <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 py-2 sm:px-4">
             <span className="hidden h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white min-[400px]:flex">
               <img src={`${process.env.PUBLIC_URL}/logo-mark.png`} alt="Sahakorn Serithai 57" className="h-full w-full object-contain" />
@@ -416,7 +417,7 @@ export default function RepairApp() {
           )}
         </header>
 
-        <main className="mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
+        <main className="mx-auto max-w-5xl px-3 pb-36 pt-3 sm:px-4">
           {page === "home" ? (
             <>
               {ordered(home.layout, Object.keys(blocks)).map((k) => (
@@ -561,7 +562,6 @@ export default function RepairApp() {
             </>
           )}
         </main>
-        <BottomNav page={page} dot={newest > seenAt} onGo={(p) => (p === "pros" ? openPros("") : goPage(p, p === "community" ? tab : undefined))} onHotline={() => setSheet({ type: "hotlines" })} />
 
         {sheet?.type === "lendForm" && (
           <Sheet title="ยืม · ให้ · ขาย" onClose={() => setSheet(null)}>
@@ -761,7 +761,7 @@ export default function RepairApp() {
           <div
             key={toast}
             role="status"
-            className="anim-toast pointer-events-none fixed inset-x-3 top-16 z-[1100] mx-auto max-w-md rounded-xl bg-neutral-900 px-4 py-3 text-center text-white shadow-lg"
+            className="anim-toast pointer-events-none fixed inset-x-3 top-20 z-[1100] mx-auto max-w-md rounded-xl bg-neutral-900 px-4 py-3 text-center text-white shadow-lg"
           >
             {toast}
           </div>

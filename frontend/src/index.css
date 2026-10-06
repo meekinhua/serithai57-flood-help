@@ -232,3 +232,8 @@ body {
 /* posters are screenshotted: no tile fade-in (headless renders can stop mid-transition, leaving tiles invisible) */
 .poster .leaflet-tile { opacity: 1 !important; transition: none !important; }
 .poster .leaflet-zoom-anim .leaflet-zoom-animated { transition: none !important; }
+
+/* 7 Oct: the page tabs stick to the top; things scrolled into view stop below them */
+html {
+  scroll-padding-top: 76px;
+}

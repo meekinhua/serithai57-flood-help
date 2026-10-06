@@ -578,8 +578,8 @@ export function BottomNav({ page, dot, onGo, onHotline }) {
     ],
   ];
   return (
-    <nav aria-label="เมนูหลัก" className="fixed inset-x-0 bottom-0 z-[950] border-t border-[#DCE2DD] bg-white pb-[env(safe-area-inset-bottom)]">
-      <div className="mx-auto grid h-[68px] max-w-5xl grid-cols-5">
+    <nav aria-label="เมนูหลัก" className="sticky top-0 z-[950] border-b border-[#DCE2DD] bg-white pt-[env(safe-area-inset-top)] shadow-sm">
+      <div className="mx-auto grid h-[64px] max-w-5xl grid-cols-5">
         {items.map(([key, label, icon]) => {
           const on = page === key;
           return (
@@ -589,7 +589,7 @@ export function BottomNav({ page, dot, onGo, onHotline }) {
               aria-current={on ? "page" : undefined}
               className={`relative flex flex-col items-center justify-center gap-0.5 text-[13px] ${on ? "font-bold text-[#1E6B47]" : "text-[#45504A]"}`}
             >
-              {on && <span className="absolute inset-x-3 top-0 h-[3px] rounded-b bg-[#1E6B47]" aria-hidden="true" />}
+              {on && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-t bg-[#1E6B47]" aria-hidden="true" />}
               <span className="relative">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={on ? 2.4 : 2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   {icon}
