@@ -304,10 +304,13 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
             </div>
           ) : null}
 
-          <Row title="น้ำหน้าบ้านตอนนี้">
+          {/* an ask, not a reading: the owner taps to tell the neighbours; what others reported sits apart below */}
+          <Row title="ช่วยแจ้งน้ำหน้าบ้านคุณ">
             {sent ? (
               <p className="text-base font-bold text-[#1E6B47]">ขอบคุณที่แจ้ง ({sent}) เพื่อนบ้านเห็นแล้ว</p>
             ) : (
+              <>
+              <p className="text-base font-bold">หน้าบ้านคุณตอนนี้เป็นแบบไหน? กดปุ่มเดียว ขึ้นแผนที่ให้เพื่อนบ้านเห็น</p>
               <div className="grid grid-cols-3 gap-2">
                 {WATER_TAPS.map((w) => (
                   <button key={w.label} onClick={() => tap(w)} className={`min-h-[52px] rounded-xl border-2 bg-white px-1 text-[15px] font-bold leading-tight ${w.cls}`}>
@@ -315,8 +318,11 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
                   </button>
                 ))}
               </div>
+              </>
             )}
-            <p className="text-sm text-[#45504A]">{lastHour.n ? `1 ชม.ที่ผ่านมา ${lastHour.n} บ้านแจ้ง · แห้ง ${lastHour.dry} · มีน้ำ ${lastHour.wet}` : "ชั่วโมงนี้ยังไม่มีใครแจ้ง · แจ้งเป็นคนแรกได้เลย"}</p>
+            <p className="rounded-xl bg-[#F2F4F1] px-3 py-2 text-sm text-[#33403A]">
+              <b>เพื่อนบ้านแจ้งมา:</b> {lastHour.n ? `1 ชม.ที่ผ่านมา ${lastHour.n} บ้าน · แห้ง ${lastHour.dry} · มีน้ำ ${lastHour.wet}` : "ชั่วโมงนี้ยังไม่มีใครแจ้ง"}
+            </p>
           </Row>
 
           {info.waste && (
