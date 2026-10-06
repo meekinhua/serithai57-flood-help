@@ -7,6 +7,7 @@ import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
 import { lookOf, ordered } from "./components/Look";
+import { TextsContext } from "./components/Texts";
 import MyHome from "./components/MyHome";
 import SurveyBoxes from "./components/SurveyBox";
 import { BottomNav, CommunityFeed, CommunityIntro, FoldBox, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PeopleIcon, PostedSheetBody, ProsList, WaterIcon } from "./components/Community";
@@ -176,7 +177,11 @@ export default function RepairApp() {
 
   // vehicles move: poll their positions every 10 s while the page is visible
   useEffect(() => {
-    const loadTrips = () => document.visibilityState === "visible" && api("/trips").then(setTrips).catch(() => {});
+    const loadTrips = () =>
+      document.visibilityState === "visible" &&
+      api("/trips")
+        .then(setTrips)
+        .catch(() => {});
     loadTrips();
     const t = setInterval(loadTrips, 10000);
     document.addEventListener("visibilitychange", loadTrips);
@@ -194,7 +199,9 @@ export default function RepairApp() {
   }, []);
 
   useEffect(() => {
-    api("/weather").then(setWeather).catch(() => {});
+    api("/weather")
+      .then(setWeather)
+      .catch(() => {});
     api("/auth/me")
       .then((u) => u.role !== "staff" && setAdmin(u))
       .catch(() => {});
@@ -207,10 +214,7 @@ export default function RepairApp() {
   }, [toast]);
 
   // the yellow box's place, also pinned on the map (same admin setting, so it moves with it)
-  const hubPins = useMemo(
-    () => (home.hub?.on && home.hub.lat != null ? [{ ...home.hub, tag: "ศูนย์อาสา", place: (home.hub.title || "").split(":").pop().trim().slice(0, 24) }] : []),
-    [home]
-  );
+  const hubPins = useMemo(() => (home.hub?.on && home.hub.lat != null ? [{ ...home.hub, tag: "ศูนย์อาสา", place: (home.hub.title || "").split(":").pop().trim().slice(0, 24) }] : []), [home]);
 
   const eventsOn = useMemo(() => (home.events || []).filter((e) => e.on), [home]);
 
@@ -278,31 +282,39 @@ export default function RepairApp() {
     watch: (
       <>
         {home.watch_on && (
-        <div className="mb-3">
-          <WatchPanel
-            title={home.watch_title}
-            water={water}
-            canal={canal}
-            onWater={() => setSheet({ type: "water" })}
-            onCanal={() => setSheet({ type: "canal" })}
-            onLeak={() => setSheet({ type: "leakForm" })}
-            onLeaks={() => setSheet({ type: "leaks" })}
-            onMap={openWater}
-          />
-        </div>
+          <div className="mb-3">
+            <WatchPanel
+              title={home.watch_title}
+              water={water}
+              canal={canal}
+              onWater={() => setSheet({ type: "water" })}
+              onCanal={() => setSheet({ type: "canal" })}
+              onLeak={() => setSheet({ type: "leakForm" })}
+              onLeaks={() => setSheet({ type: "leaks" })}
+              onMap={openWater}
+            />
+          </div>
         )}
       </>
     ),
     fund: (
       <>
-        {home.fund_on && <a href="/fund" style={home.layout?.fund ? lookOf(home.layout, "fund").frame : undefined} className="mb-3 flex min-h-[52px] items-center gap-3 rounded-xl border-2 border-emerald-600 bg-emerald-50 px-3 py-2">
-          <span className="text-2xl" aria-hidden="true">💰</span>
-          <span className="min-w-0 flex-1">
-            <b>เงินสมทบทีมอาสา · ยอดรับ-จ่ายเปิดให้ทุกคนดู</b>
-            <span className="block text-sm text-neutral-700">รวบรวมจากกลุ่ม LINE · ได้รับ / ใช้ไป / คงเหลือ</span>
-          </span>
-          <span className="shrink-0 font-semibold underline">ดู ›</span>
-        </a>}
+        {home.fund_on && (
+          <a
+            href="/fund"
+            style={home.layout?.fund ? lookOf(home.layout, "fund").frame : undefined}
+            className="mb-3 flex min-h-[52px] items-center gap-3 rounded-xl border-2 border-emerald-600 bg-emerald-50 px-3 py-2"
+          >
+            <span className="text-2xl" aria-hidden="true">
+              💰
+            </span>
+            <span className="min-w-0 flex-1">
+              <b>เงินสมทบทีมอาสา · ยอดรับ-จ่ายเปิดให้ทุกคนดู</b>
+              <span className="block text-sm text-neutral-700">รวบรวมจากกลุ่ม LINE · ได้รับ / ใช้ไป / คงเหลือ</span>
+            </span>
+            <span className="shrink-0 font-semibold underline">ดู ›</span>
+          </a>
+        )}
       </>
     ),
     water: (
@@ -338,83 +350,88 @@ export default function RepairApp() {
     community: (
       <>
         {home.tabs_on && (
-        <FoldBox
-          look={lookOf(home.layout, "community")}
-          icon={PeopleIcon}
-          title="เพื่อนบ้านช่วยกัน"
-          sub="เบอร์ช่างที่ใช้แล้วดี · ขอแรง · ยืม ซื้อขาย · ถามกัน"
-          open={commOpen}
-          onToggle={() => setCommOpen(!commOpen)}
-        >
-        <CommunityIntro
-          services={services}
-          onGroup={(g) => {
-            setProsGroup(g);
-            showTab("pros");
-          }}
-          onAll={() => {
-            setProsGroup("");
-            showTab("pros");
-          }}
-          onNeed={() => setSheet({ type: "intent", need: true })}
-          onOffer={() => setSheet({ type: "intent", need: false })}
-          onAsk={() => askForum()}
-        />
-        <nav ref={navRef} className="-mx-4 mt-5 scroll-mt-28 overflow-x-auto border-t border-[#E6EBE7] px-4 pt-4" aria-label="หมวด">
-          <div className="flex w-max gap-2">
-            {Object.entries(MAIN_TABS).map(([k, [, text]]) => (
-              <button
-                key={k}
-                onClick={() => pick(k)}
-                aria-current={tab === k ? "page" : undefined}
-                className={`min-h-[44px] whitespace-nowrap rounded-full px-4 text-[15px] ${tab === k ? "bg-[#15201A] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}
-              >
-                {text}
-              </button>
-            ))}
-          </div>
-        </nav>
-
-        <div className="mt-3">
-          {tab === "feed" && (
-            <CommunityFeed
-              lend={lend}
-              jobs={jobs}
+          <FoldBox
+            look={lookOf(home.layout, "community")}
+            icon={PeopleIcon}
+            title="เพื่อนบ้านช่วยกัน"
+            sub="เบอร์ช่างที่ใช้แล้วดี · ขอแรง · ยืม ซื้อขาย · ถามกัน"
+            open={commOpen}
+            onToggle={() => setCommOpen(!commOpen)}
+          >
+            <CommunityIntro
               services={services}
-              topics={topics}
+              onGroup={(g) => {
+                setProsGroup(g);
+                showTab("pros");
+              }}
+              onAll={() => {
+                setProsGroup("");
+                showTab("pros");
+              }}
               onNeed={() => setSheet({ type: "intent", need: true })}
-              onTab={showTab}
-              onTopic={(id) => askForum(id)}
-              onJoin={(job) => setSheet({ type: "join", job })}
+              onOffer={() => setSheet({ type: "intent", need: false })}
+              onAsk={() => askForum()}
             />
-          )}
-          {tab === "forum" && <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />}
-          {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
-          {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} />}
-          {tab === "pros" && admin && <HireStrip jobs={jobs} onOpen={() => pick("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />}
-          {tab === "lost" && <LostBoard items={lost} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />}
-          {tab === "pros" && !admin && <ProsList services={services} setServices={setServices} group={prosGroup} setGroup={setProsGroup} onAdd={() => setSheet({ type: "serviceForm" })} />}
-          {tab === "pros" && admin && (
-            <div className="rounded-xl bg-white p-3">
-              <ServiceBoard repair services={services} setServices={setServices} posts={[]} admin={admin} onAdd={() => setSheet({ type: "serviceForm" })} onOpenPost={() => {}} />
+            <nav ref={navRef} className="-mx-4 mt-5 scroll-mt-28 overflow-x-auto border-t border-[#E6EBE7] px-4 pt-4" aria-label="หมวด">
+              <div className="flex w-max gap-2">
+                {Object.entries(MAIN_TABS).map(([k, [, text]]) => (
+                  <button
+                    key={k}
+                    onClick={() => pick(k)}
+                    aria-current={tab === k ? "page" : undefined}
+                    className={`min-h-[44px] whitespace-nowrap rounded-full px-4 text-[15px] ${tab === k ? "bg-[#15201A] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}
+                  >
+                    {text}
+                  </button>
+                ))}
+              </div>
+            </nav>
+
+            <div className="mt-3">
+              {tab === "feed" && (
+                <CommunityFeed
+                  lend={lend}
+                  jobs={jobs}
+                  services={services}
+                  topics={topics}
+                  onNeed={() => setSheet({ type: "intent", need: true })}
+                  onTab={showTab}
+                  onTopic={(id) => askForum(id)}
+                  onJoin={(job) => setSheet({ type: "join", job })}
+                />
+              )}
+              {tab === "forum" && <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />}
+              {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
+              {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} />}
+              {tab === "pros" && admin && <HireStrip jobs={jobs} onOpen={() => pick("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />}
+              {tab === "lost" && <LostBoard items={lost} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />}
+              {tab === "pros" && !admin && <ProsList services={services} setServices={setServices} group={prosGroup} setGroup={setProsGroup} onAdd={() => setSheet({ type: "serviceForm" })} />}
+              {tab === "pros" && admin && (
+                <div className="rounded-xl bg-white p-3">
+                  <ServiceBoard repair services={services} setServices={setServices} posts={[]} admin={admin} onAdd={() => setSheet({ type: "serviceForm" })} onOpenPost={() => {}} />
+                </div>
+              )}
+              {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
+              {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
+              {tab === "guide" && <AfterFloodGuide />}
             </div>
-          )}
-          {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
-          {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
-          {tab === "guide" && <AfterFloodGuide />}
-        </div>
-        <div className="mt-5 grid grid-cols-2 gap-2 border-t border-[#E6EBE7] pt-4" aria-label="เรื่องอื่นในหมู่บ้าน">
-          {Object.entries(MORE_TABS).map(([k, [, text]]) => (
-            <button key={k} onClick={() => showTab(k)} aria-current={tab === k ? "page" : undefined} className={`min-h-[60px] rounded-2xl px-3 py-2 text-left ${tab === k ? "bg-[#15201A] text-white" : "border border-[#DCE2DD] bg-white"}`}>
-              <b className="block text-base leading-tight">{text}</b>
-              <span className={`block text-sm ${tab === k ? "text-[#C5D1CA]" : "text-[#45504A]"}`}>
-                {MORE_SUB[k]}
-                {counts[k] > 0 ? ` · ${counts[k]}` : ""}
-              </span>
-            </button>
-          ))}
-        </div>
-        </FoldBox>
+            <div className="mt-5 grid grid-cols-2 gap-2 border-t border-[#E6EBE7] pt-4" aria-label="เรื่องอื่นในหมู่บ้าน">
+              {Object.entries(MORE_TABS).map(([k, [, text]]) => (
+                <button
+                  key={k}
+                  onClick={() => showTab(k)}
+                  aria-current={tab === k ? "page" : undefined}
+                  className={`min-h-[60px] rounded-2xl px-3 py-2 text-left ${tab === k ? "bg-[#15201A] text-white" : "border border-[#DCE2DD] bg-white"}`}
+                >
+                  <b className="block text-base leading-tight">{text}</b>
+                  <span className={`block text-sm ${tab === k ? "text-[#C5D1CA]" : "text-[#45504A]"}`}>
+                    {MORE_SUB[k]}
+                    {counts[k] > 0 ? ` · ${counts[k]}` : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </FoldBox>
         )}
       </>
     ),
@@ -439,14 +456,18 @@ export default function RepairApp() {
       <>
         <section className="mt-3 grid gap-2 sm:grid-cols-2">
           <a href="/flood" className="flex min-h-[64px] items-center gap-3 rounded-xl border-2 border-neutral-400 bg-white px-3 py-2">
-            <span className="text-2xl" aria-hidden="true">📦</span>
+            <span className="text-2xl" aria-hidden="true">
+              📦
+            </span>
             <span>
               <b>คลังภารกิจน้ำท่วม ก.ย.–ต.ค. 2569</b>
               <span className="block text-sm text-neutral-600">แผนที่ คำขอ ระดับน้ำ ย้อนหลัง · ดูอย่างเดียว</span>
             </span>
           </a>
           <a href="/credits.html" className="flex min-h-[64px] items-center gap-3 rounded-xl bg-[#0b1622] px-3 py-2 text-white">
-            <span className="text-2xl" aria-hidden="true">🎬</span>
+            <span className="text-2xl" aria-hidden="true">
+              🎬
+            </span>
             <span>
               <b>End credits ทีมอาสา</b>
               <span className="block text-sm text-[#f2b872]">ขอบคุณทุกคน ทุกร้าน ทุกหน่วยงาน · เปิดเสียง</span>
@@ -458,255 +479,273 @@ export default function RepairApp() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F4F1] text-[#15201A]">
-      <header className="sticky top-0 z-[900] bg-[#15201A] text-white shadow">
-        <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 py-2 sm:px-4">
-          <span className="hidden h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white min-[400px]:flex">
-            <img src={`${process.env.PUBLIC_URL}/logo-mark.png`} alt="Sahakorn Serithai 57" className="h-full w-full object-contain" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-display truncate text-xl font-bold">เสรีไทย 57</h1>
-            <p className="truncate text-sm text-[#C5D1CA]">
-              {online && viewers != null && (
-                <span className="mr-1 font-semibold text-emerald-400">
-                  <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle" aria-hidden="true" />
-                  {viewers.toLocaleString("th-TH")} คนกำลังดู ·{" "}
-                </span>
-              )}
-              {online ? `อัปเดต ${updatedAt ? timeAgo(updatedAt) : "…"}` : "⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่"}
-            </p>
-          </div>
-          <WaterPill water={water} canal={canal} onOpen={openWater} />
-          <button onClick={share} aria-label="แชร์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">
-            🔗
-          </button>
-        </div>
-        <WeatherTopBar weather={weather} onOpen={() => setSheet({ type: "weather" })} />
-        {admin && (
-          <div className="border-t border-white/20 bg-neutral-800">
-            <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-1 text-sm sm:px-4">
-              <span className="font-semibold">🛡️ โหมดผู้ดูแล · {admin.name}</span>
-              <a href="/admin" className="ml-auto flex min-h-[40px] items-center underline">📢 ประกาศ / ตั้งค่า</a>
+    <TextsContext.Provider value={home.texts || {}}>
+      <div className="min-h-screen bg-[#F2F4F1] text-[#15201A]">
+        <header className="sticky top-0 z-[900] bg-[#15201A] text-white shadow">
+          <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 py-2 sm:px-4">
+            <span className="hidden h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white min-[400px]:flex">
+              <img src={`${process.env.PUBLIC_URL}/logo-mark.png`} alt="Sahakorn Serithai 57" className="h-full w-full object-contain" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h1 className="font-display truncate text-xl font-bold">เสรีไทย 57</h1>
+              <p className="truncate text-sm text-[#C5D1CA]">
+                {online && viewers != null && (
+                  <span className="mr-1 font-semibold text-emerald-400">
+                    <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle" aria-hidden="true" />
+                    {viewers.toLocaleString("th-TH")} คนกำลังดู ·{" "}
+                  </span>
+                )}
+                {online ? `อัปเดต ${updatedAt ? timeAgo(updatedAt) : "…"}` : "⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่"}
+              </p>
             </div>
+            <WaterPill water={water} canal={canal} onOpen={openWater} />
+            <button onClick={share} aria-label="แชร์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">
+              🔗
+            </button>
+          </div>
+          <WeatherTopBar weather={weather} onOpen={() => setSheet({ type: "weather" })} />
+          {admin && (
+            <div className="border-t border-white/20 bg-neutral-800">
+              <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-1 text-sm sm:px-4">
+                <span className="font-semibold">🛡️ โหมดผู้ดูแล · {admin.name}</span>
+                <a href="/admin" className="ml-auto flex min-h-[40px] items-center underline">
+                  📢 ประกาศ / ตั้งค่า
+                </a>
+              </div>
+            </div>
+          )}
+        </header>
+
+        <main className="mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
+          {ordered(home.layout, Object.keys(blocks)).map((k) => (
+            <Fragment key={k}>{blocks[k]}</Fragment>
+          ))}
+
+          <footer className="mt-8 flex flex-col items-center gap-2 text-center text-xs text-neutral-500">
+            <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Sahakorn Serithai 57" className="h-28 w-auto" />
+            {VILLAGE_NAME} · ข้อมูลในหน้านี้มาจากเพื่อนบ้านช่วยกันลง · ระบบไม่รับเงิน ตกลงกันเอง
+            {!admin && (
+              <a href="/admin" className="inline-flex min-h-[44px] items-center text-neutral-400 underline">
+                สำหรับผู้ดูแล
+              </a>
+            )}
+          </footer>
+        </main>
+        <BottomNav
+          onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          onPros={() => {
+            setProsGroup("");
+            showTab("pros");
+          }}
+          onMap={openWater}
+          onHotline={() => setSheet({ type: "hotlines" })}
+        />
+
+        {sheet?.type === "lendForm" && (
+          <Sheet title="ยืม · ให้ · ขาย" onClose={() => setSheet(null)}>
+            <LendForm
+              kind={sheet.kind}
+              onDone={(x) => {
+                setLend((p) => [x, ...p]);
+                posted("lend", `${LEND_KIND_TEXT[x.kind] || "🧰"} ${x.title}${x.price ? ` ${x.price}` : ""}${x.soi ? ` (ซ.${x.soi})` : ""}`);
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "jobForm" && (
+          <Sheet title={sheet.kind === "need" ? "🙋 ขอแรงช่วยที่บ้าน" : "💪 ลงชื่ออาสาไปช่วย"} onClose={() => setSheet(null)}>
+            <JobForm
+              kind={sheet.kind}
+              jobType={sheet.jobType}
+              onDone={(j) => {
+                setJobs((p) => [j, ...p]);
+                posted("jobs", `${j.kind === "need" ? "🙋 ขอแรง" : "💪 ช่วยได้"}: ${j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`);
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "lostForm" && (
+          <Sheet title="🐾 หาย · เจอ" onClose={() => setSheet(null)}>
+            <LostForm
+              kind={sheet.kind}
+              onDone={(x) => {
+                setLost((p) => [x, ...p]);
+                setSheet(null);
+                pick("lost");
+                setToast("ลงประกาศแล้ว เพื่อนบ้านช่วยกันดู");
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "water" && (
+          <Sheet title="💧 แจ้งระดับน้ำ" onClose={() => setSheet(null)}>
+            <WaterForm
+              onDone={(w) => {
+                setWater((p) => [w, ...p]);
+                setSheet(null);
+                setToast("ขอบคุณที่แจ้งระดับน้ำ");
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "canal" && (
+          <Sheet title="🌊 แจ้งระดับน้ำในคลอง" onClose={() => setSheet(null)}>
+            <CanalForm
+              onDone={(r) => {
+                setCanal((c) => ({ ...(c || { pumps: [], leaks: [] }), reports: [r, ...((c && c.reports) || [])] }));
+                setSheet(null);
+                setToast("ขอบคุณที่แจ้งระดับคลอง");
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "leaks" && (
+          <Sheet title="🕳️ รูรั่วริมคลอง / เขื่อน" onClose={() => setSheet(null)}>
+            <LeakList leaks={canal?.leaks || []} onLeak={(leak) => setSheet({ type: "leak", leak })} onAdd={() => setSheet({ type: "leakForm" })} />
+          </Sheet>
+        )}
+        {sheet?.type === "leak" && (
+          <Sheet title="🕳️ รูรั่ว" onClose={() => setSheet(null)}>
+            <LeakSheet
+              leak={sheet.leak}
+              onDone={() => {
+                setSheet(null);
+                setToast("อัปเดตรูรั่วแล้ว");
+                refresh();
+              }}
+              onDelete={
+                admin
+                  ? async (l) => {
+                      await api(`/admin/leaks/${l.id}`, { method: "DELETE" }).catch((e) => setToast(e.message));
+                      setSheet(null);
+                      refresh();
+                    }
+                  : null
+              }
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "pumps" && (
+          <Sheet title="⚙️ เครื่องสูบน้ำ" onClose={() => setSheet(null)}>
+            <PumpList pumps={(canal?.pumps || []).filter((x) => x.status !== "removed")} onPump={(pump) => setSheet({ type: "pump", pump })} admin={!!admin} />
+          </Sheet>
+        )}
+        {sheet?.type === "pump" && (
+          <Sheet title={sheet.pump ? "⚙️ สถานะเครื่องสูบ" : "⚙️ เพิ่มเครื่องสูบ"} onClose={() => setSheet(null)}>
+            <PumpForm
+              pump={sheet.pump}
+              admin={!!admin}
+              onDone={() => {
+                setSheet(null);
+                setToast("บันทึกเครื่องสูบแล้ว");
+                refresh();
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "leakForm" && (
+          <Sheet title="🕳️ แจ้งรูรั่ว" onClose={() => setSheet(null)}>
+            <LeakForm
+              onDone={(l) => {
+                setCanal((c) => ({ ...(c || { reports: [], pumps: [] }), leaks: [l, ...((c && c.leaks) || [])] }));
+                setSheet(null);
+                setToast("แจ้งรูรั่วแล้ว");
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "issueForm" && (
+          <Sheet title="📍 แจ้งปัญหาในซอย" onClose={() => setSheet(null)}>
+            <IssueForm
+              onDone={(x) => {
+                setIssues((p) => [x, ...p]);
+                setSheet(null);
+                pick("issues");
+                setToast("แจ้งแล้ว · ส่งต่อให้เขตได้จากลิงก์ด้านล่าง");
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "serviceForm" && (
+          <Sheet title="แนะนำช่าง / ร้าน" onClose={() => setSheet(null)}>
+            <ServiceForm
+              repair
+              onDone={(s) => {
+                setServices((p) => [s, ...p]);
+                posted("pros", `⭐ แนะนำช่าง/ร้าน: ${s.name}${s.detail ? ` · ${s.detail}` : ""}`);
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "intent" && (
+          <Sheet title={sheet.need ? "ขอความช่วยเหลือ" : "แนะนำ / ให้ / ขาย"} onClose={() => setSheet(null)}>
+            <IntentChoices need={sheet.need} choices={sheet.need ? NEED_CHOICES : OFFER_CHOICES} onPick={go} />
+          </Sheet>
+        )}
+        {sheet?.type === "join" && (
+          <Sheet title={sheet.job.kind === "need" ? "ไปช่วยเพื่อนบ้าน" : "ขอให้มาช่วยบ้านฉัน"} onClose={() => setSheet(null)}>
+            <JoinSheetBody job={sheet.job} onJoined={(j) => setJobs((p) => p.map((x) => (x.id === j.id ? j : x)))} onClose={() => setSheet(null)} />
+          </Sheet>
+        )}
+        {sheet?.type === "posted" && (
+          <Sheet title="ลงแล้ว" onClose={() => setSheet(null)}>
+            <PostedSheetBody
+              text={sheet.text}
+              onClose={() => {
+                setSheet(null);
+                showTab(tab);
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "weather" && (
+          <Sheet title="🌦️ สภาพอากาศ (Windy)" onClose={() => setSheet(null)}>
+            <WindyMap />
+          </Sheet>
+        )}
+        {sheet?.type === "hotlines" && (
+          <Sheet title="☎️ เบอร์สำคัญ" onClose={() => setSheet(null)}>
+            <div className="space-y-4">
+              {[
+                ...HOTLINE_GROUPS,
+                {
+                  title: "🏛️ หลังน้ำลด",
+                  items: [
+                    ["1555", "กทม. · แจ้งขยะ ถนน ไฟถนน"],
+                    ["1323", "สายด่วนสุขภาพจิต"],
+                    ["1130", "การไฟฟ้านครหลวง"],
+                  ],
+                },
+              ].map((group) => (
+                <section key={group.title}>
+                  <h3 className="mb-2 font-bold">{group.title}</h3>
+                  <ul className="space-y-2">
+                    {group.items.map(([num, text]) => (
+                      <li key={`${group.title}-${num}`}>
+                        <a href={`tel:${num.replace(/\D/g, "")}`} className="flex min-h-[56px] flex-wrap items-center gap-x-3 rounded-xl border border-neutral-200 px-4 py-2 active:bg-neutral-50">
+                          <span className="text-xl font-bold tabular-nums text-red-700">📞 {num}</span>
+                          <span>{text}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </Sheet>
+        )}
+
+        {toast && (
+          <div
+            key={toast}
+            role="status"
+            className="anim-toast pointer-events-none fixed inset-x-3 top-16 z-[1100] mx-auto max-w-md rounded-xl bg-neutral-900 px-4 py-3 text-center text-white shadow-lg"
+          >
+            {toast}
           </div>
         )}
-      </header>
-
-      <main className="mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
-        {ordered(home.layout, Object.keys(blocks)).map((k) => (
-          <Fragment key={k}>{blocks[k]}</Fragment>
-        ))}
-
-        <footer className="mt-8 flex flex-col items-center gap-2 text-center text-xs text-neutral-500">
-          <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Sahakorn Serithai 57" className="h-28 w-auto" />
-          {VILLAGE_NAME} · ข้อมูลในหน้านี้มาจากเพื่อนบ้านช่วยกันลง · ระบบไม่รับเงิน ตกลงกันเอง
-          {!admin && (
-            <a href="/admin" className="inline-flex min-h-[44px] items-center text-neutral-400 underline">
-              สำหรับผู้ดูแล
-            </a>
-          )}
-        </footer>
-      </main>
-      <BottomNav
-        onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        onPros={() => {
-          setProsGroup("");
-          showTab("pros");
-        }}
-        onMap={openWater}
-        onHotline={() => setSheet({ type: "hotlines" })}
-      />
-
-      {sheet?.type === "lendForm" && (
-        <Sheet title="ยืม · ให้ · ขาย" onClose={() => setSheet(null)}>
-          <LendForm
-            kind={sheet.kind}
-            onDone={(x) => {
-              setLend((p) => [x, ...p]);
-              posted("lend", `${LEND_KIND_TEXT[x.kind] || "🧰"} ${x.title}${x.price ? ` ${x.price}` : ""}${x.soi ? ` (ซ.${x.soi})` : ""}`);
-            }}
-          />
-        </Sheet>
-      )}
-      {sheet?.type === "jobForm" && (
-        <Sheet title={sheet.kind === "need" ? "🙋 ขอแรงช่วยที่บ้าน" : "💪 ลงชื่ออาสาไปช่วย"} onClose={() => setSheet(null)}>
-          <JobForm
-            kind={sheet.kind}
-            jobType={sheet.jobType}
-            onDone={(j) => {
-              setJobs((p) => [j, ...p]);
-              posted("jobs", `${j.kind === "need" ? "🙋 ขอแรง" : "💪 ช่วยได้"}: ${j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`);
-            }}
-          />
-        </Sheet>
-      )}
-      {sheet?.type === "lostForm" && (
-        <Sheet title="🐾 หาย · เจอ" onClose={() => setSheet(null)}>
-          <LostForm
-            kind={sheet.kind}
-            onDone={(x) => {
-              setLost((p) => [x, ...p]);
-              setSheet(null);
-              pick("lost");
-              setToast("ลงประกาศแล้ว เพื่อนบ้านช่วยกันดู");
-            }}
-          />
-        </Sheet>
-      )}
-      {sheet?.type === "water" && (
-        <Sheet title="💧 แจ้งระดับน้ำ" onClose={() => setSheet(null)}>
-          <WaterForm
-            onDone={(w) => {
-              setWater((p) => [w, ...p]);
-              setSheet(null);
-              setToast("ขอบคุณที่แจ้งระดับน้ำ");
-            }}
-          />
-        </Sheet>
-      )}
-      {sheet?.type === "canal" && (
-        <Sheet title="🌊 แจ้งระดับน้ำในคลอง" onClose={() => setSheet(null)}>
-          <CanalForm
-            onDone={(r) => {
-              setCanal((c) => ({ ...(c || { pumps: [], leaks: [] }), reports: [r, ...((c && c.reports) || [])] }));
-              setSheet(null);
-              setToast("ขอบคุณที่แจ้งระดับคลอง");
-            }}
-          />
-        </Sheet>
-      )}
-      {sheet?.type === "leaks" && (
-        <Sheet title="🕳️ รูรั่วริมคลอง / เขื่อน" onClose={() => setSheet(null)}>
-          <LeakList leaks={canal?.leaks || []} onLeak={(leak) => setSheet({ type: "leak", leak })} onAdd={() => setSheet({ type: "leakForm" })} />
-        </Sheet>
-      )}
-      {sheet?.type === "leak" && (
-        <Sheet title="🕳️ รูรั่ว" onClose={() => setSheet(null)}>
-          <LeakSheet
-            leak={sheet.leak}
-            onDone={() => {
-              setSheet(null);
-              setToast("อัปเดตรูรั่วแล้ว");
-              refresh();
-            }}
-            onDelete={
-              admin
-                ? async (l) => {
-                    await api(`/admin/leaks/${l.id}`, { method: "DELETE" }).catch((e) => setToast(e.message));
-                    setSheet(null);
-                    refresh();
-                  }
-                : null
-            }
-          />
-        </Sheet>
-      )}
-      {sheet?.type === "pumps" && (
-        <Sheet title="⚙️ เครื่องสูบน้ำ" onClose={() => setSheet(null)}>
-          <PumpList pumps={(canal?.pumps || []).filter((x) => x.status !== "removed")} onPump={(pump) => setSheet({ type: "pump", pump })} admin={!!admin} />
-        </Sheet>
-      )}
-      {sheet?.type === "pump" && (
-        <Sheet title={sheet.pump ? "⚙️ สถานะเครื่องสูบ" : "⚙️ เพิ่มเครื่องสูบ"} onClose={() => setSheet(null)}>
-          <PumpForm
-            pump={sheet.pump}
-            admin={!!admin}
-            onDone={() => {
-              setSheet(null);
-              setToast("บันทึกเครื่องสูบแล้ว");
-              refresh();
-            }}
-          />
-        </Sheet>
-      )}
-      {sheet?.type === "leakForm" && (
-        <Sheet title="🕳️ แจ้งรูรั่ว" onClose={() => setSheet(null)}>
-          <LeakForm
-            onDone={(l) => {
-              setCanal((c) => ({ ...(c || { reports: [], pumps: [] }), leaks: [l, ...((c && c.leaks) || [])] }));
-              setSheet(null);
-              setToast("แจ้งรูรั่วแล้ว");
-            }}
-          />
-        </Sheet>
-      )}
-      {sheet?.type === "issueForm" && (
-        <Sheet title="📍 แจ้งปัญหาในซอย" onClose={() => setSheet(null)}>
-          <IssueForm
-            onDone={(x) => {
-              setIssues((p) => [x, ...p]);
-              setSheet(null);
-              pick("issues");
-              setToast("แจ้งแล้ว · ส่งต่อให้เขตได้จากลิงก์ด้านล่าง");
-            }}
-          />
-        </Sheet>
-      )}
-      {sheet?.type === "serviceForm" && (
-        <Sheet title="แนะนำช่าง / ร้าน" onClose={() => setSheet(null)}>
-          <ServiceForm
-            repair
-            onDone={(s) => {
-              setServices((p) => [s, ...p]);
-              posted("pros", `⭐ แนะนำช่าง/ร้าน: ${s.name}${s.detail ? ` · ${s.detail}` : ""}`);
-            }}
-          />
-        </Sheet>
-      )}
-      {sheet?.type === "intent" && (
-        <Sheet title={sheet.need ? "ขอความช่วยเหลือ" : "แนะนำ / ให้ / ขาย"} onClose={() => setSheet(null)}>
-          <IntentChoices need={sheet.need} choices={sheet.need ? NEED_CHOICES : OFFER_CHOICES} onPick={go} />
-        </Sheet>
-      )}
-      {sheet?.type === "join" && (
-        <Sheet title={sheet.job.kind === "need" ? "ไปช่วยเพื่อนบ้าน" : "ขอให้มาช่วยบ้านฉัน"} onClose={() => setSheet(null)}>
-          <JoinSheetBody job={sheet.job} onJoined={(j) => setJobs((p) => p.map((x) => (x.id === j.id ? j : x)))} onClose={() => setSheet(null)} />
-        </Sheet>
-      )}
-      {sheet?.type === "posted" && (
-        <Sheet title="ลงแล้ว" onClose={() => setSheet(null)}>
-          <PostedSheetBody
-            text={sheet.text}
-            onClose={() => {
-              setSheet(null);
-              showTab(tab);
-            }}
-          />
-        </Sheet>
-      )}
-      {sheet?.type === "weather" && (
-        <Sheet title="🌦️ สภาพอากาศ (Windy)" onClose={() => setSheet(null)}>
-          <WindyMap />
-        </Sheet>
-      )}
-      {sheet?.type === "hotlines" && (
-        <Sheet title="☎️ เบอร์สำคัญ" onClose={() => setSheet(null)}>
-          <div className="space-y-4">
-            {[...HOTLINE_GROUPS, { title: "🏛️ หลังน้ำลด", items: [["1555", "กทม. · แจ้งขยะ ถนน ไฟถนน"], ["1323", "สายด่วนสุขภาพจิต"], ["1130", "การไฟฟ้านครหลวง"]] }].map((group) => (
-              <section key={group.title}>
-                <h3 className="mb-2 font-bold">{group.title}</h3>
-                <ul className="space-y-2">
-                  {group.items.map(([num, text]) => (
-                    <li key={`${group.title}-${num}`}>
-                      <a href={`tel:${num.replace(/\D/g, "")}`} className="flex min-h-[56px] flex-wrap items-center gap-x-3 rounded-xl border border-neutral-200 px-4 py-2 active:bg-neutral-50">
-                        <span className="text-xl font-bold tabular-nums text-red-700">📞 {num}</span>
-                        <span>{text}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        </Sheet>
-      )}
-
-      {toast && (
-        <div key={toast} role="status" className="anim-toast pointer-events-none fixed inset-x-3 top-16 z-[1100] mx-auto max-w-md rounded-xl bg-neutral-900 px-4 py-3 text-center text-white shadow-lg">
-          {toast}
-        </div>
-      )}
-    </div>
+      </div>
+    </TextsContext.Provider>
   );
 }
 
@@ -726,18 +765,25 @@ function HireStrip({ jobs, onOpen, onAdd }) {
     <section className="mb-3 rounded-xl border-2 border-black bg-yellow-50 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="min-w-0 flex-1 font-bold">
-          {JOB_TYPES.hire[0]} เพื่อนบ้านกำลังหาช่าง ({hires.length})
-          <span className="block text-sm font-normal text-neutral-600">ช่างที่ว่าง ดูแล้วติดต่อรับงานได้เลย</span>
+          {JOB_TYPES.hire[0]} เพื่อนบ้านกำลังหาช่าง ({hires.length})<span className="block text-sm font-normal text-neutral-600">ช่างที่ว่าง ดูแล้วติดต่อรับงานได้เลย</span>
         </h3>
-        <button onClick={onAdd} className="min-h-[44px] rounded-lg bg-black px-3 font-semibold text-white">➕ ฉันหาช่าง</button>
+        <button onClick={onAdd} className="min-h-[44px] rounded-lg bg-black px-3 font-semibold text-white">
+          ➕ ฉันหาช่าง
+        </button>
       </div>
       {hires.length > 0 && (
         <ul className="mt-2 space-y-1">
           {hires.slice(0, 5).map((j) => (
             <li key={j.id}>
               <button onClick={onOpen} className="w-full rounded-lg bg-white p-2 text-left text-sm shadow-sm">
-                <b>{j.soi ? `ซ.${j.soi} · ` : ""}{j.detail}</b>
-                <span className="block text-xs text-neutral-500">{j.name} · {timeAgo(j.created_at)}{j.when && ` · ${j.when}`}</span>
+                <b>
+                  {j.soi ? `ซ.${j.soi} · ` : ""}
+                  {j.detail}
+                </b>
+                <span className="block text-xs text-neutral-500">
+                  {j.name} · {timeAgo(j.created_at)}
+                  {j.when && ` · ${j.when}`}
+                </span>
               </button>
             </li>
           ))}
@@ -762,7 +808,9 @@ function EventBox({ ev, onMap }) {
   return (
     <section className="mb-3 rounded-xl border-4 border-red-600 bg-red-50 px-3 py-2">
       <div className="flex items-start gap-3">
-        <span className="pt-1 text-3xl" aria-hidden="true">{ev.icon || "🧱"}</span>
+        <span className="pt-1 text-3xl" aria-hidden="true">
+          {ev.icon || "🧱"}
+        </span>
         <div className="min-w-0 flex-1">
           <h2 className="break-words text-lg font-bold leading-snug">{ev.title}</h2>
           {ev.when && <p className="font-semibold text-red-700">🕘 {ev.when}</p>}
@@ -781,13 +829,22 @@ function EventBox({ ev, onMap }) {
       )}
       {ev.link === "/cleanup" ? (
         <>
-          <button onClick={() => { setPlanMounted(true); setPlan((o) => !o); }} aria-expanded={plan} className="mt-2 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-3 text-center text-lg font-bold text-white">
+          <button
+            onClick={() => {
+              setPlanMounted(true);
+              setPlan((o) => !o);
+            }}
+            aria-expanded={plan}
+            className="mt-2 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-3 text-center text-lg font-bold text-white"
+          >
             {plan ? "▲ ซ่อนแผนรถ" : ev.link_label || "🗺️ ดูแผนรถตามโซน ▼"}
           </button>
           {planMounted && (
             <div className="mt-2" hidden={!plan}>
               <CleanupPlan embedded />
-              <a href="/cleanup" className="mt-2 block text-center text-sm underline">เปิดแผนเต็มจอ ↗</a>
+              <a href="/cleanup" className="mt-2 block text-center text-sm underline">
+                เปิดแผนเต็มจอ ↗
+              </a>
             </div>
           )}
         </>
@@ -811,7 +868,9 @@ function EventBox({ ev, onMap }) {
 function HubBox({ hub, look }) {
   const body = (
     <>
-      <span className="text-2xl" aria-hidden="true">📍</span>
+      <span className="text-2xl" aria-hidden="true">
+        📍
+      </span>
       <span className="min-w-0 flex-1">
         <b className="break-words">{hub.title}</b>
         {hub.sub && <span className="block text-sm text-neutral-700">{hub.sub}</span>}
@@ -826,6 +885,8 @@ function HubBox({ hub, look }) {
       <span className="shrink-0 font-semibold underline">นำทาง ›</span>
     </a>
   ) : (
-    <div className={cls} style={style}>{body}</div>
+    <div className={cls} style={style}>
+      {body}
+    </div>
   );
 }

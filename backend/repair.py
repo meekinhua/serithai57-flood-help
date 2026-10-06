@@ -20,6 +20,7 @@ Site mode: settings {id: "site_mode", mode: "repair"|"flood"}. In repair mode th
 answer 423 for everyone but admins; an admin can switch back to flood mode if the water returns.
 """
 import hashlib
+import re
 import secrets
 import uuid
 from datetime import datetime, timezone
@@ -277,6 +278,15 @@ HOME_DEFAULT = {
 }
 
 
+# 7 Oct: wording on the page (titles, prompts, buttons) changed from the chat without a redeploy (tools/site.py text).
+# The page carries its own default for every key; only the changed ones are stored.
+TEXT_KEY = re.compile(r"^[a-z0-9_.]{1,60}$")
+
+
+class TextsBody(BaseModel):
+    set: Dict[str, Optional[str]]  # key -> new wording, or null to go back to the page's own
+
+
 class SiteBody(BaseModel):
     mode: SiteMode
 
@@ -322,7 +332,8 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     @router.get("/home")
     async def get_home():
         doc = await db.settings.find_one({"id": "home"}, {"_id": 0, "id": 0})
-        return {**HOME_DEFAULT, **(doc or {})}
+        texts = await db.settings.find_one({"id": "texts"}, {"_id": 0})
+        return {**HOME_DEFAULT, **(doc or {}), "texts": (texts or {}).get("texts", {})}
 
     @router.put("/admin/home")
     async def set_home(body: HomeBody, admin: dict = Depends(require_admin)):
@@ -340,6 +351,22 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         await db.settings.update_one({"id": "home"}, {"$set": {"id": "home", **data, "by": admin["name"], "at": now()}}, upsert=True)
         await audit(admin, "home_blocks", "home", f"watch={data['watch_on']} hub={data['hub']['on']} {data['hub']['title']}")
         return data
+
+    @router.put("/admin/texts")
+    async def set_texts(body: TextsBody, admin: dict = Depends(require_admin)):
+        bad = [k for k in body.set if not TEXT_KEY.match(k)]
+        if bad:
+            raise HTTPException(422, f"ชื่อข้อความไม่ถูกต้อง {bad}")
+        doc = await db.settings.find_one({"id": "texts"}, {"_id": 0}) or {}
+        texts = doc.get("texts", {})
+        for k, v in body.set.items():
+            if v is None or not v.strip():
+                texts.pop(k, None)
+            else:
+                texts[k] = v.strip()[:300]
+        await db.settings.update_one({"id": "texts"}, {"$set": {"id": "texts", "texts": texts, "by": admin["name"], "at": now()}}, upsert=True)
+        await audit(admin, "texts", ",".join(body.set)[:200])
+        return texts
 
     # ---------------- lend / borrow / give ----------------
     @router.get("/lend")

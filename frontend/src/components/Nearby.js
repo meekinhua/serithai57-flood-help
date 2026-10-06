@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, load, save } from "../api";
+import { useT } from "./Texts";
 
 // รอบบ้าน: small asks and warnings between houses close enough to help (backend/nearby.py)
 export const NEAR_TOPICS = {
@@ -31,13 +32,17 @@ function ago(t) {
 }
 
 function Item({ d, onChange, setErr }) {
+  const t = useT();
   const key = keys()[d.id];
   const [helping, setHelping] = useState(null); // {name, phone} while filling, then {contact}
   const [owner, setOwner] = useState(null);
   const [voted, setVoted] = useState(() => load(`nearVote:${d.id}`, false));
 
   useEffect(() => {
-    if (key) api(`/nearby/${d.id}/owner`, { headers: { "X-Edit-Key": key } }).then(setOwner).catch(() => {});
+    if (key)
+      api(`/nearby/${d.id}/owner`, { headers: { "X-Edit-Key": key } })
+        .then(setOwner)
+        .catch(() => {});
   }, [d.id, key]);
 
   async function offer() {
@@ -127,8 +132,18 @@ function Item({ d, onChange, setErr }) {
           </div>
         ) : helping ? (
           <div className="mt-2 space-y-2">
-            <input value={helping.name} onChange={(e) => setHelping({ ...helping, name: e.target.value })} placeholder="ชื่อเล่นคุณ" className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base" />
-            <input value={helping.phone} onChange={(e) => setHelping({ ...helping, phone: e.target.value })} placeholder="เบอร์คุณ (ไม่ใส่ก็ได้ เจ้าของบ้านเห็นคนเดียว)" className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base" />
+            <input
+              value={helping.name}
+              onChange={(e) => setHelping({ ...helping, name: e.target.value })}
+              placeholder="ชื่อเล่นคุณ"
+              className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base"
+            />
+            <input
+              value={helping.phone}
+              onChange={(e) => setHelping({ ...helping, phone: e.target.value })}
+              placeholder="เบอร์คุณ (ไม่ใส่ก็ได้ เจ้าของบ้านเห็นคนเดียว)"
+              className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base"
+            />
             <div className="flex gap-2">
               <button onClick={offer} disabled={!helping.name.trim()} className="min-h-[48px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-50">
                 รับช่วย แล้วดูเบอร์เจ้าของบ้าน
@@ -140,7 +155,7 @@ function Item({ d, onChange, setErr }) {
           </div>
         ) : (
           <button onClick={() => setHelping({ name: load("myName", ""), phone: "" })} className="mt-2 min-h-[48px] w-full rounded-xl bg-[#1E6B47] text-base font-bold text-white">
-            ฉันช่วยได้
+            {t("nearby.help", "ฉันช่วยได้")}
           </button>
         )
       ) : (
@@ -161,6 +176,7 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
   const topics = NEAR_TOPICS[form.kind];
   const topic = topics.find((t) => t[0] === form.topic);
   const ask = form.kind === "ask";
+  const t = useT();
   async function post() {
     setErr("");
     try {
@@ -175,7 +191,7 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
   }
   return (
     <div className="space-y-2 rounded-2xl bg-[#F2F4F1] p-3">
-      <p className="text-base font-bold">{ask ? "ฝากเพื่อนบ้านใกล้ๆ เรื่องอะไร" : "เตือนเพื่อนบ้านเรื่องอะไร"}</p>
+      <p className="text-base font-bold">{ask ? t("nearby.form.ask", "ฝากเพื่อนบ้านใกล้ๆ เรื่องอะไร") : t("nearby.form.alert", "เตือนเพื่อนบ้านเรื่องอะไร")}</p>
       <div className="grid grid-cols-2 gap-2">
         {topics.map(([k, icon, label]) => (
           <button
@@ -185,7 +201,7 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
             className={`min-h-[52px] rounded-xl border-2 px-2 text-left text-[15px] font-bold leading-tight ${form.topic === k ? "border-[#1E6B47] bg-[#1E6B47] text-white" : "border-[#C9D1CB] bg-white"}`}
           >
             <span aria-hidden="true">{icon} </span>
-            {label}
+            {t(`nearby.${form.kind}.${k}`, label)}
           </button>
         ))}
       </div>
@@ -199,7 +215,12 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
             placeholder={ask ? "รายละเอียด เช่น ไม่อยู่บ้านถึงวันอาทิตย์ กุญแจอยู่ที่…" : "อยู่ตรงไหน เช่น หน้าบ้าน 4/120 ฝั่งซ้าย"}
             className="w-full rounded-xl border border-[#A9B4AD] p-3 text-base"
           />
-          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="ชื่อเล่นคุณ" className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base" />
+          <input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="ชื่อเล่นคุณ"
+            className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base"
+          />
           {ask && (
             <input
               value={form.phone}
@@ -219,7 +240,7 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
       )}
       <div className="flex gap-2">
         <button onClick={post} disabled={!form.topic} className="min-h-[52px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-50">
-          {ask ? "ฝากเพื่อนบ้าน" : "เตือนเพื่อนบ้าน"}
+          {ask ? t("nearby.form.post_ask", "ฝากเพื่อนบ้าน") : t("nearby.form.post_alert", "เตือนเพื่อนบ้าน")}
         </button>
         <button onClick={() => setForm(null)} className="min-h-[52px] rounded-xl border border-[#C9D1CB] bg-white px-4 font-bold">
           ยกเลิก
@@ -230,6 +251,7 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
 }
 
 export default function Nearby({ info, form, setForm, setErr }) {
+  const t = useT();
   const [items, setItems] = useState(null);
   const [posted, setPosted] = useState(null);
   const refresh = useCallback(() => {
@@ -254,9 +276,10 @@ export default function Nearby({ info, form, setForm, setErr }) {
   return (
     <div className="border-t border-[#E6EBE7] py-3">
       <p className="text-base font-bold text-[#15201A]">
-        <span aria-hidden="true">🏘️ </span>รอบบ้านฉัน
+        <span aria-hidden="true">🏘️ </span>
+        {t("nearby.title", "รอบบ้านฉัน")}
       </p>
-      <p className="text-sm text-[#45504A]">เพื่อนบ้านระยะเดินถึง ฝากกันเรื่องเล็กๆ · เตือนกันให้ระวัง</p>
+      <p className="text-sm text-[#45504A]">{t("nearby.sub", "เพื่อนบ้านระยะเดินถึง ฝากกันเรื่องเล็กๆ · เตือนกันให้ระวัง")}</p>
       <div className="mt-1 space-y-2">
         {items === null ? null : items.length ? (
           <ul className="space-y-2">
@@ -265,7 +288,7 @@ export default function Nearby({ info, form, setForm, setErr }) {
             ))}
           </ul>
         ) : (
-          !form && <p className="text-[15px] text-[#45504A]">ตอนนี้รอบบ้านคุณเงียบดี ยังไม่มีใครฝากหรือเตือนอะไร</p>
+          !form && <p className="text-[15px] text-[#45504A]">{t("nearby.empty", "ตอนนี้รอบบ้านคุณเงียบดี ยังไม่มีใครฝากหรือเตือนอะไร")}</p>
         )}
 
         {posted && (
@@ -277,7 +300,7 @@ export default function Nearby({ info, form, setForm, setErr }) {
               rel="noreferrer"
               className="mt-2 flex min-h-[48px] items-center justify-center rounded-xl bg-[#06C755] text-[15px] font-bold text-white"
             >
-              แชร์เข้ากลุ่ม LINE ให้เห็นเร็วขึ้น
+              {t("nearby.share", "แชร์เข้ากลุ่ม LINE ให้เห็นเร็วขึ้น")}
             </a>
           </div>
         )}
@@ -297,10 +320,10 @@ export default function Nearby({ info, form, setForm, setErr }) {
         ) : (
           <div className="grid grid-cols-2 gap-2">
             <button onClick={() => start("ask")} className="min-h-[56px] rounded-xl border-2 border-[#1E6B47] bg-white px-2 text-[15px] font-bold leading-tight text-[#154D33]">
-              🙏 ฝากเพื่อนบ้าน
+              {t("nearby.button.ask", "🙏 ฝากเพื่อนบ้าน")}
             </button>
             <button onClick={() => start("alert")} className="min-h-[56px] rounded-xl border-2 border-[#E0A100] bg-[#FFF8E1] px-2 text-[15px] font-bold leading-tight">
-              ⚠️ เตือนเพื่อนบ้าน
+              {t("nearby.button.alert", "⚠️ เตือนเพื่อนบ้าน")}
             </button>
           </div>
         )}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, load, save } from "../api";
 import LocationPicker from "./LocationPicker";
 import Nearby from "./Nearby";
+import { useT } from "./Texts";
 import { waterOf } from "../config";
 
 // บ้านฉัน (7 Oct 2026): a house number typed once (or taken from the electricians' sign-up on this phone) and
@@ -9,9 +10,9 @@ import { waterOf } from "../config";
 // water in front of it right now (one tap), open problems in its soi to report to the office. No login.
 
 const WATER_TAPS = [
-  { label: "แห้ง", level: 0, where: "street", cls: "border-[#1E6B47] text-[#1E6B47]" },
-  { label: "น้ำขังถนน", level: 1, where: "street", cls: "border-[#B45F06] text-[#7A4104]" },
-  { label: "น้ำเข้าบ้าน", level: 2, where: "house", cls: "border-[#B42318] text-[#B42318]" },
+  { key: "dry", label: "แห้ง", level: 0, where: "street", cls: "border-[#1E6B47] text-[#1E6B47]" },
+  { key: "street", label: "น้ำขังถนน", level: 1, where: "street", cls: "border-[#B45F06] text-[#7A4104]" },
+  { key: "house", label: "น้ำเข้าบ้าน", level: 2, where: "house", cls: "border-[#B42318] text-[#B42318]" },
 ];
 const ELECTRIC = {
   done: ["ช่างตรวจแล้ว", "text-[#1E6B47]"],
@@ -47,8 +48,9 @@ function WaterRow({ info, water, onAsk, sent, onTap }) {
   const last = near[0];
   const lv = last ? waterOf(last.level) : null;
   const wet = near.filter((w) => w.level > 0).length;
+  const t = useT();
   return (
-    <Row icon="💧" title="น้ำหน้าบ้านคุณ">
+    <Row icon="💧" title={t("myhome.water.title", "น้ำหน้าบ้านคุณ")}>
       {last ? (
         <div className="flex items-center gap-3 rounded-2xl p-3" style={{ background: `${lv.color}1A`, border: `2px solid ${lv.color}` }}>
           <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: lv.color }} />
@@ -61,18 +63,18 @@ function WaterRow({ info, water, onAsk, sent, onTap }) {
           </div>
         </div>
       ) : (
-        <p className="text-[15px] text-[#33403A]">{NEAR_H} ชม.ที่ผ่านมา ยังไม่มีใครแจ้งแถวบ้านคุณ</p>
+        <p className="text-[15px] text-[#33403A]">{t("myhome.water.none", "{h} ชม.ที่ผ่านมา ยังไม่มีใครแจ้งแถวบ้านคุณ", { h: NEAR_H })}</p>
       )}
-      {!exact && <p className="text-sm text-[#7A4104]">ดูจากทั้งแถวซอย · ปักหมุดบ้านแล้วจะแม่นขึ้น</p>}
+      {!exact && <p className="text-sm text-[#7A4104]">{t("myhome.water.rough", "ดูจากทั้งแถวซอย · ปักหมุดบ้านแล้วจะแม่นขึ้น")}</p>}
       {sent ? (
-        <p className="text-[15px] font-bold text-[#1E6B47]">ขอบคุณที่แจ้ง ({sent}) เพื่อนบ้านเห็นแล้ว</p>
+        <p className="text-[15px] font-bold text-[#1E6B47]">{t("myhome.water.thanks", "ขอบคุณที่แจ้ง ({what}) เพื่อนบ้านเห็นแล้ว", { what: sent })}</p>
       ) : (
         <>
-          <p className="pt-1 text-[15px] font-bold">อยู่บ้าน? กดบอกเพื่อนบ้านว่าตอนนี้เป็นแบบไหน</p>
+          <p className="pt-1 text-[15px] font-bold">{t("myhome.water.ask", "อยู่บ้าน? กดบอกเพื่อนบ้านว่าตอนนี้เป็นแบบไหน")}</p>
           <div className="grid grid-cols-3 gap-2">
             {WATER_TAPS.map((w) => (
               <button key={w.label} onClick={() => onTap(w)} className={`min-h-[52px] rounded-xl border-2 bg-white px-1 text-[15px] font-bold leading-tight ${w.cls}`}>
-                {w.label}
+                {t(`myhome.water.${w.key}`, w.label)}
               </button>
             ))}
           </div>
@@ -80,7 +82,7 @@ function WaterRow({ info, water, onAsk, sent, onTap }) {
       )}
       {onAsk && (
         <button onClick={onAsk} className="min-h-[48px] w-full rounded-xl bg-[#F2F4F1] px-3 text-[15px] font-bold text-[#154D33]">
-          ไม่อยู่บ้าน? ฝากเพื่อนบ้านใกล้ๆ ช่วยดูให้ ›
+          {t("myhome.water.away", "ไม่อยู่บ้าน? ฝากเพื่อนบ้านใกล้ๆ ช่วยดูให้ ›")}
         </button>
       )}
     </Row>
@@ -130,21 +132,22 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
       setErr(x.message);
     }
   }
+  const t = useT();
   const tick = (i) => {
-    const t = ticks.includes(i) ? ticks.filter((x) => x !== i) : [...ticks, i];
-    setTicks(t);
-    save(`safe:${info.house}`, t);
+    const next = ticks.includes(i) ? ticks.filter((x) => x !== i) : [...ticks, i];
+    setTicks(next);
+    save(`safe:${info.house}`, next);
   };
 
   if (e.status === "done")
     return (
-      <Row icon="⚡" title="ตรวจไฟฟ้าหลังน้ำท่วม">
+      <Row icon="⚡" title={t("myhome.electric.title", "ตรวจไฟฟ้าหลังน้ำท่วม")}>
         <p className="text-base font-bold text-[#1E6B47]">ช่างตรวจบ้านนี้แล้ว</p>
       </Row>
     );
 
   return (
-    <Row icon="⚡" title="ตรวจไฟฟ้าหลังน้ำท่วม">
+    <Row icon="⚡" title={t("myhome.electric.title", "ตรวจไฟฟ้าหลังน้ำท่วม")}>
       <p className={`text-base font-bold ${e.signed ? ELECTRIC[e.status]?.[1] || "" : ""}`}>{e.signed ? ELECTRIC[e.status]?.[0] || "ลงชื่อไว้แล้ว" : "บ้านนี้ยังไม่ได้ตรวจไฟ"}</p>
       <p className="text-[15px] text-[#33403A]">
         {info.soi && e.soi_waiting > 0 ? `ใน ซ.${info.soi} ยังรอช่างอีก ${e.soi_waiting} หลัง` : `ทั้งหมู่บ้านยังรอช่างอีก ${e.village_waiting} หลัง`}
@@ -159,7 +162,7 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
           <div className="mt-2 flex gap-2">
             {(e.want === "free" || e.want === "group") && !info.has_contact && (
               <button onClick={onContact} className="min-h-[46px] flex-1 rounded-xl bg-[#1E6B47] px-2 text-[15px] font-bold text-white">
-                ฝากเบอร์/LINE ให้ทีมแจ้ง
+                {t("myhome.electric.leave_contact", "ฝากเบอร์/LINE ให้ทีมแจ้ง")}
               </button>
             )}
             <button onClick={() => setPick({ want: e.want, slots: e.slots || [] })} className="min-h-[46px] rounded-xl border border-[#C9D1CB] bg-white px-4 text-[15px] font-bold">
@@ -169,7 +172,7 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
         </div>
       ) : pick?.want === "free" ? (
         <div className="space-y-2 rounded-2xl bg-[#F2F4F1] p-3">
-          <p className="text-[15px] font-bold">ช่วงไหนมีคนอยู่บ้าน (เลือกได้หลายช่วง)</p>
+          <p className="text-[15px] font-bold">{t("myhome.electric.slots", "ช่วงไหนมีคนอยู่บ้าน (เลือกได้หลายช่วง)")}</p>
           <div className="grid grid-cols-2 gap-2">
             {SLOTS.map((x) => (
               <button
@@ -188,14 +191,14 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
         </div>
       ) : (
         <div className="space-y-2">
-          <p className="text-[15px] font-bold">ตอนนี้บ้านคุณ</p>
+          <p className="text-[15px] font-bold">{t("myhome.electric.now", "ตอนนี้บ้านคุณ")}</p>
           <button onClick={() => setPick({ want: "free", slots: [] })} className="w-full rounded-2xl border-2 border-[#1E6B47] bg-white px-3 py-2.5 text-left">
-            <b className="block text-base text-[#154D33]">ยังอยากให้ช่างฟรีมาตรวจ</b>
-            <span className="text-sm text-[#45504A]">ถ้าทีมช่างกลับมา (อาจเป็นเสาร์-อาทิตย์) จะได้อยู่ในคิว</span>
+            <b className="block text-base text-[#154D33]">{t("myhome.electric.free", "ยังอยากให้ช่างฟรีมาตรวจ")}</b>
+            <span className="text-sm text-[#45504A]">{t("myhome.electric.free_sub", "ถ้าทีมช่างกลับมา (อาจเป็นเสาร์-อาทิตย์) จะได้อยู่ในคิว")}</span>
           </button>
           <button onClick={() => send("group")} className="w-full rounded-2xl border-2 border-[#15201A] bg-white px-3 py-2.5 text-left">
-            <b className="block text-base">รวมกลุ่มในซอย จ้างช่างไฟเอกชน</b>
-            <span className="text-sm text-[#45504A]">ช่างมาทีเดียวหลายหลัง ค่าเดินทางถูกลง</span>
+            <b className="block text-base">{t("myhome.electric.group", "รวมกลุ่มในซอย จ้างช่างไฟเอกชน")}</b>
+            <span className="text-sm text-[#45504A]">{t("myhome.electric.group_sub", "ช่างมาทีเดียวหลายหลัง ค่าเดินทางถูกลง")}</span>
           </button>
           <div className="grid grid-cols-2 gap-2">
             <button onClick={() => send("hired")} className="min-h-[50px] rounded-xl border border-[#C9D1CB] bg-white text-[15px] font-bold">
@@ -215,24 +218,24 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
 
       {!sorted && (
         <>
-      <button onClick={() => setSafe((v) => !v)} aria-expanded={safe} className="min-h-[48px] w-full rounded-xl bg-[#FFF6DA] px-3 text-left text-[15px] font-bold">
-        ระหว่างรอ: เช็กเองแบบปลอดภัย 5 ข้อ {ticks.length ? `(${ticks.length}/5)` : ""}
-      </button>
-      {safe && (
-        <ul className="space-y-1.5">
-          {SAFE.map((t, i) => (
-            <li key={i}>
-              <label className="flex min-h-[48px] items-start gap-3 rounded-xl border border-[#DCE2DD] bg-white p-3 text-[15px] leading-snug">
-                <input type="checkbox" checked={ticks.includes(i)} onChange={() => tick(i)} className="mt-0.5 h-5 w-5 shrink-0 accent-[#1E6B47]" />
-                {t}
-              </label>
-            </li>
-          ))}
-        </ul>
-      )}
-      <button onClick={onElectricians} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-[15px] font-bold">
-        ดูเบอร์ช่างไฟที่เพื่อนบ้านแนะนำ
-      </button>
+          <button onClick={() => setSafe((v) => !v)} aria-expanded={safe} className="min-h-[48px] w-full rounded-xl bg-[#FFF6DA] px-3 text-left text-[15px] font-bold">
+            {t("myhome.electric.safe", "ระหว่างรอ: เช็กเองแบบปลอดภัย 5 ข้อ")} {ticks.length ? `(${ticks.length}/5)` : ""}
+          </button>
+          {safe && (
+            <ul className="space-y-1.5">
+              {SAFE.map((line, i) => (
+                <li key={i}>
+                  <label className="flex min-h-[48px] items-start gap-3 rounded-xl border border-[#DCE2DD] bg-white p-3 text-[15px] leading-snug">
+                    <input type="checkbox" checked={ticks.includes(i)} onChange={() => tick(i)} className="mt-0.5 h-5 w-5 shrink-0 accent-[#1E6B47]" />
+                    {line}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button onClick={onElectricians} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-[15px] font-bold">
+            {t("myhome.electric.list", "ดูเบอร์ช่างไฟที่เพื่อนบ้านแนะนำ")}
+          </button>
         </>
       )}
     </Row>
@@ -271,7 +274,10 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
   async function tap(w) {
     setErr("");
     try {
-      await api("/water", { method: "POST", body: JSON.stringify({ lat: info.lat, lng: info.lng, level: w.level, where: w.where, name: `บ้าน ${info.house}`, note: info.soi ? `ซ.${info.soi}` : "" }) });
+      await api("/water", {
+        method: "POST",
+        body: JSON.stringify({ lat: info.lat, lng: info.lng, level: w.level, where: w.where, name: `บ้าน ${info.house}`, note: info.soi ? `ซ.${info.soi}` : "" }),
+      });
       setSent(w.label);
     } catch (e) {
       setErr(e.message);
@@ -300,12 +306,13 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
     }
   }
 
+  const t = useT();
   const frame = look?.frame;
   if (typing || !house)
     return (
       <section className="mb-3 rounded-[20px] border border-[#DCE2DD] bg-white p-4" style={frame}>
         <h2 className="font-display text-xl font-bold">บ้านฉัน</h2>
-        <p className="text-[15px] text-[#45504A]">ใส่บ้านเลขที่ครั้งเดียว ดูวันรถขยะ ผลตรวจไฟ และแจ้งน้ำหน้าบ้านได้ทันที</p>
+        <p className="text-[15px] text-[#45504A]">{t("myhome.intro", "ใส่บ้านเลขที่ครั้งเดียว ดูวันรถขยะ ผลตรวจไฟ และแจ้งน้ำหน้าบ้านได้ทันที")}</p>
         <form
           className="mt-3 flex gap-2"
           onSubmit={(e) => {
@@ -368,10 +375,19 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
           {pinning ? (
             <Row title="ปักหมุดบ้านฉัน">
               <p className="text-[15px]">กด "ใช้ตำแหน่งปัจจุบัน" ตอนอยู่ที่บ้าน หรือเลื่อนแผนที่ให้หมุดอยู่บนหลังคาบ้านคุณ</p>
-              <LocationPicker value={info.precision === "house" ? { lat: info.lat, lng: info.lng } : null} onChange={(pos) => setPinning((p) => ({ ...p, pos }))} onTouched={() => setPinning((p) => ({ ...p, touched: true }))} />
+              <LocationPicker
+                value={info.precision === "house" ? { lat: info.lat, lng: info.lng } : null}
+                onChange={(pos) => setPinning((p) => ({ ...p, pos }))}
+                onTouched={() => setPinning((p) => ({ ...p, touched: true }))}
+              />
               <label className="block">
                 <span className="text-sm font-bold">อยู่ซอยไหน (ไม่ใส่ก็ได้ ระบบหาให้)</span>
-                <input value={pinning.soi || ""} onChange={(e) => setPinning((p) => ({ ...p, soi: e.target.value }))} placeholder="เช่น 34/6" className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base" />
+                <input
+                  value={pinning.soi || ""}
+                  onChange={(e) => setPinning((p) => ({ ...p, soi: e.target.value }))}
+                  placeholder="เช่น 34/6"
+                  className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base"
+                />
               </label>
               <div className="flex gap-2">
                 <button onClick={savePin} disabled={!pinning.pos} className="min-h-[52px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-50">
@@ -384,11 +400,9 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
             </Row>
           ) : info.precision !== "house" ? (
             <div className="mb-3 rounded-2xl bg-[#FFF6DA] p-3">
-              <p className="text-[15px]">
-                {info.soi ? `ระบบเดาว่าอยู่ ซ.${info.soi} จากบ้านเลขที่` : "ระบบยังไม่รู้ว่าบ้านนี้อยู่ซอยไหน"} · บ้านแบ่งแปลงใหม่เลขที่มักไม่ตรงซอย
-              </p>
+              <p className="text-[15px]">{info.soi ? `ระบบเดาว่าอยู่ ซ.${info.soi} จากบ้านเลขที่` : "ระบบยังไม่รู้ว่าบ้านนี้อยู่ซอยไหน"} · บ้านแบ่งแปลงใหม่เลขที่มักไม่ตรงซอย</p>
               <button onClick={() => setPinning({ pos: null, soi: "" })} className="mt-2 min-h-[50px] w-full rounded-xl bg-[#15201A] text-base font-bold text-white">
-                ปักหมุดบ้านฉัน (ใช้ GPS ได้)
+                {t("myhome.pin.button", "ปักหมุดบ้านฉัน (ใช้ GPS ได้)")}
               </button>
             </div>
           ) : null}
@@ -423,11 +437,11 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
             setErr={setErr}
           />
 
-          <Row icon="🛠️" title={`ส่งเรื่องให้สำนักงานหมู่บ้านแก้${info.soi ? ` · ซ.${info.soi}` : ""}`}>
+          <Row icon="🛠️" title={t("myhome.office.title", "ส่งเรื่องให้สำนักงานหมู่บ้านแก้") + (info.soi ? ` · ซ.${info.soi}` : "")}>
             <p className="text-[15px]">{info.issues_open ? `ในซอยนี้มีเรื่องรอแก้ ${info.issues_open} เรื่อง` : "ในซอยนี้ยังไม่มีเรื่องค้าง"}</p>
             <div className="flex gap-2">
               <button onClick={onIssue} className="min-h-[50px] flex-1 rounded-xl bg-[#1E6B47] text-[15px] font-bold text-white">
-                ส่งเรื่อง ฝาท่อ ไฟถนน ขยะ (ถ่ายรูปได้)
+                {t("myhome.office.send", "ส่งเรื่อง ฝาท่อ ไฟถนน ขยะ (ถ่ายรูปได้)")}
               </button>
               {info.issues_open > 0 && (
                 <button onClick={onIssues} className="min-h-[50px] shrink-0 rounded-xl border border-[#C9D1CB] px-3 text-[15px] font-bold">
@@ -438,7 +452,7 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
           </Row>
 
           <div ref={contactRef} />
-          <Row icon="📨" title="รับข่าวหมู่บ้าน (ไม่บังคับ)">
+          <Row icon="📨" title={t("myhome.contact.title", "รับข่าวหมู่บ้าน (ไม่บังคับ)")}>
             {info.has_contact && !contact ? (
               <p className="text-[15px] text-[#1E6B47]">บันทึกช่องทางรับข่าวไว้แล้ว</p>
             ) : contact ? (
@@ -451,7 +465,11 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
                 ].map(([k, t]) => (
                   <label key={k} className="block">
                     <span className="text-sm font-bold">{t}</span>
-                    <input value={contact[k] || ""} onChange={(e) => setContact({ ...contact, [k]: e.target.value })} className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base" />
+                    <input
+                      value={contact[k] || ""}
+                      onChange={(e) => setContact({ ...contact, [k]: e.target.value })}
+                      className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base"
+                    />
                   </label>
                 ))}
                 <p className="text-sm text-[#45504A]">ใส่ช่องเดียวก็ได้ · ทีมอาสาเห็นเท่านั้น ไม่แสดงบนเว็บ</p>
@@ -464,7 +482,7 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
               </form>
             ) : (
               <button onClick={() => setContact({})} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-[15px] font-bold">
-                ฝาก LINE / อีเมล ไว้รับข่าวด่วน
+                {t("myhome.contact.button", "ฝาก LINE / อีเมล ไว้รับข่าวด่วน")}
               </button>
             )}
           </Row>
