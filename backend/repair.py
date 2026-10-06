@@ -175,6 +175,9 @@ class WasteBody(BaseModel):
     schedule: list[WasteRound] = Field(default_factory=list, max_length=40)
     guide: list[WasteSection] = Field(default_factory=list, max_length=15)
     contacts: list[WasteContact] = Field(default_factory=list, max_length=10)
+    # 7 Oct: the regular rounds by soi parity for บ้านฉัน, e.g. {"even": "จันทร์ · พฤหัส", "odd": "พุธ · เสาร์"}
+    # None = keep what is stored (the page's editor doesn't send it)
+    rounds: Optional[Dict[Literal["even", "odd"], str]] = None
 
 
 # How to sort flood waste until the district's own guidance arrives; admins edit it on the page.
@@ -688,6 +691,10 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         data["schedule"] = [_clean(r) for r in data["schedule"]]
         data["guide"] = [{"title": g["title"].strip(), "items": [i.strip()[:200] for i in g["items"] if i.strip()]} for g in data["guide"]]
         data["contacts"] = [_clean(c) for c in data["contacts"]]
+        if data["rounds"] is None:
+            data.pop("rounds")
+        else:
+            data["rounds"] = {k: v.strip()[:60] for k, v in data["rounds"].items() if v.strip()}
         doc = {**data, "notice": data["notice"].strip(), "updated_at": now(), "by": admin["name"]}
         await db.settings.update_one({"id": "waste"}, {"$set": {"id": "waste", **doc}}, upsert=True)
         await audit(admin, "update_waste", "waste", f"{len(doc['schedule'])} rounds, {len(doc['guide'])} sections")

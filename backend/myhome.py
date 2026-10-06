@@ -19,7 +19,8 @@ from pydantic import BaseModel, Field
 HOUSE_RE = re.compile(r"^\d{1,3}/\d{1,5}(/\d{1,3})?[ก-ฮA-Za-z]?$")
 SNAP_M = 30  # a pin this close to a mapped roof snaps onto it
 SOI_M = 120  # a soi this close to the pin is taken as the house's soi
-# the district's regular rounds after the flood (LINE, 5 Oct): even sois Mon & Thu, odd sois Wed & Sat
+# the district's regular rounds after the flood (LINE, 5 Oct): even sois Mon & Thu, odd sois Wed & Sat.
+# The team changes them from the chat (settings waste.rounds, tools/site.py waste rounds); this is the fallback.
 WASTE_ROUNDS = {"even": "จันทร์ · พฤหัส", "odd": "พุธ · เสาร์"}
 
 
@@ -149,6 +150,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         soi_group = await db.survey_resp.count_documents({"survey": "electric", "soi": soi, "followup.want": "group", "house": {"$ne": h}}) if soi else 0
         village_waiting = await db.survey_resp.count_documents(waiting_q)
         follow = (sig or {}).get("followup") or {}
+        rounds = {**WASTE_ROUNDS, **((await db.settings.find_one({"id": "waste"}, {"_id": 0, "rounds": 1}) or {}).get("rounds") or {})}
         return {
             "house": h,
             "soi": soi,
@@ -165,7 +167,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
                 "soi_group": soi_group,  # … who want to hire one electrician together
                 "village_waiting": village_waiting,
             },
-            "waste": {"parity": parity, "days": WASTE_ROUNDS.get(parity)} if parity else None,
+            "waste": {"parity": parity, "days": rounds.get(parity)} if parity else None,
             "issues_open": open_issues,
             "has_contact": bool(await db.households.find_one({"house": h}, {"_id": 1})),
         }
