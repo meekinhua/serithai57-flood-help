@@ -70,6 +70,32 @@ class ElectricBody(BaseModel):
     note: str = Field("", max_length=200)
 
 
+# Questions the team asks every house from the chat (tools/site.py ask), no redeploy: "ยังมีขยะค้างหน้าบ้านไหม".
+# "no" hides it for that house; "yes" turns it into a card with a way out (tip, the neighbours' tradesmen of a
+# group, a button to the office list) and a "แก้ได้แล้ว" that flips it to no. The team reads the answers by soi.
+class Question(BaseModel):
+    id: str = Field(..., pattern=r"^[a-z0-9_]{1,30}$")
+    on: bool = True
+    icon: str = Field("❓", max_length=8)
+    q: str = Field(..., min_length=3, max_length=120)
+    yes: str = Field("มี", max_length=30)
+    no: str = Field("ไม่มี", max_length=30)
+    tip: str = Field("", max_length=300)  # shown after "yes"
+    group: str = Field("", max_length=20)  # PRO_GROUPS key on the page: list those tradesmen after "yes"
+    action: Literal["", "issue", "ask"] = ""  # a button after "yes": the office list / ask the neighbours
+    done: str = Field("แก้ได้แล้ว", max_length=30)  # the button that turns a yes into a no
+
+
+class QuestionsBody(BaseModel):
+    items: List[Question] = Field(default_factory=list, max_length=10)
+
+
+class AnswerBody(BaseModel):
+    house: str = Field(..., max_length=20)
+    qid: str = Field(..., max_length=30)
+    answer: Literal["yes", "no"]
+
+
 class ContactBody(BaseModel):
     house: str = Field(..., max_length=20)
     name: str = Field("", max_length=60)
@@ -135,6 +161,35 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             })
         return await myhome(h, request)
 
+    @router.post("/myhome/answer")
+    async def answer(body: AnswerBody, request: Request):
+        rate_limit(request, "myhome-answer", limit=40, window_s=600)
+        h = clean(body.house)
+        loc = await locate_house(h)
+        await db.myhome_answers.update_one(
+            {"house": h, "qid": body.qid},
+            {"$set": {"answer": body.answer, "soi": loc.get("soi") or "", "at": now()}, "$push": {"log": {"answer": body.answer, "at": now()}}},
+            upsert=True,
+        )
+        return await myhome(h, request)
+
+    @router.put("/admin/myhome/questions")
+    async def set_questions(body: QuestionsBody, admin: dict = Depends(require_admin)):
+        items = [q.model_dump() for q in body.items]
+        if len({q["id"] for q in items}) != len(items):
+            raise HTTPException(422, "id ซ้ำ")
+        await db.settings.update_one({"id": "myhome_questions"}, {"$set": {"id": "myhome_questions", "items": items, "by": admin["name"], "at": now()}}, upsert=True)
+        return items
+
+    @router.get("/admin/myhome/questions")
+    async def get_questions(admin: dict = Depends(require_admin)):
+        doc = await db.settings.find_one({"id": "myhome_questions"}, {"_id": 0}) or {}
+        items = doc.get("items", [])
+        for q in items:
+            rows = await db.myhome_answers.find({"qid": q["id"]}, {"_id": 0, "log": 0}).sort([("soi", 1), ("house", 1)]).to_list(3000)
+            q["answers"] = rows
+        return items
+
     @router.get("/myhome")
     async def myhome(house: str, request: Request):
         rate_limit(request, "myhome", limit=60, window_s=600)
@@ -150,6 +205,11 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         soi_group = await db.survey_resp.count_documents({"survey": "electric", "soi": soi, "followup.want": "group", "house": {"$ne": h}}) if soi else 0
         village_waiting = await db.survey_resp.count_documents(waiting_q)
         follow = (sig or {}).get("followup") or {}
+        qs = [q for q in ((await db.settings.find_one({"id": "myhome_questions"}, {"_id": 0, "items": 1}) or {}).get("items") or []) if q.get("on")]
+        mine = {a["qid"]: a["answer"] async for a in db.myhome_answers.find({"house": h, "qid": {"$in": [q["id"] for q in qs]}}, {"_id": 0, "qid": 1, "answer": 1})}
+        for q in qs:
+            q["answer"] = mine.get(q["id"])
+            q["soi_yes"] = await db.myhome_answers.count_documents({"qid": q["id"], "answer": "yes", "soi": soi, "house": {"$ne": h}}) if soi else 0
         rounds = {**WASTE_ROUNDS, **((await db.settings.find_one({"id": "waste"}, {"_id": 0, "rounds": 1}) or {}).get("rounds") or {})}
         return {
             "house": h,
@@ -169,6 +229,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             },
             "waste": {"parity": parity, "days": rounds.get(parity)} if parity else None,
             "issues_open": open_issues,
+            "questions": qs,
             "has_contact": bool(await db.households.find_one({"house": h}, {"_id": 1})),
         }
 

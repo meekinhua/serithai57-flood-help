@@ -3,6 +3,7 @@ import { api, load, save } from "../api";
 import LocationPicker from "./LocationPicker";
 import Nearby from "./Nearby";
 import { useT } from "./Texts";
+import { PRO_GROUPS } from "./Community";
 import { waterOf } from "../config";
 
 // บ้านฉัน (7 Oct 2026): a house number typed once (or taken from the electricians' sign-up on this phone) and
@@ -117,16 +118,15 @@ const SAFE = [
   "ห้ามจับสายไฟ ปลั๊ก หรือเบรกเกอร์ ตอนมือหรือเท้าเปียก",
 ];
 
-// the neighbours' electricians on the contact board: trusted first, numbers that didn't answer last
-function Electricians({ services, onAll }) {
-  const t = useT();
+// the neighbours' tradesmen of some categories on the contact board: trusted first, numbers that didn't answer last
+function ProsPick({ services, cats, title, none, all, add, onAll }) {
   const list = (services || [])
-    .filter((x) => x.category === "electrician" && x.available !== false)
+    .filter((x) => cats.includes(x.category) && x.available !== false)
     .sort((a, b) => b.pinned - a.pinned || b.verified - a.verified || (b.good || 0) - (a.good || 0) || (a.reports || 0) - (b.reports || 0))
     .slice(0, 3);
   return (
     <div className="space-y-2 rounded-2xl bg-[#F2F4F1] p-3">
-      <p className="text-[15px] font-bold">{t("myhome.electric.private", "ช่างไฟเอกชนที่เพื่อนบ้านแนะนำ")}</p>
+      <p className="text-[15px] font-bold">{title}</p>
       {list.length ? (
         <ul className="space-y-2">
           {list.map((x) => {
@@ -147,12 +147,90 @@ function Electricians({ services, onAll }) {
           })}
         </ul>
       ) : (
-        <p className="text-[15px] text-[#45504A]">{t("myhome.electric.private_none", "ยังไม่มีในระบบ · ถ้ารู้จักช่างไฟดีๆ แนะนำให้เพื่อนบ้านได้")}</p>
+        <p className="text-[15px] text-[#45504A]">{none}</p>
       )}
       <button onClick={onAll} className="min-h-[46px] w-full rounded-xl border border-[#C9D1CB] bg-white text-[15px] font-bold">
-        {list.length ? t("myhome.electric.private_all", "ดูช่างไฟทั้งหมด / แนะนำเพิ่ม") : t("myhome.electric.private_add", "แนะนำช่างไฟ")}
+        {list.length ? all : add}
       </button>
     </div>
+  );
+}
+
+function Electricians({ services, onAll }) {
+  const t = useT();
+  return (
+    <ProsPick
+      services={services}
+      cats={["electrician"]}
+      title={t("myhome.electric.private", "ช่างไฟเอกชนที่เพื่อนบ้านแนะนำ")}
+      none={t("myhome.electric.private_none", "ยังไม่มีในระบบ · ถ้ารู้จักช่างไฟดีๆ แนะนำให้เพื่อนบ้านได้")}
+      all={t("myhome.electric.private_all", "ดูช่างไฟทั้งหมด / แนะนำเพิ่ม")}
+      add={t("myhome.electric.private_add", "แนะนำช่างไฟ")}
+      onAll={onAll}
+    />
+  );
+}
+
+// ---------- questions the team asks every house from the chat (backend myhome.py Question, tools/site.py ask) ----------
+function QuestionRow({ q, info, services, onAnswered, onPros, onIssue, onAsk, setErr }) {
+  const [again, setAgain] = useState(false);
+  async function answer(a) {
+    setErr("");
+    try {
+      onAnswered(await api("/myhome/answer", { method: "POST", body: JSON.stringify({ house: info.house, qid: q.id, answer: a }) }));
+      setAgain(false);
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  if (q.answer === "no" && !again) return null;
+  const group = PRO_GROUPS.find((g) => g.key === q.group);
+  return (
+    <Row icon={q.icon} title={q.q}>
+      {q.answer === "yes" && !again ? (
+        <>
+          {q.tip && <p className="whitespace-pre-line text-[15px] leading-relaxed">{q.tip}</p>}
+          {info.soi && q.soi_yes > 0 && (
+            <p className="text-sm text-[#45504A]">
+              ใน ซ.{info.soi} ตอบว่า "{q.yes}" อีก {q.soi_yes} หลัง
+            </p>
+          )}
+          {group && (
+            <ProsPick
+              services={services}
+              cats={group.cats}
+              title={`${group.label}ที่เพื่อนบ้านแนะนำ`}
+              none="ยังไม่มีในระบบ · ถ้ารู้จักเจ้าไหนดีๆ แนะนำให้เพื่อนบ้านได้"
+              all={`ดู${group.label}ทั้งหมด / แนะนำเพิ่ม`}
+              add={`แนะนำ${group.label}`}
+              onAll={() => onPros(group.key)}
+            />
+          )}
+          {q.action === "issue" && (
+            <button onClick={onIssue} className="min-h-[48px] w-full rounded-xl bg-[#1E6B47] text-[15px] font-bold text-white">
+              ส่งเรื่องให้สำนักงานหมู่บ้าน (ถ่ายรูปได้)
+            </button>
+          )}
+          {q.action === "ask" && (
+            <button onClick={onAsk} className="min-h-[48px] w-full rounded-xl bg-[#1E6B47] text-[15px] font-bold text-white">
+              🙏 ฝากเพื่อนบ้านใกล้ๆ ช่วย
+            </button>
+          )}
+          <button onClick={() => answer("no")} className="min-h-[48px] w-full rounded-xl border-2 border-[#1E6B47] bg-white text-[15px] font-bold text-[#154D33]">
+            ✓ {q.done}
+          </button>
+        </>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => answer("yes")} className="min-h-[52px] rounded-xl border-2 border-[#B45F06] bg-white px-2 text-base font-bold text-[#7A4104]">
+            {q.yes}
+          </button>
+          <button onClick={() => answer("no")} className="min-h-[52px] rounded-xl border-2 border-[#1E6B47] bg-white px-2 text-base font-bold text-[#154D33]">
+            {q.no}
+          </button>
+        </div>
+      )}
+    </Row>
   );
 }
 
@@ -254,7 +332,7 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, setEr
   );
 }
 
-export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians }) {
+export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros }) {
   const fromSurvey = load("survey:electric", null)?.house || "";
   const [house, setHouse] = useState(() => load("myHouse", "") || fromSurvey);
   const [typing, setTyping] = useState(!house);
@@ -418,6 +496,23 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               </button>
             </div>
           ) : null}
+
+          {(info.questions || []).map((q) => (
+            <QuestionRow
+              key={q.id}
+              q={q}
+              info={info}
+              services={services}
+              onAnswered={setInfo}
+              onPros={onPros}
+              onIssue={onIssue}
+              onAsk={() => {
+                setNearForm({ kind: "ask", topic: "other", text: q.q, name: load("myName", ""), phone: load("myReach", ""), to_office: false });
+                setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+              }}
+              setErr={setErr}
+            />
+          ))}
 
           <ElectricRow
             info={info}

@@ -270,6 +270,10 @@ export default function RepairApp() {
           setProsGroup("electric");
           showTab("pros");
         }}
+        onPros={(g) => {
+          setProsGroup(g);
+          showTab("pros");
+        }}
       />
     ),
     announce: (
