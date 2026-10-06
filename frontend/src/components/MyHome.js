@@ -120,27 +120,37 @@ const SAFE = [
 
 // the neighbours' tradesmen of some categories on the contact board: trusted first, numbers that didn't answer last
 function ProsPick({ services, cats, title, none, all, add, onAll }) {
-  const list = (services || [])
+  const [more, setMore] = useState(false);
+  // most recommended first ("เคยใช้ ดี"), then the ones the team checked, numbers that didn't answer last
+  const all_ = (services || [])
     .filter((x) => cats.includes(x.category) && x.available !== false)
-    .sort((a, b) => b.pinned - a.pinned || b.verified - a.verified || (b.good || 0) - (a.good || 0) || (a.reports || 0) - (b.reports || 0))
-    .slice(0, 3);
+    .sort((a, b) => (b.good || 0) - (a.good || 0) || (a.reports || 0) - (b.reports || 0) || b.verified - a.verified || b.pinned - a.pinned);
+  const list = more ? all_ : all_.slice(0, 5);
   return (
     <div className="space-y-2 rounded-2xl bg-[#F2F4F1] p-3">
-      <p className="text-[15px] font-bold">{title}</p>
+      <p className="text-[15px] font-bold">
+        {title} {all_.length > 0 && <span className="font-normal text-[#45504A]">· {all_.length} ราย</span>}
+      </p>
       {list.length ? (
         <ul className="space-y-2">
           {list.map((x) => {
             const digits = (x.phone || "").replace(/[^\d]/g, "");
+            const good = x.good || 0;
             return (
-              <li key={x.id} className="rounded-xl bg-white p-3">
-                <b className="block text-base leading-snug">{x.name}</b>
-                {x.detail && <p className="line-clamp-2 text-sm text-[#33403A]">{x.detail}</p>}
-                {digits.length >= 9 ? (
-                  <a href={`tel:${digits}`} className="mt-1.5 flex min-h-[48px] items-center justify-center rounded-xl bg-[#15201A] text-base font-bold text-white">
-                    โทร {x.phone}
+              <li key={x.id} className="flex items-center gap-3 rounded-xl bg-white p-3">
+                <div className="min-w-0 flex-1">
+                  <b className="block text-base leading-snug">{x.name}</b>
+                  {x.detail && <p className="line-clamp-1 text-sm text-[#33403A]">{x.detail}</p>}
+                  <p className={`text-sm ${good ? "font-bold text-[#1E6B47]" : "text-[#45504A]"}`}>
+                    {good ? `👍 เพื่อนบ้านแนะนำ ${good} คน` : "ยังไม่มีคนแนะนำ"}
+                    {x.reports > 0 ? <span className="font-normal text-[#B42318]"> · โทรไม่ติด {x.reports}</span> : ""}
+                  </p>
+                  {digits.length < 9 && x.phone && <p className="text-[15px]">ติดต่อ: {x.phone}</p>}
+                </div>
+                {digits.length >= 9 && (
+                  <a href={`tel:${digits}`} aria-label={`โทร ${x.name} ${x.phone}`} className="flex min-h-[48px] shrink-0 items-center rounded-xl bg-[#15201A] px-4 text-base font-bold text-white">
+                    📞 โทร
                   </a>
-                ) : (
-                  x.phone && <p className="mt-1 text-[15px]">ติดต่อ: {x.phone}</p>
                 )}
               </li>
             );
@@ -148,6 +158,11 @@ function ProsPick({ services, cats, title, none, all, add, onAll }) {
         </ul>
       ) : (
         <p className="text-[15px] text-[#45504A]">{none}</p>
+      )}
+      {all_.length > list.length && (
+        <button onClick={() => setMore(true)} className="min-h-[46px] w-full rounded-xl bg-white text-[15px] font-bold text-[#154D33]">
+          ดูอีก {all_.length - list.length} ราย ▾
+        </button>
       )}
       <button onClick={onAll} className="min-h-[46px] w-full rounded-xl border border-[#C9D1CB] bg-white text-[15px] font-bold">
         {list.length ? all : add}
