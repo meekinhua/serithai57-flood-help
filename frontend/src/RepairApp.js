@@ -10,21 +10,7 @@ import { lookOf, ordered } from "./components/Look";
 import { TextsContext } from "./components/Texts";
 import MyHome from "./components/MyHome";
 import SurveyBoxes from "./components/SurveyBox";
-import {
-  BottomNav,
-  ProsQuick,
-  CommunityFeed,
-  CommunityIntro,
-  FoldBox,
-  IntentChoices,
-  JoinSheetBody,
-  NEED_CHOICES,
-  OFFER_CHOICES,
-  PeopleIcon,
-  PostedSheetBody,
-  ProsList,
-  WaterIcon,
-} from "./components/Community";
+import { BottomNav, CommunityFeed, CommunityIntro, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PostedSheetBody, ProsList } from "./components/Community";
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView } from "./components/WatchPanel";
@@ -45,7 +31,6 @@ const REFRESH_MS = 30000;
 const MAIN_TABS = {
   feed: ["📰", "ล่าสุด"],
   jobs: ["🙋", "ขอแรง"],
-  pros: ["🔧", "ช่าง · ร้าน"],
   lend: ["🧰", "ยืม · ซื้อขาย"],
   forum: ["💬", "ถาม-ตอบ"],
 };
@@ -56,12 +41,23 @@ const MORE_TABS = {
   lost: ["🐾", "หาย · เจอ"],
 };
 const TABS = { ...MAIN_TABS, ...MORE_TABS };
+// which bottom-bar page a link's #hash opens (old links keep working: #water → the map, #feed → เพื่อนบ้าน)
+const pageOf = (h) => (h === "pros" ? "pros" : h === "map" || h === "water" ? "map" : TABS[h] ? "community" : "home");
+
+function PageTitle({ title, sub }) {
+  return (
+    <div className="mb-3 px-1">
+      <h2 className="font-display text-2xl font-bold">{title}</h2>
+      {sub && <p className="text-[15px] text-[#45504A]">{sub}</p>}
+    </div>
+  );
+}
 
 export default function RepairApp() {
   const [tab, setTab] = useState(() => {
     const h = window.location.hash.slice(1);
     const saved = load("repairTab3", "feed");
-    return TABS[h] ? h : TABS[saved] ? saved : "feed"; // a tab that no longer exists (e.g. "water") falls back to the feed
+    return TABS[h] ? h : TABS[saved] ? saved : "feed"; // a tab that no longer exists (e.g. "pros") falls back to the feed
   });
   const [lend, setLend] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -69,22 +65,26 @@ export default function RepairApp() {
   const [lost, setLost] = useState([]);
   const [topics, setTopics] = useState([]);
   const [prosGroup, setProsGroup] = useState("");
-  // 7 Oct: ช่าง·ร้าน as its own page over home (back button closes it), not a tab far down the page
-  const [prosPage, setProsPage] = useState(() => (window.location.hash === "#pros" ? { focus: false } : null));
+  // 7 Oct: four pages under a bottom bar — บ้านฉัน is the main one; the device's back button walks back through them
+  const [page, setPage] = useState(() => pageOf(window.location.hash.slice(1)));
+  const [prosFocus, setProsFocus] = useState(false);
+  const goPage = (p, hash) => {
+    const h = hash ?? (p === "home" ? "" : p === "map" ? "map" : p === "pros" ? "pros" : null);
+    setPage(p);
+    if (h != null && window.location.hash.slice(1) !== h) window.history.pushState({ page: p }, "", h ? `#${h}` : window.location.pathname + window.location.search);
+    window.scrollTo({ top: 0 });
+  };
   const openPros = (group = "", focus = false) => {
     setProsGroup(group);
-    setProsPage({ focus });
-    if (window.location.hash !== "#pros") window.history.pushState({ pros: 1 }, "", "#pros");
-  };
-  const closePros = () => {
-    if (window.history.state?.pros) window.history.back();
-    else {
-      setProsPage(null);
-      window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    }
+    setProsFocus(focus);
+    goPage("pros");
   };
   useEffect(() => {
-    const onPop = () => setProsPage(window.location.hash === "#pros" ? { focus: false } : null);
+    const onPop = () => {
+      const h = window.location.hash.slice(1);
+      setPage(pageOf(h));
+      if (TABS[h]) setTab(h);
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -108,27 +108,14 @@ export default function RepairApp() {
   const pick = (t) => {
     setTab(t);
     save("repairTab3", t);
-    window.history.replaceState(null, "", `#${t}`);
+    window.history.replaceState({ page: "community" }, "", `#${t}`);
   };
   const navRef = useRef(null);
-  // home blocks that fold like the ⚡ box; each phone remembers open / closed
-  const waterRef = useRef(null);
-  const [waterOpenRaw, setWaterOpenRaw] = useState(() => (window.location.hash === "#water" ? true : load("waterBoxOpen", null)));
-  const [commOpenRaw, setCommOpenRaw] = useState(() => load("communityBoxOpen", null));
-  const waterOpen = waterOpenRaw ?? home.layout?.water?.open ?? false;
-  const commOpen = commOpenRaw ?? home.layout?.community?.open ?? true;
-  const setWaterOpen = (v) => {
-    setWaterOpenRaw(v);
-    save("waterBoxOpen", v);
-  };
-  const setCommOpen = (v) => {
-    setCommOpenRaw(v);
-    save("communityBoxOpen", v);
-  };
   const showTab = (t) => {
-    setCommOpen(true);
-    pick(t);
-    setTimeout(() => navRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    if (t === "pros") return openPros("");
+    setTab(t);
+    save("repairTab3", t);
+    goPage("community", t);
   };
   const go = (g) => {
     if (g.sheet) return setSheet(g.sheet);
@@ -140,23 +127,13 @@ export default function RepairApp() {
     showTab("forum");
   };
   const posted = (tab, text) => {
-    pick(tab);
+    showTab(tab);
     setSheet({ type: "posted", text });
   };
-  const openWater = () => {
-    setWaterOpen(true);
-    setTimeout(() => waterRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
-  };
+  const openWater = () => goPage("map");
 
   useEffect(() => {
     document.title = "ซ่อมบ้าน เสรีไทย 57";
-    const onHash = () => {
-      const h = window.location.hash.slice(1);
-      if (h === "water") return setWaterOpenRaw(true);
-      if (TABS[h]) setTab(h);
-    };
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -259,6 +236,15 @@ export default function RepairApp() {
     issues: issues.length,
   };
 
+  const [seenAt, setSeenAt] = useState(() => load("communitySeen", 0));
+  const newest = Math.max(0, ...[...lend, ...jobs, ...topics].map((x) => new Date(x.updated_at || x.created_at || 0).getTime() || 0));
+  useEffect(() => {
+    if (page === "community" && newest > seenAt) {
+      setSeenAt(newest);
+      save("communitySeen", newest);
+    }
+  }, [page, newest, seenAt]);
+
   async function share() {
     const url = window.location.origin;
     const text = `ซ่อมบ้าน เสรีไทย 57 — ยืม/ให้ยืมของ · ขอแรงช่วยล้างบ้าน · ช่างที่เพื่อนบ้านแนะนำ · แจ้งปัญหาในซอย`;
@@ -276,7 +262,6 @@ export default function RepairApp() {
 
   // 7 Oct: the home page's blocks, ordered and coloured by home.layout (tools/site.py layout), no redeploy
   const blocks = {
-    pros: <ProsQuick services={services} onOpen={openPros} look={home.layout?.pros ? lookOf(home.layout, "pros") : null} />,
     events: (
       <>
         {eventsOn.map((e, i) => (
@@ -284,7 +269,7 @@ export default function RepairApp() {
             key={i}
             ev={e}
             onMap={() => {
-              if (e.tab && TABS[e.tab]) return pick(e.tab);
+              if (e.tab && TABS[e.tab]) return showTab(e.tab);
               const [lat, lng] = eventSpot(e);
               setFocus({ lat, lng, t: Date.now() });
               openWater();
@@ -347,118 +332,6 @@ export default function RepairApp() {
             </span>
             <span className="shrink-0 font-semibold underline">ดู ›</span>
           </a>
-        )}
-      </>
-    ),
-    water: (
-      <>
-        <FoldBox
-          boxRef={waterRef}
-          look={lookOf(home.layout, "water")}
-          icon={WaterIcon}
-          title="ระดับน้ำ · แผนที่หมู่บ้าน"
-          sub={waterSub(water)}
-          open={waterOpen}
-          onToggle={() => setWaterOpen(!waterOpen)}
-        >
-          <WaterView
-            trips={trips}
-            focus={focus}
-            hubs={hubPins}
-            events={eventsOn}
-            onFocusTrip={(t) => setFocus({ lat: t.lat, lng: t.lng, t: Date.now() })}
-            water={water}
-            canal={canal}
-            admin={admin}
-            onWater={() => setSheet({ type: "water" })}
-            onCanal={() => setSheet({ type: "canal" })}
-            onLeaks={() => setSheet({ type: "leaks" })}
-            onLeak={(leak) => setSheet({ type: "leak", leak })}
-            onPump={(pump) => setSheet({ type: "pump", pump })}
-            onPumps={() => setSheet({ type: "pumps" })}
-          />
-        </FoldBox>
-      </>
-    ),
-    community: (
-      <>
-        {home.tabs_on && (
-          <FoldBox
-            look={lookOf(home.layout, "community")}
-            icon={PeopleIcon}
-            title="เพื่อนบ้านช่วยกัน"
-            sub="เบอร์ช่างที่ใช้แล้วดี · ขอแรง · ยืม ซื้อขาย · ถามกัน"
-            open={commOpen}
-            onToggle={() => setCommOpen(!commOpen)}
-          >
-            <CommunityIntro
-              services={services}
-              onGroup={(g) => openPros(g)}
-              onAll={() => openPros("")}
-              onNeed={() => setSheet({ type: "intent", need: true })}
-              onOffer={() => setSheet({ type: "intent", need: false })}
-              onAsk={() => askForum()}
-            />
-            <nav ref={navRef} className="-mx-4 mt-5 scroll-mt-28 overflow-x-auto border-t border-[#E6EBE7] px-4 pt-4" aria-label="หมวด">
-              <div className="flex w-max gap-2">
-                {Object.entries(MAIN_TABS).map(([k, [, text]]) => (
-                  <button
-                    key={k}
-                    onClick={() => pick(k)}
-                    aria-current={tab === k ? "page" : undefined}
-                    className={`min-h-[44px] whitespace-nowrap rounded-full px-4 text-[15px] ${tab === k ? "bg-[#15201A] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}
-                  >
-                    {text}
-                  </button>
-                ))}
-              </div>
-            </nav>
-
-            <div className="mt-3">
-              {tab === "feed" && (
-                <CommunityFeed
-                  lend={lend}
-                  jobs={jobs}
-                  services={services}
-                  topics={topics}
-                  onNeed={() => setSheet({ type: "intent", need: true })}
-                  onTab={showTab}
-                  onTopic={(id) => askForum(id)}
-                  onJoin={(job) => setSheet({ type: "join", job })}
-                />
-              )}
-              {tab === "forum" && <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />}
-              {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
-              {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} />}
-              {tab === "pros" && admin && <HireStrip jobs={jobs} onOpen={() => pick("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />}
-              {tab === "lost" && <LostBoard items={lost} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />}
-              {tab === "pros" && !admin && <ProsList services={services} setServices={setServices} group={prosGroup} setGroup={setProsGroup} onAdd={() => setSheet({ type: "serviceForm" })} />}
-              {tab === "pros" && admin && (
-                <div className="rounded-xl bg-white p-3">
-                  <ServiceBoard repair services={services} setServices={setServices} posts={[]} admin={admin} onAdd={() => setSheet({ type: "serviceForm" })} onOpenPost={() => {}} />
-                </div>
-              )}
-              {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
-              {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
-              {tab === "guide" && <AfterFloodGuide />}
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-2 border-t border-[#E6EBE7] pt-4" aria-label="เรื่องอื่นในหมู่บ้าน">
-              {Object.entries(MORE_TABS).map(([k, [, text]]) => (
-                <button
-                  key={k}
-                  onClick={() => showTab(k)}
-                  aria-current={tab === k ? "page" : undefined}
-                  className={`min-h-[60px] rounded-2xl px-3 py-2 text-left ${tab === k ? "bg-[#15201A] text-white" : "border border-[#DCE2DD] bg-white"}`}
-                >
-                  <b className="block text-base leading-tight">{text}</b>
-                  <span className={`block text-sm ${tab === k ? "text-[#C5D1CA]" : "text-[#45504A]"}`}>
-                    {MORE_SUB[k]}
-                    {counts[k] > 0 ? ` · ${counts[k]}` : ""}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </FoldBox>
         )}
       </>
     ),
@@ -544,34 +417,151 @@ export default function RepairApp() {
         </header>
 
         <main className="mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
-          {ordered(home.layout, Object.keys(blocks)).map((k) => (
-            <Fragment key={k}>{blocks[k]}</Fragment>
-          ))}
+          {page === "home" ? (
+            <>
+              {ordered(home.layout, Object.keys(blocks)).map((k) => (
+                <Fragment key={k}>{blocks[k]}</Fragment>
+              ))}
 
-          <footer className="mt-8 flex flex-col items-center gap-2 text-center text-xs text-neutral-500">
-            <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Sahakorn Serithai 57" className="h-28 w-auto" />
-            {VILLAGE_NAME} · ข้อมูลในหน้านี้มาจากเพื่อนบ้านช่วยกันลง · ระบบไม่รับเงิน ตกลงกันเอง
-            {!admin && (
-              <a href="/admin" className="inline-flex min-h-[44px] items-center text-neutral-400 underline">
-                สำหรับผู้ดูแล
-              </a>
-            )}
-          </footer>
+              <footer className="mt-8 flex flex-col items-center gap-2 text-center text-xs text-neutral-500">
+                <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Sahakorn Serithai 57" className="h-28 w-auto" />
+                {VILLAGE_NAME} · ข้อมูลในหน้านี้มาจากเพื่อนบ้านช่วยกันลง · ระบบไม่รับเงิน ตกลงกันเอง
+                {!admin && (
+                  <a href="/admin" className="inline-flex min-h-[44px] items-center text-neutral-400 underline">
+                    สำหรับผู้ดูแล
+                  </a>
+                )}
+              </footer>
+            </>
+          ) : (
+            blocks.announce
+          )}
+
+          {page === "pros" && (
+            <>
+              <PageTitle title="ช่าง · ร้าน ในหมู่บ้าน" sub={`${services.length} ราย · คนแนะนำเยอะขึ้นก่อน`} />
+              {admin ? (
+                <div className="space-y-3">
+                  <HireStrip jobs={jobs} onOpen={() => showTab("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />
+                  <div className="rounded-xl bg-white p-3">
+                    <ServiceBoard repair services={services} setServices={setServices} posts={[]} admin={admin} onAdd={() => setSheet({ type: "serviceForm" })} onOpenPost={() => {}} />
+                  </div>
+                </div>
+              ) : (
+                <ProsList
+                  key={`${prosGroup}-${prosFocus}`}
+                  services={services}
+                  setServices={setServices}
+                  group={prosGroup}
+                  setGroup={setProsGroup}
+                  autoFocus={prosFocus}
+                  onAdd={() => setSheet({ type: "serviceForm" })}
+                />
+              )}
+            </>
+          )}
+
+          {page === "community" && (
+            <>
+              <PageTitle title="เพื่อนบ้านช่วยกัน" sub="ขอแรง · ยืม ให้ ขาย · ถามกัน · ข่าวในหมู่บ้าน" />
+              <section className="rounded-[20px] border border-[#DCE2DD] bg-white p-4">
+                <CommunityIntro
+                  showPros={false}
+                  services={services}
+                  onGroup={(g) => openPros(g)}
+                  onAll={() => openPros("")}
+                  onNeed={() => setSheet({ type: "intent", need: true })}
+                  onOffer={() => setSheet({ type: "intent", need: false })}
+                  onAsk={() => askForum()}
+                />
+                <nav ref={navRef} className="-mx-4 mt-5 scroll-mt-32 overflow-x-auto border-t border-[#E6EBE7] px-4 pt-4" aria-label="หมวด">
+                  <div className="flex w-max gap-2">
+                    {Object.entries(MAIN_TABS).map(([k, [, text]]) => (
+                      <button
+                        key={k}
+                        onClick={() => pick(k)}
+                        aria-current={tab === k ? "page" : undefined}
+                        className={`min-h-[44px] whitespace-nowrap rounded-full px-4 text-[15px] ${tab === k ? "bg-[#15201A] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}
+                      >
+                        {text}
+                      </button>
+                    ))}
+                  </div>
+                </nav>
+
+                <div className="mt-3">
+                  {tab === "feed" && (
+                    <CommunityFeed
+                      lend={lend}
+                      jobs={jobs}
+                      services={services}
+                      topics={topics}
+                      onNeed={() => setSheet({ type: "intent", need: true })}
+                      onTab={showTab}
+                      onTopic={(id) => askForum(id)}
+                      onJoin={(job) => setSheet({ type: "join", job })}
+                    />
+                  )}
+                  {tab === "forum" && <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />}
+                  {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
+                  {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} />}
+                  {tab === "pros" && admin && <HireStrip jobs={jobs} onOpen={() => pick("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />}
+                  {tab === "lost" && <LostBoard items={lost} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />}
+                  {tab === "pros" && !admin && <ProsList services={services} setServices={setServices} group={prosGroup} setGroup={setProsGroup} onAdd={() => setSheet({ type: "serviceForm" })} />}
+                  {tab === "pros" && admin && (
+                    <div className="rounded-xl bg-white p-3">
+                      <ServiceBoard repair services={services} setServices={setServices} posts={[]} admin={admin} onAdd={() => setSheet({ type: "serviceForm" })} onOpenPost={() => {}} />
+                    </div>
+                  )}
+                  {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
+                  {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
+                  {tab === "guide" && <AfterFloodGuide />}
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-2 border-t border-[#E6EBE7] pt-4" aria-label="เรื่องอื่นในหมู่บ้าน">
+                  {Object.entries(MORE_TABS).map(([k, [, text]]) => (
+                    <button
+                      key={k}
+                      onClick={() => showTab(k)}
+                      aria-current={tab === k ? "page" : undefined}
+                      className={`min-h-[60px] rounded-2xl px-3 py-2 text-left ${tab === k ? "bg-[#15201A] text-white" : "border border-[#DCE2DD] bg-white"}`}
+                    >
+                      <b className="block text-base leading-tight">{text}</b>
+                      <span className={`block text-sm ${tab === k ? "text-[#C5D1CA]" : "text-[#45504A]"}`}>
+                        {MORE_SUB[k]}
+                        {counts[k] > 0 ? ` · ${counts[k]}` : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+
+          {page === "map" && (
+            <>
+              <PageTitle title="ระดับน้ำ · แผนที่หมู่บ้าน" sub={waterSub(water)} />
+              <section className="rounded-[20px] border border-[#DCE2DD] bg-white p-3">
+                <WaterView
+                  trips={trips}
+                  focus={focus}
+                  hubs={hubPins}
+                  events={eventsOn}
+                  onFocusTrip={(t) => setFocus({ lat: t.lat, lng: t.lng, t: Date.now() })}
+                  water={water}
+                  canal={canal}
+                  admin={admin}
+                  onWater={() => setSheet({ type: "water" })}
+                  onCanal={() => setSheet({ type: "canal" })}
+                  onLeaks={() => setSheet({ type: "leaks" })}
+                  onLeak={(leak) => setSheet({ type: "leak", leak })}
+                  onPump={(pump) => setSheet({ type: "pump", pump })}
+                  onPumps={() => setSheet({ type: "pumps" })}
+                />
+              </section>
+            </>
+          )}
         </main>
-        {prosPage && (
-          <div className="fixed inset-0 z-[920] overflow-y-auto bg-[#F2F4F1] pb-28" role="dialog" aria-label="ช่าง · ร้าน ในหมู่บ้าน">
-            <div className="sticky top-0 z-10 flex items-center gap-2 bg-[#15201A] px-2 py-2 text-white shadow">
-              <button onClick={closePros} className="min-h-[44px] rounded-xl px-3 text-base font-bold">
-                ‹ กลับ
-              </button>
-              <h2 className="font-display text-lg font-bold">ช่าง · ร้าน ในหมู่บ้าน</h2>
-            </div>
-            <div className="mx-auto max-w-3xl px-3 pt-3">
-              <ProsList services={services} setServices={setServices} group={prosGroup} setGroup={setProsGroup} autoFocus={prosPage.focus} onAdd={() => setSheet({ type: "serviceForm" })} />
-            </div>
-          </div>
-        )}
-        <BottomNav onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })} onPros={() => openPros("")} onMap={openWater} onHotline={() => setSheet({ type: "hotlines" })} />
+        <BottomNav page={page} dot={newest > seenAt} onGo={(p) => (p === "pros" ? openPros("") : goPage(p, p === "community" ? tab : undefined))} onHotline={() => setSheet({ type: "hotlines" })} />
 
         {sheet?.type === "lendForm" && (
           <Sheet title="ยืม · ให้ · ขาย" onClose={() => setSheet(null)}>

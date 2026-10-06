@@ -104,7 +104,7 @@ export function ProsQuick({ services, onOpen, look }) {
 }
 
 // ---------- the top of the block: find a number, then the two doors ----------
-export function CommunityIntro({ services, onGroup, onAll, onNeed, onOffer, onAsk }) {
+export function CommunityIntro({ services, onGroup, onAll, onNeed, onOffer, onAsk, showPros = true }) {
   const counts = useMemo(() => {
     const c = {};
     for (const s of services) {
@@ -115,26 +115,28 @@ export function CommunityIntro({ services, onGroup, onAll, onNeed, onOffer, onAs
   }, [services]);
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="mb-2 text-lg font-bold">หาเบอร์ช่าง / ร้าน</h3>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-          {PRO_GROUPS.map((g) => (
-            <button
-              key={g.key}
-              onClick={() => onGroup(g.key)}
-              className="flex min-h-[76px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-[#F2F4F1] px-1 py-2 text-center active:bg-[#E4EAE6]"
-            >
-              <span className="text-[15px] font-bold leading-tight">{g.label}</span>
-              <span className="text-sm text-[#45504A]">{counts[g.key] ? `${counts[g.key]} ราย` : "ยังไม่มี"}</span>
+      {showPros && (
+        <div>
+          <h3 className="mb-2 text-lg font-bold">หาเบอร์ช่าง / ร้าน</h3>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {PRO_GROUPS.map((g) => (
+              <button
+                key={g.key}
+                onClick={() => onGroup(g.key)}
+                className="flex min-h-[76px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-[#F2F4F1] px-1 py-2 text-center active:bg-[#E4EAE6]"
+              >
+                <span className="text-[15px] font-bold leading-tight">{g.label}</span>
+                <span className="text-sm text-[#45504A]">{counts[g.key] ? `${counts[g.key]} ราย` : "ยังไม่มี"}</span>
+              </button>
+            ))}
+            <button onClick={onAll} className="flex min-h-[76px] flex-col items-center justify-center rounded-2xl border-2 border-[#1E6B47] px-1 text-center text-[15px] font-bold text-[#1E6B47]">
+              ดูทั้งหมด
+              <span className="text-sm font-normal">{services.length} ราย · ค้นหา</span>
             </button>
-          ))}
-          <button onClick={onAll} className="flex min-h-[76px] flex-col items-center justify-center rounded-2xl border-2 border-[#1E6B47] px-1 text-center text-[15px] font-bold text-[#1E6B47]">
-            ดูทั้งหมด
-            <span className="text-sm font-normal">{services.length} ราย · ค้นหา</span>
-          </button>
+          </div>
         </div>
-      </div>
-      <div className="border-t border-[#E6EBE7]" />
+      )}
+      {showPros && <div className="border-t border-[#E6EBE7]" />}
       <div className="grid grid-cols-2 gap-2.5">
         <button onClick={onNeed} className="flex min-h-[108px] flex-col justify-between rounded-2xl bg-[#1E6B47] p-3.5 text-left text-white active:bg-[#154D33]">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -552,33 +554,55 @@ export function PostedSheetBody({ text, onClose }) {
 }
 
 // ---------- the bottom bar: the four things people come back for ----------
-export function BottomNav({ onHome, onPros, onMap, onHotline }) {
-  const item = "flex flex-col items-center justify-center gap-0.5 text-[13px]";
+export function BottomNav({ page, dot, onGo, onHotline }) {
+  const items = [
+    ["home", "บ้านฉัน", <path key="p" d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />],
+    ["pros", "ช่าง · ร้าน", <path key="p" d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" />],
+    [
+      "community",
+      "เพื่อนบ้าน",
+      <g key="p">
+        <circle cx="9" cy="8" r="3.2" />
+        <path d="M3 20a6 6 0 0 1 12 0" />
+        <circle cx="17" cy="9" r="2.6" />
+        <path d="M15.5 14.2A5 5 0 0 1 21 19" />
+      </g>,
+    ],
+    [
+      "map",
+      "แผนที่น้ำ",
+      <g key="p">
+        <path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z" />
+        <path d="M9 4v14M15 6v14" />
+      </g>,
+    ],
+  ];
   return (
     <nav aria-label="เมนูหลัก" className="fixed inset-x-0 bottom-0 z-[950] border-t border-[#DCE2DD] bg-white pb-[env(safe-area-inset-bottom)]">
-      <div className="mx-auto grid h-[66px] max-w-5xl grid-cols-4">
-        <button onClick={onHome} className={`${item} font-bold text-[#1E6B47]`}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
-          </svg>
-          หน้าแรก
-        </button>
-        <button onClick={onPros} className={`${item} text-[#45504A]`}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" />
-          </svg>
-          เบอร์ช่าง ร้าน
-        </button>
-        <button onClick={onMap} className={`${item} text-[#45504A]`}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z" />
-            <path d="M9 4v14M15 6v14" />
-          </svg>
-          แผนที่น้ำ
-        </button>
-        <button onClick={onHotline} className={`${item} font-bold text-[#B42318]`}>
+      <div className="mx-auto grid h-[68px] max-w-5xl grid-cols-5">
+        {items.map(([key, label, icon]) => {
+          const on = page === key;
+          return (
+            <button
+              key={key}
+              onClick={() => onGo(key)}
+              aria-current={on ? "page" : undefined}
+              className={`relative flex flex-col items-center justify-center gap-0.5 text-[13px] ${on ? "font-bold text-[#1E6B47]" : "text-[#45504A]"}`}
+            >
+              {on && <span className="absolute inset-x-3 top-0 h-[3px] rounded-b bg-[#1E6B47]" aria-hidden="true" />}
+              <span className="relative">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={on ? 2.4 : 2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  {icon}
+                </svg>
+                {key === "community" && dot && !on && <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#B42318]" aria-label="มีโพสต์ใหม่" />}
+              </span>
+              <span className="whitespace-nowrap">{label}</span>
+            </button>
+          );
+        })}
+        <button onClick={onHotline} className="flex flex-col items-center justify-center gap-0.5 text-[13px] font-bold text-[#B42318]">
           <PhoneIcon size={24} />
-          เบอร์ฉุกเฉิน
+          ฉุกเฉิน
         </button>
       </div>
     </nav>
