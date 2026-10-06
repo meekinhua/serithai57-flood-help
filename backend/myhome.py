@@ -257,7 +257,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         for r in rows:
             c = contacts.get(r["house"]) or {}
             r["status"] = (r.pop("job", None) or {}).get("status", "todo")
-            r["reach"] = " ".join(x for x in (r.get("phone"), c.get("phone"), c.get("line_id") and f"LINE {c['line_id']}") if x)
+            r["reach"] = " ".join(x for x in (c.get("name"), r.get("phone"), c.get("phone"), c.get("line_id") and f"LINE {c['line_id']}") if x)
         return sorted(rows, key=lambda r: (r["followup"]["want"], r.get("soi") or "", r["house"]))
 
     @router.get("/admin/myhome/contacts")
