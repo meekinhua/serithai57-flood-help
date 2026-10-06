@@ -28,6 +28,141 @@ function Row({ title, children }) {
   );
 }
 
+// ---------- the electrical check: what now for the houses the Ministry team didn't reach ----------
+const WANTS = {
+  free: ["รอช่างฟรีรอบหน้า", "ถ้าทีมช่างกลับมา ทีมอาสาจะติดต่อก่อนเข้า"],
+  group: ["รวมกลุ่มเพื่อนบ้านในซอย จ้างช่างไฟเอกชน", "ช่างมาทีเดียวหลายหลัง ค่าเดินทางถูกลง ทีมอาสาช่วยประสาน"],
+  hired: ["จ้างช่างเองแล้ว", ""],
+  fine: ["ไฟใช้ได้ปกติแล้ว ไม่ต้องตรวจ", ""],
+};
+const SLOTS = ["เช้าวันธรรมดา", "บ่ายวันธรรมดา", "หลัง 5 โมงเย็น", "เสาร์-อาทิตย์"];
+const SAFE = [
+  "ได้กลิ่นไหม้ ไฟกระพริบ หรือเบรกเกอร์ตัดซ้ำ: ปิดเบรกเกอร์วงจรนั้นไว้ แล้วเรียกช่าง",
+  "ปลั๊กและสวิตช์ที่เคยจมน้ำ อย่าเพิ่งใช้ จนกว่าจะแห้งสนิทและช่างดูแล้ว",
+  "เครื่องใช้ไฟฟ้าที่จมน้ำ (ตู้เย็น ปั๊ม แอร์ เครื่องซักผ้า) ให้ช่างเช็กก่อนเสียบ",
+  "มีเครื่องตัดไฟรั่ว ให้กดปุ่ม TEST ต้องตัดไฟทันที ถ้าไม่ตัด ให้ช่างดู",
+  "ห้ามจับสายไฟ ปลั๊ก หรือเบรกเกอร์ ตอนมือหรือเท้าเปียก",
+];
+
+function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
+  const e = info.electric;
+  const [pick, setPick] = useState(null); // choosing: {want, slots}
+  const [safe, setSafe] = useState(false);
+  const [ticks, setTicks] = useState(() => load(`safe:${info.house}`, []));
+  async function send(want, slots = []) {
+    setErr("");
+    try {
+      onSaved(await api("/myhome/electric", { method: "POST", body: JSON.stringify({ house: info.house, want, slots }) }));
+      setPick(null);
+    } catch (x) {
+      setErr(x.message);
+    }
+  }
+  const tick = (i) => {
+    const t = ticks.includes(i) ? ticks.filter((x) => x !== i) : [...ticks, i];
+    setTicks(t);
+    save(`safe:${info.house}`, t);
+  };
+
+  if (e.status === "done")
+    return (
+      <Row title="ตรวจไฟฟ้าหลังน้ำท่วม">
+        <p className="text-base font-bold text-[#1E6B47]">ช่างตรวจบ้านนี้แล้ว</p>
+      </Row>
+    );
+
+  return (
+    <Row title="ตรวจไฟฟ้าหลังน้ำท่วม">
+      <p className={`text-base font-bold ${e.signed ? ELECTRIC[e.status]?.[1] || "" : ""}`}>{e.signed ? ELECTRIC[e.status]?.[0] || "ลงชื่อไว้แล้ว" : "บ้านนี้ยังไม่ได้ตรวจไฟ"}</p>
+      <p className="text-[15px] text-[#33403A]">
+        {info.soi && e.soi_waiting > 0 ? `ใน ซ.${info.soi} ยังรอช่างอีก ${e.soi_waiting} หลัง` : `ทั้งหมู่บ้านยังรอช่างอีก ${e.village_waiting} หลัง`}
+        {e.soi_group > 0 ? ` · ${e.soi_group} หลังอยากรวมกลุ่มจ้างช่าง` : ""}
+      </p>
+
+      {e.want && !pick ? (
+        <div className="rounded-2xl bg-[#E4F0E9] p-3">
+          <p className="text-[15px] font-bold text-[#154D33]">คุณเลือก: {WANTS[e.want][0]}</p>
+          {e.slots?.length > 0 && <p className="text-[15px]">สะดวก: {e.slots.join(" · ")}</p>}
+          {WANTS[e.want][1] && <p className="text-sm text-[#33403A]">{WANTS[e.want][1]}</p>}
+          <div className="mt-2 flex gap-2">
+            {(e.want === "free" || e.want === "group") && !info.has_contact && (
+              <button onClick={onContact} className="min-h-[46px] flex-1 rounded-xl bg-[#1E6B47] px-2 text-[15px] font-bold text-white">
+                ฝากเบอร์/LINE ให้ทีมแจ้ง
+              </button>
+            )}
+            <button onClick={() => setPick({ want: e.want, slots: e.slots || [] })} className="min-h-[46px] rounded-xl border border-[#C9D1CB] bg-white px-4 text-[15px] font-bold">
+              เปลี่ยน
+            </button>
+          </div>
+        </div>
+      ) : pick?.want === "free" ? (
+        <div className="space-y-2 rounded-2xl bg-[#F2F4F1] p-3">
+          <p className="text-[15px] font-bold">ช่วงไหนมีคนอยู่บ้าน (เลือกได้หลายช่วง)</p>
+          <div className="grid grid-cols-2 gap-2">
+            {SLOTS.map((x) => (
+              <button
+                key={x}
+                onClick={() => setPick((p) => ({ ...p, slots: p.slots.includes(x) ? p.slots.filter((y) => y !== x) : [...p.slots, x] }))}
+                aria-pressed={pick.slots.includes(x)}
+                className={`min-h-[48px] rounded-xl border-2 text-[15px] font-bold ${pick.slots.includes(x) ? "border-[#1E6B47] bg-[#1E6B47] text-white" : "border-[#C9D1CB] bg-white"}`}
+              >
+                {x}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => send("free", pick.slots)} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-base font-bold text-white">
+            บันทึก
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[15px] font-bold">ตอนนี้บ้านคุณ</p>
+          <button onClick={() => setPick({ want: "free", slots: [] })} className="w-full rounded-2xl border-2 border-[#1E6B47] bg-white px-3 py-2.5 text-left">
+            <b className="block text-base text-[#154D33]">ยังอยากให้ช่างฟรีมาตรวจ</b>
+            <span className="text-sm text-[#45504A]">ถ้าทีมช่างกลับมา (อาจเป็นเสาร์-อาทิตย์) จะได้อยู่ในคิว</span>
+          </button>
+          <button onClick={() => send("group")} className="w-full rounded-2xl border-2 border-[#15201A] bg-white px-3 py-2.5 text-left">
+            <b className="block text-base">รวมกลุ่มในซอย จ้างช่างไฟเอกชน</b>
+            <span className="text-sm text-[#45504A]">ช่างมาทีเดียวหลายหลัง ค่าเดินทางถูกลง</span>
+          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => send("hired")} className="min-h-[50px] rounded-xl border border-[#C9D1CB] bg-white text-[15px] font-bold">
+              จ้างช่างเองแล้ว
+            </button>
+            <button onClick={() => send("fine")} className="min-h-[50px] rounded-xl border border-[#C9D1CB] bg-white text-[15px] font-bold">
+              ไฟปกติ ไม่ต้องตรวจ
+            </button>
+          </div>
+          {pick && (
+            <button onClick={() => setPick(null)} className="min-h-[44px] w-full text-[15px] font-bold text-[#45504A] underline">
+              ยกเลิก
+            </button>
+          )}
+        </div>
+      )}
+
+      <button onClick={() => setSafe((v) => !v)} aria-expanded={safe} className="min-h-[48px] w-full rounded-xl bg-[#FFF6DA] px-3 text-left text-[15px] font-bold">
+        ระหว่างรอ: เช็กเองแบบปลอดภัย 5 ข้อ {ticks.length ? `(${ticks.length}/5)` : ""}
+      </button>
+      {safe && (
+        <ul className="space-y-1.5">
+          {SAFE.map((t, i) => (
+            <li key={i}>
+              <label className="flex min-h-[48px] items-start gap-3 rounded-xl border border-[#DCE2DD] bg-white p-3 text-[15px] leading-snug">
+                <input type="checkbox" checked={ticks.includes(i)} onChange={() => tick(i)} className="mt-0.5 h-5 w-5 shrink-0 accent-[#1E6B47]" />
+                {t}
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button onClick={onElectricians} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-[15px] font-bold">
+        ดูเบอร์ช่างไฟที่เพื่อนบ้านแนะนำ
+      </button>
+    </Row>
+  );
+}
+
 export default function MyHome({ water, look, onIssue, onIssues, onElectricians }) {
   const fromSurvey = load("survey:electric", null)?.house || "";
   const [house, setHouse] = useState(() => load("myHouse", "") || fromSurvey);
@@ -192,18 +327,13 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
             </Row>
           )}
 
-          <Row title="ตรวจไฟฟ้าหลังน้ำท่วม">
-            {info.electric.signed ? (
-              <p className={`text-base font-bold ${ELECTRIC[info.electric.status]?.[1] || ""}`}>{ELECTRIC[info.electric.status]?.[0] || "ลงชื่อไว้แล้ว"}</p>
-            ) : (
-              <p className="text-base">บ้านนี้ไม่ได้ลงชื่อขอช่างไฟ</p>
-            )}
-            {info.electric.status !== "done" && (
-              <button onClick={onElectricians} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-[15px] font-bold">
-                ดูเบอร์ช่างไฟที่เพื่อนบ้านแนะนำ
-              </button>
-            )}
-          </Row>
+          <ElectricRow
+            info={info}
+            onSaved={setInfo}
+            onElectricians={onElectricians}
+            onContact={() => setContact({})}
+            setErr={setErr}
+          />
 
           <Row title={info.soi ? `ปัญหาในซอย ${info.soi}` : "ปัญหาในซอย"}>
             <p className="text-base">{info.issues_open ? `มีเรื่องที่แจ้งไว้ ยังไม่เสร็จ ${info.issues_open} เรื่อง` : "ยังไม่มีเรื่องค้าง"}</p>

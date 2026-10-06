@@ -10,7 +10,7 @@ import math
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -53,6 +53,20 @@ class PinBody(BaseModel):
     lat: float = Field(..., ge=13.7, le=13.9)
     lng: float = Field(..., ge=100.6, le=100.8)
     soi: str = Field("", max_length=12)  # the owner's own correction; empty = work it out from the pin
+
+
+# The electricians from the Ministry left after 2 days with ~80 houses unchecked. บ้านฉัน asks those houses
+# what they want now, so the team has a clean, confirmed list if the soldiers come back (weekends?) and
+# neighbours in one soi can hire a private electrician together.
+Want = Literal["free", "group", "hired", "fine"]  # still want the free check · hire together · hired someone · power is fine now
+SLOTS = ["เช้าวันธรรมดา", "บ่ายวันธรรมดา", "หลัง 5 โมงเย็น", "เสาร์-อาทิตย์"]
+
+
+class ElectricBody(BaseModel):
+    house: str = Field(..., max_length=20)
+    want: Want
+    slots: List[str] = Field(default_factory=list, max_length=4)
+    note: str = Field("", max_length=200)
 
 
 class ContactBody(BaseModel):
@@ -106,23 +120,51 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         await learn_address(h, soi=soi, lat=lat, lng=lng, source="resident", by="บ้านฉัน", building_id=bid)
         return await myhome(h, request)
 
+    @router.post("/myhome/electric")
+    async def electric(body: ElectricBody, request: Request):
+        rate_limit(request, "myhome-electric", limit=20, window_s=600)
+        h = clean(body.house)
+        follow = {"want": body.want, "slots": [x for x in body.slots if x in SLOTS], "note": body.note.strip(), "at": now()}
+        res = await db.survey_resp.update_one({"survey": "electric", "house": h}, {"$set": {"followup": follow}})
+        if not res.matched_count and body.want in ("free", "group"):
+            loc = await locate_house(h)
+            await db.survey_resp.insert_one({
+                "id": str(uuid.uuid4()), "survey": "electric", "house": h, "soi": loc.get("soi") or "", "name": "", "phone": "",
+                "picks": [], "note": "ลงจากบ้านฉัน (ยังไม่มีเบอร์)", "source": "myhome", "followup": follow, "created_at": now(), "updated_at": now(),
+            })
+        return await myhome(h, request)
+
     @router.get("/myhome")
     async def myhome(house: str, request: Request):
         rate_limit(request, "myhome", limit=60, window_s=600)
         h = clean(house)
-        sig = await db.survey_resp.find_one({"survey": "electric", "house": h}, {"_id": 0, "soi": 1, "job": 1, "updated_at": 1})
+        sig = await db.survey_resp.find_one({"survey": "electric", "house": h}, {"_id": 0, "soi": 1, "job": 1, "updated_at": 1, "followup": 1})
         loc = await locate_house(h, (sig or {}).get("soi") or None)
         soi = loc.get("soi")
         job = (sig or {}).get("job") or {}
         parity = soi_parity(soi)
         open_issues = await db.issues.count_documents({"status": {"$ne": "fixed"}, "soi": soi}) if soi else 0
+        waiting_q = {"survey": "electric", "job.status": {"$ne": "done"}, "followup.want": {"$nin": ["hired", "fine"]}}
+        soi_waiting = await db.survey_resp.count_documents({**waiting_q, "soi": soi, "house": {"$ne": h}}) if soi else 0
+        soi_group = await db.survey_resp.count_documents({"survey": "electric", "soi": soi, "followup.want": "group", "house": {"$ne": h}}) if soi else 0
+        village_waiting = await db.survey_resp.count_documents(waiting_q)
+        follow = (sig or {}).get("followup") or {}
         return {
             "house": h,
             "soi": soi,
             "lat": loc["lat"],
             "lng": loc["lng"],
             "precision": loc["precision"],
-            "electric": {"signed": bool(sig), "status": job.get("status", "todo") if sig else None, "at": job.get("at")},
+            "electric": {
+                "signed": bool(sig),
+                "status": job.get("status", "todo") if sig else None,
+                "at": job.get("at"),
+                "want": follow.get("want"),
+                "slots": follow.get("slots", []),
+                "soi_waiting": soi_waiting,  # other houses in my soi still waiting
+                "soi_group": soi_group,  # … who want to hire one electrician together
+                "village_waiting": village_waiting,
+            },
             "waste": {"parity": parity, "days": WASTE_ROUNDS.get(parity)} if parity else None,
             "issues_open": open_issues,
             "has_contact": bool(await db.households.find_one({"house": h}, {"_id": 1})),
@@ -142,6 +184,17 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             upsert=True,
         )
         return {"ok": True}
+
+    @router.get("/admin/myhome/electric")
+    async def electric_list(admin: dict = Depends(require_admin)):
+        """The houses that answered "what now" in บ้านฉัน, with their contact if they left one (team only)."""
+        rows = await db.survey_resp.find({"survey": "electric", "followup": {"$exists": True}}, {"_id": 0, "house": 1, "soi": 1, "phone": 1, "job": 1, "followup": 1}).to_list(2000)
+        contacts = {c["house"]: c async for c in db.households.find({"house": {"$in": [r["house"] for r in rows]}}, {"_id": 0})}
+        for r in rows:
+            c = contacts.get(r["house"]) or {}
+            r["status"] = (r.pop("job", None) or {}).get("status", "todo")
+            r["reach"] = " ".join(x for x in (r.get("phone"), c.get("phone"), c.get("line_id") and f"LINE {c['line_id']}") if x)
+        return sorted(rows, key=lambda r: (r["followup"]["want"], r.get("soi") or "", r["house"]))
 
     @router.get("/admin/myhome/contacts")
     async def contacts(admin: dict = Depends(require_admin)):

@@ -77,7 +77,9 @@ def soi_of(text: str) -> Optional[str]:
 
 
 def house_num(house: str) -> int:
-    return int(house.split("/")[1])
+    # pinned new plots can read "4/88ก" or "4/1234/5": the plot number is the leading digits
+    m = re.match(r"\d+", house.split("/")[1] if "/" in house else "")
+    return int(m.group()) if m else 0
 
 
 def needs_of(text: str) -> tuple[str, bool]:
