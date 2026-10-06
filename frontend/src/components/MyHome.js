@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, load, save } from "../api";
 import LocationPicker from "./LocationPicker";
+import Nearby from "./Nearby";
 import { waterOf } from "../config";
 
 // บ้านฉัน (7 Oct 2026): a house number typed once (or taken from the electricians' sign-up on this phone) and
@@ -32,7 +33,7 @@ function ago(t) {
   return m < 60 ? `${m} นาทีที่แล้ว` : `${Math.round(m / 60)} ชม.ที่แล้ว`;
 }
 
-function NearHome({ info, water }) {
+function NearHome({ info, water, onAsk }) {
   const exact = info.precision === "house";
   const radius = exact ? 150 : 300;
   const near = useMemo(() => {
@@ -46,7 +47,6 @@ function NearHome({ info, water }) {
   const last = near[0];
   const lv = last ? waterOf(last.level) : null;
   const wet = near.filter((w) => w.level > 0).length;
-  const ask = `ใครอยู่แถว${info.soi ? ` ซ.${info.soi}` : "บ้าน " + info.house} ช่วยดูน้ำหน้าบ้าน ${info.house} ให้หน่อยครับ/ค่ะ ตอนนี้ไม่ได้อยู่บ้าน 🙏 แจ้งง่ายๆ ที่ ${window.location.origin}`;
   return (
     <Row title="หน้าบ้านคุณตอนนี้ (จากที่เพื่อนบ้านแจ้ง)">
       {last ? (
@@ -70,14 +70,11 @@ function NearHome({ info, water }) {
         <p className="text-base">{NEAR_H} ชม.ที่ผ่านมา ยังไม่มีใครแจ้งแถวบ้านคุณ</p>
       )}
       {!exact && <p className="text-sm text-[#7A4104]">ตอนนี้ดูจากทั้งแถวซอย · ปักหมุดบ้านแล้วจะแม่นขึ้น</p>}
-      <a
-        href={`https://line.me/R/share?text=${encodeURIComponent(ask)}`}
-        target="_blank"
-        rel="noreferrer"
-        className="flex min-h-[48px] items-center justify-center rounded-xl border border-[#06C755] px-3 text-center text-[15px] font-bold text-[#05803C]"
-      >
-        ไม่อยู่บ้าน? ขอเพื่อนบ้านช่วยดู (LINE)
-      </a>
+      {onAsk && (
+        <button onClick={onAsk} className="min-h-[48px] w-full rounded-xl border-2 border-[#1E6B47] bg-white px-3 text-[15px] font-bold text-[#154D33]">
+          ไม่อยู่บ้าน? ขอเพื่อนบ้านใกล้ๆ ช่วยดูให้
+        </button>
+      )}
     </Row>
   );
 }
@@ -235,6 +232,8 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
   const [err, setErr] = useState("");
   const [sent, setSent] = useState(null);
   const [contact, setContact] = useState(null);
+  const [nearForm, setNearForm] = useState(null); // the รอบบ้าน ask / alert being written
+  const nearRef = useRef(null);
   const [pinning, setPinning] = useState(null); // {pos, soi, touched} while the map is open
 
   useEffect(() => {
@@ -362,7 +361,18 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
           ) : null}
 
           {/* an ask, not a reading: the owner taps to tell the neighbours; what others reported sits apart below */}
-          <NearHome info={info} water={water} />
+          <NearHome
+            info={info}
+            water={water}
+            onAsk={
+              nearForm
+                ? null
+                : () => {
+                    setNearForm({ kind: "ask", topic: "water", text: "", name: load("myName", ""), phone: load("myReach", ""), to_office: false });
+                    setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                  }
+            }
+          />
 
           <Row title="อยู่บ้าน? ช่วยแจ้งน้ำหน้าบ้านคุณ">
             {sent ? (
@@ -380,6 +390,10 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
               </>
             )}
           </Row>
+
+          <div ref={nearRef}>
+            <Nearby info={info} form={nearForm} setForm={setNearForm} setErr={setErr} />
+          </div>
 
           {info.waste && (
             <Row title="รถเก็บขยะรอบปกติ">
