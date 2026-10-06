@@ -576,6 +576,10 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const t = useT();
   const frame = look?.frame;
   const savedContact = info ? load(`myContact:${info.house}`, null) : null;
+  const startNear = (kind) => {
+    setNearForm({ kind, topic: "", text: "", name: load("myName", ""), phone: kind === "ask" ? load("myReach", "") : "", to_office: true });
+    setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
   const el = info?.electric;
   const elSettled = !!el && (el.status === "done" || (el.want && el.want !== "free"));
   const elWant = { fine: "ไม่สนใจแล้ว", hired: "จ้างช่างเองแล้ว", group: "รวมกลุ่มจ้างช่าง" };
@@ -748,49 +752,54 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
             <Nearby info={info} form={nearForm} setForm={setNearForm} setErr={setErr} />
           </div>
 
-          <Row icon="🛠️" title={t("myhome.office.title", "ส่งเรื่องให้สำนักงานหมู่บ้านแก้") + (info.soi ? ` · ซ.${info.soi}` : "")}>
-            <p className="text-[15px]">{info.issues_open ? `ในซอยนี้มีเรื่องรอแก้ ${info.issues_open} เรื่อง` : "ในซอยนี้ยังไม่มีเรื่องค้าง"}</p>
-            <div className="flex gap-2">
-              <button onClick={onIssue} className="min-h-[50px] flex-1 rounded-xl border-2 border-[#1E6B47] bg-white text-[15px] font-bold text-[#154D33]">
-                {t("myhome.office.send", "ส่งเรื่อง ฝาท่อ ไฟถนน ขยะ (ถ่ายรูปได้)")}
-              </button>
-              {info.issues_open > 0 && (
-                <button onClick={onIssues} className="min-h-[50px] shrink-0 rounded-xl border border-[#C9D1CB] px-3 text-[15px] font-bold">
+          {info.issues_open > 0 && (
+            <Row icon="🛠️" title={t("myhome.office.open", "ในซอยมีเรื่องรอสำนักงานแก้")}>
+              <div className="flex items-center gap-2">
+                <p className="min-w-0 flex-1 text-[15px]">
+                  {info.soi ? `ซ.${info.soi} · ` : ""}
+                  {info.issues_open} เรื่อง
+                </p>
+                <button onClick={onIssues} className="min-h-[46px] shrink-0 rounded-xl border border-[#C9D1CB] bg-white px-4 text-[15px] font-bold">
                   ดูรายการ
                 </button>
-              )}
-            </div>
-          </Row>
+              </div>
+            </Row>
+          )}
 
           <div ref={contactRef} />
-          <Row icon="📨" title={t("myhome.contact.title", "ช่องทางติดต่อบ้านนี้")}>
-            {!contact && <p className="-mt-1 text-sm text-[#45504A]">{t("myhome.contact.sub", "ไม่บังคับ · ทีมอาสาใช้แจ้งข่าวด่วนและนัดช่าง")}</p>}
-            {contact && contact.from !== "electric" ? (
+          {contact && contact.from !== "electric" && (
+            <Row icon="📨" title={t("myhome.contact.title", "ช่องทางติดต่อบ้านนี้")}>
               <ContactForm contact={contact} setContact={setContact} onSave={sendContact} />
-            ) : info.has_contact ? (
-              <div className="flex items-center gap-2 rounded-2xl bg-[#E4F0E9] p-3">
-                <p className="min-w-0 flex-1 text-[15px] text-[#154D33]">
-                  {savedContact ? (
-                    <>
-                      <b>{savedContact.name || "บันทึกแล้ว"}</b> · {savedContact.phone || (savedContact.line_id && `LINE ${savedContact.line_id}`)}
-                    </>
-                  ) : (
-                    <b>บันทึกช่องทางติดต่อไว้แล้ว</b>
-                  )}
-                </p>
-                <button onClick={() => setContact({ ...(savedContact || {}), from: "news" })} className="min-h-[44px] shrink-0 rounded-xl border border-[#C9D1CB] bg-white px-3 text-[15px] font-bold">
-                  แก้ไข
+            </Row>
+          )}
+
+          {/* things you may want to do some day: one grid instead of a section each */}
+          <div className="border-t border-[#E6EBE7] py-3">
+            <p className="text-base font-bold text-[#15201A]">{t("myhome.tools.title", "ทำอะไรได้อีก")}</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {[
+                ["🙏", t("myhome.tools.ask", "ฝากเพื่อนบ้าน"), t("myhome.tools.ask_sub", "ช่วยดูบ้าน รับของ"), () => startNear("ask")],
+                ["⚠️", t("myhome.tools.alert", "เตือนเพื่อนบ้าน"), t("myhome.tools.alert_sub", "ฝาท่อแตก ของหาย"), () => startNear("alert")],
+                ["🛠️", t("myhome.tools.office", "แจ้งสำนักงาน"), t("myhome.tools.office_sub", "ไฟถนน ขยะ ถ่ายรูปได้"), onIssue],
+                info.has_contact
+                  ? [
+                      "📨",
+                      t("myhome.tools.contact_saved", "เบอร์ติดต่อ ✓"),
+                      savedContact ? `${savedContact.name || ""} · แก้ไข` : "แก้ไขได้",
+                      () => setContact({ ...(savedContact || {}), from: "news" }),
+                    ]
+                  : ["📨", t("myhome.tools.contact", "ฝากเบอร์ทีม"), t("myhome.tools.contact_sub", "รับข่าวด่วน นัดช่าง"), () => setContact({ name: load("myName", ""), from: "news" })],
+              ].map(([icon, label, sub, go]) => (
+                <button key={label} onClick={go} className="flex min-h-[72px] flex-col items-start justify-center rounded-2xl border border-[#C9D1CB] bg-white px-3 py-2 text-left active:bg-[#F2F4F1]">
+                  <span className="whitespace-nowrap text-[15px] font-bold leading-tight">
+                    <span aria-hidden="true">{icon} </span>
+                    {label}
+                  </span>
+                  <span className="mt-0.5 text-sm leading-snug text-[#45504A]">{sub}</span>
                 </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setContact({ name: load("myName", ""), from: "news" })}
-                className="min-h-[50px] w-full rounded-xl border-2 border-[#1E6B47] bg-white text-[15px] font-bold text-[#154D33]"
-              >
-                {t("myhome.contact.button", "ฝากเบอร์ / LINE ให้ทีมอาสาติดต่อได้")}
-              </button>
-            )}
-          </Row>
+              ))}
+            </div>
+          </div>
 
           <Settled
             items={settled}

@@ -265,14 +265,11 @@ export default function Nearby({ info, form, setForm, setErr }) {
     return () => clearInterval(t);
   }, [refresh]);
 
-  const start = (kind) => {
-    setPosted(null);
-    setForm({ kind, topic: "", text: "", name: load("myName", ""), phone: kind === "ask" ? load("myReach", "") : "", to_office: true });
-  };
   const share = posted
     ? `${posted.kind === "ask" ? `🙏 บ้าน ${posted.house} ขอ: ${posted.label}` : `⚠️ ระวัง: ${posted.label} แถวบ้าน ${posted.house}`}${posted.text ? ` · ${posted.text}` : ""}\nใครอยู่ใกล้ๆ กดดูได้ที่ ${window.location.origin}`
     : "";
 
+  if (!form && !posted && !items?.length) return null;
   return (
     <div className="border-t border-[#E6EBE7] py-3">
       <p className="text-base font-bold text-[#15201A]">
@@ -287,9 +284,7 @@ export default function Nearby({ info, form, setForm, setErr }) {
               <Item key={d.id} d={d} onChange={refresh} setErr={setErr} />
             ))}
           </ul>
-        ) : (
-          !form && <p className="text-[15px] text-[#45504A]">{t("nearby.empty", "ตอนนี้รอบบ้านคุณเงียบดี ยังไม่มีใครฝากหรือเตือนอะไร")}</p>
-        )}
+        ) : null}
 
         {posted && (
           <div className="rounded-2xl bg-[#E4F0E9] p-3">
@@ -317,16 +312,7 @@ export default function Nearby({ info, form, setForm, setErr }) {
               refresh();
             }}
           />
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => start("ask")} className="min-h-[56px] rounded-xl border-2 border-[#1E6B47] bg-white px-2 text-[15px] font-bold leading-tight text-[#154D33]">
-              {t("nearby.button.ask", "🙏 ฝากเพื่อนบ้าน")}
-            </button>
-            <button onClick={() => start("alert")} className="min-h-[56px] rounded-xl border-2 border-[#E0A100] bg-[#FFF8E1] px-2 text-[15px] font-bold leading-tight">
-              {t("nearby.button.alert", "⚠️ เตือนเพื่อนบ้าน")}
-            </button>
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
