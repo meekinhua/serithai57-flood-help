@@ -279,7 +279,6 @@ export default function RepairApp() {
             }}
           />
         ))}
-        <SurveyBoxes />
         <div className="mb-3 space-y-2 empty:hidden">
           <Announcements items={announcements} />
           <WeatherAlerts weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
@@ -402,6 +401,10 @@ export default function RepairApp() {
         </FoldBox>
         )}
 
+        {/* 7 Oct: the electricians' visit is over for now; the sign-up box waits down here, folded, in case they come back */}
+        <div className="mt-6">
+          <SurveyBoxes />
+        </div>
         {home.hub?.on && home.hub.title && (
           <div className="mt-8">
             <HubBox hub={home.hub} />
