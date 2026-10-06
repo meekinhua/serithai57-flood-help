@@ -33,7 +33,7 @@ function ago(t) {
   return m < 60 ? `${m} นาทีที่แล้ว` : `${Math.round(m / 60)} ชม.ที่แล้ว`;
 }
 
-function NearHome({ info, water, onAsk }) {
+function WaterRow({ info, water, onAsk, sent, onTap }) {
   const exact = info.precision === "house";
   const radius = exact ? 150 : 300;
   const near = useMemo(() => {
@@ -48,41 +48,52 @@ function NearHome({ info, water, onAsk }) {
   const lv = last ? waterOf(last.level) : null;
   const wet = near.filter((w) => w.level > 0).length;
   return (
-    <Row title="หน้าบ้านคุณตอนนี้ (จากที่เพื่อนบ้านแจ้ง)">
+    <Row icon="💧" title="น้ำหน้าบ้านคุณ">
       {last ? (
-        <>
-          <div className="flex items-center gap-3 rounded-2xl p-3" style={{ background: `${lv.color}1A`, border: `2px solid ${lv.color}` }}>
-            <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: lv.color }} />
-            <div className="min-w-0">
-              <p className="text-lg font-bold leading-tight">{last.level === 0 ? "แห้ง ไม่ท่วม" : last.where === "house" ? "มีน้ำเข้าบ้านแถวนี้" : `น้ำ${lv.label} (${lv.cm})`}</p>
-              <p className="text-sm text-[#33403A]">
-                แจ้งเมื่อ {ago(last.created_at)} · ห่างบ้านคุณ ~{Math.max(10, Math.round(last.m / 10) * 10)} ม.
-              </p>
-            </div>
-          </div>
-          {near.length > 1 && (
+        <div className="flex items-center gap-3 rounded-2xl p-3" style={{ background: `${lv.color}1A`, border: `2px solid ${lv.color}` }}>
+          <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: lv.color }} />
+          <div className="min-w-0">
+            <p className="text-lg font-bold leading-tight">{last.level === 0 ? "แห้ง ไม่ท่วม" : last.where === "house" ? "มีน้ำเข้าบ้านแถวนี้" : `น้ำ${lv.label} (${lv.cm})`}</p>
             <p className="text-sm text-[#33403A]">
-              {NEAR_H} ชม.นี้ แถวบ้านคุณแจ้งมา {near.length} ครั้ง · แห้ง {near.length - wet} · มีน้ำ {wet}
+              เพื่อนบ้านแจ้ง {ago(last.created_at)} · ห่าง ~{Math.max(10, Math.round(last.m / 10) * 10)} ม.
+              {near.length > 1 ? ` · ${NEAR_H} ชม.นี้ ${near.length} ครั้ง (มีน้ำ ${wet})` : ""}
             </p>
-          )}
-        </>
+          </div>
+        </div>
       ) : (
-        <p className="text-base">{NEAR_H} ชม.ที่ผ่านมา ยังไม่มีใครแจ้งแถวบ้านคุณ</p>
+        <p className="text-[15px] text-[#33403A]">{NEAR_H} ชม.ที่ผ่านมา ยังไม่มีใครแจ้งแถวบ้านคุณ</p>
       )}
-      {!exact && <p className="text-sm text-[#7A4104]">ตอนนี้ดูจากทั้งแถวซอย · ปักหมุดบ้านแล้วจะแม่นขึ้น</p>}
+      {!exact && <p className="text-sm text-[#7A4104]">ดูจากทั้งแถวซอย · ปักหมุดบ้านแล้วจะแม่นขึ้น</p>}
+      {sent ? (
+        <p className="text-[15px] font-bold text-[#1E6B47]">ขอบคุณที่แจ้ง ({sent}) เพื่อนบ้านเห็นแล้ว</p>
+      ) : (
+        <>
+          <p className="pt-1 text-[15px] font-bold">อยู่บ้าน? กดบอกเพื่อนบ้านว่าตอนนี้เป็นแบบไหน</p>
+          <div className="grid grid-cols-3 gap-2">
+            {WATER_TAPS.map((w) => (
+              <button key={w.label} onClick={() => onTap(w)} className={`min-h-[52px] rounded-xl border-2 bg-white px-1 text-[15px] font-bold leading-tight ${w.cls}`}>
+                {w.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       {onAsk && (
-        <button onClick={onAsk} className="min-h-[48px] w-full rounded-xl border-2 border-[#1E6B47] bg-white px-3 text-[15px] font-bold text-[#154D33]">
-          ไม่อยู่บ้าน? ขอเพื่อนบ้านใกล้ๆ ช่วยดูให้
+        <button onClick={onAsk} className="min-h-[48px] w-full rounded-xl bg-[#F2F4F1] px-3 text-[15px] font-bold text-[#154D33]">
+          ไม่อยู่บ้าน? ฝากเพื่อนบ้านใกล้ๆ ช่วยดูให้ ›
         </button>
       )}
     </Row>
   );
 }
 
-function Row({ title, children }) {
+function Row({ icon, title, children }) {
   return (
     <div className="border-t border-[#E6EBE7] py-3">
-      <p className="text-sm font-bold text-[#45504A]">{title}</p>
+      <p className="text-base font-bold text-[#15201A]">
+        {icon && <span aria-hidden="true">{icon} </span>}
+        {title}
+      </p>
       <div className="mt-1 space-y-2">{children}</div>
     </div>
   );
@@ -107,6 +118,7 @@ const SAFE = [
 function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
   const e = info.electric;
   const [pick, setPick] = useState(null); // choosing: {want, slots}
+  const sorted = (e.want === "hired" || e.want === "fine") && !pick;
   const [safe, setSafe] = useState(false);
   const [ticks, setTicks] = useState(() => load(`safe:${info.house}`, []));
   async function send(want, slots = []) {
@@ -126,13 +138,13 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
 
   if (e.status === "done")
     return (
-      <Row title="ตรวจไฟฟ้าหลังน้ำท่วม">
+      <Row icon="⚡" title="ตรวจไฟฟ้าหลังน้ำท่วม">
         <p className="text-base font-bold text-[#1E6B47]">ช่างตรวจบ้านนี้แล้ว</p>
       </Row>
     );
 
   return (
-    <Row title="ตรวจไฟฟ้าหลังน้ำท่วม">
+    <Row icon="⚡" title="ตรวจไฟฟ้าหลังน้ำท่วม">
       <p className={`text-base font-bold ${e.signed ? ELECTRIC[e.status]?.[1] || "" : ""}`}>{e.signed ? ELECTRIC[e.status]?.[0] || "ลงชื่อไว้แล้ว" : "บ้านนี้ยังไม่ได้ตรวจไฟ"}</p>
       <p className="text-[15px] text-[#33403A]">
         {info.soi && e.soi_waiting > 0 ? `ใน ซ.${info.soi} ยังรอช่างอีก ${e.soi_waiting} หลัง` : `ทั้งหมู่บ้านยังรอช่างอีก ${e.village_waiting} หลัง`}
@@ -151,7 +163,7 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
               </button>
             )}
             <button onClick={() => setPick({ want: e.want, slots: e.slots || [] })} className="min-h-[46px] rounded-xl border border-[#C9D1CB] bg-white px-4 text-[15px] font-bold">
-              เปลี่ยน
+              เปลี่ยนคำตอบ
             </button>
           </div>
         </div>
@@ -201,6 +213,8 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
         </div>
       )}
 
+      {!sorted && (
+        <>
       <button onClick={() => setSafe((v) => !v)} aria-expanded={safe} className="min-h-[48px] w-full rounded-xl bg-[#FFF6DA] px-3 text-left text-[15px] font-bold">
         ระหว่างรอ: เช็กเองแบบปลอดภัย 5 ข้อ {ticks.length ? `(${ticks.length}/5)` : ""}
       </button>
@@ -219,6 +233,8 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
       <button onClick={onElectricians} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-[15px] font-bold">
         ดูเบอร์ช่างไฟที่เพื่อนบ้านแนะนำ
       </button>
+        </>
+      )}
     </Row>
   );
 }
@@ -234,6 +250,11 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
   const [contact, setContact] = useState(null);
   const [nearForm, setNearForm] = useState(null); // the รอบบ้าน ask / alert being written
   const nearRef = useRef(null);
+  const errRef = useRef(null);
+  const contactRef = useRef(null);
+  useEffect(() => {
+    if (err) errRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [err]);
   const [pinning, setPinning] = useState(null); // {pos, soi, touched} while the map is open
 
   useEffect(() => {
@@ -307,13 +328,10 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
 
   return (
     <section className="mb-3 rounded-[20px] border border-[#DCE2DD] bg-white px-4 pt-4" style={frame}>
-      <div className="flex items-baseline gap-2">
-        <h2 className="font-display min-w-0 flex-1 text-xl font-bold">
-          บ้านฉัน {info?.house || house}
-          {info?.soi && <span className="text-base font-semibold text-[#45504A]"> · ซ.{info.soi}</span>}
-        </h2>
+      <div className="flex items-center gap-3">
+        <h2 className="font-display min-w-0 flex-1 text-xl font-bold">บ้านฉัน {info?.house || house}</h2>
         {info?.precision === "house" && !pinning && (
-          <button onClick={() => setPinning({ pos: null, soi: info.soi || "" })} className="min-h-[44px] shrink-0 px-1 text-[15px] font-bold text-[#45504A] underline">
+          <button onClick={() => setPinning({ pos: null, soi: info.soi || "" })} className="min-h-[44px] shrink-0 text-[15px] font-bold text-[#45504A] underline">
             ย้ายหมุด
           </button>
         )}
@@ -322,12 +340,27 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
             setInput(house);
             setTyping(true);
           }}
-          className="min-h-[44px] shrink-0 px-2 text-[15px] font-bold text-[#45504A] underline"
+          className="min-h-[44px] shrink-0 text-[15px] font-bold text-[#45504A] underline"
         >
-          เปลี่ยน
+          เปลี่ยนบ้าน
         </button>
       </div>
-      {err && <p className="mt-2 rounded-xl bg-red-50 p-3 text-red-700">{err}</p>}
+      {info && (
+        <p className="text-[15px] text-[#33403A]">
+          {info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย"}
+          {info.waste && (
+            <>
+              {" · 🚛 รถขยะ "}
+              <b>{info.waste.days}</b>
+            </>
+          )}
+        </p>
+      )}
+      {err && (
+        <p ref={errRef} role="alert" className="mt-2 rounded-xl bg-red-50 p-3 text-red-700">
+          {err}
+        </p>
+      )}
       {!info ? (
         <p className="py-3 text-[15px] text-[#45504A]">กำลังโหลด…</p>
       ) : (
@@ -360,10 +393,11 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
             </div>
           ) : null}
 
-          {/* an ask, not a reading: the owner taps to tell the neighbours; what others reported sits apart below */}
-          <NearHome
+          <WaterRow
             info={info}
             water={water}
+            sent={sent}
+            onTap={tap}
             onAsk={
               nearForm
                 ? null
@@ -374,58 +408,37 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
             }
           />
 
-          <Row title="อยู่บ้าน? ช่วยแจ้งน้ำหน้าบ้านคุณ">
-            {sent ? (
-              <p className="text-base font-bold text-[#1E6B47]">ขอบคุณที่แจ้ง ({sent}) เพื่อนบ้านเห็นแล้ว</p>
-            ) : (
-              <>
-              <p className="text-[15px]">กดปุ่มเดียว ขึ้นแผนที่ให้เพื่อนบ้านที่ไม่อยู่บ้านเห็นด้วย</p>
-              <div className="grid grid-cols-3 gap-2">
-                {WATER_TAPS.map((w) => (
-                  <button key={w.label} onClick={() => tap(w)} className={`min-h-[52px] rounded-xl border-2 bg-white px-1 text-[15px] font-bold leading-tight ${w.cls}`}>
-                    {w.label}
-                  </button>
-                ))}
-              </div>
-              </>
-            )}
-          </Row>
-
           <div ref={nearRef}>
             <Nearby info={info} form={nearForm} setForm={setNearForm} setErr={setErr} />
           </div>
-
-          {info.waste && (
-            <Row title="รถเก็บขยะรอบปกติ">
-              <p className="text-base">
-                ซอย{info.waste.parity === "even" ? "คู่" : "คี่"} · <b>{info.waste.days}</b>
-              </p>
-            </Row>
-          )}
 
           <ElectricRow
             info={info}
             onSaved={setInfo}
             onElectricians={onElectricians}
-            onContact={() => setContact({})}
+            onContact={() => {
+              setContact({});
+              setTimeout(() => contactRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+            }}
             setErr={setErr}
           />
 
-          <Row title={info.soi ? `ปัญหาในซอย ${info.soi}` : "ปัญหาในซอย"}>
-            <p className="text-base">{info.issues_open ? `มีเรื่องที่แจ้งไว้ ยังไม่เสร็จ ${info.issues_open} เรื่อง` : "ยังไม่มีเรื่องค้าง"}</p>
+          <Row icon="🛠️" title={`ส่งเรื่องให้สำนักงานหมู่บ้านแก้${info.soi ? ` · ซ.${info.soi}` : ""}`}>
+            <p className="text-[15px]">{info.issues_open ? `ในซอยนี้มีเรื่องรอแก้ ${info.issues_open} เรื่อง` : "ในซอยนี้ยังไม่มีเรื่องค้าง"}</p>
             <div className="flex gap-2">
               <button onClick={onIssue} className="min-h-[50px] flex-1 rounded-xl bg-[#1E6B47] text-[15px] font-bold text-white">
-                แจ้งปัญหา (ฝาท่อ ไฟถนน ขยะ)
+                ส่งเรื่อง ฝาท่อ ไฟถนน ขยะ (ถ่ายรูปได้)
               </button>
               {info.issues_open > 0 && (
                 <button onClick={onIssues} className="min-h-[50px] shrink-0 rounded-xl border border-[#C9D1CB] px-3 text-[15px] font-bold">
-                  ดู
+                  ดูรายการ
                 </button>
               )}
             </div>
           </Row>
 
-          <Row title="รับข่าวหมู่บ้าน (ไม่บังคับ)">
+          <div ref={contactRef} />
+          <Row icon="📨" title="รับข่าวหมู่บ้าน (ไม่บังคับ)">
             {info.has_contact && !contact ? (
               <p className="text-[15px] text-[#1E6B47]">บันทึกช่องทางรับข่าวไว้แล้ว</p>
             ) : contact ? (

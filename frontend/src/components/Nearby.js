@@ -82,7 +82,7 @@ function Item({ d, onChange, setErr }) {
     <li className={`rounded-2xl border-2 p-3 ${ask ? "border-[#1E6B47] bg-white" : "border-[#E0A100] bg-[#FFF8E1]"}`}>
       <p className="text-base font-bold leading-snug">
         <span aria-hidden="true">{iconOf(d)} </span>
-        {ask ? `บ้าน ${d.house} ขอ: ` : "ระวัง: "}
+        {ask ? `บ้าน ${d.house} ฝาก: ` : "ระวัง: "}
         {d.label}
       </p>
       {d.text && <p className="text-[15px]">{d.text}</p>}
@@ -175,7 +175,7 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
   }
   return (
     <div className="space-y-2 rounded-2xl bg-[#F2F4F1] p-3">
-      <p className="text-base font-bold">{ask ? "ขอให้เพื่อนบ้านช่วยเรื่องอะไร" : "เตือนคนรอบบ้านเรื่องอะไร"}</p>
+      <p className="text-base font-bold">{ask ? "ฝากเพื่อนบ้านใกล้ๆ เรื่องอะไร" : "เตือนเพื่อนบ้านเรื่องอะไร"}</p>
       <div className="grid grid-cols-2 gap-2">
         {topics.map(([k, icon, label]) => (
           <button
@@ -219,7 +219,7 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
       )}
       <div className="flex gap-2">
         <button onClick={post} disabled={!form.topic} className="min-h-[52px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-50">
-          {ask ? "ขอความช่วยเหลือ" : "เตือนคนรอบบ้าน"}
+          {ask ? "ฝากเพื่อนบ้าน" : "เตือนเพื่อนบ้าน"}
         </button>
         <button onClick={() => setForm(null)} className="min-h-[52px] rounded-xl border border-[#C9D1CB] bg-white px-4 font-bold">
           ยกเลิก
@@ -253,7 +253,10 @@ export default function Nearby({ info, form, setForm, setErr }) {
 
   return (
     <div className="border-t border-[#E6EBE7] py-3">
-      <p className="text-sm font-bold text-[#45504A]">รอบบ้านฉัน · เพื่อนบ้านใกล้ๆ ช่วยกัน</p>
+      <p className="text-base font-bold text-[#15201A]">
+        <span aria-hidden="true">🏘️ </span>รอบบ้านฉัน
+      </p>
+      <p className="text-sm text-[#45504A]">เพื่อนบ้านระยะเดินถึง ฝากกันเรื่องเล็กๆ · เตือนกันให้ระวัง</p>
       <div className="mt-1 space-y-2">
         {items === null ? null : items.length ? (
           <ul className="space-y-2">
@@ -262,7 +265,7 @@ export default function Nearby({ info, form, setForm, setErr }) {
             ))}
           </ul>
         ) : (
-          !form && <p className="text-[15px] text-[#45504A]">ตอนนี้รอบบ้านคุณยังไม่มีใครขอช่วยหรือแจ้งเตือน</p>
+          !form && <p className="text-[15px] text-[#45504A]">ตอนนี้รอบบ้านคุณเงียบดี ยังไม่มีใครฝากหรือเตือนอะไร</p>
         )}
 
         {posted && (
@@ -294,10 +297,10 @@ export default function Nearby({ info, form, setForm, setErr }) {
         ) : (
           <div className="grid grid-cols-2 gap-2">
             <button onClick={() => start("ask")} className="min-h-[56px] rounded-xl border-2 border-[#1E6B47] bg-white px-2 text-[15px] font-bold leading-tight text-[#154D33]">
-              🙏 ขอเพื่อนบ้านช่วย
+              🙏 ฝากเพื่อนบ้าน
             </button>
             <button onClick={() => start("alert")} className="min-h-[56px] rounded-xl border-2 border-[#E0A100] bg-[#FFF8E1] px-2 text-[15px] font-bold leading-tight">
-              ⚠️ เตือนคนรอบบ้าน
+              ⚠️ เตือนเพื่อนบ้าน
             </button>
           </div>
         )}
