@@ -193,6 +193,38 @@ function Electricians({ services, onAll }) {
   );
 }
 
+// ---------- "เร็วๆ นี้": what is about to happen to this house (backend myhome.py soon(); tools/site.py remind) ----------
+function Soon({ items }) {
+  const t = useT();
+  const [seen, setSeen] = useState(() => load("soonSeen", []));
+  const shown = (items || []).filter((x) => !seen.includes(x.id));
+  if (!shown.length) return null;
+  const ok = (id) => {
+    const next = [...seen.slice(-40), id];
+    setSeen(next);
+    save("soonSeen", next);
+  };
+  return (
+    <div className="mt-2 space-y-2" role="status">
+      <p className="text-sm font-bold text-[#7A4104]">{t("myhome.soon.title", "เร็วๆ นี้ที่บ้านคุณ")}</p>
+      {shown.map((x) => (
+        <div key={x.id} className="flex items-center gap-3 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] p-3">
+          <span className="text-2xl" aria-hidden="true">
+            {x.icon}
+          </span>
+          <div className="min-w-0 flex-1">
+            <span className={`mr-1.5 inline-block rounded-full px-2 py-0.5 text-sm font-bold ${x.when === "วันนี้" ? "bg-[#B42318] text-white" : "bg-[#15201A] text-white"}`}>{x.when}</span>
+            <span className="text-base font-bold leading-snug">{x.text}</span>
+            <button onClick={() => ok(x.id)} className="mt-0.5 block min-h-[36px] text-sm font-bold text-[#45504A] underline">
+              รับทราบแล้ว ซ่อน
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ---------- how the team reaches this house (team only, never on the page) ----------
 const CONTACT_WHY = {
   electric: "ทีมอาสาจะโทรหรือส่ง LINE บอกก่อนช่างเข้าบ้านคุณ",
@@ -620,6 +652,8 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         <p className="py-3 text-[15px] text-[#45504A]">กำลังโหลด…</p>
       ) : (
         <>
+          <Soon items={info.soon} />
+
           {pinning ? (
             <Row title="ปักหมุดบ้านฉัน">
               <p className="text-[15px]">กด "ใช้ตำแหน่งปัจจุบัน" ตอนอยู่ที่บ้าน หรือเลื่อนแผนที่ให้หมุดอยู่บนหลังคาบ้านคุณ</p>

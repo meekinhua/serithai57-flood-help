@@ -9,7 +9,7 @@ Identity is checked in person when it matters (a volunteer walks over), not by t
 import math
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -95,6 +95,46 @@ class AnswerBody(BaseModel):
     house: str = Field(..., max_length=20)
     qid: str = Field(..., max_length=30)
     answer: Literal["yes", "no"]
+
+
+# "เร็วๆ นี้" on บ้านฉัน: what is about to happen to this house. The regular rubbish round comes by itself from the
+# rounds; the team adds the rest from the chat (tools/site.py remind) with a date and which sois it is for.
+BKK = timezone(timedelta(hours=7))
+THAI_DAYS = ["จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์", "อาทิตย์"]  # date.weekday() order
+
+
+class Reminder(BaseModel):
+    id: str = Field(..., pattern=r"^[a-z0-9_]{1,30}$")
+    text: str = Field(..., min_length=3, max_length=160)
+    icon: str = Field("📅", max_length=8)
+    date: date  # the day it happens
+    start: Optional[date] = None  # shown from (default: the day before)
+    sois: str = Field("", max_length=80)  # "" all · "22-57,60" · "odd" · "even"
+
+
+class RemindersBody(BaseModel):
+    items: List[Reminder] = Field(default_factory=list, max_length=20)
+
+
+def soi_in(soi: Optional[str], spec: str) -> bool:
+    spec = (spec or "").replace(" ", "")
+    if not spec:
+        return True
+    m = re.match(r"\d+", soi or "")
+    if not m:
+        return False
+    n = int(m.group())
+    for part in spec.split(","):
+        if part == "odd" and n % 2 or part == "even" and not n % 2:
+            return True
+        r = re.match(r"^(\d+)(?:-(\d+))?$", part)
+        if r and int(r.group(1)) <= n <= int(r.group(2) or r.group(1)):
+            return True
+    return False
+
+
+def when_word(d: date, today: date) -> str:
+    return "วันนี้" if d == today else "พรุ่งนี้" if d == today + timedelta(days=1) else f"{THAI_DAYS[d.weekday()]} {d.day}"
 
 
 class ContactBody(BaseModel):
@@ -191,6 +231,33 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             q["answers"] = rows
         return items
 
+    @router.put("/admin/myhome/reminders")
+    async def set_reminders(body: RemindersBody, admin: dict = Depends(require_admin)):
+        items = [r.model_dump(mode="json") for r in body.items]
+        await db.settings.update_one({"id": "myhome_reminders"}, {"$set": {"id": "myhome_reminders", "items": items, "by": admin["name"], "at": now()}}, upsert=True)
+        return items
+
+    @router.get("/admin/myhome/reminders")
+    async def get_reminders(admin: dict = Depends(require_admin)):
+        return ((await db.settings.find_one({"id": "myhome_reminders"}, {"_id": 0})) or {}).get("items", [])
+
+    async def soon(soi: Optional[str], rounds: dict) -> list:
+        today = datetime.now(BKK).date()
+        out = []
+        days = rounds.get(soi_parity(soi)) if soi else None
+        if days:
+            for d in (today, today + timedelta(days=1)):
+                if THAI_DAYS[d.weekday()] in days:
+                    out.append({"id": f"waste_{d.isoformat()}", "icon": "🚛", "when": when_word(d, today), "date": d.isoformat(),
+                                "text": "รถขยะเข้าซอยคุณ" + (" · มัดถุงวางหน้าบ้านคืนนี้" if d != today else "")})
+                    break
+        for r in ((await db.settings.find_one({"id": "myhome_reminders"}, {"_id": 0, "items": 1})) or {}).get("items", []):
+            d = date.fromisoformat(r["date"])
+            start = date.fromisoformat(r["start"]) if r.get("start") else d - timedelta(days=1)
+            if start <= today <= d and soi_in(soi, r.get("sois", "")):
+                out.append({"id": f"{r['id']}_{r['date']}", "icon": r.get("icon") or "📅", "when": when_word(d, today), "date": r["date"], "text": r["text"]})
+        return sorted(out, key=lambda x: x["date"])
+
     @router.get("/myhome")
     async def myhome(house: str, request: Request):
         rate_limit(request, "myhome", limit=60, window_s=600)
@@ -231,6 +298,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             "waste": {"parity": parity, "days": rounds.get(parity)} if parity else None,
             "issues_open": open_issues,
             "questions": qs,
+            "soon": await soon(soi, rounds),
             "has_contact": bool(await db.households.find_one({"house": h}, {"_id": 1})),
         }
 
