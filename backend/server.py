@@ -618,7 +618,7 @@ app.include_router(forum.build_router(db, rate_limit, current_admin, require_adm
 app.include_router(fund.build_router(db, rate_limit, current_admin, require_admin, audit, client_ip, claim_media, delete_media))
 app.include_router(survey.build_router(db, rate_limit, require_admin, audit, client_ip))
 app.include_router(credits.build_router(db, require_admin, audit))
-app.include_router(myhome.build_router(db, rate_limit, require_admin, locate_house, survey.norm_house))
+app.include_router(myhome.build_router(db, rate_limit, require_admin, locate_house, learn_address, survey.norm_house, staff.SOIS, staff.BUILDINGS["buildings"]))
 app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media, staff.SOIS, staff.ZONES["main_road"]))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 @app.middleware("http")

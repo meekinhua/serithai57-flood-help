@@ -6,6 +6,7 @@ flood left behind: the electricians' sign-ups (survey_resp), the address book, t
 People who want news by LINE / e-mail / IG leave a contact (optional, team-only) — an outlet for later.
 Identity is checked in person when it matters (a volunteer walks over), not by the site.
 """
+import math
 import re
 import uuid
 from datetime import datetime, timezone
@@ -14,7 +15,10 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-HOUSE_RE = re.compile(r"^4/\d{1,4}$")
+# new subdivided plots get odd numbers ("4/1234/5", "4/88ก") that don't follow the soi order: the owner pins it
+HOUSE_RE = re.compile(r"^\d{1,3}/\d{1,5}(/\d{1,3})?[ก-ฮA-Za-z]?$")
+SNAP_M = 30  # a pin this close to a mapped roof snaps onto it
+SOI_M = 120  # a soi this close to the pin is taken as the house's soi
 # the district's regular rounds after the flood (LINE, 5 Oct): even sois Mon & Thu, odd sois Wed & Sat
 WASTE_ROUNDS = {"even": "จันทร์ · พฤหัส", "odd": "พุธ · เสาร์"}
 
@@ -28,6 +32,29 @@ def soi_parity(soi: Optional[str]) -> Optional[str]:
     return None if not m else ("even" if int(m.group()) % 2 == 0 else "odd")
 
 
+def metres(a, b):
+    dy = (a[0] - b[0]) * 111_320
+    dx = (a[1] - b[1]) * 111_320 * math.cos(math.radians(a[0]))
+    return math.hypot(dx, dy)
+
+
+def to_segment(p, a, b):
+    """Distance in metres from point p to segment a–b (small area: treat lat/lng as a flat grid)."""
+    ky = 111_320
+    kx = 111_320 * math.cos(math.radians(p[0]))
+    px, py, ax, ay, bx, by = p[1] * kx, p[0] * ky, a[1] * kx, a[0] * ky, b[1] * kx, b[0] * ky
+    dx, dy = bx - ax, by - ay
+    t = 0 if dx == dy == 0 else max(0, min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+
+class PinBody(BaseModel):
+    house: str = Field(..., max_length=20)
+    lat: float = Field(..., ge=13.7, le=13.9)
+    lng: float = Field(..., ge=100.6, le=100.8)
+    soi: str = Field("", max_length=12)  # the owner's own correction; empty = work it out from the pin
+
+
 class ContactBody(BaseModel):
     house: str = Field(..., max_length=20)
     name: str = Field("", max_length=60)
@@ -38,7 +65,7 @@ class ContactBody(BaseModel):
     news: bool = True  # wants the village news by these channels
 
 
-def build_router(db, rate_limit, require_admin, locate_house, norm_house) -> APIRouter:
+def build_router(db, rate_limit, require_admin, locate_house, learn_address, norm_house, sois: dict, buildings: list) -> APIRouter:
     router = APIRouter(prefix="/api")
 
     def clean(house: str) -> str:
@@ -46,6 +73,38 @@ def build_router(db, rate_limit, require_admin, locate_house, norm_house) -> API
         if not HOUSE_RE.match(h):
             raise HTTPException(422, "ใส่บ้านเลขที่แบบ 4/917")
         return h
+
+    def nearest_soi(p):
+        best = None
+        for name, s in sois.items():
+            for line in s.get("lines") or []:
+                for a, b in zip(line, line[1:]):
+                    d = to_segment(p, a, b)
+                    if best is None or d < best[0]:
+                        best = (d, name)
+        return best[1] if best and best[0] <= SOI_M else None
+
+    def nearest_roof(p):
+        best = None
+        for lat, lng, bid in buildings:
+            if abs(lat - p[0]) > 0.0005 or abs(lng - p[1]) > 0.0005:
+                continue
+            d = metres(p, (lat, lng))
+            if best is None or d < best[0]:
+                best = (d, lat, lng, bid)
+        return best if best and best[0] <= SNAP_M else None
+
+    @router.post("/myhome/pin")
+    async def pin(body: PinBody, request: Request):
+        """The owner shows where the house is (GPS or dragging the map): snap to the roof, find the soi."""
+        rate_limit(request, "myhome-pin", limit=20, window_s=600)
+        h = clean(body.house)
+        p = (body.lat, body.lng)
+        roof = nearest_roof(p)
+        lat, lng, bid = (roof[1], roof[2], roof[3]) if roof else (body.lat, body.lng, None)
+        soi = re.sub(r"^(ซอย|ซ\.?|แยก)\s*", "", body.soi.strip()) or nearest_soi((lat, lng))
+        await learn_address(h, soi=soi, lat=lat, lng=lng, source="resident", by="บ้านฉัน", building_id=bid)
+        return await myhome(h, request)
 
     @router.get("/myhome")
     async def myhome(house: str, request: Request):

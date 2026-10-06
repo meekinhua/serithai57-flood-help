@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, load, save } from "../api";
+import LocationPicker from "./LocationPicker";
 
 // บ้านฉัน (7 Oct 2026): a house number typed once (or taken from the electricians' sign-up on this phone) and
 // the page shows what concerns that house: the regular rubbish round of its soi, its electrical check, the
@@ -36,6 +37,7 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
   const [err, setErr] = useState("");
   const [sent, setSent] = useState(null);
   const [contact, setContact] = useState(null);
+  const [pinning, setPinning] = useState(null); // {pos, soi, touched} while the map is open
 
   useEffect(() => {
     if (!house) return;
@@ -59,6 +61,17 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
     try {
       await api("/water", { method: "POST", body: JSON.stringify({ lat: info.lat, lng: info.lng, level: w.level, where: w.where, name: `บ้าน ${info.house}`, note: info.soi ? `ซ.${info.soi}` : "" }) });
       setSent(w.label);
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  async function savePin() {
+    setErr("");
+    try {
+      const d = await api("/myhome/pin", { method: "POST", body: JSON.stringify({ house: info.house, lat: pinning.pos.lat, lng: pinning.pos.lng, soi: pinning.soi || "" }) });
+      setInfo(d);
+      if (d.soi) save("mySoi", d.soi);
+      setPinning(null);
     } catch (e) {
       setErr(e.message);
     }
@@ -108,6 +121,11 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
           บ้านฉัน {info?.house || house}
           {info?.soi && <span className="text-base font-semibold text-[#45504A]"> · ซ.{info.soi}</span>}
         </h2>
+        {info?.precision === "house" && !pinning && (
+          <button onClick={() => setPinning({ pos: null, soi: info.soi || "" })} className="min-h-[44px] shrink-0 px-1 text-[15px] font-bold text-[#45504A] underline">
+            ย้ายหมุด
+          </button>
+        )}
         <button
           onClick={() => {
             setInput(house);
@@ -123,6 +141,34 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
         <p className="py-3 text-[15px] text-[#45504A]">กำลังโหลด…</p>
       ) : (
         <>
+          {pinning ? (
+            <Row title="ปักหมุดบ้านฉัน">
+              <p className="text-[15px]">กด "ใช้ตำแหน่งปัจจุบัน" ตอนอยู่ที่บ้าน หรือเลื่อนแผนที่ให้หมุดอยู่บนหลังคาบ้านคุณ</p>
+              <LocationPicker value={info.precision === "house" ? { lat: info.lat, lng: info.lng } : null} onChange={(pos) => setPinning((p) => ({ ...p, pos }))} onTouched={() => setPinning((p) => ({ ...p, touched: true }))} />
+              <label className="block">
+                <span className="text-sm font-bold">อยู่ซอยไหน (ไม่ใส่ก็ได้ ระบบหาให้)</span>
+                <input value={pinning.soi || ""} onChange={(e) => setPinning((p) => ({ ...p, soi: e.target.value }))} placeholder="เช่น 34/6" className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base" />
+              </label>
+              <div className="flex gap-2">
+                <button onClick={savePin} disabled={!pinning.pos} className="min-h-[52px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-50">
+                  บ้านฉันอยู่ตรงนี้
+                </button>
+                <button onClick={() => setPinning(null)} className="min-h-[52px] rounded-xl border border-[#C9D1CB] px-4 font-bold">
+                  ยกเลิก
+                </button>
+              </div>
+            </Row>
+          ) : info.precision !== "house" ? (
+            <div className="mb-3 rounded-2xl bg-[#FFF6DA] p-3">
+              <p className="text-[15px]">
+                {info.soi ? `ระบบเดาว่าอยู่ ซ.${info.soi} จากบ้านเลขที่` : "ระบบยังไม่รู้ว่าบ้านนี้อยู่ซอยไหน"} · บ้านแบ่งแปลงใหม่เลขที่มักไม่ตรงซอย
+              </p>
+              <button onClick={() => setPinning({ pos: null, soi: "" })} className="mt-2 min-h-[50px] w-full rounded-xl bg-[#15201A] text-base font-bold text-white">
+                ปักหมุดบ้านฉัน (ใช้ GPS ได้)
+              </button>
+            </div>
+          ) : null}
+
           <Row title="น้ำหน้าบ้านตอนนี้">
             {sent ? (
               <p className="text-base font-bold text-[#1E6B47]">ขอบคุณที่แจ้ง ({sent}) เพื่อนบ้านเห็นแล้ว</p>
