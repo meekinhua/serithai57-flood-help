@@ -102,13 +102,13 @@ function Row({ icon, title, children }) {
 }
 
 // ---------- the electrical check: what now for the houses the Ministry team didn't reach ----------
+// 7 Oct: only "still interested" (free) or "not any more" (fine); group / hired are older answers, still shown
 const WANTS = {
-  free: ["รอช่างฟรีรอบหน้า", "ถ้าทีมช่างกลับมา ทีมอาสาจะติดต่อก่อนเข้า"],
-  group: ["รวมกลุ่มเพื่อนบ้านในซอย จ้างช่างไฟเอกชน", "ช่างมาทีเดียวหลายหลัง ค่าเดินทางถูกลง ทีมอาสาช่วยประสาน"],
+  free: ["ยังสนใจ ให้ช่างฟรีมาตรวจ", "ถ้าทีมช่างกลับมา ทีมอาสาจะติดต่อก่อนเข้า"],
+  group: ["รวมกลุ่มเพื่อนบ้านในซอย จ้างช่างไฟเอกชน", ""],
   hired: ["จ้างช่างเองแล้ว", ""],
-  fine: ["ไฟใช้ได้ปกติแล้ว ไม่ต้องตรวจ", ""],
+  fine: ["ไม่สนใจแล้ว", ""],
 };
-const SLOTS = ["เช้าวันธรรมดา", "บ่ายวันธรรมดา", "หลัง 5 โมงเย็น", "เสาร์-อาทิตย์"];
 const SAFE = [
   "ได้กลิ่นไหม้ ไฟกระพริบ หรือเบรกเกอร์ตัดซ้ำ: ปิดเบรกเกอร์วงจรนั้นไว้ แล้วเรียกช่าง",
   "ปลั๊กและสวิตช์ที่เคยจมน้ำ อย่าเพิ่งใช้ จนกว่าจะแห้งสนิทและช่างดูแล้ว",
@@ -119,15 +119,15 @@ const SAFE = [
 
 function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
   const e = info.electric;
-  const [pick, setPick] = useState(null); // choosing: {want, slots}
-  const sorted = (e.want === "hired" || e.want === "fine") && !pick;
+  const [pick, setPick] = useState(false); // choosing again
+  const sorted = e.want && e.want !== "free" && !pick;
   const [safe, setSafe] = useState(false);
   const [ticks, setTicks] = useState(() => load(`safe:${info.house}`, []));
-  async function send(want, slots = []) {
+  async function send(want) {
     setErr("");
     try {
-      onSaved(await api("/myhome/electric", { method: "POST", body: JSON.stringify({ house: info.house, want, slots }) }));
-      setPick(null);
+      onSaved(await api("/myhome/electric", { method: "POST", body: JSON.stringify({ house: info.house, want, slots: [] }) }));
+      setPick(false);
     } catch (x) {
       setErr(x.message);
     }
@@ -151,13 +151,11 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
       <p className={`text-base font-bold ${e.signed ? ELECTRIC[e.status]?.[1] || "" : ""}`}>{e.signed ? ELECTRIC[e.status]?.[0] || "ลงชื่อไว้แล้ว" : "บ้านนี้ยังไม่ได้ตรวจไฟ"}</p>
       <p className="text-[15px] text-[#33403A]">
         {info.soi && e.soi_waiting > 0 ? `ใน ซ.${info.soi} ยังรอช่างอีก ${e.soi_waiting} หลัง` : `ทั้งหมู่บ้านยังรอช่างอีก ${e.village_waiting} หลัง`}
-        {e.soi_group > 0 ? ` · ${e.soi_group} หลังอยากรวมกลุ่มจ้างช่าง` : ""}
       </p>
 
       {e.want && !pick ? (
         <div className="rounded-2xl bg-[#E4F0E9] p-3">
           <p className="text-[15px] font-bold text-[#154D33]">คุณเลือก: {WANTS[e.want][0]}</p>
-          {e.slots?.length > 0 && <p className="text-[15px]">สะดวก: {e.slots.join(" · ")}</p>}
           {WANTS[e.want][1] && <p className="text-sm text-[#33403A]">{WANTS[e.want][1]}</p>}
           <div className="mt-2 flex gap-2">
             {(e.want === "free" || e.want === "group") && !info.has_contact && (
@@ -165,47 +163,20 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
                 {t("myhome.electric.leave_contact", "ฝากเบอร์/LINE ให้ทีมแจ้ง")}
               </button>
             )}
-            <button onClick={() => setPick({ want: e.want, slots: e.slots || [] })} className="min-h-[46px] rounded-xl border border-[#C9D1CB] bg-white px-4 text-[15px] font-bold">
+            <button onClick={() => setPick(true)} className="min-h-[46px] rounded-xl border border-[#C9D1CB] bg-white px-4 text-[15px] font-bold">
               เปลี่ยนคำตอบ
             </button>
           </div>
         </div>
-      ) : pick?.want === "free" ? (
-        <div className="space-y-2 rounded-2xl bg-[#F2F4F1] p-3">
-          <p className="text-[15px] font-bold">{t("myhome.electric.slots", "ช่วงไหนมีคนอยู่บ้าน (เลือกได้หลายช่วง)")}</p>
-          <div className="grid grid-cols-2 gap-2">
-            {SLOTS.map((x) => (
-              <button
-                key={x}
-                onClick={() => setPick((p) => ({ ...p, slots: p.slots.includes(x) ? p.slots.filter((y) => y !== x) : [...p.slots, x] }))}
-                aria-pressed={pick.slots.includes(x)}
-                className={`min-h-[48px] rounded-xl border-2 text-[15px] font-bold ${pick.slots.includes(x) ? "border-[#1E6B47] bg-[#1E6B47] text-white" : "border-[#C9D1CB] bg-white"}`}
-              >
-                {x}
-              </button>
-            ))}
-          </div>
-          <button onClick={() => send("free", pick.slots)} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-base font-bold text-white">
-            บันทึก
-          </button>
-        </div>
       ) : (
         <div className="space-y-2">
-          <p className="text-[15px] font-bold">{t("myhome.electric.now", "ตอนนี้บ้านคุณ")}</p>
-          <button onClick={() => setPick({ want: "free", slots: [] })} className="w-full rounded-2xl border-2 border-[#1E6B47] bg-white px-3 py-2.5 text-left">
-            <b className="block text-base text-[#154D33]">{t("myhome.electric.free", "ยังอยากให้ช่างฟรีมาตรวจ")}</b>
-            <span className="text-sm text-[#45504A]">{t("myhome.electric.free_sub", "ถ้าทีมช่างกลับมา (อาจเป็นเสาร์-อาทิตย์) จะได้อยู่ในคิว")}</span>
-          </button>
-          <button onClick={() => send("group")} className="w-full rounded-2xl border-2 border-[#15201A] bg-white px-3 py-2.5 text-left">
-            <b className="block text-base">{t("myhome.electric.group", "รวมกลุ่มในซอย จ้างช่างไฟเอกชน")}</b>
-            <span className="text-sm text-[#45504A]">{t("myhome.electric.group_sub", "ช่างมาทีเดียวหลายหลัง ค่าเดินทางถูกลง")}</span>
-          </button>
+          <p className="text-[15px] font-bold">{t("myhome.electric.now", "ถ้าทีมช่างฟรีกลับมา ยังสนใจให้มาตรวจไหม")}</p>
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => send("hired")} className="min-h-[50px] rounded-xl border border-[#C9D1CB] bg-white text-[15px] font-bold">
-              จ้างช่างเองแล้ว
+            <button onClick={() => send("free")} className="min-h-[56px] rounded-xl border-2 border-[#1E6B47] bg-white px-2 text-base font-bold leading-tight text-[#154D33]">
+              {t("myhome.electric.yes", "ยังสนใจ")}
             </button>
-            <button onClick={() => send("fine")} className="min-h-[50px] rounded-xl border border-[#C9D1CB] bg-white text-[15px] font-bold">
-              ไฟปกติ ไม่ต้องตรวจ
+            <button onClick={() => send("fine")} className="min-h-[56px] rounded-xl border-2 border-[#C9D1CB] bg-white px-2 text-base font-bold leading-tight">
+              {t("myhome.electric.no", "ไม่สนใจแล้ว")}
             </button>
           </div>
           {pick && (
