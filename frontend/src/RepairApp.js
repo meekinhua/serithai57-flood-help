@@ -104,7 +104,6 @@ export default function RepairApp() {
   const [viewers, setViewers] = useState(null);
   const [trips, setTrips] = useState([]); // helpers' boats / trucks / staff on duty, live
   const [focus, setFocus] = useState(null);
-  const [updatedAt, setUpdatedAt] = useState(null);
 
   const pick = (t) => {
     setTab(t);
@@ -169,7 +168,6 @@ export default function RepairApp() {
       setServices(s);
       setAnnouncements(a);
       setOnline(true);
-      setUpdatedAt(new Date());
     } catch {
       setOnline(false);
     }
@@ -387,6 +385,9 @@ export default function RepairApp() {
         <header className="fixed inset-x-0 bottom-0 z-[900] bg-[#15201A] pb-[env(safe-area-inset-bottom)] text-white shadow-[0_-2px_8px_rgba(0,0,0,0.25)]">
           {!online && <p className="bg-red-700 px-3 py-1 text-center text-sm font-bold">⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่</p>}
           <div className="mx-auto flex max-w-5xl items-center gap-2 px-2 py-1.5 sm:px-4">
+            <button onClick={() => goPage("home")} aria-label="เสรีไทย 57 · กลับบ้านฉัน" className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5">
+              <img src={`${process.env.PUBLIC_URL}/logo-mark.png`} alt="" className="h-full w-full object-contain" />
+            </button>
             <WaterPill water={water} canal={canal} onOpen={openWater} />
             <WeatherChip weather={weather} onOpen={() => setSheet({ type: "weather" })} extra={online && viewers > 1 ? `👀 ${viewers.toLocaleString("th-TH")} คนดูอยู่` : ""} />
             <button onClick={share} aria-label="แชร์ลิงก์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">

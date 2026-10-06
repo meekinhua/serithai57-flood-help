@@ -202,7 +202,7 @@ export function WeatherChip({ weather, onOpen, extra }) {
           <b>{Math.round(c.temp)}°</b>
           <span className="truncate">{c.text}</span>
           {level !== "ok" && <span className="shrink-0 rounded bg-black/20 px-1.5 text-xs font-bold">⚠️ {alerts.length}</span>}
-          {extra && <span className="ml-auto shrink-0 text-xs opacity-80">{extra}</span>}
+          {extra && <span className="ml-auto hidden shrink-0 text-xs opacity-80 min-[420px]:inline">{extra}</span>}
         </>
       ) : (
         <span className="truncate">🌦️ อากาศ</span>
