@@ -12,9 +12,21 @@ const WINDY_LAYERS = [
 function windyUrl(overlay, zoom) {
   const [lat, lon] = VILLAGE_CENTER;
   const p = new URLSearchParams({
-    type: "map", location: "coordinates", metricRain: "mm", metricTemp: "°C", metricWind: "km/h",
-    zoom: String(zoom), overlay, product: "ecmwf", level: "surface", lat: String(lat), lon: String(lon),
-    detailLat: String(lat), detailLon: String(lon), marker: "true", message: "true",
+    type: "map",
+    location: "coordinates",
+    metricRain: "mm",
+    metricTemp: "°C",
+    metricWind: "km/h",
+    zoom: String(zoom),
+    overlay,
+    product: "ecmwf",
+    level: "surface",
+    lat: String(lat),
+    lon: String(lon),
+    detailLat: String(lat),
+    detailLon: String(lon),
+    marker: "true",
+    message: "true",
   });
   return `https://embed.windy.com/embed.html?${p}`;
 }
@@ -43,7 +55,12 @@ export function WindyMap() {
           [8, "ภาค"],
           [5, "ภูมิภาค (ดูพายุ)"],
         ].map(([z, t]) => (
-          <button key={z} onClick={() => setZoom(z)} aria-pressed={zoom === z} className={`min-h-[40px] flex-1 rounded-lg border px-2 ${zoom === z ? "border-black font-semibold" : "border-neutral-300 text-neutral-600"}`}>
+          <button
+            key={z}
+            onClick={() => setZoom(z)}
+            aria-pressed={zoom === z}
+            className={`min-h-[40px] flex-1 rounded-lg border px-2 ${zoom === z ? "border-black font-semibold" : "border-neutral-300 text-neutral-600"}`}
+          >
             {t}
           </button>
         ))}
@@ -151,7 +168,10 @@ export function WeatherTopBar({ weather, onOpen }) {
         <b>{Math.round(c.temp)}°C</b>
         <span className="truncate">{c.text}</span>
         <span className="opacity-60">·</span>
-        <span className="shrink-0">💨 {Math.round(c.wind)}{c.gust >= 30 ? `–${Math.round(c.gust)}` : ""} กม./ชม.</span>
+        <span className="shrink-0">
+          💨 {Math.round(c.wind)}
+          {c.gust >= 30 ? `–${Math.round(c.gust)}` : ""} กม./ชม.
+        </span>
         {weather.stale && <span className="shrink-0 rounded bg-black/20 px-1 text-xs">ข้อมูล {ageText(weather.age_minutes)}</span>}
         <span className="hidden opacity-60 min-[400px]:inline">·</span>
         <span className="hidden shrink-0 min-[400px]:inline">☔ 6 ชม. {weather.rain_next_6h} มม.</span>
@@ -164,15 +184,42 @@ export function WeatherTopBar({ weather, onOpen }) {
   );
 }
 
+// 7 Oct: the bottom bar's weather — one line, warning colours when there is a warning, opens the weather sheet
+export function WeatherChip({ weather, onOpen, extra }) {
+  const c = weather?.current;
+  const alerts = weather?.alerts || [];
+  const level = alerts.some((a) => a.level === "danger") ? "danger" : alerts.length ? "warning" : "ok";
+  const tone = { danger: "bg-red-600 text-white", warning: "bg-yellow-300 text-black", ok: "bg-white/10 text-white" }[level];
+  return (
+    <button
+      onClick={onOpen}
+      aria-label={c ? `สภาพอากาศตอนนี้: ${c.text} ${Math.round(c.temp)} องศา${alerts.length ? ` มีคำเตือน ${alerts.length} รายการ` : ""} แตะเพื่อดูรายละเอียด` : "สภาพอากาศ"}
+      className={`flex min-h-[44px] min-w-0 flex-1 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-lg px-2.5 text-left text-sm ${tone} active:opacity-80`}
+    >
+      {c ? (
+        <>
+          <span aria-hidden="true">{c.icon}</span>
+          <b>{Math.round(c.temp)}°</b>
+          <span className="truncate">{c.text}</span>
+          {level !== "ok" && <span className="shrink-0 rounded bg-black/20 px-1.5 text-xs font-bold">⚠️ {alerts.length}</span>}
+          {extra && <span className="ml-auto shrink-0 text-xs opacity-80">{extra}</span>}
+        </>
+      ) : (
+        <span className="truncate">🌦️ อากาศ</span>
+      )}
+    </button>
+  );
+}
+
 export function WeatherCard({ weather, onOpenMap }) {
   if (!weather) return null;
   if (!weather.current) {
     return (
       <section className="flex flex-wrap items-center gap-3 rounded-xl bg-white p-3" aria-label="สภาพอากาศ">
-        <span className="text-3xl" aria-hidden="true">🌦️</span>
-        <p className="min-w-0 flex-1 text-sm text-neutral-600">
-          ข้อมูลสภาพอากาศไม่พร้อมชั่วคราว ระบบกำลังลองใหม่อัตโนมัติ · ดูภาพฝน/ลมสดได้จากแผนที่ Windy
-        </p>
+        <span className="text-3xl" aria-hidden="true">
+          🌦️
+        </span>
+        <p className="min-w-0 flex-1 text-sm text-neutral-600">ข้อมูลสภาพอากาศไม่พร้อมชั่วคราว ระบบกำลังลองใหม่อัตโนมัติ · ดูภาพฝน/ลมสดได้จากแผนที่ Windy</p>
         <button onClick={onOpenMap} className="min-h-[44px] w-full rounded-lg border-2 border-black px-3 text-sm font-semibold active:bg-neutral-100 sm:w-auto">
           🌬️ แผนที่ลม/ฝน/เมฆ
         </button>
@@ -206,10 +253,7 @@ export function WeatherCard({ weather, onOpenMap }) {
             {hours.map((h, i) => (
               <div key={h.time} className="flex h-full flex-1 flex-col items-center justify-end">
                 <span className="text-[10px] leading-none text-neutral-500">{h.precip >= 0.5 ? h.precip.toFixed(h.precip < 10 ? 1 : 0) : ""}</span>
-                <div
-                  className="bar-grow w-full rounded-t"
-                  style={{ height: `${Math.max(4, (h.precip / max) * 100)}%`, background: rainColor(h.precip), animationDelay: `${i * 50}ms` }}
-                />
+                <div className="bar-grow w-full rounded-t" style={{ height: `${Math.max(4, (h.precip / max) * 100)}%`, background: rainColor(h.precip), animationDelay: `${i * 50}ms` }} />
               </div>
             ))}
           </div>

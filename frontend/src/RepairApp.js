@@ -3,7 +3,7 @@ import { API, api, load, save, viewerId } from "./api";
 import { HOTLINE_GROUPS, JOB_TYPES, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
 import Announcements from "./components/Announcements";
-import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
+import { WeatherAlerts, WeatherChip, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
 import { lookOf, ordered } from "./components/Look";
@@ -83,6 +83,7 @@ export default function RepairApp() {
     const onPop = () => {
       const h = window.location.hash.slice(1);
       setPage(pageOf(h));
+      window.scrollTo({ top: 0 });
       if (TABS[h]) setTab(h);
     };
     window.addEventListener("popstate", onPop);
@@ -382,29 +383,16 @@ export default function RepairApp() {
     <TextsContext.Provider value={home.texts || {}}>
       <div className="min-h-screen bg-[#F2F4F1] text-[#15201A]">
         <BottomNav page={page} dot={newest > seenAt} onGo={(p) => (p === "pros" ? openPros("") : goPage(p, p === "community" ? tab : undefined))} onHotline={() => setSheet({ type: "hotlines" })} />
+        {/* 7 Oct: one row — water, weather, people here, share; the village's name lives in the footer */}
         <header className="fixed inset-x-0 bottom-0 z-[900] bg-[#15201A] pb-[env(safe-area-inset-bottom)] text-white shadow-[0_-2px_8px_rgba(0,0,0,0.25)]">
-          <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 py-2 sm:px-4">
-            <span className="hidden h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white min-[400px]:flex">
-              <img src={`${process.env.PUBLIC_URL}/logo-mark.png`} alt="Sahakorn Serithai 57" className="h-full w-full object-contain" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <h1 className="font-display truncate text-xl font-bold">เสรีไทย 57</h1>
-              <p className="truncate text-sm text-[#C5D1CA]">
-                {online && viewers != null && (
-                  <span className="mr-1 font-semibold text-emerald-400">
-                    <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle" aria-hidden="true" />
-                    {viewers.toLocaleString("th-TH")} คนกำลังดู ·{" "}
-                  </span>
-                )}
-                {online ? `อัปเดต ${updatedAt ? timeAgo(updatedAt) : "…"}` : "⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่"}
-              </p>
-            </div>
+          {!online && <p className="bg-red-700 px-3 py-1 text-center text-sm font-bold">⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่</p>}
+          <div className="mx-auto flex max-w-5xl items-center gap-2 px-2 py-1.5 sm:px-4">
             <WaterPill water={water} canal={canal} onOpen={openWater} />
-            <button onClick={share} aria-label="แชร์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">
+            <WeatherChip weather={weather} onOpen={() => setSheet({ type: "weather" })} extra={online && viewers > 1 ? `👀 ${viewers.toLocaleString("th-TH")} คนดูอยู่` : ""} />
+            <button onClick={share} aria-label="แชร์ลิงก์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">
               🔗
             </button>
           </div>
-          <WeatherTopBar weather={weather} onOpen={() => setSheet({ type: "weather" })} />
           {admin && (
             <div className="border-t border-white/20 bg-neutral-800">
               <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-1 text-sm sm:px-4">
@@ -417,7 +405,7 @@ export default function RepairApp() {
           )}
         </header>
 
-        <main className="mx-auto max-w-5xl px-3 pb-36 pt-3 sm:px-4">
+        <main className="mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
           {page === "home" ? (
             <>
               {ordered(home.layout, Object.keys(blocks)).map((k) => (

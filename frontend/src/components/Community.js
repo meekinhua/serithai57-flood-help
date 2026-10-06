@@ -587,7 +587,7 @@ export function BottomNav({ page, dot, onGo, onHotline }) {
               key={key}
               onClick={() => onGo(key)}
               aria-current={on ? "page" : undefined}
-              className={`relative flex flex-col items-center justify-center gap-0.5 text-[13px] ${on ? "font-bold text-[#1E6B47]" : "text-[#45504A]"}`}
+              className={`relative flex flex-col items-center justify-center gap-0.5 text-[14px] ${on ? "font-bold text-[#1E6B47]" : "text-[#45504A]"}`}
             >
               {on && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-t bg-[#1E6B47]" aria-hidden="true" />}
               <span className="relative">
@@ -600,7 +600,7 @@ export function BottomNav({ page, dot, onGo, onHotline }) {
             </button>
           );
         })}
-        <button onClick={onHotline} className="flex flex-col items-center justify-center gap-0.5 text-[13px] font-bold text-[#B42318]">
+        <button onClick={onHotline} className="flex flex-col items-center justify-center gap-0.5 text-[14px] font-bold text-[#B42318]">
           <PhoneIcon size={24} />
           ฉุกเฉิน
         </button>

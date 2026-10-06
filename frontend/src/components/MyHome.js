@@ -576,6 +576,8 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const t = useT();
   const frame = look?.frame;
   const savedContact = info ? load(`myContact:${info.house}`, null) : null;
+  const [pinLaterAt, setPinLaterAt] = useState(0);
+  const pinLater = Date.now() - Math.max(pinLaterAt, info ? load(`pinLater:${info.house}`, 0) : 0) < 7 * 864e5;
   const startNear = (kind) => {
     setNearForm({ kind, topic: "", text: "", name: load("myName", ""), phone: kind === "ask" ? load("myReach", "") : "", to_office: true });
     setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -684,11 +686,24 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
                 </button>
               </div>
             </Row>
+          ) : info.precision !== "house" && pinLater ? (
+            <button onClick={() => setPinning({ pos: null, soi: "" })} className="mt-1 min-h-[40px] text-[15px] font-bold text-[#7A4104] underline">
+              📍 ปักหมุดบ้าน ให้ระบบรู้ตำแหน่งแม่นขึ้น
+            </button>
           ) : info.precision !== "house" ? (
             <div className="mb-3 rounded-2xl bg-[#FFF6DA] p-3">
               <p className="text-[15px]">{info.soi ? `ระบบเดาว่าอยู่ ซ.${info.soi} จากบ้านเลขที่` : "ระบบยังไม่รู้ว่าบ้านนี้อยู่ซอยไหน"} · บ้านแบ่งแปลงใหม่เลขที่มักไม่ตรงซอย</p>
               <button onClick={() => setPinning({ pos: null, soi: "" })} className="mt-2 min-h-[50px] w-full rounded-xl bg-[#15201A] text-base font-bold text-white">
                 {t("myhome.pin.button", "ปักหมุดบ้านฉัน (ใช้ GPS ได้)")}
+              </button>
+              <button
+                onClick={() => {
+                  save(`pinLater:${info.house}`, Date.now());
+                  setPinLaterAt(Date.now());
+                }}
+                className="mt-1 min-h-[40px] w-full text-[15px] font-bold text-[#45504A] underline"
+              >
+                ไว้ทีหลัง
               </button>
             </div>
           ) : null}
