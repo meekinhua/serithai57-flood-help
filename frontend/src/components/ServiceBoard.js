@@ -290,14 +290,15 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
   const saved = load("contact", { name: "", phone: "" });
   const [form, setForm] = useState({
     category: prefill.category || "",
-    name: saved.name || "",
-    phone: saved.phone || "",
+    name: repair ? "" : saved.name || "",
+    phone: repair ? "" : saved.phone || "",
     line_id: "",
     detail: prefill.detail || "",
     pricing: "paid",
     price: prefill.price || "",
     area: "ในหมู่บ้าน",
   });
+  const [self, setSelf] = useState(!repair); // repair mode: most people list a tradesman they used, not themselves
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -308,9 +309,10 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
     setBusy(true);
     setError("");
     try {
-      const s = await api("/services", { method: "POST", body: JSON.stringify(form) });
+      const body = repair && !self ? { ...form, detail: `${form.detail}${form.detail ? " · " : ""}เพื่อนบ้านแนะนำ` } : form;
+      const s = await api("/services", { method: "POST", body: JSON.stringify(body) });
       save("serviceKeys", { ...load("serviceKeys", {}), [s.id]: s.edit_key });
-      save("contact", { ...load("contact", {}), name: form.name, phone: form.phone });
+      if (self) save("contact", { ...load("contact", {}), name: form.name, phone: form.phone });
       onDone(s);
     } catch (err) {
       setError(err.message);
@@ -320,8 +322,18 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className={label} htmlFor="svc-name">{repair ? "ชื่อช่าง หรือ ชื่อร้าน *" : "ชื่อ / ชื่อร้าน *"}</label>
+          <input id="svc-name" required maxLength={80} value={form.name} onChange={(e) => set({ name: e.target.value })} className={input} />
+        </div>
+        <div>
+          <label className={label} htmlFor="svc-phone">{repair ? "เบอร์โทร หรือ LINE / ชื่อ Facebook *" : "เบอร์โทร *"}</label>
+          <input id="svc-phone" required type={repair ? "text" : "tel"} inputMode={repair ? "text" : "tel"} maxLength={40} value={form.phone} onChange={(e) => set({ phone: e.target.value })} className={input} />
+        </div>
+      </div>
       <fieldset>
-        <legend className={label}>ให้บริการอะไร *</legend>
+        <legend className={label}>{repair ? "ทำอะไร / ขายอะไร *" : "ให้บริการอะไร *"}</legend>
         <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
           {categoriesFor(repair).map(([key, [emoji, text]]) => (
             <button
@@ -337,16 +349,6 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
           ))}
         </div>
       </fieldset>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={label} htmlFor="svc-name">ชื่อ / ชื่อร้าน *</label>
-          <input id="svc-name" required maxLength={80} value={form.name} onChange={(e) => set({ name: e.target.value })} className={input} />
-        </div>
-        <div>
-          <label className={label} htmlFor="svc-phone">เบอร์โทร *</label>
-          <input id="svc-phone" required type="tel" inputMode="tel" maxLength={40} value={form.phone} onChange={(e) => set({ phone: e.target.value })} className={input} />
-        </div>
-      </div>
       <div>
         <label className={label} htmlFor="svc-detail">รายละเอียดบริการ</label>
         <textarea id="svc-detail" rows={3} maxLength={500} value={form.detail} onChange={(e) => set({ detail: e.target.value })} className={input} placeholder="เช่น กระบะยกสูง 1 คัน รับส่งคน/ของ เข้า-ออกหมู่บ้าน ถึงถนนเสรีไทย" />
@@ -380,10 +382,16 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
           <input id="svc-line" maxLength={40} value={form.line_id} onChange={(e) => set({ line_id: e.target.value })} className={input} />
         </div>
       </div>
-      <p className="text-sm text-neutral-500">ชื่อ เบอร์ และ LINE จะแสดงให้ทุกคนเห็น · กด “ไม่ว่าง” ได้ภายหลังจากเครื่องนี้</p>
+      {repair && (
+        <label className="flex min-h-[52px] items-center gap-3 rounded-xl border border-neutral-300 px-3 text-base">
+          <input type="checkbox" checked={self} onChange={(e) => setSelf(e.target.checked)} className="h-5 w-5 accent-[#1E6B47]" />
+          ฉันเป็นช่างเอง / เจ้าของร้าน
+        </label>
+      )}
+      <p className="text-sm text-neutral-500">ชื่อ เบอร์ และ LINE จะแสดงให้ทุกคนเห็น</p>
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
       <button type="submit" disabled={busy} className="min-h-[52px] w-full rounded-xl bg-black text-lg font-semibold text-white disabled:opacity-60">
-        {busy ? "กำลังส่ง…" : "📇 ลงชื่อในบอร์ดติดต่อ"}
+        {busy ? "กำลังส่ง…" : repair ? "ลงให้เพื่อนบ้านเห็น" : "📇 ลงชื่อในบอร์ดติดต่อ"}
       </button>
     </form>
   );

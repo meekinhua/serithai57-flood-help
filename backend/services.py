@@ -19,6 +19,8 @@ SERVICE_CATEGORIES = [
     "cleaning", "repair", "food", "supplies", "pets", "other",
     # after the flood (repair mode)
     "ac", "appliance", "carpenter", "painter", "roof", "pest", "vehicle", "junk",
+    # the village marketplace after the flood (7 Oct)
+    "shop", "beauty", "tutor",
 ]
 Pricing = Literal["paid", "free", "ask"]
 HIDDEN = {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews.who": 0}

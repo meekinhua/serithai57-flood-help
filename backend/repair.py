@@ -28,9 +28,10 @@ from typing import List, Literal, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
-LendKind = Literal["lend", "give", "want"]  # ให้ยืม · ให้ฟรี · ตามหา/อยากยืม
+LendKind = Literal["lend", "give", "want", "sell"]  # ให้ยืม · ให้ฟรี · ตามหา/อยากยืม · ขาย (7 Oct: the marketplace after the flood)
 LEND_CATEGORIES = [
-    "washer", "pump", "vacuum", "dryer", "ladder", "cleaning", "tools", "cart", "power", "furniture", "supplies", "other",
+    "washer", "pump", "vacuum", "dryer", "ladder", "cleaning", "tools", "cart", "power", "furniture", "supplies",
+    "food", "clothes", "electronics", "kids", "plants", "other",
 ]
 LendStatus = Literal["available", "lent", "closed"]  # ว่าง · มีคนยืมอยู่ · ปิด (คืนเจ้าของ/ให้ไปแล้ว/หาได้แล้ว)
 JobKind = Literal["need", "offer"]  # ขอแรง · อาสาพร้อมไปช่วย
@@ -73,6 +74,7 @@ class LendCreate(Contact):
     title: str = Field(..., min_length=2, max_length=80)  # "เครื่องฉีดน้ำแรงดันสูง Karcher"
     detail: str = Field("", max_length=400)  # condition, how long, deposit, pick up where
     soi: str = Field("", max_length=12)
+    price: str = Field("", max_length=60)  # for sale: "150 บาท", "ต่อรองได้"
     media_ids: list[str] = Field(default_factory=list, max_length=3)
 
 

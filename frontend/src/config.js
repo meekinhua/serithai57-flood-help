@@ -133,16 +133,21 @@ export const SERVICE_CATEGORIES = {
   pest: ["🐜", "กำจัดปลวก / แมลง"],
   vehicle: ["🚗", "ซ่อมรถ / มอไซค์จมน้ำ"],
   junk: ["🚛", "รับขนขยะ / ของพัง"],
+  // the village marketplace after the flood (7 Oct)
+  shop: ["🏪", "ร้านค้า / ของทำขาย ในหมู่บ้าน"],
+  beauty: ["💇", "ตัดผม / เสริมสวย / นวด"],
+  tutor: ["📚", "ติวเตอร์ / สอนพิเศษ"],
   other: ["📞", "อื่นๆ"],
 };
 // Flood-era categories stay for old listings; the repair-mode form offers these first.
-export const REPAIR_SERVICE_ORDER = ["electrician", "plumber", "ac", "appliance", "carpenter", "painter", "roof", "pest", "vehicle", "cleaning", "junk", "repair", "truck", "porter", "other"];
+export const REPAIR_SERVICE_ORDER = ["electrician", "plumber", "ac", "appliance", "carpenter", "painter", "roof", "pest", "vehicle", "cleaning", "junk", "repair", "truck", "porter", "shop", "food", "beauty", "tutor", "other"];
 
 // ---------- repair mode (after the flood). Keys must match backend/repair.py ----------
 export const LEND_KINDS = {
   lend: { emoji: "🤝", label: "ให้ยืม", verb: "มีของให้ยืม" },
   give: { emoji: "🎁", label: "ให้ฟรี", verb: "มีของให้ฟรี" },
-  want: { emoji: "🔎", label: "ตามหา / อยากยืม", verb: "ตามหาของ" },
+  want: { emoji: "🔎", label: "ตามหา / อยากได้", verb: "ตามหาของ" },
+  sell: { emoji: "🏷️", label: "ขาย", verb: "ขาย" },
 };
 export const LEND_CATEGORIES = {
   washer: ["💦", "เครื่องฉีดน้ำแรงดันสูง"],
@@ -156,6 +161,11 @@ export const LEND_CATEGORIES = {
   power: ["🔌", "ปลั๊กพ่วง / เครื่องปั่นไฟ"],
   furniture: ["🪑", "เฟอร์นิเจอร์ / ของใช้"],
   supplies: ["🧴", "น้ำยา / ถุงดำ / ถุงมือ"],
+  food: ["🍱", "ของกิน / ของทำขาย"],
+  clothes: ["👕", "เสื้อผ้า / กระเป๋า"],
+  electronics: ["📱", "เครื่องใช้ไฟฟ้า / มือถือ"],
+  kids: ["🧸", "ของเด็ก / ของเล่น"],
+  plants: ["🪴", "ต้นไม้ / ของแต่งบ้าน"],
   other: ["📦", "อื่นๆ"],
 };
 export const LEND_STATUS = {

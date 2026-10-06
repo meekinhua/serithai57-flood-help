@@ -2,8 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 7 Oct: the redesign (Claude Design) — IBM Plex Sans Thai for reading, Bai Jamjuree for titles, a touch larger for older eyes */
+html {
+  font-size: 106.25%;
+}
 body {
-  font-family: "Sarabun", "Noto Sans Thai", "Leelawadee UI", system-ui, sans-serif;
+  font-family: "IBM Plex Sans Thai", "Sarabun", "Noto Sans Thai", "Leelawadee UI", system-ui, sans-serif;
+  background: #f2f4f1;
+}
+.font-display {
+  font-family: "Bai Jamjuree", "IBM Plex Sans Thai", "Sarabun", sans-serif;
 }
 
 .leaflet-container {

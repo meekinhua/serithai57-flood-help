@@ -7,7 +7,7 @@ import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
 import SurveyBoxes from "./components/SurveyBox";
-import { CommunityFeed, CommunityIntro, FoldBox, IntentChoices, NEED_CHOICES, OFFER_CHOICES, PostedSheetBody } from "./components/Community";
+import { BottomNav, CommunityFeed, CommunityIntro, FoldBox, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PeopleIcon, PostedSheetBody, ProsList, WaterIcon } from "./components/Community";
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView } from "./components/WatchPanel";
@@ -29,7 +29,7 @@ const MAIN_TABS = {
   feed: ["📰", "ล่าสุด"],
   jobs: ["🙋", "ขอแรง"],
   pros: ["🔧", "ช่าง · ร้าน"],
-  lend: ["🧰", "ยืม · ของฟรี"],
+  lend: ["🧰", "ยืม · ซื้อขาย"],
   forum: ["💬", "ถาม-ตอบ"],
 };
 const MORE_TABS = {
@@ -41,12 +41,17 @@ const MORE_TABS = {
 const TABS = { ...MAIN_TABS, ...MORE_TABS };
 
 export default function RepairApp() {
-  const [tab, setTab] = useState(() => (TABS[window.location.hash.slice(1)] ? window.location.hash.slice(1) : load("repairTab3", "feed")));
+  const [tab, setTab] = useState(() => {
+    const h = window.location.hash.slice(1);
+    const saved = load("repairTab3", "feed");
+    return TABS[h] ? h : TABS[saved] ? saved : "feed"; // a tab that no longer exists (e.g. "water") falls back to the feed
+  });
   const [lend, setLend] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [issues, setIssues] = useState([]);
   const [lost, setLost] = useState([]);
   const [topics, setTopics] = useState([]);
+  const [prosGroup, setProsGroup] = useState("");
   const [forumGo, setForumGo] = useState({ n: 0 }); // feed / "ask" door → open a topic or the form
   const [water, setWater] = useState([]);
   const [canal, setCanal] = useState(null);
@@ -229,15 +234,15 @@ export default function RepairApp() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-100 text-neutral-900">
-      <header className="sticky top-0 z-[900] bg-black text-white shadow">
+    <div className="min-h-screen bg-[#F2F4F1] text-[#15201A]">
+      <header className="sticky top-0 z-[900] bg-[#15201A] text-white shadow">
         <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 py-2 sm:px-4">
           <span className="hidden h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white min-[400px]:flex">
             <img src={`${process.env.PUBLIC_URL}/logo-mark.png`} alt="Sahakorn Serithai 57" className="h-full w-full object-contain" />
           </span>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-bold sm:text-xl">ซ่อมบ้าน เสรีไทย 57</h1>
-            <p className="truncate text-xs text-neutral-400 sm:text-sm">
+            <h1 className="font-display truncate text-xl font-bold">เสรีไทย 57</h1>
+            <p className="truncate text-sm text-[#C5D1CA]">
               {online && viewers != null && (
                 <span className="mr-1 font-semibold text-emerald-400">
                   <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle" aria-hidden="true" />
@@ -248,9 +253,6 @@ export default function RepairApp() {
             </p>
           </div>
           <WaterPill water={water} canal={canal} onOpen={openWater} />
-          <button onClick={() => setSheet({ type: "hotlines" })} aria-label="เบอร์สำคัญ" className="min-h-[44px] shrink-0 rounded-lg bg-red-600 px-3 font-semibold active:bg-red-700">
-            ☎️
-          </button>
           <button onClick={share} aria-label="แชร์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">
             🔗
           </button>
@@ -266,7 +268,7 @@ export default function RepairApp() {
         )}
       </header>
 
-      <main className="mx-auto max-w-5xl px-3 pb-10 pt-3 sm:px-4">
+      <main className="mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
         {eventsOn.map((e, i) => (
           <EventBox
             key={i}
@@ -310,10 +312,9 @@ export default function RepairApp() {
 
         <FoldBox
           boxRef={waterRef}
-          icon="💧"
+          icon={WaterIcon}
           title="ระดับน้ำ · แผนที่หมู่บ้าน"
           sub={waterSub(water)}
-          tone="border-sky-600 bg-sky-50"
           open={waterOpen}
           onToggle={() => setWaterOpen(!waterOpen)}
         >
@@ -337,41 +338,40 @@ export default function RepairApp() {
 
         {home.tabs_on && (
         <FoldBox
-          icon="🏘️"
-          title="ชุมชนเสรีไทย 57"
-          sub="เพื่อนบ้านช่วยกัน · ขอ · ให้ · แนะนำช่าง/ร้าน · ถาม-ตอบ"
-          tone="border-emerald-600 bg-emerald-50"
+          icon={PeopleIcon}
+          title="เพื่อนบ้านช่วยกัน"
+          sub="เบอร์ช่างที่ใช้แล้วดี · ขอแรง · ยืม ซื้อขาย · ถามกัน"
           open={commOpen}
           onToggle={() => setCommOpen(!commOpen)}
         >
-        <CommunityIntro onNeed={() => setSheet({ type: "intent", need: true })} onOffer={() => setSheet({ type: "intent", need: false })} onAsk={() => askForum()} />
-        <nav ref={navRef} className="scroll-mt-28 grid grid-cols-5 gap-1 rounded-2xl bg-white p-1 shadow-sm" aria-label="หมวด">
-          {Object.entries(MAIN_TABS).map(([k, [emoji, text]]) => (
-            <button
-              key={k}
-              onClick={() => pick(k)}
-              aria-current={tab === k ? "page" : undefined}
-              className={`relative flex min-h-[60px] flex-col items-center justify-center rounded-xl px-0.5 text-center text-[11px] font-semibold leading-tight min-[400px]:text-xs sm:text-sm ${tab === k ? "bg-black text-white" : "text-neutral-700 active:bg-neutral-100"}`}
-            >
-              <span className="text-2xl" aria-hidden="true">{emoji}</span>
-              {text}
-            </button>
-          ))}
+        <CommunityIntro
+          services={services}
+          onGroup={(g) => {
+            setProsGroup(g);
+            showTab("pros");
+          }}
+          onAll={() => {
+            setProsGroup("");
+            showTab("pros");
+          }}
+          onNeed={() => setSheet({ type: "intent", need: true })}
+          onOffer={() => setSheet({ type: "intent", need: false })}
+          onAsk={() => askForum()}
+        />
+        <nav ref={navRef} className="-mx-4 mt-5 scroll-mt-28 overflow-x-auto border-t border-[#E6EBE7] px-4 pt-4" aria-label="หมวด">
+          <div className="flex w-max gap-2">
+            {Object.entries(MAIN_TABS).map(([k, [, text]]) => (
+              <button
+                key={k}
+                onClick={() => pick(k)}
+                aria-current={tab === k ? "page" : undefined}
+                className={`min-h-[44px] whitespace-nowrap rounded-full px-4 text-[15px] ${tab === k ? "bg-[#15201A] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}
+              >
+                {text}
+              </button>
+            ))}
+          </div>
         </nav>
-        <div className="-mx-3 mt-1 flex items-center gap-1 overflow-x-auto whitespace-nowrap px-4 pb-1 text-sm" aria-label="หมวดอื่นๆ">
-          <span className="text-neutral-500">อื่นๆ:</span>
-          {Object.entries(MORE_TABS).map(([k, [emoji, text]]) => (
-            <button
-              key={k}
-              onClick={() => pick(k)}
-              aria-current={tab === k ? "page" : undefined}
-              className={`min-h-[36px] shrink-0 rounded-full px-3 ${tab === k ? "bg-black text-white" : "bg-white text-neutral-700 active:bg-neutral-100"}`}
-            >
-              <span aria-hidden="true">{emoji}</span> {text}
-              {counts[k] > 0 && <span className="ml-1 text-xs text-neutral-500">({counts[k]})</span>}
-            </button>
-          ))}
-        </div>
 
         <div className="mt-3">
           {tab === "feed" && (
@@ -381,15 +381,18 @@ export default function RepairApp() {
               services={services}
               topics={topics}
               onNeed={() => setSheet({ type: "intent", need: true })}
-              onOpen={(x) => (x.topic ? askForum(x.topic) : showTab(x.tab))}
+              onTab={showTab}
+              onTopic={(id) => askForum(id)}
+              onJoin={(job) => setSheet({ type: "join", job })}
             />
           )}
           {tab === "forum" && <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />}
           {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
           {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} />}
-          {tab === "pros" && <HireStrip jobs={jobs} onOpen={() => pick("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />}
+          {tab === "pros" && admin && <HireStrip jobs={jobs} onOpen={() => pick("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />}
           {tab === "lost" && <LostBoard items={lost} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />}
-          {tab === "pros" && (
+          {tab === "pros" && !admin && <ProsList services={services} setServices={setServices} group={prosGroup} setGroup={setProsGroup} onAdd={() => setSheet({ type: "serviceForm" })} />}
+          {tab === "pros" && admin && (
             <div className="rounded-xl bg-white p-3">
               <ServiceBoard repair services={services} setServices={setServices} posts={[]} admin={admin} onAdd={() => setSheet({ type: "serviceForm" })} onOpenPost={() => {}} />
             </div>
@@ -397,6 +400,17 @@ export default function RepairApp() {
           {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
           {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
           {tab === "guide" && <AfterFloodGuide />}
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-2 border-t border-[#E6EBE7] pt-4" aria-label="เรื่องอื่นในหมู่บ้าน">
+          {Object.entries(MORE_TABS).map(([k, [, text]]) => (
+            <button key={k} onClick={() => showTab(k)} aria-current={tab === k ? "page" : undefined} className={`min-h-[60px] rounded-2xl px-3 py-2 text-left ${tab === k ? "bg-[#15201A] text-white" : "border border-[#DCE2DD] bg-white"}`}>
+              <b className="block text-base leading-tight">{text}</b>
+              <span className={`block text-sm ${tab === k ? "text-[#C5D1CA]" : "text-[#45504A]"}`}>
+                {MORE_SUB[k]}
+                {counts[k] > 0 ? ` · ${counts[k]}` : ""}
+              </span>
+            </button>
+          ))}
         </div>
         </FoldBox>
         )}
@@ -437,14 +451,23 @@ export default function RepairApp() {
           )}
         </footer>
       </main>
+      <BottomNav
+        onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        onPros={() => {
+          setProsGroup("");
+          showTab("pros");
+        }}
+        onMap={openWater}
+        onHotline={() => setSheet({ type: "hotlines" })}
+      />
 
       {sheet?.type === "lendForm" && (
-        <Sheet title="🧰 ลงของ ยืม · ให้ยืม · ให้ฟรี" onClose={() => setSheet(null)}>
+        <Sheet title="ยืม · ให้ · ขาย" onClose={() => setSheet(null)}>
           <LendForm
             kind={sheet.kind}
             onDone={(x) => {
               setLend((p) => [x, ...p]);
-              posted("lend", `${LEND_KIND_TEXT[x.kind] || "🧰"} ${x.title}${x.soi ? ` (ซ.${x.soi})` : ""}`);
+              posted("lend", `${LEND_KIND_TEXT[x.kind] || "🧰"} ${x.title}${x.price ? ` ${x.price}` : ""}${x.soi ? ` (ซ.${x.soi})` : ""}`);
             }}
           />
         </Sheet>
@@ -564,7 +587,7 @@ export default function RepairApp() {
         </Sheet>
       )}
       {sheet?.type === "serviceForm" && (
-        <Sheet title="🔧 ลงชื่อช่าง / ร้าน" onClose={() => setSheet(null)}>
+        <Sheet title="แนะนำช่าง / ร้าน" onClose={() => setSheet(null)}>
           <ServiceForm
             repair
             onDone={(s) => {
@@ -575,8 +598,13 @@ export default function RepairApp() {
         </Sheet>
       )}
       {sheet?.type === "intent" && (
-        <Sheet title={sheet.need ? "🙋 ฉันต้องการ…" : "🤝 ฉันช่วยได้…"} onClose={() => setSheet(null)}>
-          <IntentChoices choices={sheet.need ? NEED_CHOICES : OFFER_CHOICES} onPick={go} />
+        <Sheet title={sheet.need ? "ขอความช่วยเหลือ" : "แนะนำ / ให้ / ขาย"} onClose={() => setSheet(null)}>
+          <IntentChoices need={sheet.need} choices={sheet.need ? NEED_CHOICES : OFFER_CHOICES} onPick={go} />
+        </Sheet>
+      )}
+      {sheet?.type === "join" && (
+        <Sheet title={sheet.job.kind === "need" ? "ไปช่วยเพื่อนบ้าน" : "ขอให้มาช่วยบ้านฉัน"} onClose={() => setSheet(null)}>
+          <JoinSheetBody job={sheet.job} onJoined={(j) => setJobs((p) => p.map((x) => (x.id === j.id ? j : x)))} onClose={() => setSheet(null)} />
         </Sheet>
       )}
       {sheet?.type === "posted" && (
@@ -632,7 +660,8 @@ function waterSub(water) {
   return w ? `แจ้งล่าสุด ${timeAgo(w.created_at)}${w.soi ? ` · ซ.${w.soi}` : ""} · คลอง เครื่องสูบ รถอาสา` : "ระดับน้ำที่เพื่อนบ้านแจ้ง · คลอง · เครื่องสูบ · รถอาสา";
 }
 
-const LEND_KIND_TEXT = { lend: "🤝 มีของให้ยืม:", give: "🎁 มีของให้ฟรี:", want: "🔎 ตามหา / อยากยืม:" };
+const LEND_KIND_TEXT = { lend: "มีของให้ยืม:", give: "มีของให้ฟรี:", want: "ตามหา / อยากได้:", sell: "ขาย:" };
+const MORE_SUB = { waste: "วันนี้รถเข้าซอยไหน", guide: "ไฟ น้ำ ความปลอดภัย", issues: "ฝาท่อแตก ขยะ ไฟถนน", lost: "สัตว์เลี้ยง ของหาย" };
 
 // Neighbours looking for a tradesman right now (jobs of type "hire"), shown above the contact board
 function HireStrip({ jobs, onOpen, onAdd }) {

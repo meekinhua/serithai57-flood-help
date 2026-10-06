@@ -161,14 +161,14 @@ export function LendBoard({ items, setItems, admin, onAdd }) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {Object.entries(LEND_KINDS).map(([k, v]) => (
           <button key={k} onClick={() => onAdd(k)} className="min-h-[56px] rounded-xl border-2 border-black bg-white px-1 text-sm font-bold leading-tight active:bg-neutral-100">
             {v.emoji} {v.verb}
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-4 gap-1 rounded-xl bg-neutral-200 p-1">
+      <div className="grid grid-cols-5 gap-1 rounded-xl bg-neutral-200 p-1">
         {[["all", "ทั้งหมด"], ...Object.entries(LEND_KINDS).map(([k, v]) => [k, `${v.emoji} ${v.label}`])].map(([k, t]) => (
           <button key={k} onClick={() => setKind(k)} aria-pressed={kind === k} className={`min-h-[40px] rounded-lg text-xs font-semibold sm:text-sm ${kind === k ? "bg-white shadow" : "text-neutral-600"}`}>
             {t}
@@ -213,6 +213,7 @@ function LendCard({ item: x, editKey, admin, onChanged, onDeleted }) {
             {mine && <Badge cls="bg-yellow-200">ของฉัน</Badge>}
           </span>
           <span className="mt-0.5 block break-words text-lg font-bold leading-snug">{x.title}</span>
+          {x.price && <span className="block text-lg font-bold text-[#8F2A1C]">{x.price}</span>}
           <span className="block text-sm text-neutral-600">
             {catText} · {x.name}
             {x.soi && ` · ซ.${x.soi}`} · {timeAgo(x.created_at)}
@@ -239,7 +240,7 @@ function LendVisitor({ item: x, onChanged }) {
   const [done, setDone] = useState(false);
   if (x.status === "closed") return <p className="text-sm text-neutral-500">รายการนี้ปิดแล้ว</p>;
   if (x.kind !== "lend")
-    return <ContactButton path={`/lend/${x.id}/contact`} text={x.kind === "give" ? "📞 ติดต่อขอรับ" : "📞 ฉันมี · ติดต่อคนตามหา"} />;
+    return <ContactButton path={`/lend/${x.id}/contact`} text={x.kind === "give" ? "📞 ติดต่อขอรับ" : x.kind === "sell" ? "📞 ติดต่อผู้ขาย" : "📞 ฉันมี · ติดต่อคนตามหา"} />;
   async function join(e) {
     e.preventDefault();
     setErr("");
@@ -348,7 +349,7 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
       )}
       {x.kind !== "lend" && x.status !== "closed" && (
         <button onClick={() => patch({ status: "closed" })} className="min-h-[44px] w-full rounded-lg bg-black font-semibold text-white">
-          {x.kind === "give" ? "✅ มีคนรับไปแล้ว · ปิด" : "✅ หาได้แล้ว · ปิด"}
+          {x.kind === "give" ? "✅ มีคนรับไปแล้ว · ปิด" : x.kind === "sell" ? "✅ ขายแล้ว · ปิด" : "✅ หาได้แล้ว · ปิด"}
         </button>
       )}
       {x.status === "closed" && (
@@ -374,7 +375,7 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
 export function LendForm({ kind: initialKind = "lend", onDone }) {
   const c = savedContact();
   const [, addKey] = useKeys("lendKeys");
-  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
+  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
   const [media, setMedia] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -399,7 +400,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
   const want = form.kind === "want";
   return (
     <form onSubmit={submit} className="space-y-4">
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-neutral-200 p-1">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 min-[400px]:grid-cols-4">
         {Object.entries(LEND_KINDS).map(([k, v]) => (
           <button type="button" key={k} onClick={() => set({ kind: k })} aria-pressed={form.kind === k} className={`min-h-[44px] rounded-lg text-sm font-semibold ${form.kind === k ? "bg-white shadow" : "text-neutral-600"}`}>
             {v.emoji} {v.label}
@@ -418,9 +419,15 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
         </div>
       </fieldset>
       <div>
-        <label className={label} htmlFor="lend-title">{want ? "ตามหาอะไร *" : "ของอะไร *"}</label>
+        <label className={label} htmlFor="lend-title">{want ? "ตามหาอะไร *" : form.kind === "sell" ? "ขายอะไร *" : "ของอะไร *"}</label>
         <input id="lend-title" required minLength={2} maxLength={80} value={form.title} onChange={(e) => set({ title: e.target.value })} className={input} placeholder={want ? "เช่น บันไดสูง 3 เมตร ขอยืมครึ่งวัน" : "เช่น เครื่องฉีดน้ำแรงดันสูง Karcher K3"} />
       </div>
+      {form.kind === "sell" && (
+        <div>
+          <label className={label} htmlFor="lend-price">ราคา *</label>
+          <input id="lend-price" required maxLength={60} value={form.price} onChange={(e) => set({ price: e.target.value })} className={input} placeholder="เช่น 150 บาท, ต่อรองได้" />
+        </div>
+      )}
       <div>
         <label className={label} htmlFor="lend-detail">รายละเอียด</label>
         <textarea id="lend-detail" rows={3} maxLength={400} value={form.detail} onChange={(e) => set({ detail: e.target.value })} className={input} placeholder={want ? "ใช้ทำอะไร ใช้เมื่อไหร่" : "สภาพ / ยืมได้นานเท่าไหร่ / มัดจำไหม / มารับที่ไหน / ต้องใช้ปลั๊กหรือน้ำมัน"} />
