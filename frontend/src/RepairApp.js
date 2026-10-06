@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API, api, load, save, viewerId } from "./api";
 import { HOTLINE_GROUPS, JOB_TYPES, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
@@ -6,6 +6,7 @@ import Announcements from "./components/Announcements";
 import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
+import { lookOf, ordered } from "./components/Look";
 import SurveyBoxes from "./components/SurveyBox";
 import { BottomNav, CommunityFeed, CommunityIntro, FoldBox, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PeopleIcon, PostedSheetBody, ProsList, WaterIcon } from "./components/Community";
 import { CleanupPlan } from "./components/CleanupPage";
@@ -77,8 +78,10 @@ export default function RepairApp() {
   const navRef = useRef(null);
   // home blocks that fold like the ⚡ box; each phone remembers open / closed
   const waterRef = useRef(null);
-  const [waterOpen, setWaterOpenRaw] = useState(() => window.location.hash === "#water" || load("waterBoxOpen", false));
-  const [commOpen, setCommOpenRaw] = useState(() => load("communityBoxOpen", true));
+  const [waterOpenRaw, setWaterOpenRaw] = useState(() => (window.location.hash === "#water" ? true : load("waterBoxOpen", null)));
+  const [commOpenRaw, setCommOpenRaw] = useState(() => load("communityBoxOpen", null));
+  const waterOpen = waterOpenRaw ?? home.layout?.water?.open ?? false;
+  const commOpen = commOpenRaw ?? home.layout?.community?.open ?? true;
   const setWaterOpen = (v) => {
     setWaterOpenRaw(v);
     save("waterBoxOpen", v);
@@ -233,42 +236,10 @@ export default function RepairApp() {
     } catch {}
   }
 
-  return (
-    <div className="min-h-screen bg-[#F2F4F1] text-[#15201A]">
-      <header className="sticky top-0 z-[900] bg-[#15201A] text-white shadow">
-        <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 py-2 sm:px-4">
-          <span className="hidden h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white min-[400px]:flex">
-            <img src={`${process.env.PUBLIC_URL}/logo-mark.png`} alt="Sahakorn Serithai 57" className="h-full w-full object-contain" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-display truncate text-xl font-bold">เสรีไทย 57</h1>
-            <p className="truncate text-sm text-[#C5D1CA]">
-              {online && viewers != null && (
-                <span className="mr-1 font-semibold text-emerald-400">
-                  <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle" aria-hidden="true" />
-                  {viewers.toLocaleString("th-TH")} คนกำลังดู ·{" "}
-                </span>
-              )}
-              {online ? `อัปเดต ${updatedAt ? timeAgo(updatedAt) : "…"}` : "⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่"}
-            </p>
-          </div>
-          <WaterPill water={water} canal={canal} onOpen={openWater} />
-          <button onClick={share} aria-label="แชร์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">
-            🔗
-          </button>
-        </div>
-        <WeatherTopBar weather={weather} onOpen={() => setSheet({ type: "weather" })} />
-        {admin && (
-          <div className="border-t border-white/20 bg-neutral-800">
-            <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-1 text-sm sm:px-4">
-              <span className="font-semibold">🛡️ โหมดผู้ดูแล · {admin.name}</span>
-              <a href="/admin" className="ml-auto flex min-h-[40px] items-center underline">📢 ประกาศ / ตั้งค่า</a>
-            </div>
-          </div>
-        )}
-      </header>
-
-      <main className="mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
+  // 7 Oct: the home page's blocks, ordered and coloured by home.layout (tools/site.py layout), no redeploy
+  const blocks = {
+    events: (
+      <>
         {eventsOn.map((e, i) => (
           <EventBox
             key={i}
@@ -281,11 +252,18 @@ export default function RepairApp() {
             }}
           />
         ))}
+      </>
+    ),
+    announce: (
+      <>
         <div className="mb-3 space-y-2 empty:hidden">
           <Announcements items={announcements} />
           <WeatherAlerts weather={weather} onOpenMap={() => setSheet({ type: "weather" })} />
         </div>
-
+      </>
+    ),
+    watch: (
+      <>
         {home.watch_on && (
         <div className="mb-3">
           <WatchPanel
@@ -300,8 +278,11 @@ export default function RepairApp() {
           />
         </div>
         )}
-
-        {home.fund_on && <a href="/fund" className="mb-3 flex min-h-[52px] items-center gap-3 rounded-xl border-2 border-emerald-600 bg-emerald-50 px-3 py-2">
+      </>
+    ),
+    fund: (
+      <>
+        {home.fund_on && <a href="/fund" style={home.layout?.fund ? lookOf(home.layout, "fund").frame : undefined} className="mb-3 flex min-h-[52px] items-center gap-3 rounded-xl border-2 border-emerald-600 bg-emerald-50 px-3 py-2">
           <span className="text-2xl" aria-hidden="true">💰</span>
           <span className="min-w-0 flex-1">
             <b>เงินสมทบทีมอาสา · ยอดรับ-จ่ายเปิดให้ทุกคนดู</b>
@@ -309,9 +290,13 @@ export default function RepairApp() {
           </span>
           <span className="shrink-0 font-semibold underline">ดู ›</span>
         </a>}
-
+      </>
+    ),
+    water: (
+      <>
         <FoldBox
           boxRef={waterRef}
+          look={lookOf(home.layout, "water")}
           icon={WaterIcon}
           title="ระดับน้ำ · แผนที่หมู่บ้าน"
           sub={waterSub(water)}
@@ -335,9 +320,13 @@ export default function RepairApp() {
             onPumps={() => setSheet({ type: "pumps" })}
           />
         </FoldBox>
-
+      </>
+    ),
+    community: (
+      <>
         {home.tabs_on && (
         <FoldBox
+          look={lookOf(home.layout, "community")}
           icon={PeopleIcon}
           title="เพื่อนบ้านช่วยกัน"
           sub="เบอร์ช่างที่ใช้แล้วดี · ขอแรง · ยืม ซื้อขาย · ถามกัน"
@@ -414,16 +403,27 @@ export default function RepairApp() {
         </div>
         </FoldBox>
         )}
-
+      </>
+    ),
+    survey: (
+      <>
         {/* 7 Oct: the electricians' visit is over for now; the sign-up box waits down here, folded, in case they come back */}
-        <div className="mt-6">
-          <SurveyBoxes />
+        <div className="mt-2">
+          <SurveyBoxes look={home.layout?.survey ? lookOf(home.layout, "survey") : null} />
         </div>
+      </>
+    ),
+    hub: (
+      <>
         {home.hub?.on && home.hub.title && (
-          <div className="mt-8">
-            <HubBox hub={home.hub} />
+          <div className="mt-2">
+            <HubBox hub={home.hub} look={home.layout?.hub ? lookOf(home.layout, "hub") : null} />
           </div>
         )}
+      </>
+    ),
+    archive: (
+      <>
         <section className="mt-3 grid gap-2 sm:grid-cols-2">
           <a href="/flood" className="flex min-h-[64px] items-center gap-3 rounded-xl border-2 border-neutral-400 bg-white px-3 py-2">
             <span className="text-2xl" aria-hidden="true">📦</span>
@@ -440,6 +440,49 @@ export default function RepairApp() {
             </span>
           </a>
         </section>
+      </>
+    ),
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F2F4F1] text-[#15201A]">
+      <header className="sticky top-0 z-[900] bg-[#15201A] text-white shadow">
+        <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 py-2 sm:px-4">
+          <span className="hidden h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white min-[400px]:flex">
+            <img src={`${process.env.PUBLIC_URL}/logo-mark.png`} alt="Sahakorn Serithai 57" className="h-full w-full object-contain" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="font-display truncate text-xl font-bold">เสรีไทย 57</h1>
+            <p className="truncate text-sm text-[#C5D1CA]">
+              {online && viewers != null && (
+                <span className="mr-1 font-semibold text-emerald-400">
+                  <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle" aria-hidden="true" />
+                  {viewers.toLocaleString("th-TH")} คนกำลังดู ·{" "}
+                </span>
+              )}
+              {online ? `อัปเดต ${updatedAt ? timeAgo(updatedAt) : "…"}` : "⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่"}
+            </p>
+          </div>
+          <WaterPill water={water} canal={canal} onOpen={openWater} />
+          <button onClick={share} aria-label="แชร์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">
+            🔗
+          </button>
+        </div>
+        <WeatherTopBar weather={weather} onOpen={() => setSheet({ type: "weather" })} />
+        {admin && (
+          <div className="border-t border-white/20 bg-neutral-800">
+            <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-1 text-sm sm:px-4">
+              <span className="font-semibold">🛡️ โหมดผู้ดูแล · {admin.name}</span>
+              <a href="/admin" className="ml-auto flex min-h-[40px] items-center underline">📢 ประกาศ / ตั้งค่า</a>
+            </div>
+          </div>
+        )}
+      </header>
+
+      <main className="mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
+        {ordered(home.layout, Object.keys(blocks)).map((k) => (
+          <Fragment key={k}>{blocks[k]}</Fragment>
+        ))}
 
         <footer className="mt-8 flex flex-col items-center gap-2 text-center text-xs text-neutral-500">
           <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Sahakorn Serithai 57" className="h-28 w-auto" />
@@ -752,7 +795,7 @@ function EventBox({ ev, onMap }) {
 }
 
 // Yellow highlight box (the volunteers' hand-out point); with a pin it opens navigation
-function HubBox({ hub }) {
+function HubBox({ hub, look }) {
   const body = (
     <>
       <span className="text-2xl" aria-hidden="true">📍</span>
@@ -763,12 +806,13 @@ function HubBox({ hub }) {
     </>
   );
   const cls = "mb-3 flex min-h-[56px] items-center gap-3 rounded-xl border-4 border-yellow-400 bg-yellow-50 px-3 py-2";
+  const style = look?.frame;
   return hub.lat != null && hub.lng != null ? (
-    <a href={`https://www.google.com/maps/search/?api=1&query=${hub.lat},${hub.lng}`} target="_blank" rel="noreferrer" className={cls}>
+    <a href={`https://www.google.com/maps/search/?api=1&query=${hub.lat},${hub.lng}`} target="_blank" rel="noreferrer" className={cls} style={style}>
       {body}
       <span className="shrink-0 font-semibold underline">นำทาง ›</span>
     </a>
   ) : (
-    <div className={cls}>{body}</div>
+    <div className={cls} style={style}>{body}</div>
   );
 }

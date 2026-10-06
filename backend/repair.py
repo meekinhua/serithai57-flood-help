@@ -23,7 +23,7 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime, timezone
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -242,6 +242,19 @@ class EventBlock(BaseModel):
     link_label: str = Field("", max_length=60)
 
 
+# 7 Oct: how each home-page block looks and where it sits, set from the chat with Claude (tools/site.py layout)
+# so the team can re-order and re-colour the home page without a redeploy. Fixed palettes only, never raw colours.
+LAYOUT_KEYS = ["events", "announce", "watch", "fund", "water", "community", "survey", "hub", "archive"]
+
+
+class BlockLook(BaseModel):
+    order: Optional[int] = Field(None, ge=0, le=99)  # smaller = higher on the page
+    tone: Optional[Literal["green", "blue", "orange", "red", "yellow", "gray"]] = None
+    border: Optional[Literal["none", "thin", "thick"]] = None
+    fill: Optional[Literal["white", "soft", "solid"]] = None  # solid: a coloured title bar with white text
+    open: Optional[bool] = None  # foldable blocks: open or folded when the page loads
+
+
 class HomeBody(BaseModel):
     watch_on: bool = True  # the "ฝนตกอีกรอบ · เฝ้าระวังน้ำ" panel
     watch_title: str = Field("", max_length=80)  # empty = the built-in heading
@@ -249,6 +262,7 @@ class HomeBody(BaseModel):
     fund_on: bool = False  # the 💰 /fund card on the home page (off until the user says so)
     tabs_on: bool = False  # the board tabs (ช่าง·ร้าน, ยืม, ขอแรง…); hidden until the team is ready to answer them
     events: List[EventBlock] = Field(default_factory=list, max_length=5)
+    layout: Optional[Dict[str, BlockLook]] = None  # None = keep what is stored (the /admin page doesn't send it)
 
 
 # The highlight boxes on top of the home page; admins switch them on/off and edit them on /admin.
@@ -257,6 +271,7 @@ HOME_DEFAULT = {
     "watch_title": "",
     "hub": {"on": True, "title": "ศูนย์อาสา · จุดแจกของ: ร้านมู้ด ซอย 5", "sub": "จุดแจกของที่ยังเปิดอยู่ 1 จุด · แตะเพื่อนำทาง", "lat": 13.789872, "lng": 100.673517},
     "fund_on": False,
+    "layout": {},
     "tabs_on": False,
     "events": [],
 }
@@ -315,6 +330,13 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         data["watch_title"] = data["watch_title"].strip()
         data["hub"]["title"] = data["hub"]["title"].strip()
         data["hub"]["sub"] = data["hub"]["sub"].strip()
+        if data["layout"] is None:
+            data.pop("layout")
+        else:
+            bad = [k for k in data["layout"] if k not in LAYOUT_KEYS]
+            if bad:
+                raise HTTPException(422, f"ไม่รู้จักกล่อง {bad} · มี {LAYOUT_KEYS}")
+            data["layout"] = {k: {f: v for f, v in look.items() if v is not None} for k, look in data["layout"].items()}
         await db.settings.update_one({"id": "home"}, {"$set": {"id": "home", **data, "by": admin["name"], "at": now()}}, upsert=True)
         await audit(admin, "home_blocks", "home", f"watch={data['watch_on']} hub={data['hub']['on']} {data['hub']['title']}")
         return data

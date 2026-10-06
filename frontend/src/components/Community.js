@@ -490,7 +490,7 @@ export function BottomNav({ onHome, onPros, onMap, onHotline }) {
 
 // A home-page block that folds to one line: icon, title, one-line summary, "ย่อ / ดู".
 // Kept mounted once opened (Leaflet maps don't like being torn down).
-export function FoldBox({ icon, title, sub, open, onToggle, boxRef, children }) {
+export function FoldBox({ icon, title, sub, open, onToggle, boxRef, look, children }) {
   const [mounted, setMounted] = useState(open);
   useEffect(() => {
     if (!open) return;
@@ -499,17 +499,17 @@ export function FoldBox({ icon, title, sub, open, onToggle, boxRef, children }) 
     return () => clearTimeout(t);
   }, [open]);
   return (
-    <section ref={boxRef} className="mb-3 scroll-mt-28 rounded-[20px] border border-[#DCE2DD] bg-white">
-      <button onClick={onToggle} aria-expanded={open} className="flex min-h-[64px] w-full items-center gap-3 px-4 py-3 text-left">
+    <section ref={boxRef} className="mb-3 scroll-mt-28 overflow-hidden rounded-[20px] border border-[#DCE2DD] bg-white" style={look?.frame}>
+      <button onClick={onToggle} aria-expanded={open} className="flex min-h-[64px] w-full items-center gap-3 px-4 py-3 text-left" style={look?.head || undefined}>
         {icon}
         <span className="min-w-0 flex-1">
           <b className="font-display block break-words text-xl leading-snug">{title}</b>
-          {sub && <span className="block text-[15px] text-[#45504A]">{sub}</span>}
+          {sub && <span className={`block text-[15px] ${look?.solid ? "text-white/85" : "text-[#45504A]"}`}>{sub}</span>}
         </span>
-        <span className="shrink-0 text-[15px] font-bold text-[#45504A]">{open ? "ย่อ" : "ดู"}</span>
+        <span className={`shrink-0 text-[15px] font-bold ${look?.solid ? "text-white" : "text-[#45504A]"}`}>{open ? "ย่อ" : "ดู"}</span>
       </button>
       {mounted && (
-        <div className="px-4 pb-4" hidden={!open}>
+        <div className={`px-4 pb-4 ${look?.solid ? "bg-white pt-4" : ""}`} hidden={!open}>
           {children}
         </div>
       )}

@@ -14,7 +14,7 @@ const cleanHouse = (h) => {
 };
 
 // Active sign-up lists (e.g. "ลงชื่อขอช่างไฟตรวจบ้าน") at the top of the home page, open by default.
-export default function SurveyBoxes() {
+export default function SurveyBoxes({ look }) {
   const [list, setList] = useState([]);
   useEffect(() => {
     const go = () => api("/surveys").then(setList).catch(() => {});
@@ -22,10 +22,10 @@ export default function SurveyBoxes() {
     const t = setInterval(go, 60000);
     return () => clearInterval(t);
   }, []);
-  return list.map((s) => <SurveyBox key={s.key} s={s} onCount={(count) => setList((l) => l.map((x) => (x.key === s.key ? { ...x, count } : x)))} />);
+  return list.map((s) => <SurveyBox key={s.key} s={s} look={look} onCount={(count) => setList((l) => l.map((x) => (x.key === s.key ? { ...x, count } : x)))} />);
 }
 
-function SurveyBox({ s, onCount }) {
+function SurveyBox({ s, onCount, look }) {
   const mine = load(`survey:${s.key}`, null);
   const c = load("contact", {});
   // 6 Oct: starts folded (title + progress only) so the community below is on the first screen
@@ -95,7 +95,7 @@ function SurveyBox({ s, onCount }) {
   }
 
   return (
-    <section className="mb-3 rounded-xl border-4 border-blue-600 bg-blue-50 px-3 py-2">
+    <section className="mb-3 rounded-xl border-4 border-blue-600 bg-blue-50 px-3 py-2" style={look?.frame}>
       <button onClick={() => setOpen((o) => !o)} className="flex min-h-[56px] w-full items-center gap-3 text-left">
         <span className="text-2xl" aria-hidden="true">⚡</span>
         <span className="min-w-0 flex-1">
