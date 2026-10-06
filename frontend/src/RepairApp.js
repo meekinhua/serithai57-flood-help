@@ -7,6 +7,7 @@ import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
 import { lookOf, ordered } from "./components/Look";
+import MyHome from "./components/MyHome";
 import SurveyBoxes from "./components/SurveyBox";
 import { BottomNav, CommunityFeed, CommunityIntro, FoldBox, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PeopleIcon, PostedSheetBody, ProsList, WaterIcon } from "./components/Community";
 import { CleanupPlan } from "./components/CleanupPage";
@@ -253,6 +254,18 @@ export default function RepairApp() {
           />
         ))}
       </>
+    ),
+    myhome: (
+      <MyHome
+        water={water}
+        look={home.layout?.myhome ? lookOf(home.layout, "myhome") : null}
+        onIssue={() => setSheet({ type: "issueForm" })}
+        onIssues={() => showTab("issues")}
+        onElectricians={() => {
+          setProsGroup("electric");
+          showTab("pros");
+        }}
+      />
     ),
     announce: (
       <>

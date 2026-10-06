@@ -678,6 +678,25 @@ export function JobForm({ kind = "need", jobType = "", onDone }) {
 // =====================================================================
 // 🗑️ ปัญหาในซอย
 // =====================================================================
+// 7 Oct: a tool for the village office (คหบาล), not a complaint wall: one tap sends the open reports,
+// soi by soi with how many neighbours confirmed each, to the office's LINE; the office sets the status here.
+function OfficeSummary({ issues }) {
+  const bySoi = {};
+  for (const x of issues) (bySoi[x.soi || "ไม่ระบุซอย"] = bySoi[x.soi || "ไม่ระบุซอย"] || []).push(x);
+  const sois = Object.keys(bySoi).sort((a, b) => (parseInt(a, 10) || 999) - (parseInt(b, 10) || 999));
+  const lines = sois.flatMap((soi) =>
+    bySoi[soi].map((x) => `• ซ.${soi} ${ISSUE_TYPES[x.type]?.[1] || ""}${x.detail ? ` · ${x.detail}` : ""}${x.votes > 1 ? ` (เพื่อนบ้านยืนยัน ${x.votes})` : ""}${x.status === "reported" ? " · ส่งต่อแล้ว" : ""}`)
+  );
+  const text = `เรื่องที่ลูกบ้านแจ้งไว้ ยังไม่เสร็จ ${issues.length} เรื่อง
+${lines.join("\n")}
+รูป/ตำแหน่ง/อัปเดตสถานะ: ${window.location.origin}/#issues`;
+  return (
+    <a href={`https://line.me/R/share?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer" className="flex min-h-[52px] w-full items-center justify-center rounded-xl border-2 border-[#06c755] bg-white text-base font-bold text-[#0B6B33]">
+      ส่งสรุปให้สำนักงานคหบาลทาง LINE ({issues.length} เรื่อง)
+    </a>
+  );
+}
+
 export function IssueBoard({ issues, setIssues, admin, onAdd }) {
   const [type, setType] = useState("all");
   const [showFixed, setShowFixed] = useState(false);
@@ -695,6 +714,7 @@ export function IssueBoard({ issues, setIssues, admin, onAdd }) {
   return (
     <div className="space-y-3">
       <button onClick={onAdd} className="min-h-[56px] w-full rounded-xl bg-black px-2 text-lg font-bold text-white">📍 แจ้งปัญหาในซอย</button>
+      {issues.length > 0 && <OfficeSummary issues={issues} />}
       <IssueMap issues={list} />
       <Chips options={ISSUE_TYPES} value={type} onChange={setType} counts={counts} />
       <label className="flex min-h-[44px] items-center gap-2 text-sm">

@@ -244,7 +244,7 @@ class EventBlock(BaseModel):
 
 # 7 Oct: how each home-page block looks and where it sits, set from the chat with Claude (tools/site.py layout)
 # so the team can re-order and re-colour the home page without a redeploy. Fixed palettes only, never raw colours.
-LAYOUT_KEYS = ["events", "announce", "watch", "fund", "water", "community", "survey", "hub", "archive"]
+LAYOUT_KEYS = ["events", "announce", "myhome", "watch", "fund", "water", "community", "survey", "hub", "archive"]
 
 
 class BlockLook(BaseModel):
