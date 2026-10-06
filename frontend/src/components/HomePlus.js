@@ -274,10 +274,23 @@ export function PlanRow({ info, services, onPros, onSaved, onFold, setErr }) {
     }
   }
   const title = t("myhome.plan.title", "แผนซ่อมบ้านฉัน");
-  if (edit || !plan) {
+  if (!edit && !plan)
+    return (
+      <Box icon="🔧" title={t("myhome.plan.ask", "บ้านยังต้องซ่อมอะไรไหม")} sub={t("myhome.plan.ask_sub", "ทำรายการไว้ แล้วเราหาช่างที่เพื่อนบ้านแนะนำให้ทีละอย่าง")}>
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => setEdit({})} className={`${btn} border-2 border-[#B45F06] bg-white text-[#7A4104]`}>
+            ยังต้องซ่อม
+          </button>
+          <button onClick={() => store({})} className={`${btn} border-2 border-[#1E6B47] bg-white text-[#154D33]`}>
+            ไม่ต้องแล้ว
+          </button>
+        </div>
+      </Box>
+    );
+  if (edit) {
     const pick = edit || {};
     return (
-      <Box icon="🔧" title={title} sub={t("myhome.plan.sub", "บ้านคุณยังต้องซ่อมอะไรบ้าง เลือกได้หลายอย่าง แล้วเราหาช่างที่เพื่อนบ้านแนะนำให้")}>
+      <Box icon="🔧" title={title} sub={t("myhome.plan.sub", "เลือกสิ่งที่ยังต้องซ่อม ได้หลายอย่าง")}>
         <div className="grid grid-cols-2 gap-2">
           {PLAN.map(([k, label]) => (
             <button
@@ -298,14 +311,9 @@ export function PlanRow({ info, services, onPros, onSaved, onFold, setErr }) {
         >
           บันทึก แล้วดูช่าง
         </button>
-        <button onClick={() => store({})} className="min-h-[44px] w-full text-[15px] font-bold text-[#45504A] underline">
-          {edit ? "ไม่ต้องซ่อมอะไรแล้ว" : "บ้านไม่ต้องซ่อมอะไร"}
+        <button onClick={() => setEdit(null)} className="min-h-[40px] w-full text-[15px] font-bold text-[#45504A] underline">
+          ยกเลิก
         </button>
-        {edit && (
-          <button onClick={() => setEdit(null)} className="min-h-[40px] w-full text-[15px] font-bold underline">
-            ยกเลิก
-          </button>
-        )}
       </Box>
     );
   }
@@ -453,43 +461,52 @@ export function InstallCard() {
     }
     setHow(true);
   }
-  return (
-    <Box icon="📲" title="เก็บบ้านฉันไว้หน้าจอมือถือ" sub="กดครั้งเดียว ครั้งหน้าเปิดจากไอคอนได้เลย ไม่ต้องหาลิงก์ในแชท">
-      {how ? (
-        <ol className="list-decimal space-y-1 rounded-xl bg-[#F2F4F1] p-3 pl-8 text-[15px] leading-relaxed">
-          {inLine ? (
-            <>
-              <li>กดปุ่ม ⋯ (หรือ ⋮) มุมขวาบนของ LINE</li>
-              <li>เลือก "เปิดในเบราว์เซอร์" (Safari / Chrome)</li>
-              <li>แล้วกดปุ่มนี้อีกครั้งในเบราว์เซอร์</li>
-            </>
-          ) : ios ? (
-            <>
-              <li>กดปุ่มแชร์ (สี่เหลี่ยมมีลูกศรชี้ขึ้น) ด้านล่างจอ</li>
-              <li>เลื่อนหา "เพิ่มไปยังหน้าจอโฮม"</li>
-              <li>กด "เพิ่ม" มุมขวาบน</li>
-            </>
-          ) : (
-            <>
-              <li>กดปุ่ม ⋮ มุมขวาบนของ Chrome</li>
-              <li>เลือก "เพิ่มลงในหน้าจอหลัก" หรือ "ติดตั้งแอป"</li>
-              <li>กด "เพิ่ม"</li>
-            </>
-          )}
-        </ol>
-      ) : (
-        <button onClick={add} className={`${btn} w-full bg-[#15201A] text-white`}>
-          📲 เพิ่มไว้หน้าจอมือถือ
+  const close = () => {
+    save("installLater", Date.now());
+    setLater(true);
+  };
+  if (!how)
+    return (
+      <div className="flex items-center gap-2 border-t border-[#E6EBE7] py-3">
+        <button onClick={add} className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2 rounded-xl bg-[#15201A] px-3 text-left text-white">
+          <span className="text-xl" aria-hidden="true">
+            📲
+          </span>
+          <span className="min-w-0">
+            <b className="block text-[15px] leading-tight">เก็บไว้หน้าจอมือถือ</b>
+            <span className="block text-xs text-[#C5D1CA]">เปิดจากไอคอนได้เลย</span>
+          </span>
         </button>
-      )}
-      <button
-        onClick={() => {
-          save("installLater", Date.now());
-          setLater(true);
-        }}
-        className="min-h-[40px] w-full text-[15px] font-bold text-[#45504A] underline"
-      >
-        ไว้ทีหลัง
+        <button onClick={close} aria-label="ไว้ทีหลัง" className="min-h-[52px] shrink-0 rounded-xl px-3 text-[15px] font-bold text-[#45504A]">
+          ไว้ทีหลัง
+        </button>
+      </div>
+    );
+  return (
+    <Box icon="📲" title="เก็บบ้านฉันไว้หน้าจอมือถือ">
+      <ol className="list-decimal space-y-1 rounded-xl bg-[#F2F4F1] p-3 pl-8 text-[15px] leading-relaxed">
+        {inLine ? (
+          <>
+            <li>กดปุ่ม ⋯ (หรือ ⋮) มุมขวาบนของ LINE</li>
+            <li>เลือก "เปิดในเบราว์เซอร์" (Safari / Chrome)</li>
+            <li>แล้วกดปุ่มนี้อีกครั้งในเบราว์เซอร์</li>
+          </>
+        ) : ios ? (
+          <>
+            <li>กดปุ่มแชร์ (สี่เหลี่ยมมีลูกศรชี้ขึ้น) ด้านล่างจอ</li>
+            <li>เลื่อนหา "เพิ่มไปยังหน้าจอโฮม"</li>
+            <li>กด "เพิ่ม" มุมขวาบน</li>
+          </>
+        ) : (
+          <>
+            <li>กดปุ่ม ⋮ มุมขวาบนของ Chrome</li>
+            <li>เลือก "เพิ่มลงในหน้าจอหลัก" หรือ "ติดตั้งแอป"</li>
+            <li>กด "เพิ่ม"</li>
+          </>
+        )}
+      </ol>
+      <button onClick={close} className="min-h-[40px] w-full text-[15px] font-bold text-[#45504A] underline">
+        ทำแล้ว / ไว้ทีหลัง
       </button>
     </Box>
   );
