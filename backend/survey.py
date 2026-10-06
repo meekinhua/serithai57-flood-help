@@ -125,18 +125,18 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         house = norm_house(house)
         if not HOUSE_RE.match(house):
             raise HTTPException(422, "ใส่บ้านเลขที่แบบ 4/917")
-        r = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0, "updated_at": 1, "picks": 1, "source": 1, "job": 1})
+        r = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0, "updated_at": 1, "picks": 1, "source": 1, "job": 1, "followup": 1})
         if not r:
             return {"signed": False, "house": house}
         job = r.get("job") or {}
         return {"signed": True, "house": house, "at": r["updated_at"], "picks": r.get("picks", []), "via": "LINE" if r.get("source") == "line" else "เว็บ",
-                "job": {"status": job.get("status", "todo"), "at": job.get("at")}}
+                "job": {"status": job.get("status", "todo"), "at": job.get("at")}, "want": (r.get("followup") or {}).get("want")}
 
     @router.get("/surveys/{key}/progress")
     async def progress(key: str):
         """Public follow-up for everyone: how many houses the technicians have done, per soi (no names, no phones)."""
-        rows = await db.survey_resp.find({"survey": key}, {"_id": 0, "soi": 1, "job": 1}).to_list(5000)
-        total = {"all": 0, "todo": 0, "claimed": 0, "done": 0, "absent": 0, "again": 0}
+        rows = await db.survey_resp.find({"survey": key}, {"_id": 0, "soi": 1, "job": 1, "followup": 1}).to_list(5000)
+        total = {"all": 0, "todo": 0, "claimed": 0, "done": 0, "absent": 0, "again": 0, "waiting": 0, "free": 0, "no": 0}
         by = {}
         last = None
         for r in rows:
@@ -146,6 +146,13 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
                 last = at
             total["all"] += 1
             total[st] = total.get(st, 0) + 1
+            want = (r.get("followup") or {}).get("want")
+            if st != "done" and want not in ("hired", "fine"):
+                total["waiting"] += 1
+            if want == "free":
+                total["free"] += 1
+            elif want in ("hired", "fine"):
+                total["no"] += 1
             m = re.search(r"\d+", r.get("soi") or "")
             k = m.group() if m else (r.get("soi") or "?")
             b = by.setdefault(k, {"soi": k, "all": 0, "done": 0})
@@ -180,6 +187,13 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
             "updated_at": now(),
         }
         # one row per house: signing again replaces the answer
+        if key == "electric":
+            doc["followup"] = {"want": "free", "slots": [], "note": "", "at": now()}
+            await db.households.update_one(
+                {"house": house},
+                {"$setOnInsert": {"id": str(uuid.uuid4()), "house": house, "name": doc["name"], "phone": phone, "line_id": "", "email": "", "ig": "", "news": True, "created_at": now(), "updated_at": now()}},
+                upsert=True,
+            )
         res = await db.survey_resp.update_one({"survey": key, "house": house}, {"$set": doc, "$setOnInsert": {"id": str(uuid.uuid4()), "created_at": now()}}, upsert=True)
         count = await db.survey_resp.count_documents({"survey": key})
         return {"ok": True, "updated": res.matched_count > 0, "count": count}

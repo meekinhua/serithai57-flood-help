@@ -3,6 +3,7 @@ import { api, load, save } from "../api";
 import LocationPicker from "./LocationPicker";
 import Nearby from "./Nearby";
 import { useT } from "./Texts";
+import { MYHOME_CHANGED } from "./SurveyBox";
 import { PRO_GROUPS } from "./Community";
 import { waterOf } from "../config";
 
@@ -411,6 +412,7 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, conta
       onSaved(await api("/myhome/electric", { method: "POST", body: JSON.stringify({ house: info.house, want, slots: [] }) }));
       setPick(false);
       onSent && onSent(want);
+      window.dispatchEvent(new Event("myhome:electric"));
     } catch (x) {
       setErr(x.message);
     }
@@ -508,6 +510,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const [typing, setTyping] = useState(!house);
   const [input, setInput] = useState(house || "4/");
   const [info, setInfo] = useState(null);
+  const [reloadN, setReloadN] = useState(0);
   const [err, setErr] = useState("");
   const [sent, setSent] = useState(null);
   const [contact, setContact] = useState(null);
@@ -532,6 +535,18 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         if (d.soi) save("mySoi", d.soi);
       })
       .catch((e) => setErr(e.message));
+  }, [house, reloadN]);
+  useEffect(() => {
+    // the sign-up box on this page signed a house: show it here (and adopt the house if this phone had none)
+    const onChange = () => {
+      const h = load("myHouse", "");
+      if (h && h !== house) {
+        setHouse(h);
+        setTyping(false);
+      } else setReloadN((n) => n + 1);
+    };
+    window.addEventListener(MYHOME_CHANGED, onChange);
+    return () => window.removeEventListener(MYHOME_CHANGED, onChange);
   }, [house]);
 
   async function tap(w) {
