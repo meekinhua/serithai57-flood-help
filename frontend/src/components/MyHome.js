@@ -193,6 +193,77 @@ function Electricians({ services, onAll }) {
   );
 }
 
+// ---------- how the team reaches this house (team only, never on the page) ----------
+const CONTACT_WHY = {
+  electric: "ทีมอาสาจะโทรหรือส่ง LINE บอกก่อนช่างเข้าบ้านคุณ",
+  news: "ข่าวด่วนของหมู่บ้าน เช่น น้ำมา ไฟดับ รถขยะเข้า ส่งตรงถึงคุณ",
+};
+function Need({ need }) {
+  return need ? <span className="ml-1 rounded bg-[#FDE8E6] px-1.5 text-xs font-bold text-[#B42318]">จำเป็น</span> : <span className="ml-1 text-xs font-normal text-[#45504A]">ไม่บังคับ</span>;
+}
+function ContactForm({ contact, setContact, onSave }) {
+  const t = useT();
+  const [more, setMore] = useState(!!(contact.email || contact.ig));
+  const f = (k) => ({ value: contact[k] || "", onChange: (e) => setContact({ ...contact, [k]: e.target.value }) });
+  const ok = (contact.name || "").trim() && ((contact.phone || "").trim() || (contact.line_id || "").trim());
+  const box = "min-h-[50px] w-full rounded-xl border border-[#A9B4AD] bg-white px-3 text-base";
+  return (
+    <form onSubmit={onSave} className="space-y-3 rounded-2xl border-2 border-[#1E6B47] bg-white p-3">
+      <p className="text-[15px] font-bold text-[#154D33]">{t(`myhome.contact.why_${contact.from || "news"}`, CONTACT_WHY[contact.from] || CONTACT_WHY.news)}</p>
+      <label className="block">
+        <span className="text-[15px] font-bold">
+          ชื่อเรียก
+          <Need need />
+        </span>
+        <input {...f("name")} placeholder="ชื่อเล่นก็ได้ เช่น ป้าน้อย" className={box} autoComplete="name" />
+      </label>
+      <fieldset className="space-y-2">
+        <legend className="text-[15px] font-bold">
+          ติดต่อทางไหน
+          <span className="ml-1 rounded bg-[#FDE8E6] px-1.5 text-xs font-bold text-[#B42318]">ใส่อย่างน้อย 1 ช่อง</span>
+        </legend>
+        <input {...f("phone")} placeholder="เบอร์โทร เช่น 081 234 5678" inputMode="tel" autoComplete="tel" className={box} aria-label="เบอร์โทร" />
+        <input {...f("line_id")} placeholder="หรือ LINE ID" className={box} aria-label="LINE ID" />
+      </fieldset>
+      {more ? (
+        <div className="space-y-2">
+          <label className="block">
+            <span className="text-sm font-bold">
+              อีเมล
+              <Need />
+            </span>
+            <input {...f("email")} inputMode="email" autoComplete="email" className={box} />
+          </label>
+          <label className="block">
+            <span className="text-sm font-bold">
+              IG / Facebook
+              <Need />
+            </span>
+            <input {...f("ig")} className={box} />
+          </label>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setMore(true)} className="min-h-[44px] text-[15px] font-bold text-[#45504A] underline">
+          + เพิ่มอีเมล / IG / Facebook (ไม่บังคับ)
+        </button>
+      )}
+      <label className="flex min-h-[44px] items-center gap-3 text-[15px]">
+        <input type="checkbox" checked={contact.news !== false} onChange={(e) => setContact({ ...contact, news: e.target.checked })} className="h-5 w-5 accent-[#1E6B47]" />
+        ส่งข่าวด่วนของหมู่บ้านให้ฉันด้วย
+      </label>
+      <p className="text-sm text-[#45504A]">🔒 ทีมอาสาเห็นเท่านั้น ไม่แสดงบนเว็บ</p>
+      <div className="flex gap-2">
+        <button disabled={!ok} className="min-h-[52px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-40">
+          บันทึก
+        </button>
+        <button type="button" onClick={() => setContact(null)} className="min-h-[52px] rounded-xl border border-[#C9D1CB] px-4 font-bold">
+          ยกเลิก
+        </button>
+      </div>
+    </form>
+  );
+}
+
 // ---------- settled things fold into one strip at the foot of the card; a tap opens one back where it was ----------
 function Settled({ items, onOpen }) {
   if (!items.length) return null;
@@ -295,7 +366,7 @@ function QuestionRow({ q, info, services, onAnswered, onPros, onIssue, onAsk, se
   );
 }
 
-function ElectricRow({ info, services, onSaved, onElectricians, onContact, setErr, onFold, onSent }) {
+function ElectricRow({ info, services, onSaved, onElectricians, onContact, contactSlot, setErr, onFold, onSent }) {
   const e = info.electric;
   const [pick, setPick] = useState(false); // choosing again
   const sorted = e.want && e.want !== "free" && !pick;
@@ -338,7 +409,7 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, setEr
           <p className="text-[15px] font-bold text-[#154D33]">คุณเลือก: {WANTS[e.want][0]}</p>
           {WANTS[e.want][1] && <p className="text-sm text-[#33403A]">{WANTS[e.want][1]}</p>}
           <div className="mt-2 flex gap-2">
-            {e.want === "free" && !info.has_contact && (
+            {e.want === "free" && !info.has_contact && !contactSlot && (
               <button onClick={onContact} className="min-h-[46px] flex-1 rounded-xl bg-[#1E6B47] px-2 text-[15px] font-bold text-white">
                 {t("myhome.electric.leave_contact", "ฝากเบอร์ให้ทีมแจ้ง")}
               </button>
@@ -366,6 +437,8 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, setEr
           )}
         </div>
       )}
+
+      {contactSlot}
 
       {sorted && <Electricians services={services} onAll={onElectricians} />}
 
@@ -456,7 +529,11 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
     e.preventDefault();
     setErr("");
     try {
-      await api("/myhome/contact", { method: "POST", body: JSON.stringify({ ...contact, house: info.house }) });
+      const { from, ...body } = contact;
+      await api("/myhome/contact", { method: "POST", body: JSON.stringify({ ...body, house: info.house }) });
+      save(`myContact:${info.house}`, body);
+      if (body.name) save("myName", body.name.trim());
+      if (body.phone || body.line_id) save("myReach", (body.phone || body.line_id).trim());
       setContact(null);
       setInfo((i) => ({ ...i, has_contact: true }));
     } catch (e2) {
@@ -466,6 +543,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
 
   const t = useT();
   const frame = look?.frame;
+  const savedContact = info ? load(`myContact:${info.house}`, null) : null;
   const el = info?.electric;
   const elSettled = !!el && (el.status === "done" || (el.want && el.want !== "free"));
   const elWant = { fine: "ไม่สนใจแล้ว", hired: "จ้างช่างเองแล้ว", group: "รวมกลุ่มจ้างช่าง" };
@@ -611,10 +689,8 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               services={services}
               onSaved={setInfo}
               onElectricians={onElectricians}
-              onContact={() => {
-                setContact({});
-                setTimeout(() => contactRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-              }}
+              onContact={() => setContact({ name: load("myName", ""), from: "electric" })}
+              contactSlot={contact?.from === "electric" ? <ContactForm contact={contact} setContact={setContact} onSave={sendContact} /> : null}
               setErr={setErr}
             />
           )}
@@ -653,37 +729,31 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           </Row>
 
           <div ref={contactRef} />
-          <Row icon="📨" title={t("myhome.contact.title", "รับข่าวหมู่บ้าน (ไม่บังคับ)")}>
-            {info.has_contact && !contact ? (
-              <p className="text-[15px] text-[#1E6B47]">บันทึกช่องทางรับข่าวไว้แล้ว</p>
-            ) : contact ? (
-              <form onSubmit={sendContact} className="space-y-2">
-                {[
-                  ["line_id", "LINE ID"],
-                  ["phone", "เบอร์โทร"],
-                  ["email", "อีเมล"],
-                  ["ig", "IG / Facebook"],
-                ].map(([k, t]) => (
-                  <label key={k} className="block">
-                    <span className="text-sm font-bold">{t}</span>
-                    <input
-                      value={contact[k] || ""}
-                      onChange={(e) => setContact({ ...contact, [k]: e.target.value })}
-                      className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base"
-                    />
-                  </label>
-                ))}
-                <p className="text-sm text-[#45504A]">ใส่ช่องเดียวก็ได้ · ทีมอาสาเห็นเท่านั้น ไม่แสดงบนเว็บ</p>
-                <div className="flex gap-2">
-                  <button className="min-h-[50px] flex-1 rounded-xl bg-[#1E6B47] font-bold text-white">บันทึก</button>
-                  <button type="button" onClick={() => setContact(null)} className="min-h-[50px] rounded-xl border border-[#C9D1CB] px-4 font-bold">
-                    ยกเลิก
-                  </button>
-                </div>
-              </form>
+          <Row icon="📨" title={t("myhome.contact.title", "ช่องทางติดต่อบ้านนี้")}>
+            {!contact && <p className="-mt-1 text-sm text-[#45504A]">{t("myhome.contact.sub", "ไม่บังคับ · ทีมอาสาใช้แจ้งข่าวด่วนและนัดช่าง")}</p>}
+            {contact && contact.from !== "electric" ? (
+              <ContactForm contact={contact} setContact={setContact} onSave={sendContact} />
+            ) : info.has_contact ? (
+              <div className="flex items-center gap-2 rounded-2xl bg-[#E4F0E9] p-3">
+                <p className="min-w-0 flex-1 text-[15px] text-[#154D33]">
+                  {savedContact ? (
+                    <>
+                      <b>{savedContact.name || "บันทึกแล้ว"}</b> · {savedContact.phone || (savedContact.line_id && `LINE ${savedContact.line_id}`)}
+                    </>
+                  ) : (
+                    <b>บันทึกช่องทางติดต่อไว้แล้ว</b>
+                  )}
+                </p>
+                <button onClick={() => setContact({ ...(savedContact || {}), from: "news" })} className="min-h-[44px] shrink-0 rounded-xl border border-[#C9D1CB] bg-white px-3 text-[15px] font-bold">
+                  แก้ไข
+                </button>
+              </div>
             ) : (
-              <button onClick={() => setContact({})} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-[15px] font-bold">
-                {t("myhome.contact.button", "ฝาก LINE / อีเมล ไว้รับข่าวด่วน")}
+              <button
+                onClick={() => setContact({ name: load("myName", ""), from: "news" })}
+                className="min-h-[50px] w-full rounded-xl border-2 border-[#1E6B47] bg-white text-[15px] font-bold text-[#154D33]"
+              >
+                {t("myhome.contact.button", "ฝากเบอร์ / LINE ให้ทีมอาสาติดต่อได้")}
               </button>
             )}
           </Row>
