@@ -7,7 +7,7 @@ import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
 import SurveyBoxes from "./components/SurveyBox";
-import { CommunityFeed, CommunityIntro, IntentChoices, NEED_CHOICES, OFFER_CHOICES, PostedSheetBody } from "./components/Community";
+import { CommunityFeed, CommunityIntro, FoldBox, IntentChoices, NEED_CHOICES, OFFER_CHOICES, PostedSheetBody } from "./components/Community";
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView } from "./components/WatchPanel";
@@ -37,7 +37,6 @@ const MORE_TABS = {
   guide: ["📋", "เช็กลิสต์หลังน้ำลด"],
   issues: ["📍", "ปัญหาซอย"],
   lost: ["🐾", "หาย · เจอ"],
-  water: ["💧", "ระดับน้ำ · แผนที่"],
 };
 const TABS = { ...MAIN_TABS, ...MORE_TABS };
 
@@ -71,7 +70,20 @@ export default function RepairApp() {
     window.history.replaceState(null, "", `#${t}`);
   };
   const navRef = useRef(null);
+  // home blocks that fold like the ⚡ box; each phone remembers open / closed
+  const waterRef = useRef(null);
+  const [waterOpen, setWaterOpenRaw] = useState(() => window.location.hash === "#water" || load("waterBoxOpen", false));
+  const [commOpen, setCommOpenRaw] = useState(() => load("communityBoxOpen", true));
+  const setWaterOpen = (v) => {
+    setWaterOpenRaw(v);
+    save("waterBoxOpen", v);
+  };
+  const setCommOpen = (v) => {
+    setCommOpenRaw(v);
+    save("communityBoxOpen", v);
+  };
   const showTab = (t) => {
+    setCommOpen(true);
     pick(t);
     setTimeout(() => navRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
@@ -89,13 +101,17 @@ export default function RepairApp() {
     setSheet({ type: "posted", text });
   };
   const openWater = () => {
-    pick("water");
-    setTimeout(() => navRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    setWaterOpen(true);
+    setTimeout(() => waterRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   };
 
   useEffect(() => {
     document.title = "ซ่อมบ้าน เสรีไทย 57";
-    const onHash = () => TABS[window.location.hash.slice(1)] && setTab(window.location.hash.slice(1));
+    const onHash = () => {
+      const h = window.location.hash.slice(1);
+      if (h === "water") return setWaterOpenRaw(true);
+      if (TABS[h]) setTab(h);
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -259,7 +275,7 @@ export default function RepairApp() {
               if (e.tab && TABS[e.tab]) return pick(e.tab);
               const [lat, lng] = eventSpot(e);
               setFocus({ lat, lng, t: Date.now() });
-              pick("water");
+              openWater();
             }}
           />
         ))}
@@ -293,7 +309,42 @@ export default function RepairApp() {
           <span className="shrink-0 font-semibold underline">ดู ›</span>
         </a>}
 
-        {home.tabs_on && (<>
+        <FoldBox
+          boxRef={waterRef}
+          icon="💧"
+          title="ระดับน้ำ · แผนที่หมู่บ้าน"
+          sub={waterSub(water)}
+          tone="border-sky-600 bg-sky-50"
+          open={waterOpen}
+          onToggle={() => setWaterOpen(!waterOpen)}
+        >
+          <WaterView
+            trips={trips}
+            focus={focus}
+            hubs={hubPins}
+            events={eventsOn}
+            onFocusTrip={(t) => setFocus({ lat: t.lat, lng: t.lng, t: Date.now() })}
+            water={water}
+            canal={canal}
+            admin={admin}
+            onWater={() => setSheet({ type: "water" })}
+            onCanal={() => setSheet({ type: "canal" })}
+            onLeaks={() => setSheet({ type: "leaks" })}
+            onLeak={(leak) => setSheet({ type: "leak", leak })}
+            onPump={(pump) => setSheet({ type: "pump", pump })}
+            onPumps={() => setSheet({ type: "pumps" })}
+          />
+        </FoldBox>
+
+        {home.tabs_on && (
+        <FoldBox
+          icon="🏘️"
+          title="ชุมชนเสรีไทย 57"
+          sub="เพื่อนบ้านช่วยกัน · ขอ · ให้ · แนะนำช่าง/ร้าน · ถาม-ตอบ"
+          tone="border-emerald-600 bg-emerald-50"
+          open={commOpen}
+          onToggle={() => setCommOpen(!commOpen)}
+        >
         <CommunityIntro onNeed={() => setSheet({ type: "intent", need: true })} onOffer={() => setSheet({ type: "intent", need: false })} onAsk={() => askForum()} />
         <nav ref={navRef} className="scroll-mt-28 grid grid-cols-5 gap-1 rounded-2xl bg-white p-1 shadow-sm" aria-label="หมวด">
           {Object.entries(MAIN_TABS).map(([k, [emoji, text]]) => (
@@ -324,24 +375,6 @@ export default function RepairApp() {
         </div>
 
         <div className="mt-3">
-          {tab === "water" && (
-            <WaterView
-              trips={trips}
-              focus={focus}
-              hubs={hubPins}
-              events={eventsOn}
-              onFocusTrip={(t) => setFocus({ lat: t.lat, lng: t.lng, t: Date.now() })}
-              water={water}
-              canal={canal}
-              admin={admin}
-              onWater={() => setSheet({ type: "water" })}
-              onCanal={() => setSheet({ type: "canal" })}
-              onLeaks={() => setSheet({ type: "leaks" })}
-              onLeak={(leak) => setSheet({ type: "leak", leak })}
-              onPump={(pump) => setSheet({ type: "pump", pump })}
-              onPumps={() => setSheet({ type: "pumps" })}
-            />
-          )}
           {tab === "feed" && (
             <CommunityFeed
               lend={lend}
@@ -366,7 +399,8 @@ export default function RepairApp() {
           {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
           {tab === "guide" && <AfterFloodGuide />}
         </div>
-        </>)}
+        </FoldBox>
+        )}
 
         {home.hub?.on && home.hub.title && (
           <div className="mt-8">
@@ -587,6 +621,12 @@ export default function RepairApp() {
       )}
     </div>
   );
+}
+
+// one line under the 💧 block's title: the newest street-level report, if any
+function waterSub(water) {
+  const w = water[0];
+  return w ? `แจ้งล่าสุด ${timeAgo(w.created_at)}${w.soi ? ` · ซ.${w.soi}` : ""} · คลอง เครื่องสูบ รถอาสา` : "ระดับน้ำที่เพื่อนบ้านแจ้ง · คลอง · เครื่องสูบ · รถอาสา";
 }
 
 const LEND_KIND_TEXT = { lend: "🤝 มีของให้ยืม:", give: "🎁 มีของให้ฟรี:", want: "🔎 ตามหา / อยากยืม:" };

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { JOB_TYPES, LEND_CATEGORIES, LEND_KINDS, SERVICE_CATEGORIES, timeAgo } from "../config";
 import { FORUM_CATEGORIES } from "./Forum";
 
@@ -25,16 +25,14 @@ export const OFFER_CHOICES = [
 
 export function CommunityIntro({ onNeed, onOffer, onAsk }) {
   return (
-    <section className="mb-3 rounded-2xl bg-white p-3 shadow-sm">
-      <h2 className="text-xl font-bold">🏘️ ชุมชนเสรีไทย 57</h2>
-      <p className="text-sm text-neutral-600">เพื่อนบ้านช่วยกัน · ขอ · ให้ · แนะนำ · ถาม</p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+    <section className="mb-3">
+      <div className="grid grid-cols-2 gap-2">
         <button onClick={onNeed} className="flex min-h-[84px] flex-col items-start justify-center rounded-xl bg-black px-3 py-2 text-left text-white active:bg-neutral-800">
-          <span className="text-lg font-bold">🙋 ฉันต้องการ…</span>
+          <span className="text-base font-bold min-[400px]:text-lg">🙋 ฉันต้องการ…</span>
           <span className="text-sm text-neutral-300">ช่าง · คนช่วย · ยืมของ</span>
         </button>
         <button onClick={onOffer} className="flex min-h-[84px] flex-col items-start justify-center rounded-xl border-2 border-black bg-white px-3 py-2 text-left active:bg-neutral-100">
-          <span className="text-lg font-bold">🤝 ฉันช่วยได้…</span>
+          <span className="text-base font-bold min-[400px]:text-lg">🤝 ฉันช่วยได้…</span>
           <span className="text-sm text-neutral-600">แนะนำร้าน · มีของ · ช่วยแรง</span>
         </button>
       </div>
@@ -163,5 +161,34 @@ export function PostedSheetBody({ text, onClose }) {
         เสร็จแล้ว
       </button>
     </div>
+  );
+}
+
+// A home-page block that folds to one line (same look as the ⚡ sign-up box): icon, title, a one-line
+// summary and "ย่อ / ดู ›". Kept mounted once opened (Leaflet maps don't like being torn down).
+export function FoldBox({ icon, title, sub, open, onToggle, tone, boxRef, children }) {
+  const [mounted, setMounted] = useState(open);
+  useEffect(() => {
+    if (!open) return;
+    setMounted(true);
+    const t = setTimeout(() => window.dispatchEvent(new Event("resize")), 60); // maps re-measure after unhiding
+    return () => clearTimeout(t);
+  }, [open]);
+  return (
+    <section ref={boxRef} className={`mb-3 scroll-mt-28 rounded-xl border-4 px-3 py-2 ${tone}`}>
+      <button onClick={onToggle} aria-expanded={open} className="flex min-h-[56px] w-full items-center gap-3 text-left">
+        <span className="text-2xl" aria-hidden="true">{icon}</span>
+        <span className="min-w-0 flex-1">
+          <b className="block break-words text-lg leading-snug">{title}</b>
+          {sub && <span className="block text-sm text-neutral-700">{sub}</span>}
+        </span>
+        <span className="shrink-0 font-semibold underline">{open ? "ย่อ" : "ดู ›"}</span>
+      </button>
+      {mounted && (
+        <div className="pb-2 pt-1" hidden={!open}>
+          {children}
+        </div>
+      )}
+    </section>
   );
 }
