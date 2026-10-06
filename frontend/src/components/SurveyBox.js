@@ -28,7 +28,8 @@ export default function SurveyBoxes() {
 function SurveyBox({ s, onCount }) {
   const mine = load(`survey:${s.key}`, null);
   const c = load("contact", {});
-  const [open, setOpen] = useState(!mine); // open unless this phone already signed
+  // 6 Oct: starts folded (title + progress only) so the community below is on the first screen
+  const [open, setOpen] = useState(false);
   const [mode, setMode] = useState("sign"); // sign | check
   const [f, setF] = useState(() => mine || { house: "", soi: "", name: c.name || "", phone: c.phone || "", picks: [], note: "" });
   const [busy, setBusy] = useState(false);

@@ -7,7 +7,7 @@ import { WeatherAlerts, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
 import SurveyBoxes from "./components/SurveyBox";
-import RecoveryStart from "./components/RecoveryStart";
+import { CommunityFeed, CommunityIntro, IntentChoices, NEED_CHOICES, OFFER_CHOICES, PostedSheetBody } from "./components/Community";
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView } from "./components/WatchPanel";
@@ -23,16 +23,18 @@ import { AfterFloodGuide, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, L
 const REFRESH_MS = 30000;
 // 3 Oct: the water is gone, people only care about getting the house back — recovery first,
 // the rest (water levels, lost & found, soi issues) one tap further under "อื่นๆ".
+// 6 Oct: rebuilt as the neighbours' community. People pick what they want to do (CommunityIntro), the
+// feed shows everything at once; the boards stay one tap away. Waste and the checklist move under "อื่นๆ".
 const MAIN_TABS = {
-  start: ["🏠", "ฟื้นฟูบ้าน"],
-  pros: ["🔧", "ช่าง · ร้าน"],
-  lend: ["🧰", "ยืม · ให้ยืม"],
+  feed: ["📰", "ล่าสุด"],
   jobs: ["🙋", "ขอแรง"],
-  waste: ["♻️", "ขยะ · รถเก็บ"],
+  pros: ["🔧", "ช่าง · ร้าน"],
+  lend: ["🧰", "ยืม · ของฟรี"],
   forum: ["💬", "ถาม-ตอบ"],
 };
 const MORE_TABS = {
-  guide: ["📋", "เช็กลิสต์"],
+  waste: ["♻️", "ขยะ · รถเก็บ"],
+  guide: ["📋", "เช็กลิสต์หลังน้ำลด"],
   issues: ["📍", "ปัญหาซอย"],
   lost: ["🐾", "หาย · เจอ"],
   water: ["💧", "ระดับน้ำ · แผนที่"],
@@ -40,11 +42,13 @@ const MORE_TABS = {
 const TABS = { ...MAIN_TABS, ...MORE_TABS };
 
 export default function RepairApp() {
-  const [tab, setTab] = useState(() => (TABS[window.location.hash.slice(1)] ? window.location.hash.slice(1) : load("repairTab2", "start")));
+  const [tab, setTab] = useState(() => (TABS[window.location.hash.slice(1)] ? window.location.hash.slice(1) : load("repairTab3", "feed")));
   const [lend, setLend] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [issues, setIssues] = useState([]);
   const [lost, setLost] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [forumGo, setForumGo] = useState({ n: 0 }); // feed / "ask" door → open a topic or the form
   const [water, setWater] = useState([]);
   const [canal, setCanal] = useState(null);
   // highlight boxes (water watch, volunteer hand-out point): admins switch them on /admin, no redeploy
@@ -63,10 +67,27 @@ export default function RepairApp() {
 
   const pick = (t) => {
     setTab(t);
-    save("repairTab2", t);
+    save("repairTab3", t);
     window.history.replaceState(null, "", `#${t}`);
   };
   const navRef = useRef(null);
+  const showTab = (t) => {
+    pick(t);
+    setTimeout(() => navRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+  const go = (g) => {
+    if (g.sheet) return setSheet(g.sheet);
+    setSheet(null);
+    showTab(g.tab);
+  };
+  const askForum = (openId = null) => {
+    setForumGo((f) => ({ n: f.n + 1, openId, compose: !openId }));
+    showTab("forum");
+  };
+  const posted = (tab, text) => {
+    pick(tab);
+    setSheet({ type: "posted", text });
+  };
   const openWater = () => {
     pick("water");
     setTimeout(() => navRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -85,7 +106,7 @@ export default function RepairApp() {
         .then((r) => setViewers(r.online))
         .catch(() => {});
     try {
-      const [l, j, i, s, a, lf, w, cn, hm] = await Promise.all([
+      const [l, j, i, s, a, lf, w, cn, hm, ft] = await Promise.all([
         api("/lend"),
         api("/jobs"),
         api("/issues"),
@@ -95,7 +116,9 @@ export default function RepairApp() {
         api("/water").catch(() => []),
         api("/canal").catch(() => null),
         api("/home").catch(() => null),
+        api("/forum").catch(() => null),
       ]);
+      if (ft) setTopics(ft);
       setLost(lf);
       if (hm) {
         setHome(hm);
@@ -271,30 +294,28 @@ export default function RepairApp() {
         </a>}
 
         {home.tabs_on && (<>
-        <nav ref={navRef} className="scroll-mt-28 grid grid-cols-3 gap-1 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-6" aria-label="หมวด">
+        <CommunityIntro onNeed={() => setSheet({ type: "intent", need: true })} onOffer={() => setSheet({ type: "intent", need: false })} onAsk={() => askForum()} />
+        <nav ref={navRef} className="scroll-mt-28 grid grid-cols-5 gap-1 rounded-2xl bg-white p-1 shadow-sm" aria-label="หมวด">
           {Object.entries(MAIN_TABS).map(([k, [emoji, text]]) => (
             <button
               key={k}
               onClick={() => pick(k)}
               aria-current={tab === k ? "page" : undefined}
-              className={`relative flex min-h-[60px] flex-col items-center justify-center rounded-xl px-1 text-center text-xs font-semibold leading-tight sm:text-sm ${tab === k ? "bg-black text-white" : "text-neutral-700 active:bg-neutral-100"}`}
+              className={`relative flex min-h-[60px] flex-col items-center justify-center rounded-xl px-0.5 text-center text-[11px] font-semibold leading-tight min-[400px]:text-xs sm:text-sm ${tab === k ? "bg-black text-white" : "text-neutral-700 active:bg-neutral-100"}`}
             >
               <span className="text-2xl" aria-hidden="true">{emoji}</span>
               {text}
-              {counts[k] > 0 && (
-                <span className={`absolute right-1 top-1 rounded-full px-1.5 text-[10px] ${tab === k ? "bg-white text-black" : "bg-black text-white"}`}>{counts[k]}</span>
-              )}
             </button>
           ))}
         </nav>
-        <div className="mt-1 flex flex-wrap items-center gap-1 px-1 text-sm" aria-label="หมวดอื่นๆ">
+        <div className="-mx-3 mt-1 flex items-center gap-1 overflow-x-auto whitespace-nowrap px-4 pb-1 text-sm" aria-label="หมวดอื่นๆ">
           <span className="text-neutral-500">อื่นๆ:</span>
           {Object.entries(MORE_TABS).map(([k, [emoji, text]]) => (
             <button
               key={k}
               onClick={() => pick(k)}
               aria-current={tab === k ? "page" : undefined}
-              className={`min-h-[36px] rounded-full px-3 ${tab === k ? "bg-black text-white" : "bg-white text-neutral-700 active:bg-neutral-100"}`}
+              className={`min-h-[36px] shrink-0 rounded-full px-3 ${tab === k ? "bg-black text-white" : "bg-white text-neutral-700 active:bg-neutral-100"}`}
             >
               <span aria-hidden="true">{emoji}</span> {text}
               {counts[k] > 0 && <span className="ml-1 text-xs text-neutral-500">({counts[k]})</span>}
@@ -321,16 +342,17 @@ export default function RepairApp() {
               onPumps={() => setSheet({ type: "pumps" })}
             />
           )}
-          {tab === "start" && (
-            <RecoveryStart
-              counts={counts}
-              onTab={pick}
-              onJob={(jobType) => setSheet({ type: "jobForm", kind: "need", jobType })}
-              onLend={(kind) => setSheet({ type: "lendForm", kind })}
-              onIssue={() => setSheet({ type: "issueForm" })}
+          {tab === "feed" && (
+            <CommunityFeed
+              lend={lend}
+              jobs={jobs}
+              services={services}
+              topics={topics}
+              onNeed={() => setSheet({ type: "intent", need: true })}
+              onOpen={(x) => (x.topic ? askForum(x.topic) : showTab(x.tab))}
             />
           )}
-          {tab === "forum" && <Forum admin={admin} />}
+          {tab === "forum" && <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />}
           {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
           {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} />}
           {tab === "pros" && <HireStrip jobs={jobs} onOpen={() => pick("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />}
@@ -385,9 +407,7 @@ export default function RepairApp() {
             kind={sheet.kind}
             onDone={(x) => {
               setLend((p) => [x, ...p]);
-              setSheet(null);
-              pick("lend");
-              setToast("ลงรายการแล้ว · จัดการคิว/ปิดรายการได้จากเครื่องนี้");
+              posted("lend", `${LEND_KIND_TEXT[x.kind] || "🧰"} ${x.title}${x.soi ? ` (ซ.${x.soi})` : ""}`);
             }}
           />
         </Sheet>
@@ -399,9 +419,7 @@ export default function RepairApp() {
             jobType={sheet.jobType}
             onDone={(j) => {
               setJobs((p) => [j, ...p]);
-              setSheet(null);
-              pick("jobs");
-              setToast("ลงแล้ว ทุกคนเห็นแล้ว");
+              posted("jobs", `${j.kind === "need" ? "🙋 ขอแรง" : "💪 ช่วยได้"}: ${j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`);
             }}
           />
         </Sheet>
@@ -514,8 +532,23 @@ export default function RepairApp() {
             repair
             onDone={(s) => {
               setServices((p) => [s, ...p]);
+              posted("pros", `⭐ แนะนำช่าง/ร้าน: ${s.name}${s.detail ? ` · ${s.detail}` : ""}`);
+            }}
+          />
+        </Sheet>
+      )}
+      {sheet?.type === "intent" && (
+        <Sheet title={sheet.need ? "🙋 ฉันต้องการ…" : "🤝 ฉันช่วยได้…"} onClose={() => setSheet(null)}>
+          <IntentChoices choices={sheet.need ? NEED_CHOICES : OFFER_CHOICES} onPick={go} />
+        </Sheet>
+      )}
+      {sheet?.type === "posted" && (
+        <Sheet title="ลงแล้ว" onClose={() => setSheet(null)}>
+          <PostedSheetBody
+            text={sheet.text}
+            onClose={() => {
               setSheet(null);
-              setToast("ลงชื่อแล้ว เพื่อนบ้านโทรหาได้ทันที");
+              showTab(tab);
             }}
           />
         </Sheet>
@@ -555,6 +588,8 @@ export default function RepairApp() {
     </div>
   );
 }
+
+const LEND_KIND_TEXT = { lend: "🤝 มีของให้ยืม:", give: "🎁 มีของให้ฟรี:", want: "🔎 ตามหา / อยากยืม:" };
 
 // Neighbours looking for a tradesman right now (jobs of type "hire"), shown above the contact board
 function HireStrip({ jobs, onOpen, onAdd }) {

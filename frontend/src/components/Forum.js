@@ -69,12 +69,13 @@ function IdentityFields({ me, set, idp }) {
   );
 }
 
-export default function Forum({ admin }) {
+// openId / startCompose: the community feed and its "ask" door land straight on a topic or the form
+export default function Forum({ admin, openId = null, startCompose = false }) {
   const [topics, setTopics] = useState(null);
   const [cat, setCat] = useState("all");
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState(null); // topic id
-  const [compose, setCompose] = useState(false);
+  const [open, setOpen] = useState(openId); // topic id
+  const [compose, setCompose] = useState(startCompose);
   const [err, setErr] = useState("");
   const reload = useCallback(() => {
     const params = new URLSearchParams();
