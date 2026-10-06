@@ -262,6 +262,7 @@ export default function RepairApp() {
     myhome: (
       <MyHome
         water={water}
+        services={services}
         look={home.layout?.myhome ? lookOf(home.layout, "myhome") : null}
         onIssue={() => setSheet({ type: "issueForm" })}
         onIssues={() => showTab("issues")}

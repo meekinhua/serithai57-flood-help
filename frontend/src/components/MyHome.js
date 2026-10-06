@@ -117,7 +117,46 @@ const SAFE = [
   "ห้ามจับสายไฟ ปลั๊ก หรือเบรกเกอร์ ตอนมือหรือเท้าเปียก",
 ];
 
-function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
+// the neighbours' electricians on the contact board: trusted first, numbers that didn't answer last
+function Electricians({ services, onAll }) {
+  const t = useT();
+  const list = (services || [])
+    .filter((x) => x.category === "electrician" && x.available !== false)
+    .sort((a, b) => b.pinned - a.pinned || b.verified - a.verified || (b.good || 0) - (a.good || 0) || (a.reports || 0) - (b.reports || 0))
+    .slice(0, 3);
+  return (
+    <div className="space-y-2 rounded-2xl bg-[#F2F4F1] p-3">
+      <p className="text-[15px] font-bold">{t("myhome.electric.private", "ช่างไฟเอกชนที่เพื่อนบ้านแนะนำ")}</p>
+      {list.length ? (
+        <ul className="space-y-2">
+          {list.map((x) => {
+            const digits = (x.phone || "").replace(/[^\d]/g, "");
+            return (
+              <li key={x.id} className="rounded-xl bg-white p-3">
+                <b className="block text-base leading-snug">{x.name}</b>
+                {x.detail && <p className="line-clamp-2 text-sm text-[#33403A]">{x.detail}</p>}
+                {digits.length >= 9 ? (
+                  <a href={`tel:${digits}`} className="mt-1.5 flex min-h-[48px] items-center justify-center rounded-xl bg-[#15201A] text-base font-bold text-white">
+                    โทร {x.phone}
+                  </a>
+                ) : (
+                  x.phone && <p className="mt-1 text-[15px]">ติดต่อ: {x.phone}</p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="text-[15px] text-[#45504A]">{t("myhome.electric.private_none", "ยังไม่มีในระบบ · ถ้ารู้จักช่างไฟดีๆ แนะนำให้เพื่อนบ้านได้")}</p>
+      )}
+      <button onClick={onAll} className="min-h-[46px] w-full rounded-xl border border-[#C9D1CB] bg-white text-[15px] font-bold">
+        {list.length ? t("myhome.electric.private_all", "ดูช่างไฟทั้งหมด / แนะนำเพิ่ม") : t("myhome.electric.private_add", "แนะนำช่างไฟ")}
+      </button>
+    </div>
+  );
+}
+
+function ElectricRow({ info, services, onSaved, onElectricians, onContact, setErr }) {
   const e = info.electric;
   const [pick, setPick] = useState(false); // choosing again
   const sorted = e.want && e.want !== "free" && !pick;
@@ -149,16 +188,16 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
   return (
     <Row icon="⚡" title={t("myhome.electric.title", "ตรวจไฟฟ้าหลังน้ำท่วม")}>
       <p className={`text-base font-bold ${e.signed ? ELECTRIC[e.status]?.[1] || "" : ""}`}>{e.signed ? ELECTRIC[e.status]?.[0] || "ลงชื่อไว้แล้ว" : "บ้านนี้ยังไม่ได้ตรวจไฟ"}</p>
-      <p className="text-[15px] text-[#33403A]">
-        {info.soi && e.soi_waiting > 0 ? `ใน ซ.${info.soi} ยังรอช่างอีก ${e.soi_waiting} หลัง` : `ทั้งหมู่บ้านยังรอช่างอีก ${e.village_waiting} หลัง`}
-      </p>
+      {!sorted && (
+        <p className="text-[15px] text-[#33403A]">{info.soi && e.soi_waiting > 0 ? `ใน ซ.${info.soi} ยังรอช่างอีก ${e.soi_waiting} หลัง` : `ทั้งหมู่บ้านยังรอช่างอีก ${e.village_waiting} หลัง`}</p>
+      )}
 
       {e.want && !pick ? (
         <div className="rounded-2xl bg-[#E4F0E9] p-3">
           <p className="text-[15px] font-bold text-[#154D33]">คุณเลือก: {WANTS[e.want][0]}</p>
           {WANTS[e.want][1] && <p className="text-sm text-[#33403A]">{WANTS[e.want][1]}</p>}
           <div className="mt-2 flex gap-2">
-            {(e.want === "free" || e.want === "group") && !info.has_contact && (
+            {e.want === "free" && !info.has_contact && (
               <button onClick={onContact} className="min-h-[46px] flex-1 rounded-xl bg-[#1E6B47] px-2 text-[15px] font-bold text-white">
                 {t("myhome.electric.leave_contact", "ฝากเบอร์/LINE ให้ทีมแจ้ง")}
               </button>
@@ -187,6 +226,8 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
         </div>
       )}
 
+      {sorted && <Electricians services={services} onAll={onElectricians} />}
+
       {!sorted && (
         <>
           <button onClick={() => setSafe((v) => !v)} aria-expanded={safe} className="min-h-[48px] w-full rounded-xl bg-[#FFF6DA] px-3 text-left text-[15px] font-bold">
@@ -213,7 +254,7 @@ function ElectricRow({ info, onSaved, onElectricians, onContact, setErr }) {
   );
 }
 
-export default function MyHome({ water, look, onIssue, onIssues, onElectricians }) {
+export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians }) {
   const fromSurvey = load("survey:electric", null)?.house || "";
   const [house, setHouse] = useState(() => load("myHouse", "") || fromSurvey);
   const [typing, setTyping] = useState(!house);
@@ -378,6 +419,18 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
             </div>
           ) : null}
 
+          <ElectricRow
+            info={info}
+            services={services}
+            onSaved={setInfo}
+            onElectricians={onElectricians}
+            onContact={() => {
+              setContact({});
+              setTimeout(() => contactRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+            }}
+            setErr={setErr}
+          />
+
           <WaterRow
             info={info}
             water={water}
@@ -396,17 +449,6 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
           <div ref={nearRef}>
             <Nearby info={info} form={nearForm} setForm={setNearForm} setErr={setErr} />
           </div>
-
-          <ElectricRow
-            info={info}
-            onSaved={setInfo}
-            onElectricians={onElectricians}
-            onContact={() => {
-              setContact({});
-              setTimeout(() => contactRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-            }}
-            setErr={setErr}
-          />
 
           <Row icon="🛠️" title={t("myhome.office.title", "ส่งเรื่องให้สำนักงานหมู่บ้านแก้") + (info.soi ? ` · ซ.${info.soi}` : "")}>
             <p className="text-[15px]">{info.issues_open ? `ในซอยนี้มีเรื่องรอแก้ ${info.issues_open} เรื่อง` : "ในซอยนี้ยังไม่มีเรื่องค้าง"}</p>
