@@ -90,13 +90,20 @@ function WaterRow({ info, water, onAsk, sent, onTap }) {
   );
 }
 
-function Row({ icon, title, children, hi }) {
+function Row({ icon, title, children, hi, onFold, id }) {
   return (
-    <div className={`border-t border-[#E6EBE7] py-3 ${hi ? "-mx-4 bg-[#FFF8E1] px-4" : ""}`}>
-      <p className="text-base font-bold text-[#15201A]">
-        {icon && <span aria-hidden="true">{icon} </span>}
-        {title}
-      </p>
+    <div id={id} className={`border-t border-[#E6EBE7] py-3 ${hi ? "-mx-4 bg-[#FFF8E1] px-4" : ""}`}>
+      <div className="flex items-start gap-2">
+        <p className="min-w-0 flex-1 text-base font-bold text-[#15201A]">
+          {icon && <span aria-hidden="true">{icon} </span>}
+          {title}
+        </p>
+        {onFold && (
+          <button onClick={onFold} className="-my-2 min-h-[44px] shrink-0 px-1 text-[15px] font-bold text-[#45504A]">
+            หุบ ▴
+          </button>
+        )}
+      </div>
       <div className="mt-1 space-y-2">{children}</div>
     </div>
   );
@@ -186,8 +193,38 @@ function Electricians({ services, onAll }) {
   );
 }
 
+// ---------- settled things fold into one strip at the foot of the card; a tap opens one back where it was ----------
+function Settled({ items, onOpen }) {
+  if (!items.length) return null;
+  return (
+    <div className="border-t border-[#E6EBE7] py-3">
+      <p className="text-sm font-bold text-[#45504A]">เรื่องที่ตอบแล้ว · แตะเพื่อดูหรือเปลี่ยน</p>
+      <div className="mt-1.5 flex flex-wrap gap-2">
+        {items.map((x) => (
+          <button
+            key={x.key}
+            onClick={() => onOpen(x.key)}
+            className="flex min-h-[44px] max-w-full items-center gap-1.5 rounded-full border border-[#C9D1CB] bg-[#F2F4F1] px-3.5 text-[15px] active:bg-[#E4F0E9]"
+          >
+            <span className="font-bold text-[#1E6B47]" aria-hidden="true">
+              ✓
+            </span>
+            <span aria-hidden="true">{x.icon}</span>
+            <span className="truncate">
+              {x.label}: <b>{x.answer}</b>
+            </span>
+            <span className="text-[#45504A]" aria-hidden="true">
+              ›
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ---------- questions the team asks every house from the chat (backend myhome.py Question, tools/site.py ask) ----------
-function QuestionRow({ q, info, services, onAnswered, onPros, onIssue, onAsk, setErr }) {
+function QuestionRow({ q, info, services, onAnswered, onPros, onIssue, onAsk, setErr, onFold }) {
   const [again, setAgain] = useState(false);
   const t = useT();
   async function answer(a) {
@@ -199,13 +236,19 @@ function QuestionRow({ q, info, services, onAnswered, onPros, onIssue, onAsk, se
       setErr(e.message);
     }
   }
-  if (q.answer === "no" && !again) return null;
   const group = PRO_GROUPS.find((g) => g.key === q.group);
   const open = !q.answer || again;
   return (
-    <Row icon={q.icon} title={q.q} hi={open}>
+    <Row id={`myhome-${q.id}`} icon={q.icon} title={q.q} hi={open} onFold={q.answer === "no" && !again ? onFold : null}>
       {open && <p className="-mt-1 text-sm text-[#7A4104]">{t("myhome.q.from", "คำถามจากทีมอาสา · กดตอบครั้งเดียว")}</p>}
-      {q.answer === "yes" && !again ? (
+      {q.answer === "no" && !again ? (
+        <div className="flex items-center gap-2 rounded-2xl bg-[#E4F0E9] p-3">
+          <p className="min-w-0 flex-1 text-[15px] font-bold text-[#154D33]">คุณตอบ: {q.no}</p>
+          <button onClick={() => setAgain(true)} className="min-h-[44px] shrink-0 rounded-xl border border-[#C9D1CB] bg-white px-3 text-[15px] font-bold">
+            เปลี่ยนคำตอบ
+          </button>
+        </div>
+      ) : q.answer === "yes" && !again ? (
         <>
           {q.tip && <p className="whitespace-pre-line text-[15px] leading-relaxed">{q.tip}</p>}
           {info.soi && q.soi_yes > 0 && (
@@ -252,7 +295,7 @@ function QuestionRow({ q, info, services, onAnswered, onPros, onIssue, onAsk, se
   );
 }
 
-function ElectricRow({ info, services, onSaved, onElectricians, onContact, setErr }) {
+function ElectricRow({ info, services, onSaved, onElectricians, onContact, setErr, onFold, onSent }) {
   const e = info.electric;
   const [pick, setPick] = useState(false); // choosing again
   const sorted = e.want && e.want !== "free" && !pick;
@@ -264,6 +307,7 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, setEr
     try {
       onSaved(await api("/myhome/electric", { method: "POST", body: JSON.stringify({ house: info.house, want, slots: [] }) }));
       setPick(false);
+      onSent && onSent(want);
     } catch (x) {
       setErr(x.message);
     }
@@ -277,13 +321,13 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, setEr
 
   if (e.status === "done")
     return (
-      <Row icon="⚡" title={t("myhome.electric.title", "ตรวจไฟฟ้าหลังน้ำท่วม")}>
+      <Row id="myhome-electric" icon="⚡" title={t("myhome.electric.title", "ตรวจไฟฟ้าหลังน้ำท่วม")} onFold={onFold}>
         <p className="text-base font-bold text-[#1E6B47]">ช่างตรวจบ้านนี้แล้ว</p>
       </Row>
     );
 
   return (
-    <Row icon="⚡" title={t("myhome.electric.title", "ตรวจไฟฟ้าหลังน้ำท่วม")}>
+    <Row id="myhome-electric" icon="⚡" title={t("myhome.electric.title", "ตรวจไฟฟ้าหลังน้ำท่วม")} onFold={sorted ? onFold : null}>
       {deciding && <p className={`text-base font-bold ${e.signed ? ELECTRIC[e.status]?.[1] || "" : ""}`}>{e.signed ? ELECTRIC[e.status]?.[0] || "ลงชื่อไว้แล้ว" : "บ้านนี้ยังไม่ได้ตรวจไฟ"}</p>}
       {deciding && (
         <p className="text-[15px] text-[#33403A]">{info.soi && e.soi_waiting > 0 ? `ใน ซ.${info.soi} ยังรอช่างอีก ${e.soi_waiting} หลัง` : `ทั้งหมู่บ้านยังรอช่างอีก ${e.village_waiting} หลัง`}</p>
@@ -369,6 +413,9 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   useEffect(() => {
     if (err) errRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [err]);
+  const [opened, setOpened] = useState([]); // settled sections opened again by a tap (or just answered)
+  const openIt = (k) => setOpened((o) => (o.includes(k) ? o : [...o, k]));
+  const foldIt = (k) => setOpened((o) => o.filter((x) => x !== k));
   const [pinning, setPinning] = useState(null); // {pos, soi, touched} while the map is open
 
   useEffect(() => {
@@ -419,6 +466,18 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
 
   const t = useT();
   const frame = look?.frame;
+  const el = info?.electric;
+  const elSettled = !!el && (el.status === "done" || (el.want && el.want !== "free"));
+  const elWant = { fine: "ไม่สนใจแล้ว", hired: "จ้างช่างเองแล้ว", group: "รวมกลุ่มจ้างช่าง" };
+  const settled = !info
+    ? []
+    : [
+        ...(info.questions || [])
+          .filter((q) => q.answer === "no" && !opened.includes(q.id))
+          .map((q) => ({ key: q.id, icon: q.icon, label: q.short || (q.q.length > 22 ? q.q.slice(0, 20) + "…" : q.q), answer: q.no })),
+        ...(elSettled && !opened.includes("electric") ? [{ key: "electric", icon: "⚡", label: "ตรวจไฟ", answer: el.status === "done" ? "ช่างตรวจแล้ว" : elWant[el.want] || "ตอบแล้ว" }] : []),
+      ];
+  const isFolded = (k) => settled.some((x) => x.key === k);
   if (typing || !house)
     return (
       <section className="mb-3 rounded-[20px] border border-[#DCE2DD] bg-white p-4" style={frame}>
@@ -518,34 +577,47 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
             </div>
           ) : null}
 
-          {(info.questions || []).map((q) => (
-            <QuestionRow
-              key={q.id}
-              q={q}
+          {(info.questions || [])
+            .filter((q) => !isFolded(q.id))
+            .map((q) => (
+              <QuestionRow
+                key={q.id}
+                onFold={() => foldIt(q.id)}
+                q={q}
+                info={info}
+                services={services}
+                onAnswered={(d) => {
+                  setInfo(d);
+                  // a fresh "no" folds right away; a "yes" stays open with its way out
+                  const a = (d.questions || []).find((x) => x.id === q.id)?.answer;
+                  if (a === "no") foldIt(q.id);
+                  else openIt(q.id);
+                }}
+                onPros={onPros}
+                onIssue={onIssue}
+                onAsk={() => {
+                  setNearForm({ kind: "ask", topic: "other", text: q.q, name: load("myName", ""), phone: load("myReach", ""), to_office: false });
+                  setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                }}
+                setErr={setErr}
+              />
+            ))}
+
+          {!isFolded("electric") && (
+            <ElectricRow
+              onFold={() => foldIt("electric")}
+              onSent={(w) => (w === "free" ? foldIt("electric") : openIt("electric"))}
               info={info}
               services={services}
-              onAnswered={setInfo}
-              onPros={onPros}
-              onIssue={onIssue}
-              onAsk={() => {
-                setNearForm({ kind: "ask", topic: "other", text: q.q, name: load("myName", ""), phone: load("myReach", ""), to_office: false });
-                setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+              onSaved={setInfo}
+              onElectricians={onElectricians}
+              onContact={() => {
+                setContact({});
+                setTimeout(() => contactRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
               }}
               setErr={setErr}
             />
-          ))}
-
-          <ElectricRow
-            info={info}
-            services={services}
-            onSaved={setInfo}
-            onElectricians={onElectricians}
-            onContact={() => {
-              setContact({});
-              setTimeout(() => contactRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-            }}
-            setErr={setErr}
-          />
+          )}
 
           <WaterRow
             info={info}
@@ -615,6 +687,14 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               </button>
             )}
           </Row>
+
+          <Settled
+            items={settled}
+            onOpen={(k) => {
+              openIt(k);
+              setTimeout(() => document.getElementById(`myhome-${k}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+            }}
+          />
         </>
       )}
     </section>

@@ -77,6 +77,7 @@ class Question(BaseModel):
     id: str = Field(..., pattern=r"^[a-z0-9_]{1,30}$")
     on: bool = True
     icon: str = Field("❓", max_length=8)
+    short: str = Field("", max_length=24)  # the label once answered "no" ("ขยะค้าง"); empty = the question cut short
     q: str = Field(..., min_length=3, max_length=120)
     yes: str = Field("มี", max_length=30)
     no: str = Field("ไม่มี", max_length=30)
