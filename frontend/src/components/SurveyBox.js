@@ -7,7 +7,7 @@ import { drawTeams } from "./teamMarkers";
 
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
 // phones' number pad has no "/": "917", "4.917" and "4-917" all mean 4/917 (every house here is 4/…)
-const cleanHouse = (h) => {
+export const cleanHouse = (h) => {
   // the field starts as "4/" on tap: someone typing "4/917" again would give "4/4/917"
   const x = (h || "")
     .replace(/\s/g, "")

@@ -3,7 +3,7 @@ import { api, load, save } from "../api";
 import LocationPicker from "./LocationPicker";
 import Nearby from "./Nearby";
 import { useT } from "./Texts";
-import { MYHOME_CHANGED } from "./SurveyBox";
+import { MYHOME_CHANGED, cleanHouse } from "./SurveyBox";
 import { PRO_GROUPS, rememberCall } from "./Community";
 import { AidRow, CheckinCard, InstallCard, OutageRow, PlanRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
 import { waterOf } from "../config";
@@ -546,7 +546,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const [plusOpen, setPlusOpen] = useState([]); // settled extras opened again (plan / aid)
   const reload = () => setReloadN((n) => n + 1);
   const [typing, setTyping] = useState(!house);
-  const [input, setInput] = useState(house || "4/");
+  const [input, setInput] = useState(house || "");
   const [info, setInfo] = useState(null);
   const [reloadN, setReloadN] = useState(0);
   const [err, setErr] = useState("");
@@ -578,7 +578,14 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         });
         if (d.soi) save("mySoi", d.soi);
       })
-      .catch((e) => setErr(e.message));
+      .catch((e) => {
+        setErr(e.message);
+        setInput(house);
+        setTyping(true);
+        // back to the last house that worked (myHouse is saved only after a good answer)
+        const good = load("myHouse", "");
+        setHouse(good !== house ? good : "");
+      });
   }, [house, reloadN]);
   useEffect(() => {
     // the sign-up box on this page signed a house: show it here (and adopt the house if this phone had none)
@@ -661,26 +668,62 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const isFolded = (k) => settled.some((x) => x.key === k);
   if (typing || !house)
     return (
-      <section className="mb-3 rounded-[20px] border border-[#DCE2DD] bg-white p-4" style={frame}>
-        <h2 className="font-display text-xl font-bold">บ้านฉัน</h2>
-        <p className="text-[15px] text-[#45504A]">{t("myhome.intro", "ใส่บ้านเลขที่ครั้งเดียว ดูวันรถขยะ ผลตรวจไฟ และแจ้งน้ำหน้าบ้านได้ทันที")}</p>
-        <form
-          className="mt-3 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setErr("");
-            setInfo(null);
-            setHouse(input.trim());
-            setTyping(false);
-          }}
-        >
-          <label className="min-w-0 flex-1">
-            <span className="sr-only">บ้านเลขที่</span>
-            <input value={input} onChange={(e) => setInput(e.target.value)} inputMode="text" placeholder="4/917" className="min-h-[52px] w-full rounded-xl border border-[#A9B4AD] px-3.5 text-lg" />
-          </label>
-          <button className="min-h-[52px] shrink-0 rounded-xl bg-[#1E6B47] px-5 text-lg font-bold text-white">ดู</button>
-        </form>
-        <p className="mt-2 text-sm text-[#45504A]">ไม่ต้องสมัคร ไม่ต้องใส่ชื่อ · จำไว้ในมือถือเครื่องนี้</p>
+      <section className="mb-3 overflow-hidden rounded-[20px] border-2 border-[#1E6B47] bg-white" style={frame}>
+        <div className="bg-[#E4F0E9] px-4 pb-3 pt-4">
+          <h2 className="font-display text-2xl font-bold">🏠 บ้านฉัน</h2>
+          <p className="text-base text-[#154D33]">{t("myhome.intro", "ใส่บ้านเลขที่ครั้งเดียว แล้วรู้เรื่องของบ้านคุณทันที")}</p>
+        </div>
+        <div className="px-4 pb-4 pt-3">
+          <ul className="space-y-1 text-base">
+            {[
+              ["🚛", "วันรถขยะซอยคุณ"],
+              ["⚡", "ไฟดับ น้ำไม่ไหลแถวบ้าน"],
+              ["💧", "น้ำหน้าบ้านตอนนี้"],
+              ["🔧", "ช่างที่เพื่อนบ้านแนะนำ"],
+            ].map(([icon, text]) => (
+              <li key={text} className="flex items-center gap-1.5">
+                <span aria-hidden="true">{icon}</span>
+                {text}
+              </li>
+            ))}
+          </ul>
+          <form
+            className="mt-3 flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const h = cleanHouse(input.trim());
+              if (!/^\d{1,3}\/\d{1,5}/.test(h)) return setErr("ใส่บ้านเลขที่ เช่น 4/917 หรือพิมพ์แค่ 917");
+              setErr("");
+              setInfo(null);
+              setHouse(h);
+              setTyping(false);
+            }}
+          >
+            <label className="min-w-0 flex-1">
+              <span className="sr-only">บ้านเลขที่</span>
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                inputMode="text"
+                autoComplete="off"
+                placeholder="เช่น 917"
+                className="min-h-[56px] w-full rounded-xl border-2 border-[#A9B4AD] px-3.5 text-xl focus:border-[#1E6B47] focus:outline-none"
+              />
+            </label>
+            <button className="min-h-[56px] shrink-0 rounded-xl bg-[#1E6B47] px-5 text-lg font-bold text-white">ดูบ้านฉัน ›</button>
+          </form>
+          {err && (
+            <p role="alert" className="mt-2 rounded-xl bg-red-50 p-3 text-red-700">
+              {err}
+            </p>
+          )}
+          <p className="mt-2 text-sm text-[#45504A]">🔒 ไม่ต้องสมัคร ไม่ต้องใส่ชื่อ · มือถือเครื่องนี้จำไว้ให้</p>
+          {house && (
+            <button type="button" onClick={() => setTyping(false)} className="mt-1 min-h-[40px] text-[15px] font-bold text-[#45504A] underline">
+              ยกเลิก กลับไปบ้าน {house}
+            </button>
+          )}
+        </div>
       </section>
     );
 

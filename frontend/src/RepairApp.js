@@ -246,10 +246,10 @@ export default function RepairApp() {
 
   async function share() {
     const url = window.location.origin;
-    const text = `ซ่อมบ้าน เสรีไทย 57 — ยืม/ให้ยืมของ · ขอแรงช่วยล้างบ้าน · ช่างที่เพื่อนบ้านแนะนำ · แจ้งปัญหาในซอย`;
+    const text = `🏠 บ้านฉัน เสรีไทย 57 · ใส่บ้านเลขที่ครั้งเดียว รู้วันรถขยะ ไฟดับ น้ำหน้าบ้าน ช่างที่เพื่อนบ้านแนะนำ`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: "ซ่อมบ้าน เสรีไทย 57", text, url });
+        await navigator.share({ title: "บ้านฉัน · เสรีไทย 57", text, url });
         return;
       } catch {}
     }
