@@ -71,6 +71,38 @@ function CallButton({ phone, label }) {
   );
 }
 
+// ---------- 7 Oct: near the top of home — find a tradesman or a shop in one tap (the village's own market) ----------
+export function ProsQuick({ services, onOpen, look }) {
+  const count = (g) => services.filter((s) => g.cats.includes(s.category)).length;
+  return (
+    <section className="mb-3 rounded-[20px] border border-[#DCE2DD] bg-white p-3" style={look?.frame}>
+      <div className="flex items-center justify-between gap-2 px-1">
+        <h2 className="font-display text-lg font-bold">ช่าง · ร้าน ในหมู่บ้าน</h2>
+        <span className="text-sm text-[#45504A]">{services.length} ราย</span>
+      </div>
+      <button onClick={() => onOpen("", true)} className="mt-2 flex min-h-[52px] w-full items-center gap-2 rounded-xl border border-[#A9B4AD] bg-white px-3 text-left text-base text-[#45504A]">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#45504A" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
+        หาช่าง ร้าน เช่น แอร์ ปั๊ม ขนขยะ
+      </button>
+      <div className="-mx-3 mt-2 flex gap-2 overflow-x-auto px-3 pb-1">
+        {PRO_GROUPS.map((g) => (
+          <button
+            key={g.key}
+            onClick={() => onOpen(g.key)}
+            className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full border border-[#C9D1CB] bg-[#F2F4F1] px-3.5 text-[15px] font-bold active:bg-[#E4F0E9]"
+          >
+            {g.label}
+            <span className="font-normal text-[#45504A]">{count(g) || ""}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ---------- the top of the block: find a number, then the two doors ----------
 export function CommunityIntro({ services, onGroup, onAll, onNeed, onOffer, onAsk }) {
   const counts = useMemo(() => {
@@ -87,7 +119,11 @@ export function CommunityIntro({ services, onGroup, onAll, onNeed, onOffer, onAs
         <h3 className="mb-2 text-lg font-bold">หาเบอร์ช่าง / ร้าน</h3>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {PRO_GROUPS.map((g) => (
-            <button key={g.key} onClick={() => onGroup(g.key)} className="flex min-h-[76px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-[#F2F4F1] px-1 py-2 text-center active:bg-[#E4EAE6]">
+            <button
+              key={g.key}
+              onClick={() => onGroup(g.key)}
+              className="flex min-h-[76px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-[#F2F4F1] px-1 py-2 text-center active:bg-[#E4EAE6]"
+            >
               <span className="text-[15px] font-bold leading-tight">{g.label}</span>
               <span className="text-sm text-[#45504A]">{counts[g.key] ? `${counts[g.key]} ราย` : "ยังไม่มี"}</span>
             </button>
@@ -143,7 +179,10 @@ export function IntentChoices({ need, choices, onPick }) {
               .filter((c) => c.group === g)
               .map((c) => (
                 <li key={c.label}>
-                  <button onClick={() => onPick(c.go)} className="flex min-h-[62px] w-full items-center gap-3 rounded-2xl border border-[#DCE2DD] bg-white px-3.5 py-2 text-left active:border-[#15201A]">
+                  <button
+                    onClick={() => onPick(c.go)}
+                    className="flex min-h-[62px] w-full items-center gap-3 rounded-2xl border border-[#DCE2DD] bg-white px-3.5 py-2 text-left active:border-[#15201A]"
+                  >
                     <span className="min-w-0 flex-1">
                       <b className="block text-base">{c.label}</b>
                       {c.hint && <span className="block text-sm text-[#45504A]">{c.hint}</span>}
@@ -178,7 +217,15 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
     for (const j of jobs) {
       if (j.status === "done" || !fresh(j.created_at)) continue;
       const [, text] = JOB_TYPES[j.type] || ["", "ขอแรง"];
-      out.push({ id: `j${j.id}`, tab: "jobs", k: j.kind === "offer" ? "offer" : "need", job: j, title: j.detail, sub: [text, j.soi && `ซ.${j.soi}`, j.house && `บ้าน ${j.house}`].filter(Boolean).join(" · "), at: j.created_at });
+      out.push({
+        id: `j${j.id}`,
+        tab: "jobs",
+        k: j.kind === "offer" ? "offer" : "need",
+        job: j,
+        title: j.detail,
+        sub: [text, j.soi && `ซ.${j.soi}`, j.house && `บ้าน ${j.house}`].filter(Boolean).join(" · "),
+        at: j.created_at,
+      });
     }
     for (const s of services) {
       const g = groupOf(s.category);
@@ -186,10 +233,26 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
     }
     for (const x of lend) {
       if (x.status === "closed" || !fresh(x.created_at)) continue;
-      out.push({ id: `l${x.id}`, tab: "lend", k: x.kind === "sell" ? "sell" : "lend", title: x.title, price: x.price, sub: [LEND_KINDS[x.kind]?.verb, LEND_CATEGORIES[x.category]?.[1], x.soi && `ซ.${x.soi}`].filter(Boolean).join(" · "), at: x.created_at });
+      out.push({
+        id: `l${x.id}`,
+        tab: "lend",
+        k: x.kind === "sell" ? "sell" : "lend",
+        title: x.title,
+        price: x.price,
+        sub: [LEND_KINDS[x.kind]?.verb, LEND_CATEGORIES[x.category]?.[1], x.soi && `ซ.${x.soi}`].filter(Boolean).join(" · "),
+        at: x.created_at,
+      });
     }
     for (const t of topics || []) {
-      out.push({ id: `t${t.id}`, tab: "forum", k: "forum", topic: t.id, title: t.title, sub: [FORUM_CATEGORIES[t.category]?.[1], `${t.reply_count} คำตอบ`].filter(Boolean).join(" · "), at: t.last_at });
+      out.push({
+        id: `t${t.id}`,
+        tab: "forum",
+        k: "forum",
+        topic: t.id,
+        title: t.title,
+        sub: [FORUM_CATEGORIES[t.category]?.[1], `${t.reply_count} คำตอบ`].filter(Boolean).join(" · "),
+        at: t.last_at,
+      });
     }
     return out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
   }, [lend, jobs, services, topics]);
@@ -220,7 +283,10 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
                 </div>
               )}
               {x.k === "need" && (
-                <button onClick={() => onJoin(x.job)} className="flex min-h-[52px] w-full flex-col items-center justify-center rounded-xl bg-[#1E6B47] text-base font-bold leading-tight text-white active:bg-[#154D33]">
+                <button
+                  onClick={() => onJoin(x.job)}
+                  className="flex min-h-[52px] w-full flex-col items-center justify-center rounded-xl bg-[#1E6B47] text-base font-bold leading-tight text-white active:bg-[#154D33]"
+                >
                   ฉันไปช่วยได้
                   <span className="text-[13px] font-medium text-[#D4EADC]">แล้วโทรนัดกับเจ้าของบ้าน</span>
                 </button>
@@ -261,15 +327,19 @@ function Trust({ s }) {
 }
 
 // ---------- the tradesmen & shops board: search, groups, a big call button, "เคยใช้ ดี" ----------
-export function ProsList({ services, setServices, group, setGroup, onAdd }) {
-  const [q, setQ] = useState("");
+export function ProsList({ services, setServices, group, setGroup, onAdd, query: q0, autoFocus }) {
+  const [q, setQ] = useState(q0 || "");
   const [msg, setMsg] = useState("");
   const [voted, setVoted] = useState(() => load("prosVoted", []));
   const query = q.trim().toLowerCase();
   const g = PRO_GROUPS.find((x) => x.key === group);
-  const shown = services.filter(
-    (s) => (!g || g.cats.includes(s.category)) && (!query || `${s.name} ${s.detail} ${s.area} ${SERVICE_CATEGORIES[s.category]?.[1] || ""} ${groupOf(s.category)?.label || ""}`.toLowerCase().includes(query))
-  );
+  const shown = services
+    .filter(
+      (s) =>
+        (!g || g.cats.includes(s.category)) &&
+        (!query || `${s.name} ${s.detail} ${s.area} ${SERVICE_CATEGORIES[s.category]?.[1] || ""} ${groupOf(s.category)?.label || ""}`.toLowerCase().includes(query)),
+    )
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.good || 0) - (a.good || 0) || (a.reports || 0) - (b.reports || 0));
   async function good(s) {
     setMsg("");
     try {
@@ -297,11 +367,22 @@ export function ProsList({ services, setServices, group, setGroup, onAdd }) {
           <circle cx="11" cy="11" r="7" />
           <path d="M20 20l-3.5-3.5" />
         </svg>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="พิมพ์ เช่น แอร์ ปั๊ม ซักพรม ร้านกาแฟ" className="min-w-0 flex-1 bg-transparent text-base outline-none" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          autoFocus={autoFocus}
+          placeholder="พิมพ์ เช่น แอร์ ปั๊ม ซักพรม ร้านกาแฟ"
+          className="min-w-0 flex-1 bg-transparent text-base outline-none"
+        />
       </label>
       <div className="flex flex-wrap gap-2">
         {[{ key: "", label: "ทั้งหมด" }, ...PRO_GROUPS].map((x) => (
-          <button key={x.key || "all"} onClick={() => setGroup(x.key)} aria-pressed={(group || "") === x.key} className={`min-h-[42px] rounded-full px-3.5 text-[15px] ${(group || "") === x.key ? "bg-[#15201A] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}>
+          <button
+            key={x.key || "all"}
+            onClick={() => setGroup(x.key)}
+            aria-pressed={(group || "") === x.key}
+            className={`min-h-[42px] rounded-full px-3.5 text-[15px] ${(group || "") === x.key ? "bg-[#15201A] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}
+          >
             {x.label}
           </button>
         ))}
@@ -320,11 +401,20 @@ export function ProsList({ services, setServices, group, setGroup, onAdd }) {
               <div className="flex gap-2 pt-1">
                 <CallButton phone={s.phone} />
                 {s.line_id && !/search|ค้นหา/i.test(s.line_id) && (
-                  <a href={`https://line.me/R/ti/p/~${encodeURIComponent(s.line_id)}`} target="_blank" rel="noreferrer" className="flex min-h-[50px] items-center rounded-xl bg-[#E4F6EA] px-3 font-bold text-[#0B6B33]">
+                  <a
+                    href={`https://line.me/R/ti/p/~${encodeURIComponent(s.line_id)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-h-[50px] items-center rounded-xl bg-[#E4F6EA] px-3 font-bold text-[#0B6B33]"
+                  >
                     LINE
                   </a>
                 )}
-                <button onClick={() => good(s)} disabled={voted.includes(s.id)} className="min-h-[50px] shrink-0 rounded-xl border border-[#C9D1CB] px-3 text-sm font-bold leading-tight disabled:opacity-50">
+                <button
+                  onClick={() => good(s)}
+                  disabled={voted.includes(s.id)}
+                  className="min-h-[50px] shrink-0 rounded-xl border border-[#C9D1CB] px-3 text-sm font-bold leading-tight disabled:opacity-50"
+                >
                   {voted.includes(s.id) ? (
                     "บอกแล้ว"
                   ) : (
@@ -411,7 +501,14 @@ export function JoinSheetBody({ job, onJoined, onClose }) {
           </ol>
           <label className="block">
             <span className="mb-1 block text-base font-bold">ชื่อเล่น</span>
-            <input required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น ต้น ซ.12" className="min-h-[52px] w-full rounded-xl border border-[#A9B4AD] px-3.5 text-[17px]" />
+            <input
+              required
+              maxLength={60}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="เช่น ต้น ซ.12"
+              className="min-h-[52px] w-full rounded-xl border border-[#A9B4AD] px-3.5 text-[17px]"
+            />
           </label>
           {err && <p className="rounded-xl bg-red-50 p-3 text-red-700">{err}</p>}
           <button type="submit" disabled={busy} className="min-h-[56px] w-full rounded-xl bg-[#1E6B47] text-lg font-bold text-white disabled:opacity-60">

@@ -10,7 +10,21 @@ import { lookOf, ordered } from "./components/Look";
 import { TextsContext } from "./components/Texts";
 import MyHome from "./components/MyHome";
 import SurveyBoxes from "./components/SurveyBox";
-import { BottomNav, CommunityFeed, CommunityIntro, FoldBox, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PeopleIcon, PostedSheetBody, ProsList, WaterIcon } from "./components/Community";
+import {
+  BottomNav,
+  ProsQuick,
+  CommunityFeed,
+  CommunityIntro,
+  FoldBox,
+  IntentChoices,
+  JoinSheetBody,
+  NEED_CHOICES,
+  OFFER_CHOICES,
+  PeopleIcon,
+  PostedSheetBody,
+  ProsList,
+  WaterIcon,
+} from "./components/Community";
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView } from "./components/WatchPanel";
@@ -55,6 +69,25 @@ export default function RepairApp() {
   const [lost, setLost] = useState([]);
   const [topics, setTopics] = useState([]);
   const [prosGroup, setProsGroup] = useState("");
+  // 7 Oct: ช่าง·ร้าน as its own page over home (back button closes it), not a tab far down the page
+  const [prosPage, setProsPage] = useState(() => (window.location.hash === "#pros" ? { focus: false } : null));
+  const openPros = (group = "", focus = false) => {
+    setProsGroup(group);
+    setProsPage({ focus });
+    if (window.location.hash !== "#pros") window.history.pushState({ pros: 1 }, "", "#pros");
+  };
+  const closePros = () => {
+    if (window.history.state?.pros) window.history.back();
+    else {
+      setProsPage(null);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  };
+  useEffect(() => {
+    const onPop = () => setProsPage(window.location.hash === "#pros" ? { focus: false } : null);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   const [forumGo, setForumGo] = useState({ n: 0 }); // feed / "ask" door → open a topic or the form
   const [water, setWater] = useState([]);
   const [canal, setCanal] = useState(null);
@@ -243,6 +276,7 @@ export default function RepairApp() {
 
   // 7 Oct: the home page's blocks, ordered and coloured by home.layout (tools/site.py layout), no redeploy
   const blocks = {
+    pros: <ProsQuick services={services} onOpen={openPros} look={home.layout?.pros ? lookOf(home.layout, "pros") : null} />,
     events: (
       <>
         {eventsOn.map((e, i) => (
@@ -266,14 +300,8 @@ export default function RepairApp() {
         look={home.layout?.myhome ? lookOf(home.layout, "myhome") : null}
         onIssue={() => setSheet({ type: "issueForm" })}
         onIssues={() => showTab("issues")}
-        onElectricians={() => {
-          setProsGroup("electric");
-          showTab("pros");
-        }}
-        onPros={(g) => {
-          setProsGroup(g);
-          showTab("pros");
-        }}
+        onElectricians={() => openPros("electric")}
+        onPros={(g) => openPros(g)}
       />
     ),
     announce: (
@@ -365,14 +393,8 @@ export default function RepairApp() {
           >
             <CommunityIntro
               services={services}
-              onGroup={(g) => {
-                setProsGroup(g);
-                showTab("pros");
-              }}
-              onAll={() => {
-                setProsGroup("");
-                showTab("pros");
-              }}
+              onGroup={(g) => openPros(g)}
+              onAll={() => openPros("")}
               onNeed={() => setSheet({ type: "intent", need: true })}
               onOffer={() => setSheet({ type: "intent", need: false })}
               onAsk={() => askForum()}
@@ -536,15 +558,20 @@ export default function RepairApp() {
             )}
           </footer>
         </main>
-        <BottomNav
-          onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          onPros={() => {
-            setProsGroup("");
-            showTab("pros");
-          }}
-          onMap={openWater}
-          onHotline={() => setSheet({ type: "hotlines" })}
-        />
+        {prosPage && (
+          <div className="fixed inset-0 z-[920] overflow-y-auto bg-[#F2F4F1] pb-28" role="dialog" aria-label="ช่าง · ร้าน ในหมู่บ้าน">
+            <div className="sticky top-0 z-10 flex items-center gap-2 bg-[#15201A] px-2 py-2 text-white shadow">
+              <button onClick={closePros} className="min-h-[44px] rounded-xl px-3 text-base font-bold">
+                ‹ กลับ
+              </button>
+              <h2 className="font-display text-lg font-bold">ช่าง · ร้าน ในหมู่บ้าน</h2>
+            </div>
+            <div className="mx-auto max-w-3xl px-3 pt-3">
+              <ProsList services={services} setServices={setServices} group={prosGroup} setGroup={setProsGroup} autoFocus={prosPage.focus} onAdd={() => setSheet({ type: "serviceForm" })} />
+            </div>
+          </div>
+        )}
+        <BottomNav onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })} onPros={() => openPros("")} onMap={openWater} onHotline={() => setSheet({ type: "hotlines" })} />
 
         {sheet?.type === "lendForm" && (
           <Sheet title="ยืม · ให้ · ขาย" onClose={() => setSheet(null)}>

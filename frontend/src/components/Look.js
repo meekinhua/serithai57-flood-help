@@ -13,7 +13,7 @@ export const TONES = {
 const WIDTH = { none: 0, thin: 1, thick: 4 };
 
 // The order blocks take when the layout says nothing about them.
-export const DEFAULT_ORDER = ["events", "announce", "myhome", "watch", "fund", "water", "community", "survey", "hub", "archive"];
+export const DEFAULT_ORDER = ["events", "announce", "pros", "myhome", "watch", "fund", "water", "community", "survey", "hub", "archive"];
 
 // A block's look: its own defaults, overridden by what the admin set. Returns inline styles for the frame
 // (border + background) and, for a solid fill, the title bar.
