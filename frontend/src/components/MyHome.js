@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, load, save } from "../api";
 import LocationPicker from "./LocationPicker";
+import { waterOf } from "../config";
 
 // บ้านฉัน (7 Oct 2026): a house number typed once (or taken from the electricians' sign-up on this phone) and
 // the page shows what concerns that house: the regular rubbish round of its soi, its electrical check, the
@@ -18,6 +19,68 @@ const ELECTRIC = {
   claimed: ["ช่างรับงานแล้ว", "text-[#1F5FA8]"],
   todo: ["ลงชื่อไว้ ยังไม่ได้ตรวจ · รอสรุปกับทีมช่าง", "text-[#45504A]"],
 };
+
+// ---------- the water at my door, read from what the neighbours reported (for owners who are away) ----------
+const NEAR_H = 6; // hours a report still counts
+function metres(a, b) {
+  const dy = (a.lat - b.lat) * 111320;
+  const dx = (a.lng - b.lng) * 111320 * Math.cos((a.lat * Math.PI) / 180);
+  return Math.hypot(dx, dy);
+}
+function ago(t) {
+  const m = Math.max(1, Math.round((Date.now() - new Date(t).getTime()) / 60000));
+  return m < 60 ? `${m} นาทีที่แล้ว` : `${Math.round(m / 60)} ชม.ที่แล้ว`;
+}
+
+function NearHome({ info, water }) {
+  const exact = info.precision === "house";
+  const radius = exact ? 150 : 300;
+  const near = useMemo(() => {
+    const t = Date.now();
+    return (water || [])
+      .filter((w) => w.lat && w.lng && t - new Date(w.created_at).getTime() < NEAR_H * 3600e3 && w.name !== `บ้าน ${info.house}`)
+      .map((w) => ({ ...w, m: metres(info, w) }))
+      .filter((w) => w.m <= radius)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }, [water, info, radius]);
+  const last = near[0];
+  const lv = last ? waterOf(last.level) : null;
+  const wet = near.filter((w) => w.level > 0).length;
+  const ask = `ใครอยู่แถว${info.soi ? ` ซ.${info.soi}` : "บ้าน " + info.house} ช่วยดูน้ำหน้าบ้าน ${info.house} ให้หน่อยครับ/ค่ะ ตอนนี้ไม่ได้อยู่บ้าน 🙏 แจ้งง่ายๆ ที่ ${window.location.origin}`;
+  return (
+    <Row title="หน้าบ้านคุณตอนนี้ (จากที่เพื่อนบ้านแจ้ง)">
+      {last ? (
+        <>
+          <div className="flex items-center gap-3 rounded-2xl p-3" style={{ background: `${lv.color}1A`, border: `2px solid ${lv.color}` }}>
+            <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: lv.color }} />
+            <div className="min-w-0">
+              <p className="text-lg font-bold leading-tight">{last.level === 0 ? "แห้ง ไม่ท่วม" : last.where === "house" ? "มีน้ำเข้าบ้านแถวนี้" : `น้ำ${lv.label} (${lv.cm})`}</p>
+              <p className="text-sm text-[#33403A]">
+                แจ้งเมื่อ {ago(last.created_at)} · ห่างบ้านคุณ ~{Math.max(10, Math.round(last.m / 10) * 10)} ม.
+              </p>
+            </div>
+          </div>
+          {near.length > 1 && (
+            <p className="text-sm text-[#33403A]">
+              {NEAR_H} ชม.นี้ แถวบ้านคุณแจ้งมา {near.length} ครั้ง · แห้ง {near.length - wet} · มีน้ำ {wet}
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="text-base">{NEAR_H} ชม.ที่ผ่านมา ยังไม่มีใครแจ้งแถวบ้านคุณ</p>
+      )}
+      {!exact && <p className="text-sm text-[#7A4104]">ตอนนี้ดูจากทั้งแถวซอย · ปักหมุดบ้านแล้วจะแม่นขึ้น</p>}
+      <a
+        href={`https://line.me/R/share?text=${encodeURIComponent(ask)}`}
+        target="_blank"
+        rel="noreferrer"
+        className="flex min-h-[48px] items-center justify-center rounded-xl border border-[#06C755] px-3 text-center text-[15px] font-bold text-[#05803C]"
+      >
+        ไม่อยู่บ้าน? ขอเพื่อนบ้านช่วยดู (LINE)
+      </a>
+    </Row>
+  );
+}
 
 function Row({ title, children }) {
   return (
@@ -185,12 +248,6 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
       .catch((e) => setErr(e.message));
   }, [house]);
 
-  const lastHour = useMemo(() => {
-    const t = Date.now();
-    const recent = (water || []).filter((w) => t - new Date(w.created_at).getTime() < 3600e3);
-    return { n: recent.length, dry: recent.filter((w) => w.level === 0).length, wet: recent.filter((w) => w.level > 0).length };
-  }, [water]);
-
   async function tap(w) {
     setErr("");
     try {
@@ -305,12 +362,14 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
           ) : null}
 
           {/* an ask, not a reading: the owner taps to tell the neighbours; what others reported sits apart below */}
-          <Row title="ช่วยแจ้งน้ำหน้าบ้านคุณ">
+          <NearHome info={info} water={water} />
+
+          <Row title="อยู่บ้าน? ช่วยแจ้งน้ำหน้าบ้านคุณ">
             {sent ? (
               <p className="text-base font-bold text-[#1E6B47]">ขอบคุณที่แจ้ง ({sent}) เพื่อนบ้านเห็นแล้ว</p>
             ) : (
               <>
-              <p className="text-base font-bold">หน้าบ้านคุณตอนนี้เป็นแบบไหน? กดปุ่มเดียว ขึ้นแผนที่ให้เพื่อนบ้านเห็น</p>
+              <p className="text-[15px]">กดปุ่มเดียว ขึ้นแผนที่ให้เพื่อนบ้านที่ไม่อยู่บ้านเห็นด้วย</p>
               <div className="grid grid-cols-3 gap-2">
                 {WATER_TAPS.map((w) => (
                   <button key={w.label} onClick={() => tap(w)} className={`min-h-[52px] rounded-xl border-2 bg-white px-1 text-[15px] font-bold leading-tight ${w.cls}`}>
@@ -320,9 +379,6 @@ export default function MyHome({ water, look, onIssue, onIssues, onElectricians 
               </div>
               </>
             )}
-            <p className="rounded-xl bg-[#F2F4F1] px-3 py-2 text-sm text-[#33403A]">
-              <b>เพื่อนบ้านแจ้งมา:</b> {lastHour.n ? `1 ชม.ที่ผ่านมา ${lastHour.n} บ้าน · แห้ง ${lastHour.dry} · มีน้ำ ${lastHour.wet}` : "ชั่วโมงนี้ยังไม่มีใครแจ้ง"}
-            </p>
           </Row>
 
           {info.waste && (
