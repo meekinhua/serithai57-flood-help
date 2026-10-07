@@ -353,28 +353,39 @@ export function LostForm({ kind: initialKind = "lost", onDone }) {
 }
 
 // ---------- the top of the home page: lost (and found) pets, loud only while it matters ----------
-// Full card with the photo: new (first 2 days, until this phone has had it on screen for a while) or near my soi.
-// After that it shrinks to one line; "ซ่อน" hides what is there now; a new one comes back full.
+// Full card with the photo only the first time this phone sees a new post (about 20 s), then one small line for a week.
+// "ซ่อน" / ✕ hides what is there now; a new post comes back full.
 // A pet that went home gets one cheerful line for a day.
 const PETS = ["dog", "cat", "pet"];
 const soiNo = (s) => parseInt(String(s || "").match(/\d+/)?.[0] || "", 10);
 export function PetAlert({ items, reunited = [], onOpen }) {
   const [hidden, setHidden] = useState(() => load("petHidden", []));
-  const [seen] = useState(() => load("petSeen", {})); // id -> when this phone first showed it big
   const now = Date.now();
   const mySoi = soiNo(load("mySoi", ""));
   const pets = items.filter((x) => PETS.includes(x.category) && x.status !== "reunited" && !hidden.includes(x.id));
   const home = reunited.filter((x) => PETS.includes(x.category) && !hidden.includes(`r${x.id}`) && now - new Date(x.updated_at || x.created_at).getTime() < 24 * 3600e3);
   const ageH = (x) => (now - new Date(x.created_at).getTime()) / 3600e3;
   const near = (x) => mySoi && soiNo(x.soi) && Math.abs(soiNo(x.soi) - mySoi) <= 4;
-  const big = pets.filter((x) => x.kind === "lost" && ((ageH(x) < 48 && (!seen[x.id] || now - seen[x.id] < 6 * 3600e3)) || (near(x) && ageH(x) < 7 * 24)));
-  const slim = pets.filter((x) => !big.includes(x) && ageH(x) < 30 * 24);
+  // big only the first time this phone sees it (and for ~20 s), then a small line; a new post pops up big again
+  const [shrunk, setShrunk] = useState(false);
+  const seenNow = load("petSeen", {}); // live: an older post seen more than ~20 s ago stays small when a new one pops up
+  const big = shrunk ? [] : pets.filter((x) => x.kind === "lost" && ageH(x) < 48 && (!seenNow[x.id] || now - seenNow[x.id] < 25e3));
+  const slim = pets.filter((x) => !big.includes(x) && ageH(x) < 7 * 24);
   const bigIds = big.map((x) => x.id).join(",");
   useEffect(() => {
     const was = load("petSeen", {});
     const fresh = bigIds.split(",").filter((id) => id && !was[id]);
     if (fresh.length) save("petSeen", { ...was, ...Object.fromEntries(fresh.map((id) => [id, Date.now()])) });
   }, [bigIds]);
+  useEffect(() => {
+    if (!bigIds) return;
+    const t = setTimeout(() => setShrunk(true), 20000);
+    return () => clearTimeout(t);
+  }, [bigIds]);
+  useEffect(() => {
+    // a post this phone has not seen yet arrives: big again
+    if (items.some((x) => PETS.includes(x.category) && x.kind === "lost" && !load("petSeen", {})[x.id])) setShrunk(false);
+  }, [items]);
   if (!big.length && !slim.length && !home.length) return null;
   const hide = (ids) => {
     const next = [...hidden.slice(-100), ...ids];
