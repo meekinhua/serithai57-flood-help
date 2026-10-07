@@ -64,6 +64,7 @@ export default function RepairApp() {
   const [jobs, setJobs] = useState([]);
   const [issues, setIssues] = useState([]);
   const [lost, setLost] = useState([]);
+  const [reunited, setReunited] = useState([]); // pets that went home in the last day or two (one cheerful line)
   const [topics, setTopics] = useState([]);
   const [prosGroup, setProsGroup] = useState("");
   // 7 Oct: four pages under a bottom bar — บ้านฉัน is the main one; the device's back button walks back through them
@@ -150,14 +151,15 @@ export default function RepairApp() {
         api("/issues"),
         api("/services"),
         api("/announcements"),
-        api("/lost"),
+        api("/lost?include_closed=true"),
         api("/water").catch(() => []),
         api("/canal").catch(() => null),
         api("/home").catch(() => null),
         api("/forum").catch(() => null),
       ]);
       if (ft) setTopics(ft);
-      setLost(lf);
+      setLost(lf.filter((x) => x.status !== "reunited"));
+      setReunited(lf.filter((x) => x.status === "reunited" && Date.now() - new Date(x.updated_at || x.created_at).getTime() < 2 * 864e5));
       if (hm) {
         setHome(hm);
         save("homeBlocks", hm);
@@ -279,7 +281,8 @@ export default function RepairApp() {
   const needs = jobs.filter((j) => j.kind === "need" && j.status === "open" && j.type !== "hire");
   const hires = jobs.filter((j) => j.type === "hire" && j.status !== "done");
   const lostOpen = lost.filter((x) => x.status !== "reunited");
-  const lostPets = lostOpen.filter((x) => x.kind === "lost" && ["dog", "cat", "pet"].includes(x.category));
+  const lostPets = lostOpen.filter((x) => x.kind === "lost" && ["dog", "cat", "pet"].includes(x.category) && Date.now() - new Date(x.created_at).getTime() < 2 * 864e5);
+  const lostHot = lostOpen.filter((x) => x.kind === "lost" && Date.now() - new Date(x.created_at).getTime() < 7 * 864e5);
   const needSig = needs.map((j) => j.id.slice(0, 6)).join(",");
 
   // what each page tab has to say (the bell lists it; ล้าง mutes it until it changes)
@@ -509,7 +512,7 @@ export default function RepairApp() {
         <main className="mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
           {page === "home" ? (
             <>
-              <PetAlert items={lost} onOpen={() => showTab("lost")} />
+              <PetAlert items={lost} reunited={reunited} onOpen={() => showTab("lost")} />
               {ordered(home.layout, Object.keys(blocks)).map((k) => (
                 <Fragment key={k}>{blocks[k]}</Fragment>
               ))}
@@ -580,7 +583,7 @@ export default function RepairApp() {
                         key={k}
                         onClick={() => pick(k)}
                         aria-current={tab === k ? "page" : undefined}
-                        className={`min-h-[44px] whitespace-nowrap rounded-full px-4 text-[15px] ${tab === k ? "bg-[#15201A] font-bold text-white" : k === "lost" && lostOpen.length ? "border-2 border-[#B42318] bg-[#FDE8E6] font-bold text-[#7A1A12]" : "border border-[#C9D1CB] bg-white"}`}
+                        className={`min-h-[44px] whitespace-nowrap rounded-full px-4 text-[15px] ${tab === k ? "bg-[#15201A] font-bold text-white" : k === "lost" && lostHot.length ? "border-2 border-[#B42318] bg-[#FDE8E6] font-bold text-[#7A1A12]" : "border border-[#C9D1CB] bg-white"}`}
                       >
                         {k === "lost" ? "🐾 " : ""}
                         {text}

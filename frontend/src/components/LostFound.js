@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, load, save } from "../api";
 import { LOST_CATEGORIES, LOST_KINDS, timeAgo } from "../config";
 import { mediaUrl } from "../media";
@@ -317,51 +317,107 @@ export function LostForm({ kind: initialKind = "lost", onDone }) {
   );
 }
 
-// ---------- the top of the home page: a lost (or found) dog / cat, big with its photo — hideable, back when a new one comes ----------
+// ---------- the top of the home page: lost (and found) pets, loud only while it matters ----------
+// Full card with the photo: new (first 2 days, until this phone has had it on screen for a while) or near my soi.
+// After that it shrinks to one line; "ซ่อน" hides what is there now; a new one comes back full.
+// A pet that went home gets one cheerful line for a day.
 const PETS = ["dog", "cat", "pet"];
-export function PetAlert({ items, onOpen }) {
-  const pets = items.filter((x) => PETS.includes(x.category) && x.status !== "reunited");
+const soiNo = (s) => parseInt(String(s || "").match(/\d+/)?.[0] || "", 10);
+export function PetAlert({ items, reunited = [], onOpen }) {
   const [hidden, setHidden] = useState(() => load("petHidden", []));
-  if (!pets.length || pets.every((x) => hidden.includes(x.id))) return null;
-  const hide = () => {
-    const ids = pets.map((x) => x.id);
-    setHidden(ids);
-    save("petHidden", ids);
+  const [seen] = useState(() => load("petSeen", {})); // id -> when this phone first showed it big
+  const now = Date.now();
+  const mySoi = soiNo(load("mySoi", ""));
+  const pets = items.filter((x) => PETS.includes(x.category) && x.status !== "reunited" && !hidden.includes(x.id));
+  const home = reunited.filter((x) => PETS.includes(x.category) && !hidden.includes(`r${x.id}`) && now - new Date(x.updated_at || x.created_at).getTime() < 24 * 3600e3);
+  const ageH = (x) => (now - new Date(x.created_at).getTime()) / 3600e3;
+  const near = (x) => mySoi && soiNo(x.soi) && Math.abs(soiNo(x.soi) - mySoi) <= 4;
+  const big = pets.filter((x) => x.kind === "lost" && ((ageH(x) < 48 && (!seen[x.id] || now - seen[x.id] < 6 * 3600e3)) || (near(x) && ageH(x) < 7 * 24)));
+  const slim = pets.filter((x) => !big.includes(x) && ageH(x) < 30 * 24);
+  const bigIds = big.map((x) => x.id).join(",");
+  useEffect(() => {
+    const was = load("petSeen", {});
+    const fresh = bigIds.split(",").filter((id) => id && !was[id]);
+    if (fresh.length) save("petSeen", { ...was, ...Object.fromEntries(fresh.map((id) => [id, Date.now()])) });
+  }, [bigIds]);
+  if (!big.length && !slim.length && !home.length) return null;
+  const hide = (ids) => {
+    const next = [...hidden.slice(-100), ...ids];
+    setHidden(next);
+    save("petHidden", next);
   };
-  const lost = pets.filter((x) => x.kind === "lost").length;
+  const thumb = (x, cls) => {
+    const photo = x.media?.[0];
+    return photo ? (
+      <img src={mediaUrl(photo.id, "thumb")} alt="" loading="lazy" className={`${cls} object-cover`} />
+    ) : (
+      <span className={`${cls} flex items-center justify-center bg-neutral-100`} aria-hidden="true">
+        {(LOST_CATEGORIES[x.category] || ["🐾"])[0]}
+      </span>
+    );
+  };
   return (
-    <section className="mb-3 rounded-[20px] border-2 border-[#B42318] bg-[#FDE8E6] p-3" aria-label="สัตว์เลี้ยงหาย">
-      <div className="flex items-center gap-2">
-        <p className="min-w-0 flex-1 text-lg font-bold leading-tight text-[#7A1A12]">🐾 {lost ? `ช่วยกันดู! สัตว์เลี้ยงหาย ${lost} ตัว` : "มีคนเจอสัตว์เลี้ยง · เจ้าของอยู่ไหน?"}</p>
-        <button onClick={hide} className="min-h-[40px] shrink-0 text-sm font-bold text-[#45504A] underline">
-          ซ่อน
-        </button>
-      </div>
-      <div className="-mx-3 mt-2 flex gap-2 overflow-x-auto px-3 pb-1">
-        {pets.slice(0, 6).map((x) => {
-          const [emoji] = LOST_CATEGORIES[x.category] || ["🐾"];
-          const photo = x.media?.[0];
-          return (
-            <button key={x.id} onClick={onOpen} className="w-[168px] shrink-0 overflow-hidden rounded-2xl bg-white text-left shadow-sm">
-              {photo ? (
-                <img src={mediaUrl(photo.id, "thumb")} alt={x.title} loading="lazy" className="aspect-square w-full object-cover" />
-              ) : (
-                <div className="flex aspect-square w-full items-center justify-center bg-neutral-100 text-6xl" aria-hidden="true">
-                  {emoji}
-                </div>
-              )}
-              <div className="p-2">
-                <span className={`rounded px-1.5 text-sm font-bold text-white ${x.kind === "lost" ? "bg-[#B42318]" : "bg-[#1E6B47]"}`}>{x.kind === "lost" ? "😢 หาย" : "🙌 มีคนเจอ"}</span>
-                <p className="mt-1 line-clamp-2 text-[15px] font-bold leading-snug">{x.title}</p>
-                <p className="text-sm text-[#45504A]">{[x.soi && `ซ.${x.soi}`, timeAgo(x.created_at)].filter(Boolean).join(" · ")}</p>
-              </div>
+    <div className="mb-3 space-y-2">
+      {home.map((x) => (
+        <div key={x.id} className="flex items-center gap-2 rounded-2xl bg-[#E4F0E9] px-3 py-2">
+          {thumb(x, "h-10 w-10 shrink-0 rounded-full text-xl")}
+          <p className="min-w-0 flex-1 text-[15px] leading-snug">
+            🎉 <b>เจอแล้ว!</b> {x.title} กลับบ้านแล้ว · ขอบคุณทุกคนที่ช่วยดู
+          </p>
+          <button onClick={() => hide([`r${x.id}`])} aria-label="ปิด" className="min-h-[40px] min-w-[40px] shrink-0 text-[#45504A]">
+            ✕
+          </button>
+        </div>
+      ))}
+      {big.length > 0 && (
+        <section className="rounded-[20px] border-2 border-[#E0A100] bg-[#FFF8E1] p-3" aria-label="สัตว์เลี้ยงหาย">
+          <div className="flex items-center gap-2">
+            <p className="min-w-0 flex-1 text-lg font-bold leading-tight">🐾 ช่วยกันดู · สัตว์เลี้ยงหาย {big.length} ตัว</p>
+            <button onClick={() => hide(big.map((x) => x.id))} className="min-h-[40px] shrink-0 text-sm font-bold text-[#45504A] underline">
+              ซ่อน
             </button>
-          );
-        })}
-      </div>
-      <button onClick={onOpen} className="mt-1 min-h-[44px] w-full rounded-xl bg-white text-[15px] font-bold text-[#7A1A12]">
-        {lost ? "เห็นตัวนี้? กดบอกเจ้าของ ›" : "ดูรูป · ติดต่อ ›"}
-      </button>
-    </section>
+          </div>
+          <div className="-mx-3 mt-2 flex gap-2 overflow-x-auto px-3 pb-1">
+            {big.map((x) => (
+              <button key={x.id} onClick={onOpen} className="w-[168px] shrink-0 overflow-hidden rounded-2xl bg-white text-left shadow-sm">
+                {thumb(x, "aspect-square w-full text-6xl")}
+                <div className="p-2">
+                  <span className="rounded bg-[#B42318] px-1.5 text-sm font-bold text-white">😢 หาย</span>
+                  {near(x) ? <span className="ml-1 rounded bg-[#15201A] px-1.5 text-sm font-bold text-white">ใกล้บ้านคุณ</span> : null}
+                  <p className="mt-1 line-clamp-2 text-[15px] font-bold leading-snug">{x.title}</p>
+                  <p className="text-sm text-[#45504A]">{[x.soi && `ซ.${x.soi}`, timeAgo(x.created_at)].filter(Boolean).join(" · ")}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+          <button onClick={onOpen} className="mt-1 min-h-[44px] w-full rounded-xl bg-white text-[15px] font-bold">
+            เห็นตัวไหน? กดบอกเจ้าของ ›
+          </button>
+        </section>
+      )}
+      {slim.length > 0 && (
+        // seen already: one quiet line that still says "they are still looking"
+        <div className="flex items-center gap-2 rounded-2xl border border-[#E0C27A] bg-[#FFFBEF] px-3 py-1.5">
+          <button onClick={onOpen} className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2 text-left">
+            <span className="flex shrink-0 -space-x-2">
+              {slim.slice(0, 3).map((x) => (
+                <span key={x.id}>{thumb(x, "h-8 w-8 rounded-full border-2 border-white text-base")}</span>
+              ))}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[15px]">
+              🐾 <b>{slim.some((x) => x.kind === "lost") ? "ยังตามหาอยู่" : "มีคนเจอ รอเจ้าของ"}</b> {slim.length} ตัว ·{" "}
+              {slim
+                .slice(0, 2)
+                .map((x) => `${x.title.slice(0, 18)}${x.soi ? ` ซ.${x.soi}` : ""}`)
+                .join(" · ")}
+            </span>
+            <span className="shrink-0 text-[#45504A]">›</span>
+          </button>
+          <button onClick={() => hide(slim.map((x) => x.id))} aria-label="ซ่อน" className="min-h-[40px] min-w-[36px] shrink-0 text-[#45504A]">
+            ✕
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
