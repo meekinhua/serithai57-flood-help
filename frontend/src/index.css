@@ -276,3 +276,12 @@ details[open] > :not(summary) { animation: row-in 0.25s ease-out both; }
   .fold { transition: none; }
   button:not(:disabled):active, a:active { transform: none; }
 }
+
+/* the peek: slides down, a thin bar runs out the 7 s, slides back up */
+@keyframes peek-in { from { transform: translateY(-140%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes peek-out { from { transform: none; opacity: 1; } to { transform: translateY(-140%); opacity: 0; } }
+@keyframes peek-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.peek-in { animation: peek-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.1) both; }
+.peek-out { animation: peek-out 0.3s ease-in both; }
+.peek-in .peek-timer { animation: peek-timer 7s linear both; }
+@media (prefers-reduced-motion: reduce) { .peek-in, .peek-out, .peek-timer { animation: none !important; } }

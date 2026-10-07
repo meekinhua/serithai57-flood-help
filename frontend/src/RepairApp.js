@@ -17,7 +17,7 @@ import { BottomNav, CommunityFeed, CommunityIntro, IntentChoices, JoinSheetBody,
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/WatchPanel";
-import { LostBoard, LostForm, LostPreview, PetAlert, shareLost } from "./components/LostFound";
+import { LostBoard, LostForm, LostPreview, shareLost } from "./components/LostFound";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, HireList, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
@@ -67,18 +67,45 @@ export default function RepairApp() {
   const [issues, setIssues] = useState([]);
   const [lost, setLost] = useState([]);
   const [reunited, setReunited] = useState([]);
-  const [liveLost, setLiveLost] = useState(null); // a pet just posted by someone else, shown live for a few seconds
-  const knownLost = useRef(null);
+  // the peek: a new lost pet / a pet back home slides in at the top, stays ~7 s, slides away; once per phone.
+  // Nothing stays above บ้านฉัน; the 🔔 list and เพื่อนบ้าน › หาย·เจอ keep them for later.
+  const [peek, setPeek] = useState(null); // {x, kind: "lost" | "home", leaving}
+  const peekQ = useRef([]);
   useEffect(() => {
     const on = (e) => setToast(e.detail);
     window.addEventListener("app-toast", on);
     return () => window.removeEventListener("app-toast", on);
   }, []);
+  const nextPeek = useCallback(() => {
+    const n = peekQ.current.shift();
+    if (n) {
+      save("petSeen", { ...load("petSeen", {}), [n.key]: Date.now() });
+      setPeek({ ...n, leaving: false });
+    } else setPeek(null);
+  }, []);
+  const closePeek = useCallback(() => {
+    setPeek((p) => (p ? { ...p, leaving: true } : p));
+    setTimeout(nextPeek, 320); // the slide-out, then the next one
+  }, [nextPeek]);
   useEffect(() => {
-    if (!liveLost) return;
-    const t = setTimeout(() => setLiveLost(null), 15000); // says it once, then gets out of the way
+    if (!peek || peek.leaving) return;
+    const t = setTimeout(closePeek, 7000);
     return () => clearTimeout(t);
-  }, [liveLost]); // pets that went home in the last day or two (one cheerful line)
+  }, [peek, closePeek]);
+  useEffect(() => {
+    // what this phone has not been told yet: lost pets of the last 2 days, pets home in the last day (not my own posts)
+    const seenP = load("petSeen", {});
+    const mine = load("lostKeys", {});
+    const pet = (x) => ["dog", "cat", "pet"].includes(x.category);
+    const age = (t) => Date.now() - new Date(t).getTime();
+    const fresh = [
+      ...lost.filter((x) => pet(x) && x.kind === "lost" && age(x.created_at) < 2 * 864e5 && !mine[x.id]).map((x) => ({ key: x.id, x, kind: "lost" })),
+      ...reunited.filter((x) => pet(x) && age(x.updated_at || x.created_at) < 864e5).map((x) => ({ key: `r${x.id}`, x, kind: "home" })),
+    ].filter((n) => !seenP[n.key] && !peekQ.current.some((q) => q.key === n.key) && peek?.key !== n.key);
+    if (!fresh.length) return;
+    peekQ.current.push(...fresh.slice(0, 3)); // never a long parade
+    if (!peek) setTimeout(nextPeek, 1200); // after the page has settled
+  }, [lost, reunited]); // eslint-disable-line react-hooks/exhaustive-deps
   const [topics, setTopics] = useState([]);
   const [prosGroup, setProsGroup] = useState("");
   // 7 Oct: four pages under a bottom bar — บ้านฉัน is the main one; the device's back button walks back through them
@@ -184,15 +211,6 @@ export default function RepairApp() {
       ]);
       if (ft) setTopics(ft);
       setLost(lf.filter((x) => x.status !== "reunited"));
-      {
-        const ids = new Set(lf.map((x) => x.id));
-        if (knownLost.current) {
-          const mine = load("lostKeys", {});
-          const fresh = lf.find((x) => !knownLost.current.has(x.id) && x.status === "open" && x.kind === "lost" && ["dog", "cat", "pet"].includes(x.category) && !mine[x.id]);
-          if (fresh) setLiveLost(fresh);
-        }
-        knownLost.current = ids;
-      }
       setReunited(lf.filter((x) => x.status === "reunited" && Date.now() - new Date(x.updated_at || x.created_at).getTime() < 2 * 864e5));
       if (hm) {
         setHome(hm);
@@ -315,7 +333,8 @@ export default function RepairApp() {
   const needs = jobs.filter((j) => j.kind === "need" && j.status === "open" && j.type !== "hire");
   const hires = jobs.filter((j) => j.type === "hire" && j.status !== "done");
   const lostOpen = lost.filter((x) => x.status !== "reunited");
-  const lostPets = lostOpen.filter((x) => x.kind === "lost" && ["dog", "cat", "pet"].includes(x.category) && Date.now() - new Date(x.created_at).getTime() < 2 * 864e5);
+  const lostPets = lostOpen.filter((x) => x.kind === "lost" && ["dog", "cat", "pet"].includes(x.category) && Date.now() - new Date(x.created_at).getTime() < 7 * 864e5);
+  const homePets = reunited.filter((x) => ["dog", "cat", "pet"].includes(x.category) && Date.now() - new Date(x.updated_at || x.created_at).getTime() < 864e5);
   const lostHot = lostOpen.filter((x) => x.kind === "lost" && Date.now() - new Date(x.created_at).getTime() < 7 * 864e5);
   const needSig = needs.map((j) => j.id.slice(0, 6)).join(",");
 
@@ -325,15 +344,17 @@ export default function RepairApp() {
     home: homeBadge,
     pros: newestPro > prosSeen ? { level: "general", reasons: ["🔧 มีร้าน / ช่างใหม่ในหมู่บ้าน"], sig: `p${newestPro}` } : null,
     community:
-      needs.length || lostPets.length || newest > seenAt
+      needs.length || lostPets.length || homePets.length || newest > seenAt
         ? {
             level: "general",
             reasons: [
-              ...lostPets.slice(0, 3).map((x) => ({ text: `🐾 สัตว์เลี้ยงหาย: ${x.title}${x.soi ? ` (ซ.${x.soi})` : ""}`, go: ["lost", x.id] })),
+              ...homePets.slice(0, 2).map((x) => ({ text: `🎉 เจอแล้ว: ${x.title}`, go: ["lost", x.id] })),
+              ...lostPets.slice(0, 4).map((x) => ({ text: `🐾 ยังตามหา: ${x.title}${x.soi ? ` (ซ.${x.soi})` : ""}`, go: ["lost", x.id] })),
               ...needs.slice(0, 4).map((j) => ({ text: `🙋 ${j.name} ขอแรง: ${j.detail.length > 70 ? `${j.detail.slice(0, 70)}…` : j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`, go: ["jobs", j.id] })),
               ...(newest > seenAt && !needs.length ? ["👥 มีโพสต์ใหม่จากเพื่อนบ้าน"] : []),
             ],
-            sig: needs.length || lostPets.length ? `n${needSig}|p${lostPets.map((x) => x.id.slice(0, 6)).join(",")}` : `c${newest}`,
+            sig:
+              needs.length || lostPets.length || homePets.length ? `n${needSig}|p${lostPets.map((x) => x.id.slice(0, 6)).join(",")}|h${homePets.map((x) => x.id.slice(0, 6)).join(",")}` : `c${newest}`,
           }
         : null,
     map: ws.alarm ? { level: "important", reasons: [`💧 ระดับน้ำ: ${ws.text}${ws.sub ? ` · ${ws.sub}` : ""}`], sig: `m${ws.text}` } : null,
@@ -503,11 +524,15 @@ export default function RepairApp() {
           onHotline={() => setSheet({ type: "hotlines" })}
         />
         <UrgentBar items={announcements} />
-        {liveLost && (
-          <div className="anim-hop fixed inset-x-3 top-[70px] z-40 mx-auto max-w-md rounded-2xl border-2 border-[#E0A100] bg-white p-2 shadow-xl" role="status">
+        {peek && (
+          <div
+            key={peek.key}
+            className={`peek fixed inset-x-3 top-[68px] z-40 mx-auto max-w-md rounded-2xl border-2 bg-white p-2 shadow-xl ${peek.leaving ? "peek-out" : "peek-in"} ${peek.kind === "home" ? "border-[#1E6B47]" : "border-[#E0A100]"}`}
+            role="status"
+          >
             <div className="flex items-center gap-2">
-              {liveLost.media?.[0] ? (
-                <img src={mediaUrl(liveLost.media[0].id, "thumb")} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+              {peek.x.media?.[0] ? (
+                <img src={mediaUrl(peek.x.media[0].id, "thumb")} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
               ) : (
                 <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#F2F4F1] text-3xl" aria-hidden="true">
                   🐾
@@ -515,21 +540,24 @@ export default function RepairApp() {
               )}
               <button
                 onClick={() => {
-                  setLiveLost(null);
-                  goItem("lost", liveLost.id);
+                  closePeek();
+                  goItem("lost", peek.x.id);
                 }}
                 className="min-w-0 flex-1 text-left"
               >
-                <span className="block text-sm font-bold text-[#B42318]">🐾 เพิ่งประกาศ · สัตว์เลี้ยงหาย</span>
+                <span className={`block text-sm font-bold ${peek.kind === "home" ? "text-[#154D33]" : "text-[#B42318]"}`}>
+                  {peek.kind === "home" ? "🎉 เจอแล้ว! กลับบ้านแล้ว" : "🐾 ช่วยกันดู · สัตว์เลี้ยงหาย"}
+                </span>
                 <span className="line-clamp-2 block text-[15px] font-bold leading-snug">
-                  {liveLost.title}
-                  {liveLost.soi ? ` (ซ.${liveLost.soi})` : ""}
+                  {peek.x.title}
+                  {peek.x.soi ? ` (ซ.${peek.x.soi})` : ""}
                 </span>
               </button>
-              <button onClick={() => setLiveLost(null)} aria-label="ปิด" className="min-h-[44px] min-w-[40px] shrink-0 text-[#45504A]">
+              <button onClick={closePeek} aria-label="ปิด" className="min-h-[44px] min-w-[40px] shrink-0 text-[#45504A]">
                 ✕
               </button>
             </div>
+            <span className="peek-timer absolute inset-x-3 bottom-0.5 h-0.5 origin-left rounded-full bg-[#E0A100]" aria-hidden="true" />
           </div>
         )}
         {/* 7 Oct: one row — water, weather, people here, share; the village's name lives in the footer */}
@@ -577,7 +605,6 @@ export default function RepairApp() {
         <main key={page} className="anim-page mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
           {page === "home" ? (
             <>
-              <PetAlert items={lost} reunited={reunited} onOpen={(id) => goItem("lost", id)} />
               {ordered(home.layout, Object.keys(blocks)).map((k) => (
                 <Fragment key={k}>{blocks[k]}</Fragment>
               ))}
