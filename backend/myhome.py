@@ -198,6 +198,11 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         h = clean(body.house)
         follow = {"want": body.want, "slots": [x for x in body.slots if x in SLOTS], "note": body.note.strip(), "at": now()}
         res = await db.survey_resp.update_one({"survey": "electric", "house": h}, {"$set": {"followup": follow}})
+        if res.matched_count or body.want in ("free", "group"):
+            await db.electric_nosign.delete_one({"house": h})
+        else:
+            # a house that never signed says it doesn't need the check: keep the answer apart (not a job for the electricians)
+            await db.electric_nosign.update_one({"house": h}, {"$set": {"house": h, "followup": follow}}, upsert=True)
         if not res.matched_count and body.want in ("free", "group"):
             loc = await locate_house(h)
             await db.survey_resp.insert_one({
@@ -276,7 +281,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         soi_waiting = await db.survey_resp.count_documents({**waiting_q, "soi": soi, "house": {"$ne": h}}) if soi else 0
         soi_group = await db.survey_resp.count_documents({"survey": "electric", "soi": soi, "followup.want": "group", "house": {"$ne": h}}) if soi else 0
         village_waiting = await db.survey_resp.count_documents(waiting_q)
-        follow = (sig or {}).get("followup") or {}
+        follow = (sig or {}).get("followup") or ((await db.electric_nosign.find_one({"house": h}, {"_id": 0, "followup": 1})) or {}).get("followup") or {}
         qs = [q for q in ((await db.settings.find_one({"id": "myhome_questions"}, {"_id": 0, "items": 1}) or {}).get("items") or []) if q.get("on")]
         mine = {a["qid"]: a["answer"] async for a in db.myhome_answers.find({"house": h, "qid": {"$in": [q["id"] for q in qs]}}, {"_id": 0, "qid": 1, "answer": 1})}
         for q in qs:
