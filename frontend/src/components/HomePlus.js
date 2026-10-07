@@ -177,8 +177,6 @@ export function OutageRow({ info, forced, onFold, onChanged, setErr }) {
 }
 
 // ---------- 💰 flood relief this house can claim ----------
-// step-by-step animated guides (public/), per aid item
-const GUIDES = { bkk_claim: "/claim-guide.html" };
 export function AidRow({ info, onChanged, setErr }) {
   const [open, setOpen] = useState(null); // the information-only items fold behind one line
   const [how, setHow] = useState([]); // claim cards whose "วิธียื่น" is open
@@ -220,11 +218,6 @@ export function AidRow({ info, onChanged, setErr }) {
         </div>
         {a.amount && <p className={`mt-0.5 font-bold leading-snug text-[#154D33] ${info_ ? "text-lg" : "text-xl"}`}>{a.amount.split("\n")[0]}</p>}
         {a.deadline && <p className="text-[15px] font-bold text-[#B42318]">ยื่นภายใน {thaiDate(a.deadline)}</p>}
-        {GUIDES[a.id] && (
-          <a href={GUIDES[a.id]} className="mt-1.5 flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[#1E6B47] px-3 text-[15px] font-bold text-white">
-            ▶ ดูวิธียื่นทีละขั้น (มีเสียงอธิบาย)
-          </a>
-        )}
         {shown && (
           <>
             <MediaStrip media={a.media || []} />
