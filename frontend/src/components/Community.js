@@ -345,7 +345,7 @@ function Trust({ s }) {
 }
 
 // ---------- the tradesmen & shops board: search, groups, a big call button, "เคยใช้ ดี" ----------
-export function ProsList({ services, setServices, group, setGroup, onAdd, query: q0, autoFocus }) {
+export function ProsList({ services, setServices, group, setGroup, onAdd, query: q0, autoFocus, hires = [], onHire, onHires }) {
   const [q, setQ] = useState(q0 || "");
   const [msg, setMsg] = useState("");
   const [voted, setVoted] = useState(() => load("prosVoted", []));
@@ -455,6 +455,20 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
           <button onClick={onAdd} className="mt-2 min-h-[48px] rounded-xl bg-[#1E6B47] px-4 font-bold text-white">
             แนะนำ
           </button>
+        </div>
+      )}
+      {/* the end of the list: can't find one? say so; tradesmen see who is looking — quietly, not as an alert */}
+      {onHire && (
+        <div className="mt-2 space-y-2 rounded-2xl border border-dashed border-[#A9B4AD] p-3">
+          <p className="text-[15px] font-bold">หาไม่เจอ?</p>
+          <button onClick={onHire} className="min-h-[48px] w-full rounded-xl border-2 border-[#15201A] bg-white text-[15px] font-bold">
+            🙋 ประกาศหาช่าง ให้ช่างในหมู่บ้านเห็น
+          </button>
+          {hires.length > 0 && (
+            <button onClick={onHires} className="min-h-[44px] w-full text-left text-[15px] text-[#45504A] underline">
+              เพื่อนบ้านกำลังหาช่าง {hires.length} เรื่อง · เป็นช่าง? ดูงาน ›
+            </button>
+          )}
         </div>
       )}
     </div>

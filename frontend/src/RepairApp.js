@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API, api, load, save, viewerId } from "./api";
-import { HOTLINE_GROUPS, JOB_TYPES, VILLAGE_NAME, timeAgo } from "./config";
+import { HOTLINE_GROUPS, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
 import Announcements, { UrgentBar } from "./components/Announcements";
 import { WeatherAlerts, WeatherChip, WindyMap } from "./components/Weather";
@@ -500,23 +500,26 @@ export default function RepairApp() {
           {page === "pros" && (
             <>
               <PageTitle title="ช่าง · ร้าน ในหมู่บ้าน" sub={`${services.length} ราย · คนแนะนำเยอะขึ้นก่อน`} />
-              {admin ? (
-                <div className="space-y-3">
-                  <HireStrip jobs={jobs} onOpen={() => showTab("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />
-                  <div className="rounded-xl bg-white p-3">
+              {/* 7 Oct: everyone (admins too) gets the same list; neighbours looking for a tradesman sit quietly at its end */}
+              <ProsList
+                key={`${prosGroup}-${prosFocus}`}
+                services={services}
+                setServices={setServices}
+                group={prosGroup}
+                setGroup={setProsGroup}
+                autoFocus={prosFocus}
+                onAdd={() => setSheet({ type: "serviceForm" })}
+                hires={jobs.filter((j) => j.type === "hire" && j.status !== "done")}
+                onHire={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })}
+                onHires={() => showTab("jobs")}
+              />
+              {admin && (
+                <details className="mt-4 rounded-xl bg-white p-3">
+                  <summary className="min-h-[44px] cursor-pointer font-bold">🛡️ เครื่องมือผู้ดูแล · แก้ ยืนยัน ปักหมุด ลบ ร้าน</summary>
+                  <div className="mt-2">
                     <ServiceBoard repair services={services} setServices={setServices} posts={[]} admin={admin} onAdd={() => setSheet({ type: "serviceForm" })} onOpenPost={() => {}} />
                   </div>
-                </div>
-              ) : (
-                <ProsList
-                  key={`${prosGroup}-${prosFocus}`}
-                  services={services}
-                  setServices={setServices}
-                  group={prosGroup}
-                  setGroup={setProsGroup}
-                  autoFocus={prosFocus}
-                  onAdd={() => setSheet({ type: "serviceForm" })}
-                />
+                </details>
               )}
             </>
           )}
@@ -565,14 +568,7 @@ export default function RepairApp() {
                   {tab === "forum" && <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />}
                   {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
                   {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} />}
-                  {tab === "pros" && admin && <HireStrip jobs={jobs} onOpen={() => pick("jobs")} onAdd={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })} />}
                   {tab === "lost" && <LostBoard items={lost} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />}
-                  {tab === "pros" && !admin && <ProsList services={services} setServices={setServices} group={prosGroup} setGroup={setProsGroup} onAdd={() => setSheet({ type: "serviceForm" })} />}
-                  {tab === "pros" && admin && (
-                    <div className="rounded-xl bg-white p-3">
-                      <ServiceBoard repair services={services} setServices={setServices} posts={[]} admin={admin} onAdd={() => setSheet({ type: "serviceForm" })} onOpenPost={() => {}} />
-                    </div>
-                  )}
                   {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
                   {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
                   {tab === "guide" && <AfterFloodGuide />}
@@ -896,41 +892,6 @@ function waterSub(water) {
 
 const LEND_KIND_TEXT = { lend: "มีของให้ยืม:", give: "มีของให้ฟรี:", want: "ตามหา / อยากได้:", sell: "ขาย:" };
 const MORE_SUB = { waste: "วันนี้รถเข้าซอยไหน", guide: "ไฟ น้ำ ความปลอดภัย", issues: "ฝาท่อแตก ขยะ ไฟถนน", lost: "สัตว์เลี้ยง ของหาย" };
-
-// Neighbours looking for a tradesman right now (jobs of type "hire"), shown above the contact board
-function HireStrip({ jobs, onOpen, onAdd }) {
-  const hires = jobs.filter((j) => j.type === "hire" && j.status !== "done");
-  return (
-    <section className="mb-3 rounded-xl border-2 border-black bg-yellow-50 p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="min-w-0 flex-1 font-bold">
-          {JOB_TYPES.hire[0]} เพื่อนบ้านกำลังหาช่าง ({hires.length})<span className="block text-sm font-normal text-neutral-600">ช่างที่ว่าง ดูแล้วติดต่อรับงานได้เลย</span>
-        </h3>
-        <button onClick={onAdd} className="min-h-[44px] rounded-lg bg-black px-3 font-semibold text-white">
-          ➕ ฉันหาช่าง
-        </button>
-      </div>
-      {hires.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {hires.slice(0, 5).map((j) => (
-            <li key={j.id}>
-              <button onClick={onOpen} className="w-full rounded-lg bg-white p-2 text-left text-sm shadow-sm">
-                <b>
-                  {j.soi ? `ซ.${j.soi} · ` : ""}
-                  {j.detail}
-                </b>
-                <span className="block text-xs text-neutral-500">
-                  {j.name} · {timeAgo(j.created_at)}
-                  {j.when && ` · ${j.when}`}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
 
 // Where an event's sign goes: its meeting point, or the middle of its line
 export function eventSpot(e) {
