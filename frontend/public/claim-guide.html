@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>วิธียื่นขอเงินช่วยเหลือน้ำท่วม กทม.</title>
+<meta name="description" content="ดูทีละขั้น มีเสียงอธิบาย: ยื่นขอเงินช่วยเหลือน้ำท่วมทางออนไลน์ที่ claim.bangkok.go.th" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f6f3ea; --ink: #15201a; --sub: #45504a; --green: #1e6b47; --green2: #154d33; --mint: #e4f0e9;
+    --gold: #e0a100; --cream: #fff8e1; --red: #b42318; --card: #ffffff; --line: #dce2dd; --gov: #1d6b4a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Sarabun", system-ui, sans-serif; }
+  body { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 12px 16px 24px; }
+  header { width: 100%; max-width: 520px; display: flex; align-items: center; gap: 10px; }
+  header a { color: var(--green2); font-weight: 700; text-decoration: none; font-size: 15px; min-height: 44px; display: flex; align-items: center; }
+  header h1 { flex: 1; font-size: 18px; margin: 0; line-height: 1.2; }
+  .progress { width: 100%; max-width: 520px; display: flex; gap: 4px; margin: 10px 0 12px; }
+  .progress i { flex: 1; height: 6px; border-radius: 3px; background: #d9dcd2; transition: background .3s; }
+  .progress i.on { background: var(--green); }
+
+  .stage { width: 100%; max-width: 520px; display: grid; grid-template-columns: 1fr; gap: 14px; }
+  .phone { position: relative; margin: 0 auto; width: 270px; height: 470px; border-radius: 34px; background: #111; padding: 12px; box-shadow: 0 18px 40px -18px rgba(0,0,0,.45); }
+  .phone::before { content: ""; position: absolute; top: 18px; left: 50%; width: 70px; height: 7px; margin-left: -35px; border-radius: 4px; background: #333; z-index: 3; }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 24px; overflow: hidden; background: #fff; }
+  .bar { height: 46px; background: var(--gov); color: #fff; display: flex; align-items: flex-end; padding: 0 12px 8px; font-weight: 700; font-size: 13px; gap: 6px; }
+  .bar b { background: #fff; color: var(--gov); border-radius: 6px; padding: 0 5px; font-size: 11px; }
+  .url { font-size: 11px; color: #555; background: #f1f1f1; margin: 6px 10px 0; border-radius: 8px; padding: 4px 8px; text-align: center; }
+  .body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .el { border-radius: 12px; padding: 9px 11px; font-size: 13px; line-height: 1.3; opacity: 0; transform: translateY(10px); transition: opacity .45s, transform .45s, box-shadow .3s, background .3s; }
+  .el.in { opacity: 1; transform: none; }
+  .el.card { background: #fff; border: 1.5px solid var(--line); }
+  .el.btn { background: var(--gov); color: #fff; text-align: center; font-weight: 700; }
+  .el.ghost { background: #eef3ef; color: var(--green2); font-weight: 700; }
+  .el.hot { box-shadow: 0 0 0 3px var(--gold); }
+  .el.done { background: var(--mint); border-color: var(--green); }
+  .el small { display: block; color: var(--sub); font-size: 11px; margin-top: 2px; }
+  .el .chk { float: right; width: 18px; height: 18px; border-radius: 5px; border: 2px solid #9aa59f; text-align: center; line-height: 14px; font-size: 12px; color: #fff; }
+  .el.done .chk { background: var(--green); border-color: var(--green); }
+  .big { font-size: 22px; font-weight: 800; color: var(--green2); text-align: center; }
+  .money { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 13px; }
+  .money b { color: var(--green2); text-align: right; }
+  .finger { position: absolute; z-index: 5; width: 34px; height: 34px; margin: -6px 0 0 -10px; font-size: 30px; pointer-events: none; opacity: 0; transition: left .8s ease, top .8s ease, opacity .3s; filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)); }
+  .ripple { position: absolute; z-index: 4; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 3px solid var(--gold); pointer-events: none; animation: rip .7s ease-out forwards; }
+  @keyframes rip { from { transform: scale(.4); opacity: 1; } to { transform: scale(3.2); opacity: 0; } }
+  .doc { display: flex; align-items: center; gap: 8px; }
+  .doc span:first-child { font-size: 20px; }
+
+  .caption { background: var(--card); border: 2px solid var(--green); border-radius: 18px; padding: 14px 16px; min-height: 120px; }
+  .caption .step { color: var(--green); font-weight: 800; font-size: 14px; }
+  .caption h2 { margin: 2px 0 6px; font-size: 21px; line-height: 1.25; }
+  .caption p { margin: 0; font-size: 17px; line-height: 1.55; }
+  .caption .warn { margin-top: 8px; background: var(--cream); border-radius: 10px; padding: 8px 10px; font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 8px; }
+  button { font: inherit; font-weight: 800; font-size: 17px; min-height: 54px; border-radius: 14px; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
+  button.main { background: var(--green); border-color: var(--green); color: #fff; }
+  button:disabled { opacity: .35; }
+  .row2 { display: flex; gap: 8px; }
+  .row2 button { flex: 1; min-height: 46px; font-size: 15px; border-width: 1.5px; }
+  .note { font-size: 13px; color: var(--sub); text-align: center; margin: 2px 0 0; }
+
+  .start { position: fixed; inset: 0; z-index: 20; background: rgba(21,32,26,.86); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .start .box { background: var(--bg); border-radius: 22px; padding: 22px 18px; max-width: 420px; width: 100%; text-align: center; }
+  .start h2 { margin: 6px 0 4px; font-size: 24px; line-height: 1.25; }
+  .start p { margin: 0 0 14px; font-size: 17px; color: var(--sub); line-height: 1.5; }
+  .start button { width: 100%; margin-top: 8px; }
+  .hide { display: none !important; }
+  @media (max-width: 759px) { .phone { width: 236px; height: 380px; } .el { padding: 7px 10px; } }
+  @media (min-width: 760px) {
+    .stage { max-width: 860px; grid-template-columns: 300px 1fr; align-items: start; }
+    header, .progress { max-width: 860px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .el, .finger { transition: none; } .ripple { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <a href="/" aria-label="กลับไปบ้านฉัน">‹ บ้านฉัน</a>
+  <h1>วิธียื่นขอเงินช่วยเหลือน้ำท่วม กทม.</h1>
+</header>
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<main class="stage">
+  <div class="phone" aria-hidden="true"><div class="screen" id="screen"></div><div class="finger" id="finger">👆</div></div>
+  <div>
+    <section class="caption" aria-live="polite">
+      <div class="step" id="step"></div>
+      <h2 id="title"></h2>
+      <p id="text"></p>
+      <div class="warn hide" id="warn"></div>
+    </section>
+    <div class="controls" style="margin-top: 10px">
+      <button id="prev" aria-label="ขั้นก่อนหน้า">‹ ก่อน</button>
+      <button id="play" class="main">⏸ หยุด</button>
+      <button id="next" aria-label="ขั้นถัดไป">ต่อ ›</button>
+    </div>
+    <div class="row2" style="margin-top: 8px">
+      <button id="sound">🔊 เสียง: เปิด</button>
+      <button id="again">↺ ฟังขั้นนี้อีกครั้ง</button>
+    </div>
+    <p class="note" id="voiceNote"></p>
+    <div class="row2" style="margin-top: 10px">
+      <button class="main" onclick="window.open('https://claim.bangkok.go.th/','_blank')">ไปยื่นที่ claim.bangkok.go.th ›</button>
+    </div>
+    <p class="note">ทำโดยทีมอาสาหมู่บ้านสหกรณ์ฯ 4 (เสรีไทย 57) จากหน้าเว็บจริง ณ 7 ต.ค. 69 · ไม่ใช่เว็บของ กทม. · ถ้าหน้าเว็บเปลี่ยน ให้ยึดตามเว็บ กทม.</p>
+  </div>
+</main>
+
+<div class="start" id="start">
+  <div class="box">
+    <div style="font-size: 44px">💰</div>
+    <h2>ยื่นขอเงินช่วยเหลือน้ำท่วม กทม. ทำเองในมือถือได้</h2>
+    <p>ดูทีละขั้น มีเสียงอธิบาย ประมาณ 3 นาที<br /><b style="color: var(--red)">หมดเขต 24 ต.ค. 69</b></p>
+    <button class="main" id="goSound">▶ เริ่มดู (มีเสียง)</button>
+    <button id="goMute">ดูแบบไม่มีเสียง</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- the steps (wording checked against claim.bangkok.go.th on 7 Oct 2026) ----------
+  const S = [
+    {
+      step: "เริ่มต้น", title: "ขอเงินช่วยเหลือน้ำท่วมจาก กทม.",
+      say: "บ้านที่โดนน้ำท่วม ขอเงินช่วยเหลือจากกรุงเทพมหานครได้ ทำเองในมือถือ ที่เว็บ เคลม ดอท บางกอก ดอท โก ดอท ที เอช. ใช้เวลาประมาณสิบห้านาที. หมดเขตวันที่ยี่สิบสี่ ตุลาคม. เงินนี้เป็นคนละก้อนกับเงินเก้าพันบาท ในแอปทางรัฐ ขอได้ทั้งสองทาง.",
+      warn: "เงินนี้คนละก้อนกับเงิน 9,000 บาทในแอปทางรัฐ · ขอได้ทั้งสองทาง",
+      screen: [
+        ["card", "<div class='big'>claim.bangkok.go.th</div><small style='text-align:center'>ระบบขอรับเงินช่วยเหลือน้ำท่วมออนไลน์ กทม.</small>"],
+        ["card", "1. เช็กสิทธิ<br>2. กรอกข้อมูล<br>3. แนบเอกสารและหลักฐาน<br>4. รอเขตพิจารณา<br>5. รับเงินช่วยเหลือ"],
+        ["btn", "รับทราบ", "tap"],
+      ],
+    },
+    {
+      step: "ได้เท่าไหร่", title: "เงินที่อาจได้รับ",
+      say: "ค่าซ่อมแซมบ้าน ตามความเสียหายจริง ไม่เกินแปดหมื่นแปดพันหกร้อยบาท ช่วยเฉพาะค่าวัสดุส่วนโครงสร้างบ้าน. ค่าดำรงชีพ หนึ่งพันเก้าร้อย หรือสามพันแปดร้อยบาทต่อครอบครัว. ถ้าเช่าบ้าน ได้ค่าเช่าไม่เกินสามพันบาทต่อเดือน. ค่าเครื่องมือทำมาหากิน ไม่เกินหนึ่งหมื่นสามพันห้าร้อยบาท. และค่ารักษาพยาบาล ถ้าบาดเจ็บ.",
+      screen: [
+        ["card", "<div class='money'><span>🏠 ค่าซ่อมบ้าน (ค่าวัสดุ)</span><b>≤ 88,600</b></div>"],
+        ["card", "<div class='money'><span>🍚 ค่าดำรงชีพ / ครอบครัว</span><b>1,900 / 3,800</b></div><small>เสียหายบางส่วน / ทั้งหลัง</small>"],
+        ["card", "<div class='money'><span>🔑 ค่าเช่าบ้านชั่วคราว</span><b>≤ 3,000/ด.</b></div>"],
+        ["card", "<div class='money'><span>🧰 เครื่องมือทำมาหากิน</span><b>≤ 13,500</b></div>"],
+        ["card", "<div class='money'><span>🏥 ค่ารักษา ผู้ป่วยนอก / ใน</span><b>2,000 / 4,000</b></div>"],
+      ],
+    },
+    {
+      step: "เตรียมก่อน", title: "เตรียม 3 อย่างไว้ในมือถือ",
+      say: "ก่อนเริ่ม ถ่ายรูปเก็บไว้ในมือถือสามอย่าง. หนึ่ง บัตรประชาชนที่ยังไม่หมดอายุ. สอง รูปความเสียหายของบ้าน. สาม หน้าสมุดบัญชีธนาคาร ที่เห็นชื่อและเลขบัญชี. ถ้าเช่าบ้าน เตรียมสัญญาเช่าหรือใบเสร็จค่าเช่าด้วย. และต้องมีแอปไทยดี หรือบัญชีทางรัฐ ไว้ยืนยันตัวตน.",
+      warn: "ไฟล์ละไม่เกิน 5MB · รูปความเสียหายควรถ่ายก่อนทำความสะอาด ถ้าล้างไปแล้ว ใช้รูปที่มีอยู่",
+      screen: [
+        ["card", "<div class='doc'><span>🪪</span><span>บัตรประชาชน<small>ที่ยังไม่หมดอายุ</small></span></div>"],
+        ["card", "<div class='doc'><span>📷</span><span>รูปความเสียหาย<small>ถ่ายก่อนทำความสะอาด</small></span></div>"],
+        ["card", "<div class='doc'><span>📗</span><span>หน้าสมุดบัญชี<small>หน้าที่มีชื่อ-เลขบัญชี</small></span></div>"],
+        ["ghost", "📱 แอป ThaID หรือ บัญชีทางรัฐ"],
+      ],
+    },
+    {
+      step: "ขั้นที่ 1", title: "เช็กสิทธิ์ ตอบ 6 ข้อ",
+      say: "เข้าเว็บ แล้วกดปุ่ม เช็กสิทธิ์ที่อาจได้รับ. ระบบจะถามหกข้อ คือ เป็นที่อยู่ประจำไหม. ทะเบียนบ้าน. น้ำท่วมแค่ไหน. ตัวบ้านเสียหายแค่ไหน. อาชีพ. และมีคนบาดเจ็บไหม. กดตอบไปทีละข้อ แล้วกด ถัดไป.",
+      screen: [
+        ["btn", "เช็กสิทธิ์ที่อาจได้รับ", "tap"],
+        ["card", "<small>ที่อยู่ · ขั้น 1/6</small><b>บ้านที่ถูกน้ำท่วมเป็นที่อยู่ประจำไหม</b>"],
+        ["ghost", "ใช่ อยู่ประจำ", "tap"],
+        ["card", "<small>ที่อยู่ · ทะเบียนบ้าน · น้ำท่วม · ตัวบ้าน · อาชีพ · บาดเจ็บ</small>"],
+        ["btn", "ถัดไป", "tap"],
+      ],
+    },
+    {
+      step: "ขั้นที่ 2", title: "เลือกเงินที่จะขอ",
+      say: "ไปที่ เตรียมเอกสาร. ระบบจะขึ้นรายการเงินที่เข้าเกณฑ์. แตะเลือกช่องที่ต้องการขอ เช่น ค่าซ่อมแซมบ้าน และค่าดำรงชีพ. แล้วกดปุ่ม ถัดไป ด้านล่าง.",
+      screen: [
+        ["card", "สิทธิ์ที่เข้าเกณฑ์ในการช่วยเหลือ"],
+        ["card", "ค่าซ่อมแซมที่อยู่อาศัย<span class='chk'>✓</span><small>ไม่เกิน 88,600 บาท</small>", "tick"],
+        ["card", "ค่าดำรงชีพเบื้องต้น<span class='chk'>✓</span><small>1,900 / 3,800 บาท</small>", "tick"],
+        ["card", "ค่าที่พักชั่วคราว / ค่าเช่าบ้าน<span class='chk'></span><small>ไม่เกิน 3,000 บาท/เดือน</small>"],
+        ["btn", "ถัดไป · 2 สิทธิ์", "tap"],
+      ],
+    },
+    {
+      step: "ขั้นที่ 3", title: "แนบรูป แนบเอกสาร",
+      say: "ในหน้าอัปโหลดเอกสาร กดปุ่ม แนบไฟล์ ทีละช่อง. เลือกรูปบัตรประชาชน รูปความเสียหาย และหน้าสมุดบัญชี ที่ถ่ายเตรียมไว้. ช่องที่มีดอกจัน ต้องแนบ. แบบฟอร์มอื่นๆ ระบบจะกรอกให้เอง.",
+      screen: [
+        ["card", "อัปโหลดเอกสาร <b style='float:right'>0/3</b>"],
+        ["card", "สำเนาบัตรประชาชน *<small>ที่ยังไม่หมดอายุ</small>"],
+        ["ghost", "📎 แนบไฟล์", "tap"],
+        ["card", "รูปถ่ายความเสียหาย *<small>ถ่ายก่อนทำความสะอาด</small>"],
+        ["card", "สำเนาหน้าสมุดธนาคาร *<small>หน้าที่มีชื่อ-เลขบัญชี</small>"],
+      ],
+    },
+    {
+      step: "ขั้นที่ 4", title: "ยืนยันตัวตน แล้วตอบคำถาม",
+      say: "กด ตอบคำถาม แล้วระบบกรอกฟอร์มให้. ระบบจะให้เข้าสู่ระบบ ผ่านแอปไทยดี หรือทางรัฐ อย่างใดอย่างหนึ่ง. ทำครั้งเดียว แล้วชื่อ เลขบัตร วันเกิด และที่อยู่ จะถูกกรอกให้อัตโนมัติ. จากนั้นตอบคำถามต่อ รวมถึงบัญชีรับเงิน.",
+      warn: "ถ้าใช้แอปไม่เป็น ให้ลูกหลานช่วย หรือไปยื่นที่สำนักงานเขตบึงกุ่ม",
+      screen: [
+        ["card", "<b>ตอบคำถาม แล้วระบบกรอกฟอร์มให้</b>", "tap"],
+        ["card", "เข้าสู่ระบบเพื่อยืนยันตัวตน<small>ทำครั้งเดียว ระบบกรอกชื่อ-ที่อยู่ให้</small>"],
+        ["btn", "เข้าสู่ระบบผ่าน ThaID", "tap"],
+        ["ghost", "เข้าสู่ระบบผ่าน ทางรัฐ"],
+      ],
+    },
+    {
+      step: "ขั้นที่ 5", title: "กดยื่นคำร้อง แล้วรอเขต",
+      say: "ตรวจข้อมูลให้ครบ แล้วกดปุ่ม ยื่นคำร้อง ด้านล่างสุด. จากนั้นรอสำนักงานเขตพิจารณา. ดูผลได้ที่ปุ่ม เช็กสถานะคำร้อง ในหน้าแรก. ถ้าผ่าน เงินจะโอนเข้าบัญชีที่แจ้งไว้.",
+      screen: [
+        ["card", "สิทธิ์ที่ขอ 2 สิทธิ์ · เอกสาร 3/3 ✓", "tick"],
+        ["btn", "ยื่นคำร้อง", "tap"],
+        ["card", "⏳ รอเขตพิจารณา"],
+        ["ghost", "🔎 เช็กสถานะคำร้อง"],
+        ["card", "💸 รับเงินโอนเข้าบัญชี"],
+      ],
+    },
+    {
+      step: "สำคัญ", title: "ถ้าทำออนไลน์ไม่ได้",
+      say: "ถ้าไม่มีโฉนดที่ดิน ชื่อในโฉนดไม่ตรงกับคนยื่น หรือบ้านไม่มีเลขที่ ให้ไปยื่นที่สำนักงานเขตบึงกุ่มแทน. ถ้าติดปัญหา ให้ลูกหลานช่วย หรือโทรสายด่วนกรุงเทพมหานคร หนึ่งห้าห้าห้า. ยื่นแล้ว อย่าลืมกด ยื่นแล้ว ในบ้านฉัน เพื่อบันทึกกันลืม.",
+      warn: "📞 สายด่วน กทม. 1555 · ยื่นที่สำนักงานเขตบึงกุ่มได้ · หมดเขต 24 ต.ค. 69",
+      screen: [
+        ["card", "📄 ไม่มีโฉนด / ชื่อไม่ตรง / ไม่มีเลขที่บ้าน<small>→ ยื่นที่สำนักงานเขต</small>"],
+        ["card", "👨‍👩‍👧 ให้ลูกหลานช่วยทำ"],
+        ["btn", "📞 สายด่วน กทม. 1555"],
+        ["ghost", "✓ ยื่นแล้ว (บันทึกกันลืมในบ้านฉัน)", "tap"],
+      ],
+    },
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const screen = $("screen"), finger = $("finger");
+  const synth = window.speechSynthesis;
+  let i = 0, playing = true, sound = true, timers = [], voice = null, runId = 0;
+
+  // a Thai voice if the phone has one; otherwise the captions carry it
+  function pickVoice() {
+    if (!synth) return null;
+    const vs = synth.getVoices();
+    return vs.find((v) => /^th/i.test(v.lang) && /google|premwadee|kanya|narisa/i.test(v.name)) || vs.find((v) => /^th/i.test(v.lang)) || null;
+  }
+  if (synth) { voice = pickVoice(); synth.onvoiceschanged = () => { voice = pickVoice(); note(); }; }
+  function note() { $("voiceNote").textContent = !synth || !voice ? "เครื่องนี้ไม่มีเสียงอ่านภาษาไทย · อ่านคำบรรยายด้านบนแทนได้ เลื่อนเองด้วยปุ่ม ต่อ ›" : ""; }
+
+  $("progress").innerHTML = S.map(() => "<i></i>").join("");
+  const clear = () => { timers.forEach(clearTimeout); timers = []; if (synth) synth.cancel(); };
+  const later = (ms, fn) => timers.push(setTimeout(fn, ms));
+
+  function tapAt(el) {
+    const r = el.getBoundingClientRect(), p = screen.parentElement.getBoundingClientRect();
+    const x = r.left - p.left + r.width * 0.6, y = r.top - p.top + r.height * 0.55;
+    finger.style.opacity = 1; finger.style.left = x + "px"; finger.style.top = y + "px";
+    later(850, () => {
+      const rp = document.createElement("div"); rp.className = "ripple"; rp.style.left = x + 10 + "px"; rp.style.top = y + 6 + "px";
+      screen.parentElement.appendChild(rp); later(800, () => rp.remove());
+      el.classList.add("hot"); later(600, () => el.classList.remove("hot"));
+    });
+  }
+
+  function show(n) {
+    clear(); const id = ++runId;
+    i = Math.max(0, Math.min(S.length - 1, n));
+    const s = S[i];
+    [...$("progress").children].forEach((b, k) => b.classList.toggle("on", k <= i));
+    $("step").textContent = `${s.step} · ${i + 1}/${S.length}`;
+    $("title").textContent = s.title; $("text").textContent = s.say.replace(/เคลม ดอท บางกอก ดอท โก ดอท ที เอช/g, "claim.bangkok.go.th").replace(/\.(\s|$)/g, " ").trim(); // the dots are pauses for the voice
+    $("warn").textContent = s.warn || ""; $("warn").classList.toggle("hide", !s.warn);
+    $("prev").disabled = i === 0; $("next").textContent = i === S.length - 1 ? "จบ ✓" : "ต่อ ›";
+    finger.style.opacity = 0;
+    screen.innerHTML = `<div class="bar"><b>BKK</b> Claim Bangkok</div><div class="url">🔒 claim.bangkok.go.th</div><div class="body"></div>`;
+    const body = screen.querySelector(".body");
+    const els = s.screen.map(([kind, html, act]) => { const d = document.createElement("div"); d.className = "el " + kind; d.innerHTML = html; d.dataset.act = act || ""; body.appendChild(d); return d; });
+    // elements appear one by one; taps and ticks follow along the narration
+    const per = Math.max(900, Math.min(2200, (s.say.length * 70) / (els.length + 1)));
+    els.forEach((d, k) => later(300 + k * per, () => {
+      if (id !== runId) return;
+      d.classList.add("in");
+      if (d.dataset.act === "tap") later(500, () => tapAt(d));
+      if (d.dataset.act === "tick") later(500, () => d.classList.add("done"));
+    }));
+    speak(s, id, els.length * per + 1200);
+  }
+
+  function speak(s, id, minMs) {
+    const advance = () => { if (id === runId && playing && i < S.length - 1) later(900, () => id === runId && show(i + 1)); };
+    if (sound && synth && voice) {
+      const u = new SpeechSynthesisUtterance(s.say); u.voice = voice; u.lang = voice.lang; u.rate = 0.92;
+      let spoke = false; u.onend = () => { spoke = true; advance(); };
+      synth.speak(u);
+      later(Math.max(minMs, s.say.length * 160), () => { if (!spoke) advance(); }); // some phones never fire onend
+    } else {
+      later(Math.max(minMs, s.say.length * 75), advance); // reading pace for captions
+    }
+  }
+
+  $("next").onclick = () => (i === S.length - 1 ? (location.href = "/") : show(i + 1));
+  $("prev").onclick = () => show(i - 1);
+  $("again").onclick = () => show(i);
+  $("play").onclick = () => { playing = !playing; $("play").textContent = playing ? "⏸ หยุด" : "▶ เล่นต่อ"; if (playing) show(i); else clear(); };
+  $("sound").onclick = () => { sound = !sound; $("sound").textContent = sound ? "🔊 เสียง: เปิด" : "🔇 เสียง: ปิด"; show(i); };
+  const go = (withSound) => { sound = withSound; $("sound").textContent = sound ? "🔊 เสียง: เปิด" : "🔇 เสียง: ปิด"; $("start").classList.add("hide"); voice = pickVoice(); note(); show(0); };
+  $("goSound").onclick = () => go(true);
+  $("goMute").onclick = () => go(false);
+  note();
+})();
+</script>
+</body>
+</html>
