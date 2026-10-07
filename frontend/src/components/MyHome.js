@@ -559,6 +559,31 @@ export function homeBadgeOf(info) {
   return { level: important.length ? "important" : "general", reasons, sig: reasons.join("|") };
 }
 
+// the rubbish days in the header: today's in big dark green with "วันนี้", tomorrow's marked too — stays even after รับทราบ
+const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์"]; // Date.getUTCDay() order
+function WasteDays({ days }) {
+  const bkk = new Date(Date.now() + 7 * 3600e3);
+  const today = THAI_DAYS[bkk.getUTCDay()];
+  const tomorrow = THAI_DAYS[(bkk.getUTCDay() + 1) % 7];
+  const parts = (days || "").split("·").map((x) => x.trim()).filter(Boolean);
+  return parts.map((d, i) => (
+    <span key={d}>
+      {i > 0 && " · "}
+      {d === today ? (
+        <span className="rounded-md bg-[#E4F0E9] px-1.5 text-lg font-extrabold text-[#154D33]">
+          {d} <span className="text-xs font-bold">วันนี้</span>
+        </span>
+      ) : d === tomorrow ? (
+        <b className="text-[#1E6B47]">
+          {d} <span className="text-xs">พรุ่งนี้</span>
+        </b>
+      ) : (
+        <b>{d}</b>
+      )}
+    </span>
+  ));
+}
+
 // ---------- 🤝 อาสาข้างบ้าน: what this house can do for the neighbours (backend nearby.py SKILLS) ----------
 const SKILL_LIST = [
   ["fix", "🔧", "ซ่อมเล็กๆ ในบ้าน"],
@@ -879,7 +904,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           {info.waste && (
             <>
               {" · 🚛 รถขยะ "}
-              <b>{info.waste.days}</b>
+              <WasteDays days={info.waste.days} />
             </>
           )}
         </p>
