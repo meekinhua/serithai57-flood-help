@@ -661,6 +661,13 @@ function HandyRow({ house, handy, onSaved, onClose, setErr }) {
 }
 
 export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], onNeeds }) {
+  // the ขอแรง card can be hidden; it comes back only when a new ask appears
+  const [needsHidden, setNeedsHidden] = useState(() => load("needsHidden", []));
+  const hideNeeds = () => {
+    const ids = needs.map((j) => j.id);
+    setNeedsHidden(ids);
+    save("needsHidden", ids);
+  };
   const fromSurvey = load("survey:electric", null)?.house || "";
   const [house, setHouse] = useState(() => takeFamilyParam() || load("myHouse", "") || fromSurvey);
   const [houses, setHouses] = useState(() => load("myHouses", []));
@@ -923,23 +930,28 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         <>
           <CheckinCard info={info} onSaved={setInfo} onContact={() => setContact({ name: load("myName", ""), from: "news" })} setErr={setErr} />
           <Soon items={info.soon} onSeen={() => setSeenN((n) => n + 1)} />
-          {needs.length > 0 && (
+          {needs.some((j) => !needsHidden.includes(j.id)) && (
             // the ขอแรง board, seen from home: who still needs hands (no one is pushed, the card just shows)
-            <button onClick={onNeeds} className="mt-2 flex w-full items-center gap-3 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] p-3 text-left">
+            <div className="mt-2 flex items-start gap-3 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] p-3">
               <span className="text-2xl" aria-hidden="true">
                 🙋
               </span>
-              <span className="min-w-0 flex-1">
-                <b className="block text-base leading-snug">เพื่อนบ้านขอแรงอยู่ {needs.length} เรื่อง</b>
-                {needs.slice(0, 2).map((j) => (
-                  <span key={j.id} className="mt-0.5 block text-[15px] leading-snug text-[#33403A]">
-                    {j.name}
-                    {j.soi ? ` (ซ.${j.soi})` : ""}: {j.detail.length > 60 ? `${j.detail.slice(0, 60)}…` : j.detail}
-                  </span>
-                ))}
-                <span className="mt-1 block text-[15px] font-bold text-[#7A4104]">ช่วยได้? ดูและติดต่อ ›</span>
-              </span>
-            </button>
+              <div className="min-w-0 flex-1">
+                <button onClick={onNeeds} className="block w-full text-left">
+                  <b className="block text-base leading-snug">เพื่อนบ้านขอแรงอยู่ {needs.length} เรื่อง</b>
+                  {needs.slice(0, 2).map((j) => (
+                    <span key={j.id} className="mt-0.5 block text-[15px] leading-snug text-[#33403A]">
+                      {j.name}
+                      {j.soi ? ` (ซ.${j.soi})` : ""}: {j.detail.length > 60 ? `${j.detail.slice(0, 60)}…` : j.detail}
+                    </span>
+                  ))}
+                  <span className="mt-1 block text-[15px] font-bold text-[#7A4104]">ช่วยได้? ดูและติดต่อ ›</span>
+                </button>
+                <button onClick={hideNeeds} className="mt-0.5 block min-h-[36px] text-sm font-bold text-[#45504A] underline">
+                  รับทราบแล้ว ซ่อน
+                </button>
+              </div>
+            </div>
           )}
 
           {pinning ? (
