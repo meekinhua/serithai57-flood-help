@@ -4,6 +4,7 @@ import { HOTLINE_GROUPS, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
 import Announcements, { UrgentBar } from "./components/Announcements";
 import { WeatherAlerts, WeatherChip, WindyMap } from "./components/Weather";
+import { mediaUrl } from "./media";
 import { MediaStrip } from "./components/MediaGallery";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
@@ -15,7 +16,7 @@ import { BottomNav, CommunityFeed, CommunityIntro, IntentChoices, JoinSheetBody,
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/WatchPanel";
-import { LostBoard, LostForm, PetAlert } from "./components/LostFound";
+import { LostBoard, LostForm, LostPreview, PetAlert, shareLost } from "./components/LostFound";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, HireList, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
@@ -30,9 +31,9 @@ const REFRESH_MS = 30000;
 // 6 Oct: rebuilt as the neighbours' community. People pick what they want to do (CommunityIntro), the
 // feed shows everything at once; the boards stay one tap away. Waste and the checklist move under "อื่นๆ".
 const MAIN_TABS = {
+  lost: ["🐾", "หาย · เจอ"],
   feed: ["📰", "ล่าสุด"],
   jobs: ["🙋", "ขอแรง"],
-  lost: ["🐾", "หาย · เจอ"],
   lend: ["🧰", "ยืม · ซื้อขาย"],
   forum: ["💬", "ถาม-ตอบ"],
 };
@@ -64,7 +65,14 @@ export default function RepairApp() {
   const [jobs, setJobs] = useState([]);
   const [issues, setIssues] = useState([]);
   const [lost, setLost] = useState([]);
-  const [reunited, setReunited] = useState([]); // pets that went home in the last day or two (one cheerful line)
+  const [reunited, setReunited] = useState([]);
+  const [liveLost, setLiveLost] = useState(null); // a pet just posted by someone else, shown live for a few seconds
+  const knownLost = useRef(null);
+  useEffect(() => {
+    if (!liveLost) return;
+    const t = setTimeout(() => setLiveLost(null), 15000); // says it once, then gets out of the way
+    return () => clearTimeout(t);
+  }, [liveLost]); // pets that went home in the last day or two (one cheerful line)
   const [topics, setTopics] = useState([]);
   const [prosGroup, setProsGroup] = useState("");
   // 7 Oct: four pages under a bottom bar — บ้านฉัน is the main one; the device's back button walks back through them
@@ -159,6 +167,15 @@ export default function RepairApp() {
       ]);
       if (ft) setTopics(ft);
       setLost(lf.filter((x) => x.status !== "reunited"));
+      {
+        const ids = new Set(lf.map((x) => x.id));
+        if (knownLost.current) {
+          const mine = load("lostKeys", {});
+          const fresh = lf.find((x) => !knownLost.current.has(x.id) && x.status === "open" && x.kind === "lost" && ["dog", "cat", "pet"].includes(x.category) && !mine[x.id]);
+          if (fresh) setLiveLost(fresh);
+        }
+        knownLost.current = ids;
+      }
       setReunited(lf.filter((x) => x.status === "reunited" && Date.now() - new Date(x.updated_at || x.created_at).getTime() < 2 * 864e5));
       if (hm) {
         setHome(hm);
@@ -367,6 +384,7 @@ export default function RepairApp() {
         onNeeds={() => showTab("jobs")}
         onAskHelp={() => setSheet({ type: "jobForm", kind: "need" })}
         onLost={() => showTab("lost")}
+        onLostPosted={(x) => setLost((p) => [x, ...p.filter((y) => y.id !== x.id)])}
       />
     ),
     announce: (
@@ -468,6 +486,35 @@ export default function RepairApp() {
           onHotline={() => setSheet({ type: "hotlines" })}
         />
         <UrgentBar items={announcements} />
+        {liveLost && (
+          <div className="fixed inset-x-3 top-[70px] z-40 mx-auto max-w-md animate-[fadein_.3s_ease-out] rounded-2xl border-2 border-[#E0A100] bg-white p-2 shadow-xl" role="status">
+            <div className="flex items-center gap-2">
+              {liveLost.media?.[0] ? (
+                <img src={mediaUrl(liveLost.media[0].id, "thumb")} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+              ) : (
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#F2F4F1] text-3xl" aria-hidden="true">
+                  🐾
+                </span>
+              )}
+              <button
+                onClick={() => {
+                  setLiveLost(null);
+                  showTab("lost");
+                }}
+                className="min-w-0 flex-1 text-left"
+              >
+                <span className="block text-sm font-bold text-[#B42318]">🐾 เพิ่งประกาศ · สัตว์เลี้ยงหาย</span>
+                <span className="line-clamp-2 block text-[15px] font-bold leading-snug">
+                  {liveLost.title}
+                  {liveLost.soi ? ` (ซ.${liveLost.soi})` : ""}
+                </span>
+              </button>
+              <button onClick={() => setLiveLost(null)} aria-label="ปิด" className="min-h-[44px] min-w-[40px] shrink-0 text-[#45504A]">
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
         {/* 7 Oct: one row — water, weather, people here, share; the village's name lives in the footer */}
         <header className="fixed inset-x-0 bottom-0 z-[900] bg-[#15201A] pb-[env(safe-area-inset-bottom)] text-white shadow-[0_-2px_8px_rgba(0,0,0,0.25)]">
           {!online && <p className="bg-red-700 px-3 py-1 text-center text-sm font-bold">⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่</p>}
@@ -576,6 +623,18 @@ export default function RepairApp() {
                   onOffer={() => setSheet({ type: "intent", need: false })}
                   onAsk={() => askForum()}
                 />
+                <button onClick={() => pick("lost")} className="mt-2.5 flex min-h-[56px] w-full items-center gap-3 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] px-3 text-left">
+                  <span className="text-2xl" aria-hidden="true">
+                    🐾
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <b className="block text-base leading-tight">หาย · เจอ</b>
+                    <span className="block text-sm text-[#45504A]">
+                      {lostOpen.length ? `ตามหาอยู่ ${lostOpen.filter((x) => x.kind === "lost").length} · มีคนเจอ ${lostOpen.filter((x) => x.kind === "found").length}` : "หมาแมวหาย เจอของ ลงรูปไว้"}
+                    </span>
+                  </span>
+                  <span aria-hidden="true">›</span>
+                </button>
                 <nav ref={navRef} className="-mx-4 mt-5 scroll-mt-32 overflow-x-auto border-t border-[#E6EBE7] px-4 pt-4" aria-label="หมวด">
                   <div className="flex w-max gap-2">
                     {Object.entries(MAIN_TABS).map(([k, [, text]]) => (
@@ -748,11 +807,24 @@ export default function RepairApp() {
               kind={sheet.kind}
               onDone={(x) => {
                 setLost((p) => [x, ...p]);
-                setSheet(null);
                 pick("lost");
-                setToast("ลงประกาศแล้ว เพื่อนบ้านช่วยกันดู");
+                setSheet({ type: "lostPosted", item: x });
               }}
             />
+          </Sheet>
+        )}
+        {sheet?.type === "lostPosted" && (
+          <Sheet title="✅ ประกาศแล้ว" onClose={() => setSheet(null)}>
+            <div className="space-y-3">
+              <p className="text-base">{["dog", "cat", "pet"].includes(sheet.item.category) ? "ขึ้นหน้าแรกของทุกคนในหมู่บ้านแล้ว แบบนี้ 👇" : "อยู่ในหาย · เจอ ของเพื่อนบ้านแล้ว แบบนี้ 👇"}</p>
+              <LostPreview x={sheet.item} photo={sheet.item.media?.[0] ? mediaUrl(sheet.item.media[0].id, "thumb") : null} />
+              <button onClick={() => shareLost(sheet.item)} className="min-h-[56px] w-full rounded-xl bg-[#06C755] text-lg font-bold text-white">
+                📤 ส่งต่อในกลุ่ม LINE (ยิ่งแชร์ ยิ่งเจอเร็ว)
+              </button>
+              <button onClick={() => setSheet(null)} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] font-bold">
+                เสร็จแล้ว
+              </button>
+            </div>
           </Sheet>
         )}
         {sheet?.type === "water" && (

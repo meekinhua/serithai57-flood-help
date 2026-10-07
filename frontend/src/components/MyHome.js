@@ -5,6 +5,7 @@ import Nearby from "./Nearby";
 import { useT } from "./Texts";
 import { MYHOME_CHANGED, cleanHouse } from "./SurveyBox";
 import { PRO_GROUPS, goodOf, rememberCall } from "./Community";
+import PetsRow from "./Pets";
 import { MediaStrip, MediaThumb } from "./MediaGallery";
 import { AidRow, CheckinCard, InstallCard, OutageRow, PlanRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
 import { waterOf } from "../config";
@@ -660,7 +661,7 @@ function HandyRow({ house, handy, onSaved, onClose, setErr }) {
   );
 }
 
-export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], onNeeds, onAskHelp, onLost }) {
+export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], onNeeds, onAskHelp, onLost, onLostPosted }) {
   // the ขอแรง card can be hidden; it comes back only when a new ask appears
   const [needsHidden, setNeedsHidden] = useState(() => load("needsHidden", []));
   // a ขอแรง ask this house's อาสาข้างบ้าน profile can do (job type → skill)
@@ -964,6 +965,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <div className="mt-3">
             <AidRow info={info} onChanged={reload} setErr={setErr} />
           </div>
+          <PetsRow house={info.house} setErr={setErr} onLostPosted={onLostPosted} onOpenLost={onLost} />
 
           {pinning ? (
             <Row title="ปักหมุดบ้านฉัน">

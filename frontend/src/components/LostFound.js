@@ -9,6 +9,34 @@ import { input } from "./RepairBoards";
 // recognise a pet. Anyone can add "I saw it at soi 24 this morning"; only the poster marks it reunited.
 const label = "mb-1 block font-medium";
 
+// pass a lost / found post on to a LINE group (or the phone's share sheet): every share is a link back here
+export function shareLost(x) {
+  const text = `${x.kind === "found" ? "🙌 มีคนเจอ" : "😢 ช่วยกันดู"} ${x.title}${x.soi ? ` (ซ.${x.soi})` : ""}\nใครเห็นบอกเจ้าของได้ที่ 👉 https://serithai57.com/#lost`;
+  if (navigator.share) return navigator.share({ text }).catch(() => {});
+  window.open(`https://line.me/R/share?text=${encodeURIComponent(text)}`, "_blank");
+}
+
+// what neighbours will see: the same card as on their home page
+export function LostPreview({ x, photo }) {
+  const [emoji] = LOST_CATEGORIES[x.category] || ["🐾"];
+  return (
+    <div className="w-[168px] overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-[#E6EBE7]">
+      {photo ? (
+        <img src={photo} alt="" className="aspect-square w-full object-cover" />
+      ) : (
+        <div className="flex aspect-square w-full items-center justify-center bg-neutral-100 text-6xl" aria-hidden="true">
+          {emoji}
+        </div>
+      )}
+      <div className="p-2">
+        <span className={`rounded px-1.5 text-sm font-bold text-white ${x.kind === "found" ? "bg-[#1E6B47]" : "bg-[#B42318]"}`}>{x.kind === "found" ? "🙌 มีคนเจอ" : "😢 หาย"}</span>
+        <p className="mt-1 line-clamp-2 text-[15px] font-bold leading-snug">{x.title || "(ชื่อ / ลักษณะ)"}</p>
+        <p className="text-sm text-[#45504A]">{[x.soi && `ซ.${x.soi}`, "เมื่อสักครู่"].filter(Boolean).join(" · ")}</p>
+      </div>
+    </div>
+  );
+}
+
 export function LostBoard({ items, setItems, admin, onAdd }) {
   const [kind, setKind] = useState("all");
   const [cat, setCat] = useState("all");
@@ -121,6 +149,9 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
               ))}
           </ul>
         )}
+        <button onClick={() => shareLost(x)} className="min-h-[46px] w-full rounded-xl bg-[#06C755] font-bold text-white">
+          📤 ส่งต่อในกลุ่ม LINE
+        </button>
         {phone ? (
           <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="flex min-h-[48px] items-center justify-center rounded-xl bg-black text-lg font-bold text-white">
             📞 {phone}
@@ -307,6 +338,10 @@ export function LostForm({ kind: initialKind = "lost", onDone }) {
           </label>
           <input id="lost-phone" required type="tel" inputMode="tel" maxLength={40} value={form.phone} onChange={(e) => set({ phone: e.target.value })} className={input} />
         </div>
+      </div>
+      <div className="rounded-2xl bg-[#F2F4F1] p-3">
+        <p className="mb-2 text-sm font-bold text-[#45504A]">👀 ตัวอย่างที่เพื่อนบ้านจะเห็น{["dog", "cat", "pet"].includes(form.category) ? " (บนหน้าแรกของทุกคน)" : ""}</p>
+        <LostPreview x={form} photo={media.find((m) => m.preview)?.preview} />
       </div>
       <p className="text-sm text-neutral-500">เบอร์แสดงเมื่อมีคนกดติดต่อทีละรายการ · ได้คืนแล้วกด “ได้คืนแล้ว” จากเครื่องนี้</p>
       {err && <p className="rounded-lg bg-red-50 p-3 text-red-700">{err}</p>}

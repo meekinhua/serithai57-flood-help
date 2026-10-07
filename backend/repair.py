@@ -49,7 +49,7 @@ LostStatus = Literal["open", "reunited"]
 # Water / canal / leak / pump reports stay open: the rain came back (2 Oct) and the village watches the water.
 # Staff stay open too (live tracking of the helpers' boats and trucks), except the LINE import into the request board.
 FLOOD_WRITES = ("/api/posts", "/api/ops", "/api/team", "/api/staff/import", "/api/zones")
-HIDDEN = {"_id": 0, "edit_key_hash": 0, "phone": 0, "house": 0, "voters": 0}
+HIDDEN = {"_id": 0, "edit_key_hash": 0, "phone": 0, "house": 0, "voters": 0, "pet_house": 0}
 
 
 def now():
@@ -602,7 +602,8 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     async def delete_lost(item_id: str, request: Request, x_edit_key: str = Header("")):
         doc = await owned(db.lost, item_id, x_edit_key, request)
         await db.lost.delete_one({"id": item_id})
-        await delete_media([m["id"] for m in doc.get("media", [])])
+        if not doc.get("pet_id"):  # a post made from สัตว์เลี้ยงบ้านฉัน shares the pet's photos
+            await delete_media([m["id"] for m in doc.get("media", [])])
 
     # ---------------- soi issues ----------------
     @router.get("/issues")
