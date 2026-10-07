@@ -315,7 +315,7 @@ export function AidRow({ info, onChanged, setErr }) {
             </button>
           ))}
         {got.length > 0 && (
-          <div className="rounded-xl bg-white/70 px-3 py-2">
+          <div id="myhome-aid-got" className="rounded-xl bg-white/70 px-3 py-2 transition-shadow">
             <p className="text-sm font-bold text-[#154D33]">✓ บันทึกว่าได้รับเงินแล้ว</p>
             {got.map((a) => (
               <div key={a.id} className="flex min-h-[44px] items-center gap-2">

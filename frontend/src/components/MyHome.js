@@ -1177,7 +1177,15 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
             onOpen={(k) => {
               if (k === "plan") setPlusOpen((o) => [...o, "plan"]);
               openIt(k);
-              setTimeout(() => document.getElementById(`myhome-${k}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+              // a payout marked received is fixed in the 💰 box itself ("ยังไม่ได้รับ? แก้")
+              const target = k.startsWith("aid_") ? document.getElementById("myhome-aid-got") : document.getElementById(`myhome-${k}`);
+              setTimeout(() => {
+                target?.scrollIntoView({ behavior: "smooth", block: "center" });
+                if (k.startsWith("aid_") && target) {
+                  target.classList.add("ring-4", "ring-[#E0A100]");
+                  setTimeout(() => target.classList.remove("ring-4", "ring-[#E0A100]"), 2500);
+                }
+              }, 50);
             }}
           />
         </>
