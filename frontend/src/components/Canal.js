@@ -43,7 +43,10 @@ export function canalSummary(reports) {
     const recent = mine.filter((r) => ageH(r) <= NOW_H);
     const use = recent.length ? recent : mine.slice(0, 1);
     const has = (s) => use.some((r) => r.state === s);
-    const cms = use.filter((r) => r.state === "below" && r.below_cm != null).map((r) => r.below_cm).sort((a, b) => a - b);
+    const cms = use
+      .filter((r) => r.state === "below" && r.below_cm != null)
+      .map((r) => r.below_cm)
+      .sort((a, b) => a - b);
     const cm = cms.length ? cms[Math.floor((cms.length - 1) / 2)] : null;
     let state, title, advice, short;
     if (has("over")) [state, title, short, advice] = ["over", "ล้นเข้าหมู่บ้าน", "อย่าสูบลงคลองนี้", "สูบลงคลองนี้จะวนกลับเข้าหมู่บ้าน · เร่งกั้นกระสอบทราย / แจ้งเขต"];
@@ -93,11 +96,14 @@ export function PumpList({ pumps, onPump, admin = false }) {
 
 function useName() {
   const [contact, setContact] = useState(() => load("contact", { name: "", phone: "" }));
-  return [contact.name, (name) => {
-    const next = { ...contact, name };
-    setContact(next);
-    save("contact", next);
-  }];
+  return [
+    contact.name,
+    (name) => {
+      const next = { ...contact, name };
+      setContact(next);
+      save("contact", next);
+    },
+  ];
 }
 
 export function CanalForm({ onDone }) {
@@ -126,7 +132,13 @@ export function CanalForm({ onDone }) {
       const r = await api("/canal/reports", {
         method: "POST",
         body: JSON.stringify({
-          canal, state, below_cm: state === "below" ? Number(cm) : null, soi: soi.trim(), note: note.trim(), name: name.trim(), media_ids: attached.ids,
+          canal,
+          state,
+          below_cm: state === "below" ? Number(cm) : null,
+          soi: soi.trim(),
+          note: note.trim(),
+          name: name.trim(),
+          media_ids: attached.ids,
           ...(pinned && loc ? loc : {}), // no pin moved: the server puts it at the canal end of that soi
         }),
       });
@@ -237,12 +249,15 @@ export function PumpForm({ pump, onDone, admin = false }) {
         <div className="rounded-lg bg-neutral-100 p-2 text-sm">
           <p className="font-bold">{pump.label}</p>
           <p>{[pump.place || (pump.soi && `ซอย ${pump.soi}`), pump.into && `สูบลง ${pump.into}`, pump.owner].filter(Boolean).join(" · ")}</p>
-          {(pump.history || []).slice(-3).reverse().map((h, i) => (
-            <p key={i} className="text-xs text-neutral-600">
-              {PUMP_STATUS[h.status]?.icon} {PUMP_STATUS[h.status]?.label} · {h.name} · {timeAgo(h.at)}
-              {h.note && ` · ${h.note}`}
-            </p>
-          ))}
+          {(pump.history || [])
+            .slice(-3)
+            .reverse()
+            .map((h, i) => (
+              <p key={i} className="text-xs text-neutral-600">
+                {PUMP_STATUS[h.status]?.icon} {PUMP_STATUS[h.status]?.label} · {h.name} · {timeAgo(h.at)}
+                {h.note && ` · ${h.note}`}
+              </p>
+            ))}
           {admin && (
             <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
               <button type="button" onClick={() => setEditing(true)} className="min-h-[44px] rounded-lg border-2 border-black bg-white font-semibold">
@@ -335,7 +350,13 @@ export function LeakForm({ onDone }) {
       const r = await api("/leaks", {
         method: "POST",
         body: JSON.stringify({
-          canal, severity, soi: soi.trim(), note: note.trim(), name: name.trim(), sandbags: bags === "" ? null : Number(bags), media_ids: attached.ids,
+          canal,
+          severity,
+          soi: soi.trim(),
+          note: note.trim(),
+          name: name.trim(),
+          sandbags: bags === "" ? null : Number(bags),
+          media_ids: attached.ids,
           ...(pinned && loc ? loc : {}),
         }),
       });
@@ -421,12 +442,16 @@ export function LeakSheet({ leak, onDone, onDelete }) {
           {leak.soi && ` · ท้ายซอย ${leak.soi}`}
         </p>
         {leak.sandbags != null && <p className="text-sm">ต้องใช้ทรายประมาณ {leak.sandbags} ถุง</p>}
-        {(leak.history || []).slice().reverse().slice(0, 4).map((h, i) => (
-          <p key={i} className="text-xs text-neutral-600">
-            {LEAK_STATUS[h.status]?.label} · {h.name} · {timeAgo(h.at)}
-            {h.note && ` · ${h.note}`}
-          </p>
-        ))}
+        {(leak.history || [])
+          .slice()
+          .reverse()
+          .slice(0, 4)
+          .map((h, i) => (
+            <p key={i} className="text-xs text-neutral-600">
+              {LEAK_STATUS[h.status]?.label} · {h.name} · {timeAgo(h.at)}
+              {h.note && ` · ${h.note}`}
+            </p>
+          ))}
         <div className="mt-1 flex gap-2">
           {(leak.media || []).map((m) => (
             <a key={m.id} href={mediaUrl(m.id)} target="_blank" rel="noreferrer">

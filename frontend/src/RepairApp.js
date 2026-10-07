@@ -5,6 +5,7 @@ import Sheet from "./components/Sheet";
 import Announcements, { UrgentBar } from "./components/Announcements";
 import { WeatherAlerts, WeatherChip, WindyMap } from "./components/Weather";
 import { mediaUrl } from "./media";
+import { flashTo } from "./notify";
 import { MediaStrip } from "./components/MediaGallery";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
@@ -68,6 +69,11 @@ export default function RepairApp() {
   const [reunited, setReunited] = useState([]);
   const [liveLost, setLiveLost] = useState(null); // a pet just posted by someone else, shown live for a few seconds
   const knownLost = useRef(null);
+  useEffect(() => {
+    const on = (e) => setToast(e.detail);
+    window.addEventListener("app-toast", on);
+    return () => window.removeEventListener("app-toast", on);
+  }, []);
   useEffect(() => {
     if (!liveLost) return;
     const t = setTimeout(() => setLiveLost(null), 15000); // says it once, then gets out of the way
@@ -136,6 +142,17 @@ export default function RepairApp() {
   const askForum = (openId = null) => {
     setForumGo((f) => ({ n: f.n + 1, openId, compose: !openId }));
     showTab("forum");
+  };
+  const goItem = (t, id) => {
+    showTab(t);
+    if (!id) return;
+    let n = 0;
+    const find = () => {
+      const el = document.querySelector(`[data-item="${id}"]`);
+      if (el) flashTo(el);
+      else if (n++ < 12) setTimeout(find, 150); // the page is still drawing
+    };
+    setTimeout(find, 200);
   };
   const posted = (tab, text) => {
     showTab(tab);
@@ -312,8 +329,8 @@ export default function RepairApp() {
         ? {
             level: "general",
             reasons: [
-              ...lostPets.slice(0, 3).map((x) => `🐾 สัตว์เลี้ยงหาย: ${x.title}${x.soi ? ` (ซ.${x.soi})` : ""}`),
-              ...needs.slice(0, 4).map((j) => `🙋 ${j.name} ขอแรง: ${j.detail.length > 70 ? `${j.detail.slice(0, 70)}…` : j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`),
+              ...lostPets.slice(0, 3).map((x) => ({ text: `🐾 สัตว์เลี้ยงหาย: ${x.title}${x.soi ? ` (ซ.${x.soi})` : ""}`, go: ["lost", x.id] })),
+              ...needs.slice(0, 4).map((j) => ({ text: `🙋 ${j.name} ขอแรง: ${j.detail.length > 70 ? `${j.detail.slice(0, 70)}…` : j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`, go: ["jobs", j.id] })),
               ...(newest > seenAt && !needs.length ? ["👥 มีโพสต์ใหม่จากเพื่อนบ้าน"] : []),
             ],
             sig: needs.length || lostPets.length ? `n${needSig}|p${lostPets.map((x) => x.id.slice(0, 6)).join(",")}` : `c${newest}`,
@@ -381,9 +398,9 @@ export default function RepairApp() {
         onPros={(g) => openPros(g)}
         onBadge={onHomeBadge}
         needs={needs}
-        onNeeds={() => showTab("jobs")}
+        onNeeds={(id) => goItem("jobs", id)}
         onAskHelp={() => setSheet({ type: "jobForm", kind: "need" })}
-        onLost={() => showTab("lost")}
+        onLost={(id) => goItem("lost", id)}
         onLostPosted={(x) => setLost((p) => [x, ...p.filter((y) => y.id !== x.id)])}
       />
     ),
@@ -487,7 +504,7 @@ export default function RepairApp() {
         />
         <UrgentBar items={announcements} />
         {liveLost && (
-          <div className="fixed inset-x-3 top-[70px] z-40 mx-auto max-w-md animate-[fadein_.3s_ease-out] rounded-2xl border-2 border-[#E0A100] bg-white p-2 shadow-xl" role="status">
+          <div className="anim-hop fixed inset-x-3 top-[70px] z-40 mx-auto max-w-md rounded-2xl border-2 border-[#E0A100] bg-white p-2 shadow-xl" role="status">
             <div className="flex items-center gap-2">
               {liveLost.media?.[0] ? (
                 <img src={mediaUrl(liveLost.media[0].id, "thumb")} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
@@ -499,7 +516,7 @@ export default function RepairApp() {
               <button
                 onClick={() => {
                   setLiveLost(null);
-                  showTab("lost");
+                  goItem("lost", liveLost.id);
                 }}
                 className="min-w-0 flex-1 text-left"
               >
@@ -533,7 +550,8 @@ export default function RepairApp() {
                 🔔
                 {live.length > 0 && (
                   <span
-                    className={`absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-xs font-bold ${live.some(([, b]) => b.level === "important") ? "bg-[#B42318]" : "bg-[#1E9E5A]"}`}
+                    key={live.length}
+                    className={`anim-pop absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-xs font-bold ${live.some(([, b]) => b.level === "important") ? "bg-[#B42318]" : "bg-[#1E9E5A]"}`}
                   >
                     {live.length}
                   </span>
@@ -556,10 +574,10 @@ export default function RepairApp() {
           )}
         </header>
 
-        <main className="mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
+        <main key={page} className="anim-page mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
           {page === "home" ? (
             <>
-              <PetAlert items={lost} reunited={reunited} onOpen={() => showTab("lost")} />
+              <PetAlert items={lost} reunited={reunited} onOpen={(id) => goItem("lost", id)} />
               {ordered(home.layout, Object.keys(blocks)).map((k) => (
                 <Fragment key={k}>{blocks[k]}</Fragment>
               ))}
@@ -652,7 +670,7 @@ export default function RepairApp() {
                   </div>
                 </nav>
 
-                <div className="mt-3">
+                <div key={tab} className="anim-in mt-3">
                   {tab === "feed" && (
                     <CommunityFeed
                       lost={lostOpen}
@@ -669,7 +687,7 @@ export default function RepairApp() {
                   {tab === "forum" && <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />}
                   {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
                   {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} onPaid={() => openPros("")} />}
-                  {tab === "lost" && <LostBoard items={lost} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />}
+                  {tab === "lost" && <LostBoard items={lost} reunited={reunited} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />}
                   {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
                   {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
                   {tab === "guide" && <AfterFloodGuide />}
@@ -744,9 +762,23 @@ export default function RepairApp() {
                         </span>
                       </div>
                       <ul className="mt-1 space-y-0.5 text-[15px] leading-snug">
-                        {(b.reasons || []).map((r, i) => (
-                          <li key={i}>{r}</li>
-                        ))}
+                        {(b.reasons || []).map((r, i) =>
+                          typeof r === "string" ? (
+                            <li key={i}>{r}</li>
+                          ) : (
+                            <li key={i}>
+                              <button
+                                onClick={() => {
+                                  setNotifyOpen(false);
+                                  goItem(...r.go);
+                                }}
+                                className="min-h-[36px] text-left underline decoration-dotted underline-offset-4"
+                              >
+                                {r.text} ›
+                              </button>
+                            </li>
+                          ),
+                        )}
                       </ul>
                       <div className="mt-2 flex gap-2">
                         <button

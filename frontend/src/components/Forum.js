@@ -24,9 +24,14 @@ const label = "mb-1 block font-medium";
 export function AuthorBadge({ a }) {
   if (!a) return null;
   return a.outsider ? (
-    <span className="font-semibold">👤 {a.name} <span className="rounded bg-neutral-200 px-1 text-xs font-normal">คนนอก</span></span>
+    <span className="font-semibold">
+      👤 {a.name} <span className="rounded bg-neutral-200 px-1 text-xs font-normal">คนนอก</span>
+    </span>
   ) : (
-    <span className="font-semibold">🏠 {a.house}{a.name && <span className="font-normal"> · {a.name}</span>}</span>
+    <span className="font-semibold">
+      🏠 {a.house}
+      {a.name && <span className="font-normal"> · {a.name}</span>}
+    </span>
   );
 }
 
@@ -47,8 +52,17 @@ function IdentityFields({ me, set, idp }) {
     <fieldset className="space-y-2 rounded-xl bg-neutral-50 p-2">
       <legend className="sr-only">ลงชื่อ</legend>
       <div className="grid grid-cols-2 gap-1 rounded-lg bg-neutral-200 p-1">
-        {[[false, "🏠 คนในหมู่บ้าน"], [true, "👤 คนนอก / ญาติ"]].map(([v, t]) => (
-          <button type="button" key={t} onClick={() => set({ outsider: v })} aria-pressed={me.outsider === v} className={`min-h-[40px] rounded-md text-sm font-semibold ${me.outsider === v ? "bg-white shadow" : "text-neutral-600"}`}>
+        {[
+          [false, "🏠 คนในหมู่บ้าน"],
+          [true, "👤 คนนอก / ญาติ"],
+        ].map(([v, t]) => (
+          <button
+            type="button"
+            key={t}
+            onClick={() => set({ outsider: v })}
+            aria-pressed={me.outsider === v}
+            className={`min-h-[40px] rounded-md text-sm font-semibold ${me.outsider === v ? "bg-white shadow" : "text-neutral-600"}`}
+          >
             {t}
           </button>
         ))}
@@ -56,12 +70,16 @@ function IdentityFields({ me, set, idp }) {
       <div className="grid grid-cols-2 gap-2">
         {!me.outsider && (
           <div>
-            <label className="mb-1 block text-sm font-medium" htmlFor={`${idp}-house`}>บ้านเลขที่ *</label>
+            <label className="mb-1 block text-sm font-medium" htmlFor={`${idp}-house`}>
+              บ้านเลขที่ *
+            </label>
             <input id={`${idp}-house`} required inputMode="numeric" maxLength={20} value={me.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="4/917" />
           </div>
         )}
         <div className={me.outsider ? "col-span-2" : ""}>
-          <label className="mb-1 block text-sm font-medium" htmlFor={`${idp}-name`}>ชื่อเล่น {me.outsider ? "*" : "(ไม่บังคับ)"}</label>
+          <label className="mb-1 block text-sm font-medium" htmlFor={`${idp}-name`}>
+            ชื่อเล่น {me.outsider ? "*" : "(ไม่บังคับ)"}
+          </label>
           <input id={`${idp}-name`} required={me.outsider} maxLength={40} value={me.name} onChange={(e) => set({ name: e.target.value })} className={input} />
         </div>
       </div>
@@ -114,12 +132,19 @@ export default function Forum({ admin, openId = null, startCompose = false }) {
 
   return (
     <div className="space-y-3">
-      <button onClick={() => setCompose(true)} className="min-h-[56px] w-full rounded-xl bg-black text-lg font-bold text-white">✍️ ตั้งกระทู้ถาม / แชร์ความรู้</button>
+      <button onClick={() => setCompose(true)} className="min-h-[56px] w-full rounded-xl bg-black text-lg font-bold text-white">
+        ✍️ ตั้งกระทู้ถาม / แชร์ความรู้
+      </button>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 ค้นหา เช่น ปาร์เก้, ประกันรถ, ตู้เย็น" className={input} aria-label="ค้นหากระทู้" />
       <div className="-mx-3 overflow-x-auto px-3 pb-1">
         <div className="flex w-max gap-2">
           {[["all", ["", "ทั้งหมด"]], ...Object.entries(FORUM_CATEGORIES)].map(([k, [emoji, text]]) => (
-            <button key={k} onClick={() => setCat(k)} aria-pressed={cat === k} className={`min-h-[40px] whitespace-nowrap rounded-full px-3 text-sm ${cat === k ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}>
+            <button
+              key={k}
+              onClick={() => setCat(k)}
+              aria-pressed={cat === k}
+              className={`min-h-[40px] whitespace-nowrap rounded-full px-3 text-sm ${cat === k ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}
+            >
               {emoji} {text}
             </button>
           ))}
@@ -138,7 +163,9 @@ export default function Forum({ admin, openId = null, startCompose = false }) {
                   <span className="flex flex-wrap items-center gap-1.5 text-xs">
                     {t.pinned && <span className="rounded bg-black px-1.5 font-bold text-white">📌 ปักหมุด</span>}
                     {t.solved_reply && <span className="rounded bg-emerald-600 px-1.5 font-bold text-white">✅ ได้คำตอบแล้ว</span>}
-                    <span className="text-neutral-600">{emoji} {catText}</span>
+                    <span className="text-neutral-600">
+                      {emoji} {catText}
+                    </span>
                   </span>
                   <span className="mt-0.5 block break-words text-lg font-bold leading-snug">{t.title}</span>
                   {t.body && <span className="line-clamp-2 block break-words text-sm text-neutral-700">{t.body}</span>}
@@ -184,12 +211,20 @@ function TopicForm({ onCancel, onDone }) {
   }
   return (
     <form onSubmit={submit} className="space-y-4 rounded-xl bg-white p-3">
-      <button type="button" onClick={onCancel} className="min-h-[44px] font-semibold underline">‹ กลับ</button>
+      <button type="button" onClick={onCancel} className="min-h-[44px] font-semibold underline">
+        ‹ กลับ
+      </button>
       <fieldset>
         <legend className={label}>หมวด *</legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {Object.entries(FORUM_CATEGORIES).map(([k, [emoji, text]]) => (
-            <button type="button" key={k} onClick={() => setForm({ ...form, category: k })} aria-pressed={form.category === k} className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.category === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}>
+            <button
+              type="button"
+              key={k}
+              onClick={() => setForm({ ...form, category: k })}
+              aria-pressed={form.category === k}
+              className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.category === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}
+            >
               <span className="text-xl">{emoji}</span>
               <span className="leading-tight">{text}</span>
             </button>
@@ -197,12 +232,24 @@ function TopicForm({ onCancel, onDone }) {
         </div>
       </fieldset>
       <div>
-        <label className={label} htmlFor="topic-title">หัวข้อ / คำถาม *</label>
+        <label className={label} htmlFor="topic-title">
+          หัวข้อ / คำถาม *
+        </label>
         <input id="topic-title" required minLength={4} maxLength={120} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={input} placeholder={EXAMPLES[0]} />
       </div>
       <div>
-        <label className={label} htmlFor="topic-body">รายละเอียด</label>
-        <textarea id="topic-body" rows={5} maxLength={2000} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} className={input} placeholder="เล่าสภาพ สิ่งที่ลองแล้ว อยากรู้อะไร · ถ้าเป็นความรู้ที่อยากแชร์ เขียนได้เลย" />
+        <label className={label} htmlFor="topic-body">
+          รายละเอียด
+        </label>
+        <textarea
+          id="topic-body"
+          rows={5}
+          maxLength={2000}
+          value={form.body}
+          onChange={(e) => setForm({ ...form, body: e.target.value })}
+          className={input}
+          placeholder="เล่าสภาพ สิ่งที่ลองแล้ว อยากรู้อะไร · ถ้าเป็นความรู้ที่อยากแชร์ เขียนได้เลย"
+        />
       </div>
       <div>
         <p className={label}>รูป (ไม่บังคับ)</p>
@@ -246,7 +293,7 @@ function TopicView({ id, admin, onBack }) {
       api(`/forum/${id}`)
         .then(setT)
         .catch((e) => setErr(e.message)),
-    [id]
+    [id],
   );
   useEffect(() => {
     reload();
@@ -278,22 +325,31 @@ function TopicView({ id, admin, onBack }) {
 
   return (
     <div className="space-y-3">
-      <button onClick={onBack} className="min-h-[44px] font-semibold underline">‹ กระทู้ทั้งหมด</button>
+      <button onClick={onBack} className="min-h-[44px] font-semibold underline">
+        ‹ กระทู้ทั้งหมด
+      </button>
       <article className="rounded-xl bg-white p-3">
-        <p className="text-sm text-neutral-600">{emoji} {catText}</p>
+        <p className="text-sm text-neutral-600">
+          {emoji} {catText}
+        </p>
         <h3 className="break-words text-xl font-bold leading-snug">{t.title}</h3>
-        <p className="mt-1 text-sm text-neutral-500"><AuthorBadge a={t.author} /> · {timeAgo(t.created_at)}</p>
+        <p className="mt-1 text-sm text-neutral-500">
+          <AuthorBadge a={t.author} /> · {timeAgo(t.created_at)}
+        </p>
         {t.body && <p className="mt-2 whitespace-pre-wrap break-words">{t.body}</p>}
         <Photos media={t.media} />
         {(topicKey || admin) && (
           <div className="mt-2 flex flex-wrap gap-3 text-sm">
             {admin && (
-              <button onClick={() =>
+              <button
+                onClick={() =>
                   run(async () => {
                     await api(`/admin/forum/${id}/pin`, { method: "PUT", body: JSON.stringify({ pinned: !t.pinned }) });
                     await reload();
                   })
-                } className="min-h-[40px] underline">
+                }
+                className="min-h-[40px] underline"
+              >
                 {t.pinned ? "เลิกปักหมุด" : "📌 ปักหมุด"}
               </button>
             )}
@@ -317,7 +373,9 @@ function TopicView({ id, admin, onBack }) {
         <div className="rounded-xl border-2 border-emerald-600 bg-emerald-50 p-3">
           <p className="text-sm font-bold text-emerald-800">✅ คำตอบที่ช่วยได้</p>
           <p className="mt-1 whitespace-pre-wrap break-words">{solved.body}</p>
-          <p className="mt-1 text-xs text-neutral-600"><AuthorBadge a={solved.author} /></p>
+          <p className="mt-1 text-xs text-neutral-600">
+            <AuthorBadge a={solved.author} />
+          </p>
         </div>
       )}
 
@@ -325,7 +383,9 @@ function TopicView({ id, admin, onBack }) {
       <ul className="space-y-2">
         {t.replies.map((r) => (
           <li key={r.id} className={`rounded-xl bg-white p-3 ${r.id === t.solved_reply ? "ring-2 ring-emerald-600" : ""}`}>
-            <p className="text-sm text-neutral-500"><AuthorBadge a={r.author} /> · {timeAgo(r.created_at)}</p>
+            <p className="text-sm text-neutral-500">
+              <AuthorBadge a={r.author} /> · {timeAgo(r.created_at)}
+            </p>
             <p className="mt-1 whitespace-pre-wrap break-words">{r.body}</p>
             <Photos media={r.media} />
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
@@ -346,7 +406,11 @@ function TopicView({ id, admin, onBack }) {
               </button>
               {canSolve && (
                 <button
-                  onClick={() => run(async () => setT(await api(`/forum/${id}/solve`, { method: "POST", headers: { "X-Edit-Key": topicKey || "" }, body: JSON.stringify({ reply_id: r.id === t.solved_reply ? null : r.id }) })))}
+                  onClick={() =>
+                    run(async () =>
+                      setT(await api(`/forum/${id}/solve`, { method: "POST", headers: { "X-Edit-Key": topicKey || "" }, body: JSON.stringify({ reply_id: r.id === t.solved_reply ? null : r.id }) })),
+                    )
+                  }
                   className="min-h-[40px] rounded-lg border border-emerald-700 px-2 text-emerald-800"
                 >
                   {r.id === t.solved_reply ? "ยกเลิก ✅" : "✅ คำตอบนี้ช่วยได้"}
@@ -373,7 +437,9 @@ function TopicView({ id, admin, onBack }) {
       </ul>
 
       <form onSubmit={reply} className="space-y-2 rounded-xl border-2 border-black bg-white p-3">
-        <label className={label} htmlFor="reply-body">ตอบ / แชร์ประสบการณ์</label>
+        <label className={label} htmlFor="reply-body">
+          ตอบ / แชร์ประสบการณ์
+        </label>
         <textarea id="reply-body" required rows={4} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} className={input} />
         <MediaPicker items={media} setItems={setMedia} max={2} allowVideo={false} />
         <IdentityFields me={me} set={setMe} idp="reply" />

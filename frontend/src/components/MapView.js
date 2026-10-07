@@ -32,9 +32,7 @@ function postIcon(post, isNew = false) {
     iconAnchor: [size / 2, size / 2],
     html: `<div class="${isNew ? "pin-drop " : ""}${post.urgent && post.status === "open" ? "pin-urgent" : ""}" style="width:${size}px;height:${size}px;border-radius:9999px;background:${
       post.status === "done" ? "#e5e5e5" : kind.pin
-    };border:${border};box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;position:relative;font-size:${
-      size / 2
-    }px">${emoji}${
+    };border:${border};box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;position:relative;font-size:${size / 2}px">${emoji}${
       post.payment === "paid"
         ? '<span style="position:absolute;top:-8px;right:-8px;font-size:14px;line-height:1;background:#fff;border:1.5px solid #000;border-radius:9999px;padding:1px">💰</span>'
         : ""
@@ -71,7 +69,25 @@ function clusterIcon(cluster) {
 
 // 1 Oct: the map opens on the water view; truck drop points are always on it; in the water view it also
 // shows the canal reports (how far below the flood wall) and the pumps.
-export default function MapView({ posts, water, trips = [], onSelect, focus, filter = "all", onReportWater, drops = [], canal = null, onReportCanal, onPump, onPumps, canAddPump = false, onLeak, onLeaks, hubs = [], events = [] }) {
+export default function MapView({
+  posts,
+  water,
+  trips = [],
+  onSelect,
+  focus,
+  filter = "all",
+  onReportWater,
+  drops = [],
+  canal = null,
+  onReportCanal,
+  onPump,
+  onPumps,
+  canAddPump = false,
+  onLeak,
+  onLeaks,
+  hubs = [],
+  events = [],
+}) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -116,7 +132,10 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
     mapRef.current = map;
     map.on("click", (e) => {
       if (!fieldRef.current) return;
-      L.popup().setLatLng(e.latlng).setContent(levelHtml(e.latlng.lat, e.latlng.lng, pointsRef.current)).openOn(map);
+      L.popup()
+        .setLatLng(e.latlng)
+        .setContent(levelHtml(e.latlng.lat, e.latlng.lng, pointsRef.current))
+        .openOn(map);
     });
     // Map containers that start hidden (mobile tabs) need a size refresh when shown.
     const ro = new ResizeObserver(() => map.invalidateSize());
@@ -156,13 +175,11 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
         .bindPopup(
           `${stale ? `<b style="color:#b45309">⚠️ ข้อมูลเก่า ${Math.round(ageH)} ชม. — ตอนนี้อาจไม่ใช่แล้ว</b><br>` : ""}<b>💧 ระดับน้ำ: ${lv.label} (${w.cm != null ? `${w.cm} ซม.` : lv.cm})</b>${w.trend ? ` ${WATER_TREND[w.trend][0]} ${WATER_TREND[w.trend][1]}` : ""}${
             w.where ? `<br>${WATER_WHERE[w.where][0]} วัด${WATER_WHERE[w.where][1]}` : ""
-          }<br>${timeAgo(w.created_at)}${w.name ? ` · ${escapeHtml(w.name)}` : ""}${
-            w.note ? `<br>${escapeHtml(w.note)}` : ""
-          }${
+          }<br>${timeAgo(w.created_at)}${w.name ? ` · ${escapeHtml(w.name)}` : ""}${w.note ? `<br>${escapeHtml(w.note)}` : ""}${
             w.media?.[0]
               ? `<br><a href="${mediaUrl(w.media[0].id)}" target="_blank" rel="noreferrer"><img src="${mediaUrl(w.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
               : ""
-          }`
+          }`,
         )
         .addTo(layer);
     }
@@ -194,7 +211,7 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
         }),
       })
         .bindPopup(
-          `<b>📍 ${escapeHtml(h.title || "")}</b>${h.sub ? `<br>${escapeHtml(h.sub)}` : ""}<br><a href="https://www.google.com/maps/search/?api=1&query=${h.lat},${h.lng}" target="_blank" rel="noreferrer">นำทาง ›</a>`
+          `<b>📍 ${escapeHtml(h.title || "")}</b>${h.sub ? `<br>${escapeHtml(h.sub)}` : ""}<br><a href="https://www.google.com/maps/search/?api=1&query=${h.lat},${h.lng}" target="_blank" rel="noreferrer">นำทาง ›</a>`,
         )
         .addTo(layer);
     }
@@ -251,8 +268,10 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
             `<b>🌊 ${CANALS[r.canal]}: ${text}</b>${r.soi ? `<br>ท้ายซอย ${escapeHtml(r.soi)}` : ""}<br>${timeAgo(r.created_at)}${r.name ? ` · ${escapeHtml(r.name)}` : ""}${
               r.note ? `<br>${escapeHtml(r.note)}` : ""
             }${ageH > 3 ? `<br><b style="color:#b45309">⚠️ รายงานเก่ากว่า 3 ชม.</b>` : ""}${
-              r.media?.[0] ? `<br><a href="${mediaUrl(r.media[0].id)}" target="_blank" rel="noreferrer"><img src="${mediaUrl(r.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>` : ""
-            }`
+              r.media?.[0]
+                ? `<br><a href="${mediaUrl(r.media[0].id)}" target="_blank" rel="noreferrer"><img src="${mediaUrl(r.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
+                : ""
+            }`,
           )
           .addTo(layer);
       }
@@ -322,10 +341,13 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
         const { latitude: lat, longitude: lng } = pos.coords;
         setHint("");
         mapRef.current.setView([lat, lng], 17);
-        L.popup().setLatLng([lat, lng]).setContent(`<b>📍 ตรงที่คุณอยู่</b><br>${levelHtml(lat, lng, pointsRef.current)}`).openOn(mapRef.current);
+        L.popup()
+          .setLatLng([lat, lng])
+          .setContent(`<b>📍 ตรงที่คุณอยู่</b><br>${levelHtml(lat, lng, pointsRef.current)}`)
+          .openOn(mapRef.current);
       },
       () => setHint("ไม่ได้อนุญาตตำแหน่ง — แตะบนแผนที่ตรงบ้านคุณแทน"),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
     );
   }
 
@@ -375,7 +397,12 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
             {hint && <p className="text-neutral-600">{hint}</p>}
           </div>
           <div className="flex flex-wrap gap-1">
-            <button type="button" onClick={hereLevel} aria-label="ระดับน้ำตรงที่ฉันอยู่" className="pointer-events-auto min-h-[44px] rounded-full border-2 border-black bg-white px-3 text-sm font-bold shadow">
+            <button
+              type="button"
+              onClick={hereLevel}
+              aria-label="ระดับน้ำตรงที่ฉันอยู่"
+              className="pointer-events-auto min-h-[44px] rounded-full border-2 border-black bg-white px-3 text-sm font-bold shadow"
+            >
               📍 ตรงฉัน
             </button>
             {onReportWater && (
@@ -443,5 +470,5 @@ export default function MapView({ posts, water, trips = [], onSelect, focus, fil
 }
 
 export function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }

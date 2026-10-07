@@ -135,12 +135,16 @@ export default function FundPage() {
     <div className="min-h-screen bg-stone-100 text-neutral-900">
       <header className="sticky top-0 z-[900] bg-black text-white shadow">
         <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 py-2">
-          <a href="/" className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-white/10 text-xl" aria-label="กลับหน้าแรก">‹</a>
+          <a href="/" className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-white/10 text-xl" aria-label="กลับหน้าแรก">
+            ‹
+          </a>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-bold">💰 เงินสมทบทีมอาสา</h1>
             <p className="truncate text-xs text-neutral-400">หมู่บ้านสหกรณ์ฯ 4 · อัปเดตล่าสุด {when(data.updated_at)}</p>
           </div>
-          <button onClick={copySummary} className="min-h-[44px] shrink-0 rounded-lg bg-white/10 px-3 text-sm font-semibold">📋 สรุปไป LINE</button>
+          <button onClick={copySummary} className="min-h-[44px] shrink-0 rounded-lg bg-white/10 px-3 text-sm font-semibold">
+            📋 สรุปไป LINE
+          </button>
         </div>
       </header>
 
@@ -150,7 +154,12 @@ export default function FundPage() {
           <Kpi tone="dark" label="รับเข้าทั้งหมด" value={baht(m.total)} sub={`${m.n} รายการ`} />
           <Kpi label="ใช้ไปแล้ว" value={baht(m.spent)} sub={`${data.expenses.length} รายการ`} />
           <Kpi tone="green" label="คงเหลือ" value={baht(m.left)} sub={m.total ? `${Math.round((m.left / m.total) * 100)}% ของยอดรับ` : ""} />
-          <Kpi label="ตรวจกับบัญชีแล้ว" value={`${m.total ? Math.round((m.confirmed / m.total) * 100) : 0}%`} sub={`${baht(m.confirmed)} · รอตรวจ ${m.nWait}`} bar={m.total ? m.confirmed / m.total : 0} />
+          <Kpi
+            label="ตรวจกับบัญชีแล้ว"
+            value={`${m.total ? Math.round((m.confirmed / m.total) * 100) : 0}%`}
+            sub={`${baht(m.confirmed)} · รอตรวจ ${m.nWait}`}
+            bar={m.total ? m.confirmed / m.total : 0}
+          />
         </section>
 
         {data.options?.self_report && (
@@ -172,9 +181,7 @@ export default function FundPage() {
           <Card title="รับเข้า ตามวัตถุประสงค์">
             <Bars data={m.inBy} total={m.total} color="bg-neutral-900" />
           </Card>
-          <Card title="ใช้ไป ตามหมวด">
-            {m.spent ? <Bars data={m.outBy} total={m.spent} color="bg-amber-500" /> : <p className="text-sm text-neutral-500">ยังไม่มีรายจ่าย</p>}
-          </Card>
+          <Card title="ใช้ไป ตามหมวด">{m.spent ? <Bars data={m.outBy} total={m.spent} color="bg-amber-500" /> : <p className="text-sm text-neutral-500">ยังไม่มีรายจ่าย</p>}</Card>
           <Card title="ความครบถ้วนของการตรวจสอบ">
             <Check ok={m.nOk} of={m.n} label="ตรวจกับบัญชีธนาคารแล้ว" />
             <Check ok={m.nSlip} of={m.n} label="มีสลิปเป็นหลักฐาน" />
@@ -191,10 +198,15 @@ export default function FundPage() {
 
         {data.account && (
           <Card title="บัญชีรับเงินสมทบ">
-            <p className="font-semibold">{data.account.bank} · {data.account.name}</p>
+            <p className="font-semibold">
+              {data.account.bank} · {data.account.name}
+            </p>
             <div className="flex flex-wrap items-center gap-2">
               <span className="select-all text-xl font-black tabular-nums">{data.account.number}</span>
-              <button onClick={() => copy(data.account.number.replace(/\D/g, "")).then(() => setToast("คัดลอกเลขบัญชีแล้ว"))} className="min-h-[40px] rounded-lg border-2 border-black px-3 text-sm font-semibold">
+              <button
+                onClick={() => copy(data.account.number.replace(/\D/g, "")).then(() => setToast("คัดลอกเลขบัญชีแล้ว"))}
+                className="min-h-[40px] rounded-lg border-2 border-black px-3 text-sm font-semibold"
+              >
                 คัดลอก
               </button>
             </div>
@@ -203,9 +215,8 @@ export default function FundPage() {
         )}
 
         <section className="rounded-xl bg-white p-3 text-sm text-neutral-600">
-          <b className="text-neutral-900">ตรวจสอบยอดของตัวเอง:</b> หาชื่อหรือเวลาโอนในตารางรายรับ แล้วดูเลขท้าย 4 ตัวของเลขที่รายการให้ตรงกับสลิปของคุณ ·
-          ✅ = เหรัญญิกเห็นยอดในบัญชีแล้ว · ⏳ = รอตรวจ · แตะรูปสลิปเพื่อดูเต็ม · บ้านเลขที่และเลขที่รายการเต็มเห็นเฉพาะเหรัญญิก · เว็บนี้ไม่ได้รับหรือโอนเงิน ·
-          ระวังมิจฉาชีพ: โอนเฉพาะบัญชีที่ทีมอาสาประกาศ
+          <b className="text-neutral-900">ตรวจสอบยอดของตัวเอง:</b> หาชื่อหรือเวลาโอนในตารางรายรับ แล้วดูเลขท้าย 4 ตัวของเลขที่รายการให้ตรงกับสลิปของคุณ · ✅ = เหรัญญิกเห็นยอดในบัญชีแล้ว · ⏳ = รอตรวจ
+          · แตะรูปสลิปเพื่อดูเต็ม · บ้านเลขที่และเลขที่รายการเต็มเห็นเฉพาะเหรัญญิก · เว็บนี้ไม่ได้รับหรือโอนเงิน · ระวังมิจฉาชีพ: โอนเฉพาะบัญชีที่ทีมอาสาประกาศ
         </section>
       </main>
 
@@ -255,7 +266,9 @@ function Bars({ data, total, color }) {
       {rows.map(([k, v]) => (
         <li key={k}>
           <div className="flex justify-between gap-2 text-sm">
-            <span>{PURPOSES[k]?.[0]} {PURPOSES[k]?.[1] || k}</span>
+            <span>
+              {PURPOSES[k]?.[0]} {PURPOSES[k]?.[1] || k}
+            </span>
             <span className="tabular-nums">
               {fmt(v)} <span className="text-neutral-500">({Math.round((v / total) * 100)}%)</span>
             </span>
@@ -274,8 +287,12 @@ function Check({ ok, of, label }) {
   return (
     <div className="mb-2">
       <div className="flex justify-between gap-2 text-sm">
-        <span>{done ? "✅" : "⬜"} {label}</span>
-        <span className="font-semibold tabular-nums">{ok}/{of}</span>
+        <span>
+          {done ? "✅" : "⬜"} {label}
+        </span>
+        <span className="font-semibold tabular-nums">
+          {ok}/{of}
+        </span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100" aria-hidden="true">
         <div className={`h-full rounded-full ${done ? "bg-emerald-600" : "bg-amber-400"}`} style={{ width: of ? `${(ok / of) * 100}%` : "0%" }} />
@@ -288,7 +305,12 @@ function Check({ ok, of, label }) {
 function FlowChart({ donations, expenses }) {
   const ev = [...donations.map((d) => ({ t: tOf(d), in: d.amount, out: 0 })), ...expenses.map((x) => ({ t: tOf(x), in: 0, out: x.amount }))].sort((a, b) => a.t - b.t);
   if (!ev.length) return <p className="text-sm text-neutral-500">ยังไม่มีรายการ</p>;
-  const W = 640, H = 180, L = 56, R = 12, T = 12, B = 26;
+  const W = 640,
+    H = 180,
+    L = 56,
+    R = 12,
+    T = 12,
+    B = 26;
   const t0 = ev[0].t;
   const t1 = Math.max(ev[ev.length - 1].t, t0 + 60000);
   const pts = [];
@@ -311,18 +333,30 @@ function FlowChart({ donations, expenses }) {
         {ticks.map((v) => (
           <g key={v}>
             <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke="#e5e5e5" />
-            <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#737373">{fmt(Math.round(v))}</text>
+            <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#737373">
+              {fmt(Math.round(v))}
+            </text>
           </g>
         ))}
         <path d={step("cin")} fill="none" stroke="#111" strokeWidth="2.5" />
         {cout > 0 && <path d={step("cout")} fill="none" stroke="#f59e0b" strokeWidth="2.5" />}
         <circle cx={x(t1)} cy={y(cin)} r="4" fill="#111" />
-        <text x={L} y={H - 6} fontSize="11" fill="#737373">{tl(t0)}</text>
-        <text x={W - R} y={H - 6} fontSize="11" fill="#737373" textAnchor="end">{tl(t1)}</text>
+        <text x={L} y={H - 6} fontSize="11" fill="#737373">
+          {tl(t0)}
+        </text>
+        <text x={W - R} y={H - 6} fontSize="11" fill="#737373" textAnchor="end">
+          {tl(t1)}
+        </text>
       </svg>
       <p className="mt-1 flex flex-wrap gap-x-4 text-sm">
-        <span><span className="mr-1 inline-block h-2.5 w-4 rounded bg-neutral-900 align-middle" />รับสะสม {baht(cin)}</span>
-        <span><span className="mr-1 inline-block h-2.5 w-4 rounded bg-amber-500 align-middle" />ใช้สะสม {baht(cout)}</span>
+        <span>
+          <span className="mr-1 inline-block h-2.5 w-4 rounded bg-neutral-900 align-middle" />
+          รับสะสม {baht(cin)}
+        </span>
+        <span>
+          <span className="mr-1 inline-block h-2.5 w-4 rounded bg-amber-500 align-middle" />
+          ใช้สะสม {baht(cout)}
+        </span>
       </p>
     </div>
   );
@@ -337,9 +371,7 @@ function Ledger({ data }) {
   const ins = data.donations
     .filter((d) => (status === "all" || d.status === status) && (!query || `${d.name} ${d.ref_tail} ${fmt(d.amount)} ${d.amount}`.toLowerCase().includes(query)))
     .sort((a, b) => (sort === "amount" ? b.amount - a.amount : tOf(b) - tOf(a)));
-  const outs = data.expenses
-    .filter((x) => !query || `${x.item} ${x.paid_by} ${x.amount}`.toLowerCase().includes(query))
-    .sort((a, b) => (sort === "amount" ? b.amount - a.amount : tOf(b) - tOf(a)));
+  const outs = data.expenses.filter((x) => !query || `${x.item} ${x.paid_by} ${x.amount}`.toLowerCase().includes(query)).sort((a, b) => (sort === "amount" ? b.amount - a.amount : tOf(b) - tOf(a)));
 
   function csv() {
     const rows = [["ประเภท", "เวลา", "ชื่อ/รายการ", "ยอด", "วัตถุประสงค์", "สถานะ", "เลขที่รายการ (ท้าย)", "หลักฐาน"]];
@@ -355,8 +387,13 @@ function Ledger({ data }) {
   return (
     <Card title="บัญชีรายการ">
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1">
-        {[["in", `รายรับ (${data.donations.length})`], ["out", `รายจ่าย (${data.expenses.length})`]].map(([k, t]) => (
-          <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className={`min-h-[44px] rounded-lg text-sm font-semibold ${tab === k ? "bg-white shadow" : "text-neutral-600"}`}>{t}</button>
+        {[
+          ["in", `รายรับ (${data.donations.length})`],
+          ["out", `รายจ่าย (${data.expenses.length})`],
+        ].map(([k, t]) => (
+          <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className={`min-h-[44px] rounded-lg text-sm font-semibold ${tab === k ? "bg-white shadow" : "text-neutral-600"}`}>
+            {t}
+          </button>
         ))}
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
@@ -364,14 +401,20 @@ function Ledger({ data }) {
         {tab === "in" && (
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="min-h-[44px] flex-1 rounded-lg border border-neutral-300 px-2" aria-label="สถานะ">
             <option value="all">ทุกสถานะ</option>
-            {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+            {Object.entries(STATUS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v.icon} {v.label}
+              </option>
+            ))}
           </select>
         )}
         <select value={sort} onChange={(e) => setSort(e.target.value)} className="min-h-[44px] flex-1 rounded-lg border border-neutral-300 px-2" aria-label="เรียง">
           <option value="time">ล่าสุดก่อน</option>
           <option value="amount">ยอดมากก่อน</option>
         </select>
-        <button onClick={csv} className="min-h-[44px] rounded-lg border-2 border-black px-3 text-sm font-semibold">⬇️ CSV</button>
+        <button onClick={csv} className="min-h-[44px] rounded-lg border-2 border-black px-3 text-sm font-semibold">
+          ⬇️ CSV
+        </button>
       </div>
       <div className="-mx-3 mt-2 overflow-x-auto px-3">
         {tab === "in" ? (
@@ -391,15 +434,23 @@ function Ledger({ data }) {
                   <td className="whitespace-nowrap py-2 pr-2 tabular-nums">{when(d.paid_at || d.created_at)}</td>
                   <td className="py-2 pr-2">
                     {d.name}
-                    <span className="block text-xs text-neutral-500">{PURPOSES[d.purpose]?.[1]} · {SOURCES[d.source] || ""}</span>
+                    <span className="block text-xs text-neutral-500">
+                      {PURPOSES[d.purpose]?.[1]} · {SOURCES[d.source] || ""}
+                    </span>
                     <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs sm:hidden">
-                      <span className={`rounded px-1.5 font-semibold ${STATUS[d.status].cls}`}>{STATUS[d.status].icon} {STATUS[d.status].label}</span>
+                      <span className={`rounded px-1.5 font-semibold ${STATUS[d.status].cls}`}>
+                        {STATUS[d.status].icon} {STATUS[d.status].label}
+                      </span>
                       <SlipLink d={d} />
                       {d.ref_tail && <span className="font-mono text-neutral-600">…{d.ref_tail}</span>}
                     </span>
                   </td>
                   <td className="py-2 pr-2 text-right font-semibold tabular-nums">{fmt(d.amount)}</td>
-                  <td className="hidden py-2 pr-2 sm:table-cell"><span className={`whitespace-nowrap rounded px-1.5 text-xs font-semibold ${STATUS[d.status].cls}`}>{STATUS[d.status].icon} {STATUS[d.status].label}</span></td>
+                  <td className="hidden py-2 pr-2 sm:table-cell">
+                    <span className={`whitespace-nowrap rounded px-1.5 text-xs font-semibold ${STATUS[d.status].cls}`}>
+                      {STATUS[d.status].icon} {STATUS[d.status].label}
+                    </span>
+                  </td>
                   <td className="hidden whitespace-nowrap py-2 text-xs sm:table-cell">
                     <span className="flex items-center gap-1">
                       <SlipLink d={d} big />
@@ -409,11 +460,19 @@ function Ledger({ data }) {
                   </td>
                 </tr>
               ))}
-              {!ins.length && <tr><td colSpan={5} className="py-4 text-center text-neutral-500">ไม่มีรายการ</td></tr>}
+              {!ins.length && (
+                <tr>
+                  <td colSpan={5} className="py-4 text-center text-neutral-500">
+                    ไม่มีรายการ
+                  </td>
+                </tr>
+              )}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-black font-bold">
-                <td colSpan={2} className="py-2">รวม {ins.length} รายการ{status === "all" ? " (ไม่นับ ❌)" : ""}</td>
+                <td colSpan={2} className="py-2">
+                  รวม {ins.length} รายการ{status === "all" ? " (ไม่นับ ❌)" : ""}
+                </td>
                 <td className="py-2 pr-2 text-right tabular-nums">{fmt(ins.filter((d) => d.status !== "rejected").reduce((s, d) => s + d.amount, 0))}</td>
                 <td colSpan={2} className="hidden sm:table-cell" />
               </tr>
@@ -435,24 +494,38 @@ function Ledger({ data }) {
                   <td className="whitespace-nowrap py-2 pr-2 tabular-nums">{when(x.paid_at || x.created_at)}</td>
                   <td className="py-2 pr-2">
                     {x.item}
-                    <span className="block text-xs text-neutral-500">{PURPOSES[x.purpose]?.[1]}{x.paid_by && ` · จ่ายโดย ${x.paid_by}`}{x.note && ` · ${x.note}`}</span>
+                    <span className="block text-xs text-neutral-500">
+                      {PURPOSES[x.purpose]?.[1]}
+                      {x.paid_by && ` · จ่ายโดย ${x.paid_by}`}
+                      {x.note && ` · ${x.note}`}
+                    </span>
                   </td>
                   <td className="py-2 pr-2 text-right font-semibold tabular-nums">{fmt(x.amount)}</td>
                   <td className="py-2">
                     <span className="flex gap-1">
                       {(x.receipts || []).map((r) => (
-                        <a key={r.id} href={mediaUrl(r.id)} target="_blank" rel="noreferrer"><img src={mediaUrl(r.id, "thumb")} alt="ใบเสร็จ" className="h-10 w-10 rounded object-cover" /></a>
+                        <a key={r.id} href={mediaUrl(r.id)} target="_blank" rel="noreferrer">
+                          <img src={mediaUrl(r.id, "thumb")} alt="ใบเสร็จ" className="h-10 w-10 rounded object-cover" />
+                        </a>
                       ))}
                       {!x.receipts?.length && "—"}
                     </span>
                   </td>
                 </tr>
               ))}
-              {!outs.length && <tr><td colSpan={4} className="py-4 text-center text-neutral-500">ยังไม่มีรายจ่าย</td></tr>}
+              {!outs.length && (
+                <tr>
+                  <td colSpan={4} className="py-4 text-center text-neutral-500">
+                    ยังไม่มีรายจ่าย
+                  </td>
+                </tr>
+              )}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-black font-bold">
-                <td colSpan={2} className="py-2">รวม {outs.length} รายการ</td>
+                <td colSpan={2} className="py-2">
+                  รวม {outs.length} รายการ
+                </td>
                 <td className="py-2 pr-2 text-right tabular-nums">{fmt(outs.reduce((s, x) => s + x.amount, 0))}</td>
                 <td />
               </tr>
@@ -505,15 +578,31 @@ function Treasurer({ tre, onChanged, setToast }) {
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <button onClick={() => setForm({ mode: "in" })} className="min-h-[48px] rounded-xl bg-black font-bold text-white">➕ ลงรายรับ + สลิป</button>
-        <button onClick={() => setForm({ mode: "out" })} className="min-h-[48px] rounded-xl border-2 border-black bg-white font-bold">🧾 ลงรายจ่าย + ใบเสร็จ</button>
+        <button onClick={() => setForm({ mode: "in" })} className="min-h-[48px] rounded-xl bg-black font-bold text-white">
+          ➕ ลงรายรับ + สลิป
+        </button>
+        <button onClick={() => setForm({ mode: "out" })} className="min-h-[48px] rounded-xl border-2 border-black bg-white font-bold">
+          🧾 ลงรายจ่าย + ใบเสร็จ
+        </button>
       </div>
       {form?.mode === "in" && <DonationForm key={form.edit?.id || "new"} edit={form.edit} onClose={() => setForm(null)} onSaved={saved} />}
       {form?.mode === "out" && <ExpenseForm onClose={() => setForm(null)} onSaved={saved} />}
       <p className="text-sm">เปิดแอปธนาคาร เทียบทีละรายการ (ยอด + เวลา + เลขที่รายการ) → ✅ เจอ · ❌ ไม่เจอ · ✏️ แก้ถ้าพิมพ์ผิด</p>
       <div className="flex flex-wrap gap-2">
-        {[["pending", `⏳ รอตรวจ (${counts.pending || 0})`], ["confirmed", `✅ (${counts.confirmed || 0})`], ["rejected", `❌ (${counts.rejected || 0})`], ["all", "ทั้งหมด"]].map(([k, t]) => (
-          <button key={k} onClick={() => setShow(k)} aria-pressed={show === k} className={`min-h-[40px] rounded-full px-3 text-sm ${show === k ? "bg-black font-semibold text-white" : "border border-neutral-400 bg-white"}`}>{t}</button>
+        {[
+          ["pending", `⏳ รอตรวจ (${counts.pending || 0})`],
+          ["confirmed", `✅ (${counts.confirmed || 0})`],
+          ["rejected", `❌ (${counts.rejected || 0})`],
+          ["all", "ทั้งหมด"],
+        ].map(([k, t]) => (
+          <button
+            key={k}
+            onClick={() => setShow(k)}
+            aria-pressed={show === k}
+            className={`min-h-[40px] rounded-full px-3 text-sm ${show === k ? "bg-black font-semibold text-white" : "border border-neutral-400 bg-white"}`}
+          >
+            {t}
+          </button>
         ))}
       </div>
       <ul className="space-y-2">
@@ -524,7 +613,9 @@ function Treasurer({ tre, onChanged, setToast }) {
                 <img src={mediaUrl(d.slip[0].id, "thumb")} alt="สลิป" className="h-24 rounded object-cover" style={{ width: "4.5rem" }} />
               </a>
             ) : (
-              <span className="flex h-24 shrink-0 items-center justify-center rounded bg-neutral-100 px-1 text-center text-xs text-neutral-500" style={{ width: "4.5rem" }}>ไม่มีสลิป</span>
+              <span className="flex h-24 shrink-0 items-center justify-center rounded bg-neutral-100 px-1 text-center text-xs text-neutral-500" style={{ width: "4.5rem" }}>
+                ไม่มีสลิป
+              </span>
             )}
             <div className="min-w-0 flex-1 text-sm">
               <p className="text-lg font-black tabular-nums">{baht(d.amount)}</p>
@@ -533,17 +624,42 @@ function Treasurer({ tre, onChanged, setToast }) {
                 {d.house && ` · ${d.house}`}
                 {d.anonymous && " · ไม่ออกนาม"}
               </p>
-              <p className="text-neutral-600">{when(d.paid_at)} · {d.bank || "-"} · {SOURCES[d.source]}</p>
+              <p className="text-neutral-600">
+                {when(d.paid_at)} · {d.bank || "-"} · {SOURCES[d.source]}
+              </p>
               {d.ref && <p className="break-all font-mono text-xs">#{d.ref}</p>}
               {d.note && <p className="text-xs">{d.note}</p>}
-              {d.reviewed_by && <p className="text-xs text-neutral-500">{STATUS[d.status].icon} โดย {d.reviewed_by}</p>}
+              {d.reviewed_by && (
+                <p className="text-xs text-neutral-500">
+                  {STATUS[d.status].icon} โดย {d.reviewed_by}
+                </p>
+              )}
             </div>
             <div className="flex w-full flex-wrap gap-2">
-              {d.status !== "confirmed" && <button onClick={() => setStatus(d, "confirmed", "✅ ตรวจแล้ว")} className="min-h-[40px] rounded-lg bg-emerald-600 px-3 font-bold text-white">✅ เจอยอด</button>}
-              {d.status !== "rejected" && <button onClick={() => setStatus(d, "rejected", "บันทึกว่าไม่พบยอด")} className="min-h-[40px] rounded-lg bg-red-600 px-3 font-bold text-white">❌ ไม่พบ</button>}
-              {d.status !== "pending" && <button onClick={() => setStatus(d, "pending")} className="min-h-[40px] rounded-lg border border-black px-3">↩️ รอตรวจ</button>}
-              <button onClick={() => setForm({ mode: "in", edit: d })} className="min-h-[40px] rounded-lg border border-black px-3">✏️ แก้ / แนบสลิป</button>
-              <button onClick={() => window.confirm(`ลบ ${d.name} ${baht(d.amount)}?`) && run(() => fapi(`/fund/donations/${d.id}`, { method: "DELETE" }), "ลบแล้ว")} className="min-h-[40px] px-2 text-sm text-red-700 underline">ลบ</button>
+              {d.status !== "confirmed" && (
+                <button onClick={() => setStatus(d, "confirmed", "✅ ตรวจแล้ว")} className="min-h-[40px] rounded-lg bg-emerald-600 px-3 font-bold text-white">
+                  ✅ เจอยอด
+                </button>
+              )}
+              {d.status !== "rejected" && (
+                <button onClick={() => setStatus(d, "rejected", "บันทึกว่าไม่พบยอด")} className="min-h-[40px] rounded-lg bg-red-600 px-3 font-bold text-white">
+                  ❌ ไม่พบ
+                </button>
+              )}
+              {d.status !== "pending" && (
+                <button onClick={() => setStatus(d, "pending")} className="min-h-[40px] rounded-lg border border-black px-3">
+                  ↩️ รอตรวจ
+                </button>
+              )}
+              <button onClick={() => setForm({ mode: "in", edit: d })} className="min-h-[40px] rounded-lg border border-black px-3">
+                ✏️ แก้ / แนบสลิป
+              </button>
+              <button
+                onClick={() => window.confirm(`ลบ ${d.name} ${baht(d.amount)}?`) && run(() => fapi(`/fund/donations/${d.id}`, { method: "DELETE" }), "ลบแล้ว")}
+                className="min-h-[40px] px-2 text-sm text-red-700 underline"
+              >
+                ลบ
+              </button>
             </div>
           </li>
         ))}
@@ -599,21 +715,44 @@ function DonationForm({ edit, onClose, onSaved }) {
         <MediaPicker items={slip} setItems={setSlip} max={1} allowVideo={false} />
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        <input required inputMode="decimal" type="number" min="0.01" step="0.01" value={f.amount} onChange={(e) => set({ amount: e.target.value })} className={`${input} text-lg font-bold`} placeholder="ยอด (บาท) *" aria-label="ยอด" />
+        <input
+          required
+          inputMode="decimal"
+          type="number"
+          min="0.01"
+          step="0.01"
+          value={f.amount}
+          onChange={(e) => set({ amount: e.target.value })}
+          className={`${input} text-lg font-bold`}
+          placeholder="ยอด (บาท) *"
+          aria-label="ยอด"
+        />
         <input type="datetime-local" value={f.paid_at} onChange={(e) => set({ paid_at: e.target.value })} className={input} aria-label="เวลาโอนตามสลิป" />
         <input required maxLength={60} value={f.name} onChange={(e) => set({ name: e.target.value })} className={input} placeholder="ชื่อตามสลิป / ในกลุ่ม *" aria-label="ชื่อ" />
         <input maxLength={60} value={f.ref} onChange={(e) => set({ ref: e.target.value })} className={`${input} font-mono`} placeholder="เลขที่รายการ (กันลงซ้ำ)" aria-label="เลขที่รายการ" />
         <input maxLength={30} value={f.bank} onChange={(e) => set({ bank: e.target.value })} className={input} placeholder="ธนาคารผู้โอน" aria-label="ธนาคาร" />
         <input maxLength={20} value={f.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="บ้านเลขที่ (เห็นเฉพาะเหรัญญิก)" aria-label="บ้านเลขที่" />
         <select value={f.purpose} onChange={(e) => set({ purpose: e.target.value })} className={input} aria-label="วัตถุประสงค์">
-          {Object.entries(PURPOSES).map(([k, [i, t]]) => <option key={k} value={k}>{i} {t}</option>)}
+          {Object.entries(PURPOSES).map(([k, [i, t]]) => (
+            <option key={k} value={k}>
+              {i} {t}
+            </option>
+          ))}
         </select>
         <select value={f.status} onChange={(e) => set({ status: e.target.value })} className={input} aria-label="สถานะ">
-          {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+          {Object.entries(STATUS).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v.icon} {v.label}
+            </option>
+          ))}
         </select>
         {!edit && (
           <select value={f.source} onChange={(e) => set({ source: e.target.value })} className={input} aria-label="ที่มา">
-            {Object.entries(SOURCES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.entries(SOURCES).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
           </select>
         )}
         <input maxLength={200} value={f.note} onChange={(e) => set({ note: e.target.value })} className={input} placeholder="หมายเหตุ / บันทึกช่วยจำในสลิป" aria-label="หมายเหตุ" />
@@ -623,8 +762,12 @@ function DonationForm({ edit, onClose, onSaved }) {
       </label>
       {err && <p className="rounded-lg bg-red-50 p-2 text-red-700">{err}</p>}
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={onClose} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">ยกเลิก</button>
-        <button disabled={st.busy} className="min-h-[48px] rounded-xl bg-black font-bold text-white disabled:opacity-60">{st.busy ? "รอสลิป…" : "บันทึก"}</button>
+        <button type="button" onClick={onClose} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">
+          ยกเลิก
+        </button>
+        <button disabled={st.busy} className="min-h-[48px] rounded-xl bg-black font-bold text-white disabled:opacity-60">
+          {st.busy ? "รอสลิป…" : "บันทึก"}
+        </button>
       </div>
     </form>
   );
@@ -651,10 +794,34 @@ function ExpenseForm({ onClose, onSaved }) {
       <p className="font-bold">🧾 ลงรายจ่ายพร้อมใบเสร็จ</p>
       <MediaPicker items={rc} setItems={setRc} max={4} allowVideo={false} />
       <div className="grid gap-2 sm:grid-cols-2">
-        <input required minLength={2} maxLength={120} value={f.item} onChange={(e) => set({ item: e.target.value })} className={input} placeholder="ซื้ออะไร เช่น ข้าวกล่อง 100 กล่อง *" aria-label="ซื้ออะไร" />
-        <input required inputMode="decimal" type="number" min="0.01" step="0.01" value={f.amount} onChange={(e) => set({ amount: e.target.value })} className={`${input} font-bold`} placeholder="ยอด (บาท) *" aria-label="ยอด" />
+        <input
+          required
+          minLength={2}
+          maxLength={120}
+          value={f.item}
+          onChange={(e) => set({ item: e.target.value })}
+          className={input}
+          placeholder="ซื้ออะไร เช่น ข้าวกล่อง 100 กล่อง *"
+          aria-label="ซื้ออะไร"
+        />
+        <input
+          required
+          inputMode="decimal"
+          type="number"
+          min="0.01"
+          step="0.01"
+          value={f.amount}
+          onChange={(e) => set({ amount: e.target.value })}
+          className={`${input} font-bold`}
+          placeholder="ยอด (บาท) *"
+          aria-label="ยอด"
+        />
         <select value={f.purpose} onChange={(e) => set({ purpose: e.target.value })} className={input} aria-label="หมวด">
-          {Object.entries(PURPOSES).map(([k, [i, t]]) => <option key={k} value={k}>{i} {t}</option>)}
+          {Object.entries(PURPOSES).map(([k, [i, t]]) => (
+            <option key={k} value={k}>
+              {i} {t}
+            </option>
+          ))}
         </select>
         <input type="datetime-local" value={f.paid_at} onChange={(e) => set({ paid_at: e.target.value })} className={input} aria-label="เวลาจ่าย" />
         <input maxLength={60} value={f.paid_by} onChange={(e) => set({ paid_by: e.target.value })} className={input} placeholder="ใครจ่าย" aria-label="ใครจ่าย" />
@@ -662,8 +829,12 @@ function ExpenseForm({ onClose, onSaved }) {
       </div>
       {err && <p className="rounded-lg bg-red-50 p-2 text-red-700">{err}</p>}
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={onClose} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">ยกเลิก</button>
-        <button disabled={st.busy} className="min-h-[48px] rounded-xl bg-black font-bold text-white disabled:opacity-60">{st.busy ? "รอใบเสร็จ…" : "บันทึก"}</button>
+        <button type="button" onClick={onClose} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">
+          ยกเลิก
+        </button>
+        <button disabled={st.busy} className="min-h-[48px] rounded-xl bg-black font-bold text-white disabled:opacity-60">
+          {st.busy ? "รอใบเสร็จ…" : "บันทึก"}
+        </button>
       </div>
     </form>
   );
@@ -721,13 +892,28 @@ function SelfReport({ onDone }) {
         <MediaPicker items={slip} setItems={setSlip} max={1} allowVideo={false} />
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        <input required inputMode="decimal" type="number" min="1" step="0.01" value={f.amount} onChange={(e) => set({ amount: e.target.value })} className={`${input} text-lg font-bold`} placeholder="ยอดที่โอน (บาท) *" aria-label="ยอด" />
+        <input
+          required
+          inputMode="decimal"
+          type="number"
+          min="1"
+          step="0.01"
+          value={f.amount}
+          onChange={(e) => set({ amount: e.target.value })}
+          className={`${input} text-lg font-bold`}
+          placeholder="ยอดที่โอน (บาท) *"
+          aria-label="ยอด"
+        />
         <input type="datetime-local" value={f.paid_at} onChange={(e) => set({ paid_at: e.target.value })} className={input} aria-label="เวลาโอน" />
         <input required maxLength={60} value={f.name} onChange={(e) => set({ name: e.target.value })} className={input} placeholder="ชื่อ *" aria-label="ชื่อ" />
         <input maxLength={20} value={f.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="บ้านเลขที่ (เห็นเฉพาะเหรัญญิก)" aria-label="บ้านเลขที่" />
         <input maxLength={60} value={f.ref} onChange={(e) => set({ ref: e.target.value })} className={`${input} font-mono`} placeholder="เลขที่รายการในสลิป (ถ้ามี)" aria-label="เลขที่รายการ" />
         <select value={f.purpose} onChange={(e) => set({ purpose: e.target.value })} className={input} aria-label="สมทบค่าอะไร">
-          {Object.entries(PURPOSES).map(([k, [i, t]]) => <option key={k} value={k}>{i} {t}</option>)}
+          {Object.entries(PURPOSES).map(([k, [i, t]]) => (
+            <option key={k} value={k}>
+              {i} {t}
+            </option>
+          ))}
         </select>
       </div>
       <label className="flex min-h-[40px] items-center gap-2 text-sm">
@@ -735,8 +921,12 @@ function SelfReport({ onDone }) {
       </label>
       {err && <p className="rounded-lg bg-red-50 p-2 text-red-700">{err}</p>}
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => setOpen(false)} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">ยกเลิก</button>
-        <button disabled={busy || st.busy} className="min-h-[48px] rounded-xl bg-emerald-600 font-bold text-white disabled:opacity-60">{busy ? "กำลังส่ง…" : st.busy ? "รอสลิปอัปโหลด…" : "ส่ง"}</button>
+        <button type="button" onClick={() => setOpen(false)} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">
+          ยกเลิก
+        </button>
+        <button disabled={busy || st.busy} className="min-h-[48px] rounded-xl bg-emerald-600 font-bold text-white disabled:opacity-60">
+          {busy ? "กำลังส่ง…" : st.busy ? "รอสลิปอัปโหลด…" : "ส่ง"}
+        </button>
       </div>
     </form>
   );

@@ -102,84 +102,84 @@ function PhoneDemo({ app, os }) {
   );
   return (
     <div>
-    <div className="mx-auto w-52 rounded-[2rem] border-[6px] border-neutral-800 bg-neutral-800 shadow-lg" aria-hidden="true">
-      <div className="relative h-80 overflow-hidden rounded-[1.5rem] bg-white text-left">
-        {/* in-app browser chrome */}
-        {step < 3 ? (
-          <div className="flex items-center gap-1 px-2 py-2 text-white" style={{ background: a.color }}>
-            <span className="text-sm">✕</span>
-            <span className="min-w-0 flex-1 truncate text-center text-[11px]">serithai57.com</span>
-            <span className={`relative rounded px-1 text-lg leading-none ${step === 1 ? "bg-white/40" : ""}`}>
-              {s.dots}
-              {step === 1 && <Finger className="-bottom-7 -left-1" />}
-            </span>
+      <div className="mx-auto w-52 rounded-[2rem] border-[6px] border-neutral-800 bg-neutral-800 shadow-lg" aria-hidden="true">
+        <div className="relative h-80 overflow-hidden rounded-[1.5rem] bg-white text-left">
+          {/* in-app browser chrome */}
+          {step < 3 ? (
+            <div className="flex items-center gap-1 px-2 py-2 text-white" style={{ background: a.color }}>
+              <span className="text-sm">✕</span>
+              <span className="min-w-0 flex-1 truncate text-center text-[11px]">serithai57.com</span>
+              <span className={`relative rounded px-1 text-lg leading-none ${step === 1 ? "bg-white/40" : ""}`}>
+                {s.dots}
+                {step === 1 && <Finger className="-bottom-7 -left-1" />}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 bg-neutral-100 px-2 py-2">
+              <span className="text-xs">🔒</span>
+              <span className="min-w-0 flex-1 truncate rounded-full bg-white px-2 text-center text-[11px]">serithai57.com/staff</span>
+              <span className="text-[10px] font-bold">{s.browser}</span>
+            </div>
+          )}
+          <div className="p-2">
+            {step === 0 && (
+              <div className="g-drop-in space-y-2">
+                <p className="rounded-lg bg-yellow-100 p-2 text-[11px] font-semibold">⚠️ กำลังเปิดอยู่ใน {a.name}</p>
+                <p className="text-[11px] text-neutral-600">GPS จะหยุดทันทีที่ปิดแชต · จอค้างไม่ได้</p>
+                <div className="h-16 rounded-lg bg-neutral-100" />
+                <div className="h-10 rounded-lg bg-neutral-100" />
+              </div>
+            )}
+            {step === 1 && (
+              <div className="space-y-2">
+                <p className="g-drop-in rounded-lg bg-black p-2 text-center text-[11px] font-bold text-white">แตะ {s.dots} มุมขวาบน</p>
+                <div className="h-16 rounded-lg bg-neutral-100" />
+              </div>
+            )}
+            {step === 2 && (
+              <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-2 shadow-[0_-4px_16px_rgba(0,0,0,.25)] g-drop-in">
+                {s.menu.map((m, i) => (
+                  <p key={m} className={`relative my-1 rounded-lg px-2 py-2 text-[12px] ${i === s.pick ? "bg-emerald-100 font-bold ring-2 ring-emerald-500" : ""}`}>
+                    {m}
+                    {i === s.pick && <Finger className="right-2 top-1" />}
+                  </p>
+                ))}
+                <p className="text-center text-[10px] text-neutral-500">{s.pickHint}</p>
+              </div>
+            )}
+            {step === 3 && (
+              <div className="g-drop-in space-y-2">
+                <p className="rounded-lg bg-emerald-100 p-2 text-[11px] font-semibold text-emerald-900">✅ เปิดใน {s.browser} แล้ว</p>
+                <p className="text-[11px]">📡 GPS ทำงานต่อ · 🔆 จอเปิดค้างได้</p>
+                <div className="rounded-lg bg-black p-2 text-center text-[11px] font-bold text-white">เริ่มทำงาน</div>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="flex items-center gap-1 bg-neutral-100 px-2 py-2">
-            <span className="text-xs">🔒</span>
-            <span className="min-w-0 flex-1 truncate rounded-full bg-white px-2 text-center text-[11px]">serithai57.com/staff</span>
-            <span className="text-[10px] font-bold">{s.browser}</span>
-          </div>
-        )}
-        <div className="p-2">
-          {step === 0 && (
-            <div className="g-drop-in space-y-2">
-              <p className="rounded-lg bg-yellow-100 p-2 text-[11px] font-semibold">⚠️ กำลังเปิดอยู่ใน {a.name}</p>
-              <p className="text-[11px] text-neutral-600">GPS จะหยุดทันทีที่ปิดแชต · จอค้างไม่ได้</p>
-              <div className="h-16 rounded-lg bg-neutral-100" />
-              <div className="h-10 rounded-lg bg-neutral-100" />
-            </div>
-          )}
-          {step === 1 && (
-            <div className="space-y-2">
-              <p className="g-drop-in rounded-lg bg-black p-2 text-center text-[11px] font-bold text-white">แตะ {s.dots} มุมขวาบน</p>
-              <div className="h-16 rounded-lg bg-neutral-100" />
-            </div>
-          )}
-          {step === 2 && (
-            <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-2 shadow-[0_-4px_16px_rgba(0,0,0,.25)] g-drop-in">
-              {s.menu.map((m, i) => (
-                <p key={m} className={`relative my-1 rounded-lg px-2 py-2 text-[12px] ${i === s.pick ? "bg-emerald-100 font-bold ring-2 ring-emerald-500" : ""}`}>
-                  {m}
-                  {i === s.pick && <Finger className="right-2 top-1" />}
-                </p>
-              ))}
-              <p className="text-center text-[10px] text-neutral-500">{s.pickHint}</p>
-            </div>
-          )}
-          {step === 3 && (
-            <div className="g-drop-in space-y-2">
-              <p className="rounded-lg bg-emerald-100 p-2 text-[11px] font-semibold text-emerald-900">✅ เปิดใน {s.browser} แล้ว</p>
-              <p className="text-[11px]">📡 GPS ทำงานต่อ · 🔆 จอเปิดค้างได้</p>
-              <div className="rounded-lg bg-black p-2 text-center text-[11px] font-bold text-white">เริ่มทำงาน</div>
-            </div>
-          )}
         </div>
       </div>
-    </div>
-    {/* tap a step to hold it (for slow readers); ▶ to play again */}
-    <div className="mt-2 flex flex-wrap items-center justify-center gap-1">
-      {["เปิดลิงก์", `แตะ ${s.dots}`, "เลือกเมนู", "เสร็จ"].map((label, i) => (
-        <button
-          key={label}
-          type="button"
-          data-step={i}
-          onClick={() => {
-            setStep(i);
-            setPaused(true);
-          }}
-          aria-pressed={step === i}
-          className={`min-h-[36px] rounded-full px-2 text-xs font-semibold ${step === i ? "bg-black text-white" : "bg-neutral-100"}`}
-        >
-          {i + 1}. {label}
-        </button>
-      ))}
-      {paused && !reduced && (
-        <button type="button" onClick={() => setPaused(false)} aria-label="เล่นต่อ" className="min-h-[36px] min-w-[36px] rounded-full bg-neutral-100 text-xs">
-          ▶
-        </button>
-      )}
-    </div>
+      {/* tap a step to hold it (for slow readers); ▶ to play again */}
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-1">
+        {["เปิดลิงก์", `แตะ ${s.dots}`, "เลือกเมนู", "เสร็จ"].map((label, i) => (
+          <button
+            key={label}
+            type="button"
+            data-step={i}
+            onClick={() => {
+              setStep(i);
+              setPaused(true);
+            }}
+            aria-pressed={step === i}
+            className={`min-h-[36px] rounded-full px-2 text-xs font-semibold ${step === i ? "bg-black text-white" : "bg-neutral-100"}`}
+          >
+            {i + 1}. {label}
+          </button>
+        ))}
+        {paused && !reduced && (
+          <button type="button" onClick={() => setPaused(false)} aria-label="เล่นต่อ" className="min-h-[36px] min-w-[36px] rounded-full bg-neutral-100 text-xs">
+            ▶
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -193,12 +193,20 @@ export function BrowserHowTo({ initialApp, initialOs }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap justify-center gap-2">
-        <button type="button" className={pill(app === "line")} onClick={() => setApp("line")}>LINE</button>
-        <button type="button" className={pill(app === "messenger")} onClick={() => setApp("messenger")}>Messenger / Facebook</button>
+        <button type="button" className={pill(app === "line")} onClick={() => setApp("line")}>
+          LINE
+        </button>
+        <button type="button" className={pill(app === "messenger")} onClick={() => setApp("messenger")}>
+          Messenger / Facebook
+        </button>
       </div>
       <div className="flex justify-center gap-2">
-        <button type="button" className={pill(os === "ios")} onClick={() => setOs("ios")}>iPhone</button>
-        <button type="button" className={pill(os === "android")} onClick={() => setOs("android")}>Android</button>
+        <button type="button" className={pill(os === "ios")} onClick={() => setOs("ios")}>
+          iPhone
+        </button>
+        <button type="button" className={pill(os === "android")} onClick={() => setOs("android")}>
+          Android
+        </button>
       </div>
       <PhoneDemo app={app} os={os} />
       <ol className="list-decimal space-y-1 pl-6 text-left text-sm">

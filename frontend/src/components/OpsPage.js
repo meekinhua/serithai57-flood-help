@@ -79,7 +79,7 @@ function PointEditor({ zone, p, onDone }) {
         setMsg("");
       },
       (err) => setMsg(err.code === 1 ? "ไม่ได้อนุญาตตำแหน่ง" : "หาตำแหน่งไม่ได้"),
-      { enableHighAccuracy: true, timeout: 20000 }
+      { enableHighAccuracy: true, timeout: 20000 },
     );
   }
 
@@ -110,8 +110,12 @@ function PointEditor({ zone, p, onDone }) {
       <input value={f.hours} onChange={set("hours")} maxLength={40} className={inputCls} placeholder="🕐 อยู่ช่วงไหน เช่น 11:00–17:00" />
       <p className="text-xs text-neutral-500">เบอร์นี้ทุกคนเห็น (ให้คนเอาของมาโทรหาได้) ใส่เฉพาะเบอร์ที่ยินดีรับสาย</p>
       <div className="flex gap-2">
-        <Chip on={f.manned} onClick={() => setF({ ...f, manned: true })}>✅ มีคนอยู่ตอนนี้</Chip>
-        <Chip on={!f.manned} onClick={() => setF({ ...f, manned: false })}>❌ ไม่มีคน / ต้องการคนประจำ</Chip>
+        <Chip on={f.manned} onClick={() => setF({ ...f, manned: true })}>
+          ✅ มีคนอยู่ตอนนี้
+        </Chip>
+        <Chip on={!f.manned} onClick={() => setF({ ...f, manned: false })}>
+          ❌ ไม่มีคน / ต้องการคนประจำ
+        </Chip>
       </div>
       <p className="text-sm font-semibold">จุดนี้ต้องการอะไร (แตะเลือก)</p>
       <div className="flex flex-wrap gap-1.5">
@@ -123,17 +127,25 @@ function PointEditor({ zone, p, onDone }) {
       </div>
       <div className="flex items-center gap-2">
         <span className="flex-1 text-sm font-semibold">🚤 จุดนี้ต้องการเรือกี่ลำ</span>
-        <button type="button" onClick={() => setF({ ...f, boats_needed: Math.max(0, f.boats_needed - 1) })} className="h-11 w-11 rounded-full border border-neutral-300 text-xl">−</button>
+        <button type="button" onClick={() => setF({ ...f, boats_needed: Math.max(0, f.boats_needed - 1) })} className="h-11 w-11 rounded-full border border-neutral-300 text-xl">
+          −
+        </button>
         <span className="w-8 text-center text-xl font-black">{f.boats_needed}</span>
-        <button type="button" onClick={() => setF({ ...f, boats_needed: Math.min(10, f.boats_needed + 1) })} className="h-11 w-11 rounded-full border border-neutral-300 text-xl">+</button>
+        <button type="button" onClick={() => setF({ ...f, boats_needed: Math.min(10, f.boats_needed + 1) })} className="h-11 w-11 rounded-full border border-neutral-300 text-xl">
+          +
+        </button>
       </div>
       <input value={f.surplus} onChange={set("surplus")} maxLength={120} className={inputCls} placeholder="✅ มีของเหลือ / พอแบ่ง เช่น น้ำ 20 แพ็ค" />
       <input value={f.note} onChange={set("note")} maxLength={200} className={inputCls} placeholder="📝 หมายเหตุ เช่น รวมจุดกับ G · มีโต๊ะวางของ" />
       <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={`${inputCls} ${msg.startsWith("✍️") ? "border-2 border-red-500" : ""}`} placeholder="ชื่อคุณ (จำเป็น)" />
       {msg && <p className="rounded bg-yellow-50 p-2 text-sm">{msg}</p>}
       <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => onDone(false)} className="min-h-[48px] rounded-lg border border-neutral-300">ยกเลิก</button>
-        <button onClick={submit} className="col-span-2 min-h-[48px] rounded-lg bg-black font-bold text-white">บันทึก</button>
+        <button onClick={() => onDone(false)} className="min-h-[48px] rounded-lg border border-neutral-300">
+          ยกเลิก
+        </button>
+        <button onClick={submit} className="col-span-2 min-h-[48px] rounded-lg bg-black font-bold text-white">
+          บันทึก
+        </button>
       </div>
     </div>
   );
@@ -154,7 +166,9 @@ export function PointCard({ zone, p = {}, onSaved, insider = true, boatsHere }) 
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-bold leading-tight">{p.place || placeOf(zone)}</p>
-          <p className="text-xs text-neutral-500">โซน {zone.id} · ซอย {zone.sois.join(", ")}</p>
+          <p className="text-xs text-neutral-500">
+            โซน {zone.id} · ซอย {zone.sois.join(", ")}
+          </p>
         </div>
         {touched && (
           <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${here ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>{here ? "✅ มีคนอยู่" : "❌ ไม่มีคน"}</span>
@@ -302,8 +316,12 @@ export function Hazards({ hazards, onChange, insider = true }) {
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={inputCls} placeholder="ชื่อคุณ (จำเป็น)" />
           {msg && <p className="rounded bg-yellow-50 p-2 text-sm">{msg}</p>}
           <div className="grid grid-cols-3 gap-2">
-            <button onClick={() => setAdding(false)} className="min-h-[48px] rounded-lg border border-neutral-300">ยกเลิก</button>
-            <button onClick={add} className="col-span-2 min-h-[48px] rounded-lg bg-red-600 font-bold text-white">แจ้งอันตราย</button>
+            <button onClick={() => setAdding(false)} className="min-h-[48px] rounded-lg border border-neutral-300">
+              ยกเลิก
+            </button>
+            <button onClick={add} className="col-span-2 min-h-[48px] rounded-lg bg-red-600 font-bold text-white">
+              แจ้งอันตราย
+            </button>
           </div>
         </div>
       ) : (
@@ -372,8 +390,12 @@ function BoatForm({ boat, onDone }) {
       <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={inputCls} placeholder="ชื่อคุณ (จำเป็น)" />
       {msg && <p className="rounded bg-yellow-50 p-2 text-sm">{msg}</p>}
       <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => onDone(false)} className="min-h-[48px] rounded-lg border border-neutral-300">ยกเลิก</button>
-        <button onClick={submit} className="col-span-2 min-h-[48px] rounded-lg bg-black font-bold text-white">บันทึก</button>
+        <button onClick={() => onDone(false)} className="min-h-[48px] rounded-lg border border-neutral-300">
+          ยกเลิก
+        </button>
+        <button onClick={submit} className="col-span-2 min-h-[48px] rounded-lg bg-black font-bold text-white">
+          บันทึก
+        </button>
       </div>
     </div>
   );
@@ -428,11 +450,15 @@ export function Boats({ boats, onChange }) {
               อัปเดต {timeAgo(b.updated_at)} โดย {b.updated_by}
             </p>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <button onClick={() => setEditing(b.id)} className="min-h-[44px] rounded-lg bg-blue-600 text-sm font-bold text-white">✏️ ย้าย / เปลี่ยนคนดูแล</button>
-              <button onClick={() => giveBack(b)} className="min-h-[44px] rounded-lg border border-neutral-300 text-sm">↩️ คืนแล้ว</button>
+              <button onClick={() => setEditing(b.id)} className="min-h-[44px] rounded-lg bg-blue-600 text-sm font-bold text-white">
+                ✏️ ย้าย / เปลี่ยนคนดูแล
+              </button>
+              <button onClick={() => giveBack(b)} className="min-h-[44px] rounded-lg border border-neutral-300 text-sm">
+                ↩️ คืนแล้ว
+              </button>
             </div>
           </div>
-        )
+        ),
       )}
       {editing === "new" ? (
         <BoatForm onDone={done} />
@@ -476,13 +502,23 @@ function NoteForm({ kind, onDone }) {
         {k.icon} {k.add}
       </p>
       <input value={text} onChange={(e) => setText(e.target.value)} maxLength={200} className={inputCls} placeholder={k.ph} />
-      <input value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={200} className={inputCls} placeholder={kind === "supply" ? "จำนวน / ไซซ์ เช่น 40–41 ×4 คู่, 42–43 ×6 คู่" : "รายละเอียด (ไม่ใส่ก็ได้)"} />
+      <input
+        value={detail}
+        onChange={(e) => setDetail(e.target.value)}
+        maxLength={200}
+        className={inputCls}
+        placeholder={kind === "supply" ? "จำนวน / ไซซ์ เช่น 40–41 ×4 คู่, 42–43 ×6 คู่" : "รายละเอียด (ไม่ใส่ก็ได้)"}
+      />
       <input value={forWho} onChange={(e) => setForWho(e.target.value)} maxLength={60} className={inputCls} placeholder={k.who} />
       <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={inputCls} placeholder="ชื่อคุณ (จำเป็น)" />
       {msg && <p className="rounded bg-yellow-50 p-2 text-sm">{msg}</p>}
       <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => onDone(false)} className="min-h-[48px] rounded-lg border border-neutral-300">ยกเลิก</button>
-        <button onClick={submit} className="col-span-2 min-h-[48px] rounded-lg bg-black font-bold text-white">บันทึก</button>
+        <button onClick={() => onDone(false)} className="min-h-[48px] rounded-lg border border-neutral-300">
+          ยกเลิก
+        </button>
+        <button onClick={submit} className="col-span-2 min-h-[48px] rounded-lg bg-black font-bold text-white">
+          บันทึก
+        </button>
       </div>
     </div>
   );
@@ -501,10 +537,7 @@ export function Board({ notes, onChange }) {
     }
   }
   function resolve(n) {
-    const res =
-      n.kind === "question"
-        ? window.prompt(`สรุปว่าอย่างไร?\n❓ ${n.text}`)
-        : window.prompt(`ได้ “${n.text}” แล้ว — ตอนนี้อยู่กับใคร / ที่ไหน? (ไม่ใส่ก็ได้)`, "");
+    const res = n.kind === "question" ? window.prompt(`สรุปว่าอย่างไร?\n❓ ${n.text}`) : window.prompt(`ได้ “${n.text}” แล้ว — ตอนนี้อยู่กับใคร / ที่ไหน? (ไม่ใส่ก็ได้)`, "");
     if (res == null || (n.kind === "question" && !res.trim())) return;
     const w = who();
     if (w) post(`/ops/notes/${n.id}/resolve`, { resolution: res.trim(), name: w });
@@ -634,23 +667,25 @@ export function Roster({ people, insider, onChange }) {
           ]
             .filter(([, list]) => list.length)
             .map(([title, list]) => (
-          <div key={title} className="mb-3">
-          <p className="mb-1 text-sm font-bold text-neutral-700">{title} ({list.length})</p>
-          <ol className="space-y-1">
-            {list.map((pp, i) => (
-              <li key={pp.id} className="flex items-center gap-2 rounded-lg bg-neutral-50 px-2 py-1.5">
-                <span className="w-6 text-right text-sm text-neutral-500">{i + 1}.</span>
-                <span className="min-w-0 flex-1">
-                  <b>{pp.name}</b> {insider ? <Tel phone={pp.phone} /> : <span className="text-sm text-neutral-600">{pp.phone}</span>}
-                  {pp.role && <span className="block text-xs text-neutral-600">{pp.role.replace(/^ติดต่อ · /, "")}</span>}
-                </span>
-                <button onClick={() => remove(pp)} aria-label={`ลบ ${pp.name}`} className="min-h-[36px] rounded px-2 text-sm text-neutral-400">
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ol>
-          </div>
+              <div key={title} className="mb-3">
+                <p className="mb-1 text-sm font-bold text-neutral-700">
+                  {title} ({list.length})
+                </p>
+                <ol className="space-y-1">
+                  {list.map((pp, i) => (
+                    <li key={pp.id} className="flex items-center gap-2 rounded-lg bg-neutral-50 px-2 py-1.5">
+                      <span className="w-6 text-right text-sm text-neutral-500">{i + 1}.</span>
+                      <span className="min-w-0 flex-1">
+                        <b>{pp.name}</b> {insider ? <Tel phone={pp.phone} /> : <span className="text-sm text-neutral-600">{pp.phone}</span>}
+                        {pp.role && <span className="block text-xs text-neutral-600">{pp.role.replace(/^ติดต่อ · /, "")}</span>}
+                      </span>
+                      <button onClick={() => remove(pp)} aria-label={`ลบ ${pp.name}`} className="min-h-[36px] rounded px-2 text-sm text-neutral-400">
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             ))
         )}
       </section>
@@ -665,9 +700,7 @@ export function Roster({ people, insider, onChange }) {
         <button onClick={join} className="min-h-[48px] w-full rounded-lg bg-green-600 font-bold text-white">
           ลงชื่อ
         </button>
-        <p className="text-xs text-neutral-500">
-          🔒 รายชื่อนี้เห็นเฉพาะคนที่เปิดจากลิงก์ทีม · ลงซ้ำด้วยเบอร์เดิม = แก้ชื่อ/หน้าที่ · ขึ้นต้นหน้าที่ด้วย “ติดต่อ” = ไปอยู่กลุ่มติดต่อภายนอก
-        </p>
+        <p className="text-xs text-neutral-500">🔒 รายชื่อนี้เห็นเฉพาะคนที่เปิดจากลิงก์ทีม · ลงซ้ำด้วยเบอร์เดิม = แก้ชื่อ/หน้าที่ · ขึ้นต้นหน้าที่ด้วย “ติดต่อ” = ไปอยู่กลุ่มติดต่อภายนอก</p>
       </section>
     </div>
   );
@@ -766,7 +799,8 @@ export function summaryText(zones, board) {
   }
   if (board.boats.length) {
     out.push("", "🚤 เรือ / อุปกรณ์");
-    for (const b of board.boats) out.push(`${b.label}${b.where ? ` @ ${b.where}` : ""}${b.holder ? ` · ${b.holder}${b.holder_phone ? ` ${b.holder_phone}` : ""}` : ""}${b.need_driver ? " · 🙋 หาคนขับ" : ""}`);
+    for (const b of board.boats)
+      out.push(`${b.label}${b.where ? ` @ ${b.where}` : ""}${b.holder ? ` · ${b.holder}${b.holder_phone ? ` ${b.holder_phone}` : ""}` : ""}${b.need_driver ? " · 🙋 หาคนขับ" : ""}`);
   }
   out.push("", `ดู/อัปเดต: ${window.location.origin}/ops`);
   return out.join("\n");
@@ -812,7 +846,7 @@ export default function OpsPage() {
         .map((z) => ({ z, p: board.points[z.id] || {} }))
         .filter(({ p }) => p.needs?.length)
         .sort((a, b) => b.p.needs.length - a.p.needs.length),
-    [zones, board]
+    [zones, board],
   );
   const unmanned = (zones || []).filter((z) => !board.points[z.id]?.person || board.points[z.id]?.manned === false);
 
@@ -849,8 +883,12 @@ export default function OpsPage() {
             <h1 className="text-lg font-bold leading-tight">🤝 ประสานงานอาสา</h1>
             <p className="text-sm text-neutral-300">ใครอยู่จุดไหน · ขาดอะไร · อันตราย · เรือ</p>
           </div>
-          <a href="/zones" className="shrink-0 rounded-lg bg-white/10 px-2.5 py-2.5 text-sm">🗺️ โซน</a>
-          <a href="/" className="shrink-0 rounded-lg bg-white/10 px-2.5 py-2.5 text-sm">🏠</a>
+          <a href="/zones" className="shrink-0 rounded-lg bg-white/10 px-2.5 py-2.5 text-sm">
+            🗺️ โซน
+          </a>
+          <a href="/" className="shrink-0 rounded-lg bg-white/10 px-2.5 py-2.5 text-sm">
+            🏠
+          </a>
         </div>
       </header>
 
@@ -926,7 +964,14 @@ export default function OpsPage() {
           <section className="space-y-2">
             {!zones && !error && <p className="p-3 text-neutral-600">กำลังโหลด…</p>}
             {zones?.map((z) => (
-              <PointCard key={z.id} zone={z} p={board.points[z.id]} onSaved={reload} insider={!!board.insider} boatsHere={(board.boats || []).filter((b) => (z.drop.shared || [z.id]).includes(b.zone)).length} />
+              <PointCard
+                key={z.id}
+                zone={z}
+                p={board.points[z.id]}
+                onSaved={reload}
+                insider={!!board.insider}
+                boatsHere={(board.boats || []).filter((b) => (z.drop.shared || [z.id]).includes(b.zone)).length}
+              />
             ))}
           </section>
         )}

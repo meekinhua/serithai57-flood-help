@@ -111,7 +111,13 @@ function AddCase({ zone, name, onDone }) {
       </div>
       <div className="flex flex-wrap gap-1.5">
         {QUICK_CATS.map((k) => (
-          <button key={k} type="button" onClick={() => setCat(k)} aria-pressed={cat === k} className={`min-h-[40px] rounded-full px-3 text-sm ${cat === k ? "bg-black text-white" : "border border-neutral-300 bg-white"}`}>
+          <button
+            key={k}
+            type="button"
+            onClick={() => setCat(k)}
+            aria-pressed={cat === k}
+            className={`min-h-[40px] rounded-full px-3 text-sm ${cat === k ? "bg-black text-white" : "border border-neutral-300 bg-white"}`}
+          >
             {NEED[k][0]} {NEED[k][1].split(" / ")[0]}
           </button>
         ))}
@@ -121,13 +127,22 @@ function AddCase({ zone, name, onDone }) {
         <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" maxLength={40} className={input} placeholder="📞 เบอร์บ้านนั้น" />
       </div>
       <input value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={500} className={input} placeholder="ต้องการอะไร เช่น ข้าว 3 กล่อง มีผู้ป่วยติดเตียง" />
-      <button type="button" onClick={() => setUrgent(!urgent)} aria-pressed={urgent} className={`min-h-[40px] w-full rounded-lg text-sm font-bold ${urgent ? "bg-red-600 text-white" : "border border-red-600 text-red-700"}`}>
+      <button
+        type="button"
+        onClick={() => setUrgent(!urgent)}
+        aria-pressed={urgent}
+        className={`min-h-[40px] w-full rounded-lg text-sm font-bold ${urgent ? "bg-red-600 text-white" : "border border-red-600 text-red-700"}`}
+      >
         {urgent ? "🔴 ด่วน (คนแก่ / ป่วย / เด็กเล็ก)" : "แตะถ้าด่วน (คนแก่ / ป่วย / เด็กเล็ก)"}
       </button>
       {msg && <p className="rounded bg-yellow-50 p-2 text-sm">{msg}</p>}
       <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => onDone(false)} className="min-h-[48px] rounded-lg border border-neutral-300">ยกเลิก</button>
-        <button onClick={submit} className="col-span-2 min-h-[48px] rounded-lg bg-black font-bold text-white">เพิ่มเคส</button>
+        <button onClick={() => onDone(false)} className="min-h-[48px] rounded-lg border border-neutral-300">
+          ยกเลิก
+        </button>
+        <button onClick={submit} className="col-span-2 min-h-[48px] rounded-lg bg-black font-bold text-white">
+          เพิ่มเคส
+        </button>
       </div>
     </div>
   );
@@ -155,7 +170,9 @@ function CaseCard({ c, name, onChanged, isNew, sois }) {
     }
   }
   return (
-    <li className={`rounded-xl border-l-8 bg-white p-3 shadow ${done ? "border-green-500 opacity-60" : c.urgent ? "border-red-600" : c.status === "helping" ? "border-blue-500" : "border-neutral-300"}`}>
+    <li
+      className={`rounded-xl border-l-8 bg-white p-3 shadow ${done ? "border-green-500 opacity-60" : c.urgent ? "border-red-600" : c.status === "helping" ? "border-blue-500" : "border-neutral-300"}`}
+    >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-2xl font-black leading-tight">
@@ -260,7 +277,9 @@ function CaseCard({ c, name, onChanged, isNew, sois }) {
             )}
             <button
               disabled={busy}
-              onClick={() => window.confirm(`ปิด ${c.house || "เคสนี้"} โดยไม่ได้ไปส่ง?\n(ไม่ใช่คำขอ / ไม่ต้องแล้ว / ย้ายออก) — ถ้าเขาขอใหม่ในไลน์ เคสจะเปิดเอง`) && set("done", "ปิด: ไม่ต้องแล้ว / ไม่ใช่คำขอ")}
+              onClick={() =>
+                window.confirm(`ปิด ${c.house || "เคสนี้"} โดยไม่ได้ไปส่ง?\n(ไม่ใช่คำขอ / ไม่ต้องแล้ว / ย้ายออก) — ถ้าเขาขอใหม่ในไลน์ เคสจะเปิดเอง`) && set("done", "ปิด: ไม่ต้องแล้ว / ไม่ใช่คำขอ")
+              }
               className="col-span-2 min-h-[40px] rounded-lg border border-neutral-300 text-sm text-neutral-600"
             >
               🚫 ไม่ต้องแล้ว / ไม่ใช่คำขอ
@@ -369,7 +388,9 @@ export default function TeamPage() {
             <h1 className="text-xl font-black">🚶 ทีมแจก{zone ? ` · โซน ${zone === "?" ? "ไม่รู้โซน" : z?.label || zone}` : ""}</h1>
             <p className="text-sm opacity-90">{updated ? `อัปเดต ${updated.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} · รีเฟรชเองทุก 30 วิ` : "กำลังโหลด…"}</p>
           </div>
-          <a href="/hq" className="rounded-lg bg-white/20 px-3 py-2.5 text-sm font-semibold">🧭 ภาพรวม</a>
+          <a href="/hq" className="rounded-lg bg-white/20 px-3 py-2.5 text-sm font-semibold">
+            🧭 ภาพรวม
+          </a>
         </div>
       </header>
 
@@ -493,9 +514,7 @@ export default function TeamPage() {
         {toast && <p className="rounded-xl bg-green-100 p-3 font-semibold text-green-900">{toast}</p>}
 
         {!cases && !error && <p className="p-3 text-neutral-600">กำลังโหลด…</p>}
-        {cases && groups.urgent.length === 0 && groups.sois.length === 0 && (
-          <p className="rounded-xl bg-white p-4 text-center text-lg">🎉 ไม่มีเคสค้าง{zone ? `ในโซน ${zone}` : ""}</p>
-        )}
+        {cases && groups.urgent.length === 0 && groups.sois.length === 0 && <p className="rounded-xl bg-white p-4 text-center text-lg">🎉 ไม่มีเคสค้าง{zone ? `ในโซน ${zone}` : ""}</p>}
         {groups.urgent.length > 0 && (
           <section>
             <h2 className="mb-1 text-lg font-black text-red-700">🔴 ด่วนก่อน ({groups.urgent.length})</h2>

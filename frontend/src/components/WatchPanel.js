@@ -36,7 +36,11 @@ export default function WatchPanel({ water, canal, onWater, onCanal, onLeak, onL
           ) : (
             <p className="font-semibold text-neutral-600">ยังไม่มีคนแจ้ง · ช่วยแจ้งหน้าบ้านคุณ</p>
           )}
-          {worst?.note && <p className="truncate text-xs text-neutral-600">{worst.note} · {timeAgo(worst.created_at)}</p>}
+          {worst?.note && (
+            <p className="truncate text-xs text-neutral-600">
+              {worst.note} · {timeAgo(worst.created_at)}
+            </p>
+          )}
         </div>
         <div className="rounded-xl bg-white p-2">
           <p className="text-xs font-semibold text-neutral-500">🌊 คลองข้างหมู่บ้าน</p>
@@ -54,7 +58,12 @@ export default function WatchPanel({ water, canal, onWater, onCanal, onLeak, onL
           <p className="text-xs font-semibold text-neutral-500">🕳️ รูรั่วที่ยังไม่อุด</p>
           {openLeaks.length ? (
             <p className="font-bold text-red-700">
-              {openLeaks.length} จุด{openLeaks[0].soi && ` · ท้ายซอย ${openLeaks.map((l) => l.soi).filter(Boolean).join(", ")}`}
+              {openLeaks.length} จุด
+              {openLeaks[0].soi &&
+                ` · ท้ายซอย ${openLeaks
+                  .map((l) => l.soi)
+                  .filter(Boolean)
+                  .join(", ")}`}
               <span className="block text-xs font-normal">{LEAK_STATUS[openLeaks[0].status]?.label} · ดูทั้งหมด ›</span>
             </p>
           ) : (
@@ -64,10 +73,18 @@ export default function WatchPanel({ water, canal, onWater, onCanal, onLeak, onL
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <button onClick={onWater} className="min-h-[48px] rounded-xl bg-sky-700 px-2 font-bold text-white">💧 แจ้งระดับน้ำ</button>
-        <button onClick={onCanal} className="min-h-[48px] rounded-xl border-2 border-black bg-white px-2 font-bold">🌊 แจ้งคลอง</button>
-        <button onClick={onLeak} className="min-h-[48px] rounded-xl bg-red-700 px-2 font-bold text-white">🕳️ เจอรูรั่ว</button>
-        <button onClick={onMap} className="min-h-[48px] rounded-xl border-2 border-black bg-white px-2 font-bold">🗺️ แผนที่น้ำ</button>
+        <button onClick={onWater} className="min-h-[48px] rounded-xl bg-sky-700 px-2 font-bold text-white">
+          💧 แจ้งระดับน้ำ
+        </button>
+        <button onClick={onCanal} className="min-h-[48px] rounded-xl border-2 border-black bg-white px-2 font-bold">
+          🌊 แจ้งคลอง
+        </button>
+        <button onClick={onLeak} className="min-h-[48px] rounded-xl bg-red-700 px-2 font-bold text-white">
+          🕳️ เจอรูรั่ว
+        </button>
+        <button onClick={onMap} className="min-h-[48px] rounded-xl border-2 border-black bg-white px-2 font-bold">
+          🗺️ แผนที่น้ำ
+        </button>
       </div>
       <p className="mt-2 text-xs text-neutral-600">น้ำไม่ท่วมก็แจ้ง “ไม่ท่วม” ได้ ช่วยให้รู้ว่าซอยไหนปลอดภัย · ถ้าน้ำเข้าหมู่บ้าน ผู้ดูแลจะเปิดระบบน้ำท่วมกลับมาทันที · ฉุกเฉินโทร 1669 / 199</p>
     </section>
@@ -160,7 +177,9 @@ export function WaterView({ water, canal, onWater, onCanal, onLeaks, onLeak, onP
           })}
           {!water.length && <li className="text-neutral-500">ยังไม่มีรายงาน</li>}
         </ul>
-        <button onClick={onWater} className="mt-2 min-h-[48px] w-full rounded-xl bg-sky-700 font-bold text-white">💧 แจ้งระดับน้ำหน้าบ้านฉัน</button>
+        <button onClick={onWater} className="mt-2 min-h-[48px] w-full rounded-xl bg-sky-700 font-bold text-white">
+          💧 แจ้งระดับน้ำหน้าบ้านฉัน
+        </button>
       </section>
     </div>
   );

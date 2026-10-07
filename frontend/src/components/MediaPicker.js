@@ -25,10 +25,7 @@ export default function MediaPicker({ items, setItems, max = 4, allowVideo = tru
         previews.current.push(preview);
       }
       const tooBig = type === "video" && file.size > MAX_VIDEO_MB * 1024 * 1024;
-      setItems((prev) => [
-        ...prev,
-        { key, type, status: tooBig ? "error" : "preparing", progress: 0, preview, error: tooBig ? `คลิปใหญ่เกิน ${MAX_VIDEO_MB} MB ลองถ่ายให้สั้นลง` : "" },
-      ]);
+      setItems((prev) => [...prev, { key, type, status: tooBig ? "error" : "preparing", progress: 0, preview, error: tooBig ? `คลิปใหญ่เกิน ${MAX_VIDEO_MB} MB ลองถ่ายให้สั้นลง` : "" }]);
       if (tooBig) continue;
       queue.current = queue.current.then(async () => {
         try {
@@ -97,9 +94,7 @@ export default function MediaPicker({ items, setItems, max = 4, allowVideo = tru
                   <span className="text-4xl">🎬</span>
                 )}
               </div>
-              {it.type === "video" && it.status === "ready" && (
-                <span className="absolute left-1 top-1 rounded bg-black/70 px-1.5 text-xs text-white">▶ คลิป</span>
-              )}
+              {it.type === "video" && it.status === "ready" && <span className="absolute left-1 top-1 rounded bg-black/70 px-1.5 text-xs text-white">▶ คลิป</span>}
               <div className="absolute inset-x-0 bottom-0 bg-black/70 px-2 py-1 text-xs text-white">
                 {it.status === "preparing" && "กำลังย่อ…"}
                 {it.status === "uploading" && `อัปโหลด ${Math.round(it.progress * 100)}%`}

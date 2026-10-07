@@ -72,10 +72,7 @@ function SceneWater({ playing }) {
       <WaterGauge level={level} className="h-full max-h-56 w-auto rounded-xl shadow" />
       <div className="flex flex-col gap-1 text-xs">
         {WATER_LEVELS.map((w) => (
-          <span
-            key={w.level}
-            className={`flex items-center gap-1 rounded px-1.5 py-0.5 ${w.level === level ? "bg-black font-bold text-white" : "text-neutral-500"}`}
-          >
+          <span key={w.level} className={`flex items-center gap-1 rounded px-1.5 py-0.5 ${w.level === level ? "bg-black font-bold text-white" : "text-neutral-500"}`}>
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: w.color }} />
             {w.label}
           </span>
@@ -112,17 +109,7 @@ function SceneMap({ cycle }) {
             <circle key={`b${x}`} className="g-blob" style={{ animationDelay: `${d + 400}ms` }} cx={x} cy={y} r="48" fill={`url(#blob${l})`} />
           ))}
           {BLOBS.map(([x, y, l, d]) => (
-            <circle
-              key={`d${x}`}
-              className="g-dot"
-              style={{ animationDelay: `${d}ms` }}
-              cx={x}
-              cy={y}
-              r="6"
-              fill={WATER_LEVELS[l].color}
-              stroke="#fff"
-              strokeWidth="2"
-            />
+            <circle key={`d${x}`} className="g-dot" style={{ animationDelay: `${d}ms` }} cx={x} cy={y} r="6" fill={WATER_LEVELS[l].color} stroke="#fff" strokeWidth="2" />
           ))}
         </g>
       </MiniMap>
@@ -250,21 +237,11 @@ function SceneJoin({ cycle }) {
 }
 
 function SceneImport({ cycle }) {
-  const bubbles = [
-    "1. 4/224 ข้าว 3 กล่อง",
-    "1. 4/224 … 2. 4/63 …",
-    "1. 4/224 … 2. 4/63 … 3. 4/102",
-    "1. 4/224 … 2. 4/63 … 3. 4/102 … 4. 4/158",
-    "📦 ชุดกันน้ำ ตัวละ 400 (ขายของ)",
-  ];
+  const bubbles = ["1. 4/224 ข้าว 3 กล่อง", "1. 4/224 … 2. 4/63 …", "1. 4/224 … 2. 4/63 … 3. 4/102", "1. 4/224 … 2. 4/63 … 3. 4/102 … 4. 4/158", "📦 ชุดกันน้ำ ตัวละ 400 (ขายของ)"];
   return (
     <div key={cycle} className="mx-auto flex h-full max-w-sm flex-col justify-center gap-1.5">
       {bubbles.map((b, i) => (
-        <div
-          key={b}
-          className={`g-collapse rounded-xl px-3 py-1.5 text-xs shadow ${i === 4 ? "bg-red-50 line-through" : "bg-emerald-50"}`}
-          style={{ animationDelay: `${i * 250}ms` }}
-        >
+        <div key={b} className={`g-collapse rounded-xl px-3 py-1.5 text-xs shadow ${i === 4 ? "bg-red-50 line-through" : "bg-emerald-50"}`} style={{ animationDelay: `${i * 250}ms` }}>
           {b}
         </div>
       ))}
@@ -280,9 +257,7 @@ function SceneImport({ cycle }) {
 function SceneClaim({ playing }) {
   const step = usePhaseCycle(playing, 3, 1700);
   const Card = ({ house, soi, state }) => (
-    <div
-      className={`rounded-xl border-2 bg-white p-2 text-sm ${state === "mine" ? "border-blue-600" : state === "other" ? "border-neutral-200 opacity-60" : "border-neutral-200"}`}
-    >
+    <div className={`rounded-xl border-2 bg-white p-2 text-sm ${state === "mine" ? "border-blue-600" : state === "other" ? "border-neutral-200 opacity-60" : "border-neutral-200"}`}>
       <p className="font-bold">
         {house} <span className="font-normal text-neutral-500">ซ.{soi} · 🍚 5 ที่</span>
       </p>
@@ -324,10 +299,7 @@ function SceneStaffTrip({ playing }) {
       <p className="rounded-lg bg-emerald-50 p-1.5 text-center text-xs font-semibold text-emerald-800">📡 GPS ใช้ได้ · ส่งตำแหน่งอัตโนมัติ · จอไม่ดับ</p>
       <div className="grid grid-cols-2 gap-1.5 text-xs">
         {PHASE_STEPS.map(([t, cls], k) => (
-          <span
-            key={t}
-            className={`rounded-lg px-2 py-2 text-center font-semibold ${k === i ? `${cls} ring-2 ring-black` : "border border-neutral-300 bg-white"}`}
-          >
+          <span key={t} className={`rounded-lg px-2 py-2 text-center font-semibold ${k === i ? `${cls} ring-2 ring-black` : "border border-neutral-300 bg-white"}`}>
             {t}
           </span>
         ))}
@@ -404,7 +376,11 @@ export const USER_SLIDES = [
     Scene: SceneBoard,
   },
   { title: "💧 แจ้งระดับน้ำ", text: "เลือกระดับเทียบกับร่างกาย หรือใส่เป็นเซนติเมตร บอกว่าน้ำขึ้นหรือลด ถ่ายรูปแนบได้", Scene: SceneWater },
-  { title: "🌊 ดูภาพรวมบนแผนที่", text: "กดปุ่ม “💧 ระดับน้ำ” บนแผนที่ สีเกลี่ยจากรายงานของทุกคน เขียว = แห้ง แดง/ม่วง = ลึก แตะตรงไหนก็ได้ หรือกด “📍 น้ำตรงที่ฉันอยู่” เพื่อดูระดับน้ำ", Scene: SceneMap },
+  {
+    title: "🌊 ดูภาพรวมบนแผนที่",
+    text: "กดปุ่ม “💧 ระดับน้ำ” บนแผนที่ สีเกลี่ยจากรายงานของทุกคน เขียว = แห้ง แดง/ม่วง = ลึก แตะตรงไหนก็ได้ หรือกด “📍 น้ำตรงที่ฉันอยู่” เพื่อดูระดับน้ำ",
+    Scene: SceneMap,
+  },
   {
     title: "📢 ประกาศ และ ☎️ เบอร์ฉุกเฉิน",
     text: "ประกาศและเตือนสภาพอากาศอยู่บนสุด เบอร์ รปภ. และสายด่วนอยู่ที่ปุ่มแดง อันตรายถึงชีวิตโทร 1669 / 199 ทันที",
@@ -494,12 +470,7 @@ export default function Guide({ onClose, slides = USER_SLIDES, heading = "วิ
   const { title, text, Scene } = slides[index];
 
   return (
-    <div
-      className="anim-fade fixed inset-0 z-[1300] flex items-end justify-center bg-black/70 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="วิธีใช้งาน"
-    >
+    <div className="anim-fade fixed inset-0 z-[1300] flex items-end justify-center bg-black/70 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="วิธีใช้งาน">
       <div
         className="anim-sheet flex h-[92vh] w-full flex-col rounded-t-2xl bg-white sm:h-[640px] sm:max-w-md sm:rounded-2xl"
         onPointerDown={(e) => {

@@ -656,7 +656,7 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
     });
   const setStatus = (status) => run(async () => onChanged(await api(`/jobs/${j.id}/status`, { method: "POST", body: JSON.stringify({ status, name: name || j.name }) })));
   return (
-    <li className={`anim-row rounded-xl border bg-white p-3 shadow-sm ${j.status === "done" ? "opacity-60" : ""}`}>
+    <li data-item={j.id} className={`anim-row scroll-mt-28 rounded-xl border bg-white p-3 shadow-sm ${j.status === "done" ? "opacity-60" : ""}`}>
       <button onClick={() => setOpen((v) => !v)} className="flex w-full items-start gap-3 text-left">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl" aria-hidden="true">
           {emoji}

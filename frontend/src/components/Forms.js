@@ -50,12 +50,7 @@ function Ask({ tone = "yellow", title, children, actions }) {
       {children && <div className="mt-1 text-sm">{children}</div>}
       <div className="mt-2 grid gap-2 min-[400px]:grid-cols-2">
         {actions.map(([text, onClick, primary]) => (
-          <button
-            type="button"
-            key={text}
-            onClick={onClick}
-            className={`min-h-[48px] rounded-lg px-3 font-semibold ${primary ? "bg-black text-white" : "border-2 border-black bg-white"}`}
-          >
+          <button type="button" key={text} onClick={onClick} className={`min-h-[48px] rounded-lg px-3 font-semibold ${primary ? "bg-black text-white" : "border-2 border-black bg-white"}`}>
             {text}
           </button>
         ))}
@@ -124,7 +119,7 @@ export function PostForm({ kind: initialKind, posts = [], prefill = {}, onDone, 
         p.kind === "need" &&
         p.status !== "done" &&
         Date.now() - new Date(p.created_at).getTime() < 24 * 3600 * 1000 &&
-        ((mine.length >= 3 && normPlace(p.place) === mine) || (p.category === category && metres(p, loc) < 30))
+        ((mine.length >= 3 && normPlace(p.place) === mine) || (p.category === category && metres(p, loc) < 30)),
     );
   }
 
@@ -182,9 +177,7 @@ export function PostForm({ kind: initialKind, posts = [], prefill = {}, onDone, 
   return (
     <form id="post-form" onSubmit={submit} className="space-y-4">
       {switched && (
-        <p className="anim-pop rounded-xl border-2 border-black bg-yellow-100 p-3 text-sm font-semibold">
-          เปลี่ยนเป็น “🆘 ขอความช่วยเหลือ” แล้ว ตรวจหมวดและปุ่มด่วนด้านล่าง แล้วกดส่งอีกครั้ง
-        </p>
+        <p className="anim-pop rounded-xl border-2 border-black bg-yellow-100 p-3 text-sm font-semibold">เปลี่ยนเป็น “🆘 ขอความช่วยเหลือ” แล้ว ตรวจหมวดและปุ่มด่วนด้านล่าง แล้วกดส่งอีกครั้ง</p>
       )}
 
       {kind === "need" && (
@@ -268,7 +261,9 @@ export function PostForm({ kind: initialKind, posts = [], prefill = {}, onDone, 
       )}
 
       <div>
-        <label className={label} htmlFor="detail">รายละเอียด</label>
+        <label className={label} htmlFor="detail">
+          รายละเอียด
+        </label>
         <textarea
           id="detail"
           rows={3}
@@ -288,12 +283,16 @@ export function PostForm({ kind: initialKind, posts = [], prefill = {}, onDone, 
 
       <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
         <div>
-          <label className={label} htmlFor="place">บ้านเลขที่ / ซอย / จุดสังเกต</label>
+          <label className={label} htmlFor="place">
+            บ้านเลขที่ / ซอย / จุดสังเกต
+          </label>
           <input id="place" value={place} onChange={(e) => setPlace(e.target.value)} maxLength={200} className={input} placeholder="เช่น 4/123 ซอย 3 ตรงข้ามสโมสร" />
         </div>
         {kind !== "info" && (
           <div>
-            <label className={label} htmlFor="people">{kind === "need" ? "จำนวนคน" : "รองรับได้ (คน)"}</label>
+            <label className={label} htmlFor="people">
+              {kind === "need" ? "จำนวนคน" : "รองรับได้ (คน)"}
+            </label>
             <input
               id="people"
               type="number"
@@ -356,11 +355,15 @@ export function PostForm({ kind: initialKind, posts = [], prefill = {}, onDone, 
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className={label} htmlFor="name">ชื่อผู้แจ้ง *</label>
+          <label className={label} htmlFor="name">
+            ชื่อผู้แจ้ง *
+          </label>
           <input id="name" required value={contact.name} onChange={(e) => setContact({ name: e.target.value })} maxLength={80} className={input} autoComplete="name" />
         </div>
         <div>
-          <label className={label} htmlFor="phone">เบอร์โทร {kind !== "info" && "(แนะนำ)"}</label>
+          <label className={label} htmlFor="phone">
+            เบอร์โทร {kind !== "info" && "(แนะนำ)"}
+          </label>
           <input id="phone" type="tel" inputMode="tel" value={contact.phone} onChange={(e) => setContact({ phone: e.target.value })} maxLength={40} className={input} autoComplete="tel" />
         </div>
       </div>
@@ -390,7 +393,17 @@ export function PostForm({ kind: initialKind, posts = [], prefill = {}, onDone, 
               },
               true,
             ],
-            ...(kind !== "need" ? [["เป็นข่าวทั้งหมู่บ้าน", () => { setGeneral(true); setAsk(null); }]] : []),
+            ...(kind !== "need"
+              ? [
+                  [
+                    "เป็นข่าวทั้งหมู่บ้าน",
+                    () => {
+                      setGeneral(true);
+                      setAsk(null);
+                    },
+                  ],
+                ]
+              : []),
             ["ตำแหน่งถูกแล้ว ส่งเลย", () => proceed("pin")],
           ]}
         >
@@ -540,11 +553,15 @@ export function WaterForm({ onDone }) {
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className={label} htmlFor="wnote">หมายเหตุ</label>
+          <label className={label} htmlFor="wnote">
+            หมายเหตุ
+          </label>
           <input id="wnote" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className={input} placeholder="เช่น ซอย 34 น้ำเริ่มเน่า" />
         </div>
         <div>
-          <label className={label} htmlFor="wname">ชื่อ (ไม่บังคับ)</label>
+          <label className={label} htmlFor="wname">
+            ชื่อ (ไม่บังคับ)
+          </label>
           <input id="wname" value={contact.name} onChange={(e) => setContact({ name: e.target.value })} maxLength={80} className={input} />
         </div>
       </div>

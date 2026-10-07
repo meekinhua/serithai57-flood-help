@@ -6,6 +6,8 @@ import { useT } from "./Texts";
 import { MYHOME_CHANGED, cleanHouse } from "./SurveyBox";
 import { PRO_GROUPS, goodOf, rememberCall } from "./Community";
 import PetsRow from "./Pets";
+import { notify } from "../notify";
+import { seenVisits } from "../visits";
 import { MediaStrip, MediaThumb } from "./MediaGallery";
 import { AidRow, CheckinCard, InstallCard, OutageRow, PlanRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
 import { waterOf } from "../config";
@@ -338,16 +340,29 @@ function ContactForm({ contact, setContact, onSave }) {
 
 // ---------- settled things fold into one strip at the foot of the card; a tap opens one back where it was ----------
 function Settled({ items, onOpen }) {
+  const prev = useRef(null);
+  const ref = useRef(null);
+  const keys = items.map((x) => x.key).join(",");
+  const fresh = prev.current === null ? [] : items.filter((x) => !prev.current.includes(x.key)).map((x) => x.key);
+  useEffect(() => {
+    if (prev.current !== null && fresh.length && ref.current) {
+      ref.current.classList.remove("anim-fresh");
+      void ref.current.offsetWidth;
+      ref.current.classList.add("anim-fresh");
+      notify("เก็บไว้ที่ “เรื่องที่ตอบแล้ว” ท้ายการ์ด · แตะเพื่อเปิดอีกครั้ง");
+    }
+    prev.current = items.map((x) => x.key);
+  }, [keys]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!items.length) return null;
   return (
-    <div className="border-t border-[#E6EBE7] py-3">
+    <div ref={ref} className="rounded-xl border-t border-[#E6EBE7] py-3">
       <p className="text-sm font-bold text-[#45504A]">เรื่องที่ตอบแล้ว · แตะเพื่อดูหรือเปลี่ยน</p>
       <div className="mt-1.5 flex flex-wrap gap-2">
         {items.map((x) => (
           <button
             key={x.key}
             onClick={() => onOpen(x.key)}
-            className="flex min-h-[44px] max-w-full items-center gap-1.5 rounded-full border border-[#C9D1CB] bg-[#F2F4F1] px-3.5 text-[15px] active:bg-[#E4F0E9]"
+            className={`${fresh.includes(x.key) ? "anim-pop " : ""}flex min-h-[44px] max-w-full items-center gap-1.5 rounded-full border border-[#C9D1CB] bg-[#F2F4F1] px-3.5 text-[15px] active:bg-[#E4F0E9]`}
           >
             <span className="font-bold text-[#1E6B47]" aria-hidden="true">
               ✓
@@ -667,10 +682,14 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   // a ขอแรง ask this house's อาสาข้างบ้าน profile can do (job type → skill)
   const JOB_SKILL = { clean: "strong", move: "strong", trash: "strong", fix: "fix", check: "elec", ride: "drive", errand: "errand" };
   const fits = (j) => (handy?.on && (handy.skills || []).includes(JOB_SKILL[j.type]) ? 1 : 0);
+  const needsKey = needs.map((j) => j.id.slice(0, 6)).join(",");
+  const needsVisits = useMemo(() => (needsKey ? seenVisits(`needs:${needsKey}`) : 0), [needsKey]);
+  const needsSmall = needsVisits > 3; // nobody tapped it in 3 visits: step back to one line
   const hideNeeds = () => {
     const ids = needs.map((j) => j.id);
     setNeedsHidden(ids);
     save("needsHidden", ids);
+    notify("ซ่อนแล้ว · ดูได้ที่ เพื่อนบ้าน › ขอแรง");
   };
   const fromSurvey = load("survey:electric", null)?.house || "";
   const [house, setHouse] = useState(() => takeFamilyParam() || load("myHouse", "") || fromSurvey);
@@ -935,27 +954,41 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         <>
           <CheckinCard info={info} onSaved={setInfo} onContact={() => setContact({ name: load("myName", ""), from: "news" })} setErr={setErr} />
           <Soon items={info.soon} onSeen={() => setSeenN((n) => n + 1)} />
-          {needs.some((j) => !needsHidden.includes(j.id)) && (
+          {needs.some((j) => !needsHidden.includes(j.id)) && needsSmall && (
+            <button
+              onClick={() => onNeeds()}
+              className="anim-shrink mt-2 flex min-h-[44px] w-full items-center gap-2 rounded-2xl border border-[#E0C27A] bg-[#FFFBEF] px-3 text-left text-[15px] opacity-90"
+            >
+              <span aria-hidden="true">🙋</span>
+              <span className="min-w-0 flex-1 truncate">
+                <b>เพื่อนบ้านขอแรง {needs.length} เรื่อง</b> · {needs[0].detail.slice(0, 40)}
+              </span>
+              <span className="text-[#45504A]">›</span>
+            </button>
+          )}
+          {needs.some((j) => !needsHidden.includes(j.id)) && !needsSmall && (
             // the ขอแรง board, seen from home: who still needs hands (no one is pushed, the card just shows)
-            <div className="mt-2 flex items-start gap-3 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] p-3">
+            <div className="anim-in mt-2 flex items-start gap-3 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] p-3">
               <span className="text-2xl" aria-hidden="true">
                 🙋
               </span>
               <div className="min-w-0 flex-1">
-                <button onClick={onNeeds} className="block w-full text-left">
+                <div className="block w-full text-left">
                   <b className="block text-base leading-snug">เพื่อนบ้านขอแรงอยู่ {needs.length} เรื่อง</b>
                   {[...needs]
                     .sort((x, y) => fits(y) - fits(x))
                     .slice(0, 2)
                     .map((j) => (
-                      <span key={j.id} className="mt-0.5 block text-[15px] leading-snug text-[#33403A]">
+                      <button key={j.id} onClick={() => onNeeds(j.id)} className="mt-0.5 block min-h-[36px] w-full text-left text-[15px] leading-snug text-[#33403A]">
                         {j.name}
                         {j.soi ? ` (ซ.${j.soi})` : ""}: {j.detail.length > 60 ? `${j.detail.slice(0, 60)}…` : j.detail}
-                        {fits(j) ? <b className="ml-1 rounded-full bg-[#1E6B47] px-2 text-sm text-white">🤝 ตรงกับที่คุณถนัด</b> : null}
-                      </span>
+                        {fits(j) ? <b className="ml-1 rounded-full bg-[#1E6B47] px-2 text-sm text-white">🤝 ตรงกับที่คุณถนัด</b> : null} <span className="text-[#45504A]">›</span>
+                      </button>
                     ))}
-                  <span className="mt-1 block text-[15px] font-bold text-[#7A4104]">ช่วยได้? ดูและติดต่อ ›</span>
-                </button>
+                  <button onClick={() => onNeeds()} className="mt-1 block min-h-[40px] text-[15px] font-bold text-[#7A4104]">
+                    ดูทั้งหมด ›
+                  </button>
+                </div>
                 <button onClick={hideNeeds} className="mt-0.5 block min-h-[36px] text-sm font-bold text-[#45504A] underline">
                   รับทราบแล้ว ซ่อน
                 </button>

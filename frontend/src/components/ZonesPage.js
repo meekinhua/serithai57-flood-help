@@ -7,7 +7,7 @@ import { createBaseMap } from "./MapView";
 // /zones — the village split into zones A, B, C… (so relief teams don't overlap) and one truck
 // drop point per zone on the main road (big trucks can't enter the small sois). Printable.
 
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 // /zones?poster=1 — the same page without buttons, for a printable image / LINE post
 const QS = new URLSearchParams(window.location.search);
 const POSTER = QS.has("poster");
@@ -45,7 +45,13 @@ export function zoneGroups(zones) {
     const ids = z.drop.shared || [z.id];
     if (ids[0] !== z.id) continue;
     const members = ids.map((id) => zones.find((x) => x.id === id)).filter(Boolean);
-    out.push({ ...z, ids, label: ids.join("·"), sois: members.flatMap((m) => m.sois).sort((a, b) => parseFloat(a) - parseFloat(b) || a.localeCompare(b)), houses: members.reduce((a, m) => a + m.houses, 0) });
+    out.push({
+      ...z,
+      ids,
+      label: ids.join("·"),
+      sois: members.flatMap((m) => m.sois).sort((a, b) => parseFloat(a) - parseFloat(b) || a.localeCompare(b)),
+      houses: members.reduce((a, m) => a + m.houses, 0),
+    });
   }
   return out;
 }
@@ -79,7 +85,9 @@ export function drawZones(map, data, { houses = true, labels = true, pane, focus
   if (houses) {
     for (const [lat, lng, zi] of data.houses) {
       const mine = !focus || inZone(data.zones[zi], focus); // single-zone sheet: other zones greyed out
-      L.circleMarker([lat, lng], { ...P, radius: mine ? (focus ? 4 : 3) : 2.5, stroke: false, fillColor: mine ? data.zones[zi].color : GREY, fillOpacity: mine ? 0.9 : 0.5, interactive: false }).addTo(group);
+      L.circleMarker([lat, lng], { ...P, radius: mine ? (focus ? 4 : 3) : 2.5, stroke: false, fillColor: mine ? data.zones[zi].color : GREY, fillOpacity: mine ? 0.9 : 0.5, interactive: false }).addTo(
+        group,
+      );
     }
   }
   for (const z of data.zones) {
@@ -91,14 +99,23 @@ export function drawZones(map, data, { houses = true, labels = true, pane, focus
         // soi number on the soi itself, for printed sheets
         const longest = lines.reduce((a, b) => (b.length > a.length ? b : a));
         const mid = longest[Math.floor(longest.length / 2)];
-        L.marker(mid, { ...P, interactive: false, icon: L.divIcon({ className: "", iconSize: [60, 26], iconAnchor: [30, 13], html: `<div class="soi-tag" style="--c:${z.color}">ซ.${esc(s)}</div>` }) }).addTo(group);
+        L.marker(mid, {
+          ...P,
+          interactive: false,
+          icon: L.divIcon({ className: "", iconSize: [60, 26], iconAnchor: [30, 13], html: `<div class="soi-tag" style="--c:${z.color}">ซ.${esc(s)}</div>` }),
+        }).addTo(group);
       }
     }
     if (labels && (!focus || mine)) {
       L.marker(z.center, {
         ...P,
         interactive: false,
-        icon: L.divIcon({ className: "", iconSize: [z.ids?.length > 1 ? 96 : 58, 58], iconAnchor: [z.ids?.length > 1 ? 48 : 29, 29], html: `<div class="zone-label" style="--c:${z.color}">${z.label || z.id}</div>` }),
+        icon: L.divIcon({
+          className: "",
+          iconSize: [z.ids?.length > 1 ? 96 : 58, 58],
+          iconAnchor: [z.ids?.length > 1 ? 48 : 29, 29],
+          html: `<div class="zone-label" style="--c:${z.color}">${z.label || z.id}</div>`,
+        }),
       }).addTo(group);
     }
     // zones sharing one drop point (F·G·H) get one pin, drawn with the first zone of the group
@@ -122,7 +139,7 @@ export function drawZones(map, data, { houses = true, labels = true, pane, focus
         .bindPopup(
           `<b>🚚 จุดลงของ ${esc(d.tag)}</b><br>${esc(d.place || `ปากซอย ${d.soi}`)}<br>${
             shared.length > 1 ? `จุดรวมของโซน ${esc(shared.join(", "))} — ทีมที่จุดนี้แบ่งของเข้าแต่ละโซน` : `โซน ${z.id} · ${z.houses} หลัง · ซอย ${esc(z.sois.join(", "))}`
-          }<br>รถใหญ่จอดริมถนนหลัก แล้วทีมขนเข้าซอย<br><a href="${navUrl(d)}" target="_blank" rel="noreferrer">🧭 นำทางไปจุดนี้</a> · <a href="/ops#${z.id}">👤 ใครอยู่จุดนี้</a>`
+          }<br>รถใหญ่จอดริมถนนหลัก แล้วทีมขนเข้าซอย<br><a href="${navUrl(d)}" target="_blank" rel="noreferrer">🧭 นำทางไปจุดนี้</a> · <a href="/ops#${z.id}">👤 ใครอยู่จุดนี้</a>`,
         )
         .addTo(group);
     }
@@ -219,7 +236,13 @@ function ZoneStatus({ zone, entries, onAdded }) {
           <p className={`text-sm font-semibold ${msg && !kind ? "text-red-700" : ""}`}>1. ทำอะไรในโซน {zone.id}?</p>
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(ACTIONS).map(([k, [e, t]]) => (
-              <button key={k} type="button" onClick={() => setKind(k)} aria-pressed={kind === k} className={`min-h-[40px] rounded-full px-3 text-sm ${kind === k ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}>
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKind(k)}
+                aria-pressed={kind === k}
+                className={`min-h-[40px] rounded-full px-3 text-sm ${kind === k ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}
+              >
                 {e} {t}
               </button>
             ))}
@@ -227,13 +250,31 @@ function ZoneStatus({ zone, entries, onAdded }) {
           <p className="text-sm font-semibold">2. เมื่อไหร่?</p>
           <div className="flex flex-wrap gap-1.5">
             {WHEN.map(([m, t]) => (
-              <button key={m} type="button" onClick={() => setWhen(m)} aria-pressed={when === m} className={`min-h-[36px] rounded-full px-3 text-sm ${when === m ? "bg-black text-white" : "border border-neutral-300 bg-white"}`}>
+              <button
+                key={m}
+                type="button"
+                onClick={() => setWhen(m)}
+                aria-pressed={when === m}
+                className={`min-h-[36px] rounded-full px-3 text-sm ${when === m ? "bg-black text-white" : "border border-neutral-300 bg-white"}`}
+              >
                 {t}
               </button>
             ))}
           </div>
-          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className="min-h-[44px] w-full rounded-lg border border-neutral-300 px-3" placeholder="รายละเอียด (ไม่ใส่ก็ได้) เช่น ข้าว 80 กล่อง ซอย 18–20" />
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className={`min-h-[44px] w-full rounded-lg border px-3 ${msg && kind && !name.trim() ? "border-2 border-red-500" : "border-neutral-300"}`} placeholder="3. ชื่อ / ทีม (จำเป็น) เช่น เรือทีมต้น" />
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={300}
+            className="min-h-[44px] w-full rounded-lg border border-neutral-300 px-3"
+            placeholder="รายละเอียด (ไม่ใส่ก็ได้) เช่น ข้าว 80 กล่อง ซอย 18–20"
+          />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={60}
+            className={`min-h-[44px] w-full rounded-lg border px-3 ${msg && kind && !name.trim() ? "border-2 border-red-500" : "border-neutral-300"}`}
+            placeholder="3. ชื่อ / ทีม (จำเป็น) เช่น เรือทีมต้น"
+          />
           {msg && <p className="rounded bg-red-50 p-2 text-sm text-red-700">{msg}</p>}
           <button onClick={submit} className="min-h-[48px] w-full rounded-lg bg-black font-bold text-white">
             ส่งสถานะ
@@ -253,7 +294,9 @@ export default function ZonesPage() {
   const [log, setLog] = useState([]);
   const [hazards, setHazards] = useState([]); // live ⚡/🌳 warnings from /ops
   const loadLog = () => {
-    api("/zones/log").then(setLog).catch(() => {});
+    api("/zones/log")
+      .then(setLog)
+      .catch(() => {});
     api("/ops")
       .then((b) => setHazards(b.hazards.filter((h) => !h.cleared_at)))
       .catch(() => {});
@@ -277,7 +320,11 @@ export default function ZonesPage() {
     meLayer.current?.remove();
     meLayer.current = L.layerGroup([
       L.circle([me.lat, me.lng], { radius: Math.min(me.acc, 300), color: "#2563eb", weight: 1, fillColor: "#3b82f6", fillOpacity: 0.12, interactive: false }),
-      L.circleMarker([me.lat, me.lng], { radius: 9, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).bindTooltip("คุณอยู่ที่นี่", { permanent: true, direction: "top", offset: [0, -10] }),
+      L.circleMarker([me.lat, me.lng], { radius: 9, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).bindTooltip("คุณอยู่ที่นี่", {
+        permanent: true,
+        direction: "top",
+        offset: [0, -10],
+      }),
     ]).addTo(map);
     if (!centred.current) {
       centred.current = true;
@@ -314,7 +361,7 @@ export default function ZonesPage() {
         navigator.geolocation.clearWatch(watchRef.current);
         watchRef.current = null;
       },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 },
     );
   }
 
@@ -394,7 +441,10 @@ export default function ZonesPage() {
             {fname}
           </span>
           <div className="min-w-0">
-            <p className="text-4xl font-black">โซน {fname}{fzone ? ` · ~${fzone.houses} หลัง` : ""}</p>
+            <p className="text-4xl font-black">
+              โซน {fname}
+              {fzone ? ` · ~${fzone.houses} หลัง` : ""}
+            </p>
             <p className="text-2xl font-semibold">ซอย {fzone?.sois.join(", ")}</p>
             <p className="text-lg opacity-90">หมู่บ้านสหกรณ์เคหะสถาน 4 · เสรีไทย 57</p>
           </div>
@@ -403,13 +453,19 @@ export default function ZonesPage() {
           <div className="rounded-xl border-4 border-yellow-400 bg-yellow-50 p-3">
             <p className="text-2xl font-black">🚚 จุดลงของ: {fzone && placeOf(fzone)}</p>
             {fzone?.drop.extra?.map((x) => (
-              <p key={x.soi} className="font-bold">+ จุดที่ 2: {x.place}</p>
+              <p key={x.soi} className="font-bold">
+                + จุดที่ 2: {x.place}
+              </p>
             ))}
-            <p>รถใหญ่จอด<b>ริมถนนหลัก (เส้นเหลือง)</b> ที่ป้าย 🚚 {fname} เข้าซอยเล็กไม่ได้</p>
+            <p>
+              รถใหญ่จอด<b>ริมถนนหลัก (เส้นเหลือง)</b> ที่ป้าย 🚚 {fname} เข้าซอยเล็กไม่ได้
+            </p>
           </div>
           <div className="rounded-xl border-4 p-3" style={{ borderColor: fzone?.color }}>
             <p className="text-2xl font-black">👷 ทีมโซน {fname}</p>
-            <p>ขนของจากจุดลงของเข้าซอย · รับงาน/กดเสร็จที่ <b>serithai57.com/team</b> เลือก “{fname}”</p>
+            <p>
+              ขนของจากจุดลงของเข้าซอย · รับงาน/กดเสร็จที่ <b>serithai57.com/team</b> เลือก “{fname}”
+            </p>
           </div>
         </div>
         {error && <p className="mx-6 rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
@@ -432,9 +488,17 @@ export default function ZonesPage() {
             <h1 className="text-xl font-bold">🗺️ แผนที่โซน · จุดลงของ</h1>
             <p className="text-sm text-neutral-300 print:text-neutral-700">หมู่บ้านสหกรณ์เคหะสถาน 4 · เสรีไทย 57</p>
           </div>
-          {!POSTER && <a href="/ops" className="min-h-[44px] rounded-lg bg-green-600 px-3 py-2.5 text-sm font-semibold print:hidden">🤝 ประสานงาน</a>}
-          <button onClick={() => window.print()} className="min-h-[44px] rounded-lg bg-white/10 px-3 text-sm font-semibold print:hidden">🖨️ พิมพ์</button>
-          <a href="/" className="min-h-[44px] rounded-lg bg-white/10 px-3 py-2.5 text-sm print:hidden">หน้าหลัก</a>
+          {!POSTER && (
+            <a href="/ops" className="min-h-[44px] rounded-lg bg-green-600 px-3 py-2.5 text-sm font-semibold print:hidden">
+              🤝 ประสานงาน
+            </a>
+          )}
+          <button onClick={() => window.print()} className="min-h-[44px] rounded-lg bg-white/10 px-3 text-sm font-semibold print:hidden">
+            🖨️ พิมพ์
+          </button>
+          <a href="/" className="min-h-[44px] rounded-lg bg-white/10 px-3 py-2.5 text-sm print:hidden">
+            หน้าหลัก
+          </a>
         </div>
       </header>
 
@@ -454,11 +518,15 @@ export default function ZonesPage() {
         <section className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-xl border-4 border-yellow-400 bg-yellow-50 p-3">
             <p className="text-lg font-bold">🚚 รถใหญ่ / คนนำของมาบริจาค</p>
-            <p>รถใหญ่เข้าได้<b>เฉพาะถนนหลัก (เส้นเหลือง)</b> เข้าซอยเล็กไม่ได้ · เลือก<b>จุดลงของ 🚚</b> ที่สะดวก จอดลงของริมถนนหลัก แล้วทีมในโซนนั้นขนเข้าซอยต่อ</p>
+            <p>
+              รถใหญ่เข้าได้<b>เฉพาะถนนหลัก (เส้นเหลือง)</b> เข้าซอยเล็กไม่ได้ · เลือก<b>จุดลงของ 🚚</b> ที่สะดวก จอดลงของริมถนนหลัก แล้วทีมในโซนนั้นขนเข้าซอยต่อ
+            </p>
           </div>
           <div className="rounded-xl border-4 border-emerald-500 bg-emerald-50 p-3">
             <p className="text-lg font-bold">👷 ทีมช่วยเหลือ / อาสา</p>
-            <p>ตกลงกันว่า<b>ทีมไหนดูแลโซนไหน</b> (A, B, C…) แล้วรับงานเฉพาะในโซนตัวเอง ไม่ไปบ้านซ้ำกัน · ในหน้า /staff เลือกกรองงานตามโซนได้</p>
+            <p>
+              ตกลงกันว่า<b>ทีมไหนดูแลโซนไหน</b> (A, B, C…) แล้วรับงานเฉพาะในโซนตัวเอง ไม่ไปบ้านซ้ำกัน · ในหน้า /staff เลือกกรองงานตามโซนได้
+            </p>
           </div>
         </section>
 
@@ -499,7 +567,12 @@ export default function ZonesPage() {
                     🚚 จุดลงของที่ใกล้สุด: <b>{here.nearest.z.label || here.nearest.z.id}</b> {placeOf(here.nearest.z)} · ห่าง {fmtDist(here.nearest.d)}
                   </p>
                 )}
-                <a href={navUrl((here.own || here.nearest).z.drop)} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-[44px] items-center rounded-lg bg-black px-4 font-semibold text-white">
+                <a
+                  href={navUrl((here.own || here.nearest).z.drop)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex min-h-[44px] items-center rounded-lg bg-black px-4 font-semibold text-white"
+                >
                   🧭 นำทางไปจุดลงของ {(here.own || here.nearest).z.label || (here.own || here.nearest).z.id}
                 </a>
               </>
@@ -518,7 +591,9 @@ export default function ZonesPage() {
                       {z.label || z.id}
                     </span>
                     <div className="min-w-0">
-                      <p className="font-bold">โซน {z.label || z.id} · ~{z.houses} หลัง{z.ids?.length > 1 ? " (รวมโซน)" : ""}</p>
+                      <p className="font-bold">
+                        โซน {z.label || z.id} · ~{z.houses} หลัง{z.ids?.length > 1 ? " (รวมโซน)" : ""}
+                      </p>
                       <p className="text-sm text-neutral-600">ซอย {z.sois.join(", ")}</p>
                     </div>
                   </div>
@@ -536,7 +611,9 @@ export default function ZonesPage() {
                   )}
                   {!POSTER && <ZoneStatus zone={z} entries={log.filter((e) => inZone(z, e.zone))} onAdded={loadLog} />}
                   <div className="mt-2 grid grid-cols-2 gap-2 print:hidden">
-                    <button onClick={() => focus(z)} className="min-h-[44px] rounded-lg border-2 border-black text-sm font-semibold">📍 ดูบนแผนที่</button>
+                    <button onClick={() => focus(z)} className="min-h-[44px] rounded-lg border-2 border-black text-sm font-semibold">
+                      📍 ดูบนแผนที่
+                    </button>
                     <a href={navUrl(z.drop)} target="_blank" rel="noreferrer" className="flex min-h-[44px] items-center justify-center rounded-lg bg-black text-sm font-semibold text-white">
                       🧭 นำทาง
                     </a>

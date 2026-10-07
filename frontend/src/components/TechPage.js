@@ -52,7 +52,9 @@ export default function TechPage() {
 
   useEffect(() => {
     document.title = "งานช่างไฟ · เสรีไทย 57";
-    api("/zones").then(setZones).catch(() => {});
+    api("/zones")
+      .then(setZones)
+      .catch(() => {});
   }, []);
 
   const refresh = () =>
@@ -142,7 +144,14 @@ export default function TechPage() {
         >
           <h2 className="text-lg font-bold">ชื่อช่าง / ชื่อทีม</h2>
           <p className="text-sm text-neutral-600">ใส่ครั้งเดียว ใช้บันทึกว่าใครรับงานบ้านไหน (เช่น "ช่างเอก ทีม 1")</p>
-          <input autoFocus value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} maxLength={40} className="min-h-[48px] w-full rounded-lg border border-neutral-300 px-3 text-lg" placeholder="ชื่อช่าง" />
+          <input
+            autoFocus
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            maxLength={40}
+            className="min-h-[48px] w-full rounded-lg border border-neutral-300 px-3 text-lg"
+            placeholder="ชื่อช่าง"
+          />
           <button className="min-h-[48px] w-full rounded-xl bg-black font-bold text-white">เริ่มใช้งาน</button>
         </form>
       </Shell>
@@ -172,7 +181,9 @@ export default function TechPage() {
         <>
           <section className="mb-3 rounded-2xl bg-white p-3 shadow-sm">
             <div className="flex items-baseline justify-between">
-              <b className="text-lg">ตรวจแล้ว {counts.c.done + counts.c.absent} / {counts.c.all} หลัง</b>
+              <b className="text-lg">
+                ตรวจแล้ว {counts.c.done + counts.c.absent} / {counts.c.all} หลัง
+              </b>
               <span className="text-sm text-neutral-600">{pct}%</span>
             </div>
             <div className="my-2 h-3 overflow-hidden rounded-full bg-neutral-200">
@@ -187,7 +198,10 @@ export default function TechPage() {
             </div>
             {Object.keys(counts.byTech).length > 0 && (
               <p className="mt-2 text-xs text-neutral-600">
-                👷 {Object.entries(counts.byTech).map(([t, n]) => `${t}: เสร็จ ${n.done}${n.open ? ` · ค้าง ${n.open}` : ""}`).join("  |  ")}
+                👷{" "}
+                {Object.entries(counts.byTech)
+                  .map(([t, n]) => `${t}: เสร็จ ${n.done}${n.open ? ` · ค้าง ${n.open}` : ""}`)
+                  .join("  |  ")}
               </p>
             )}
           </section>
@@ -322,7 +336,15 @@ function Job({ r, me, busy, onStatus }) {
             setAsk("");
           }}
         >
-          <textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} rows={2} placeholder={ASK[ask][0]} className="w-full rounded-lg border border-neutral-300 px-3 py-2" />
+          <textarea
+            autoFocus
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={300}
+            rows={2}
+            placeholder={ASK[ask][0]}
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+          />
           <div className="flex gap-1">
             <button disabled={busy} className={`${btn} ${ASK[ask][2]}`}>
               {ASK[ask][1]}
@@ -333,33 +355,33 @@ function Job({ r, me, busy, onStatus }) {
           </div>
         </form>
       ) : (
-      <div className="mt-2 flex gap-1">
-        {st === "todo" || st === "again" ? (
-          <button disabled={busy} onClick={() => pick("claimed")} className={`${btn} bg-amber-400`}>
-            🙋 รับงาน
-          </button>
-        ) : null}
-        {st !== "done" && (
-          <button disabled={busy} onClick={() => pick("done")} className={`${btn} bg-emerald-600 text-white`}>
-            ✅ ตรวจเสร็จ
-          </button>
-        )}
-        {(st === "claimed" || st === "todo") && (
-          <button disabled={busy} onClick={() => pick("absent")} className={`${btn} border-2 border-neutral-400`}>
-            🚪 ไม่อยู่
-          </button>
-        )}
-        {(st === "done" || st === "absent") && (
-          <button disabled={busy} onClick={() => pick("again")} className={`${btn} border-2 border-violet-500 text-violet-800`}>
-            ↩︎ ต้องกลับมาอีก
-          </button>
-        )}
-        {st === "claimed" && mine && (
-          <button disabled={busy} onClick={() => pick("todo")} className={`${btn} border-2 border-neutral-300 text-neutral-600`}>
-            คืนงาน
-          </button>
-        )}
-      </div>
+        <div className="mt-2 flex gap-1">
+          {st === "todo" || st === "again" ? (
+            <button disabled={busy} onClick={() => pick("claimed")} className={`${btn} bg-amber-400`}>
+              🙋 รับงาน
+            </button>
+          ) : null}
+          {st !== "done" && (
+            <button disabled={busy} onClick={() => pick("done")} className={`${btn} bg-emerald-600 text-white`}>
+              ✅ ตรวจเสร็จ
+            </button>
+          )}
+          {(st === "claimed" || st === "todo") && (
+            <button disabled={busy} onClick={() => pick("absent")} className={`${btn} border-2 border-neutral-400`}>
+              🚪 ไม่อยู่
+            </button>
+          )}
+          {(st === "done" || st === "absent") && (
+            <button disabled={busy} onClick={() => pick("again")} className={`${btn} border-2 border-violet-500 text-violet-800`}>
+              ↩︎ ต้องกลับมาอีก
+            </button>
+          )}
+          {st === "claimed" && mine && (
+            <button disabled={busy} onClick={() => pick("todo")} className={`${btn} border-2 border-neutral-300 text-neutral-600`}>
+              คืนงาน
+            </button>
+          )}
+        </div>
       )}
     </article>
   );
@@ -415,7 +437,9 @@ function TechMap({ zones, rows, zone, soi, me, onSoi }) {
   const [sois, setSois] = useState(null);
   const [gps, setGps] = useState(""); // "" | "wait" | "on" | error text
   useEffect(() => {
-    api("/sois").then((d) => setSois(d.sois)).catch(() => {});
+    api("/sois")
+      .then((d) => setSois(d.sois))
+      .catch(() => {});
   }, []);
   useEffect(() => {
     if (!zones || !el.current) return;
@@ -481,7 +505,9 @@ function TechMap({ zones, rows, zone, soi, me, onSoi }) {
         iconAnchor: [size / 2, size / 2],
         html: `<div style="width:${size}px;height:${size}px;border-radius:9999px;background:${color};color:#fff;border:3px solid ${k === soi ? "#000" : "#fff"};box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;font:700 11px/1 sans-serif">${v.open || "✓"}<span style="font-size:8px;font-weight:600">ซ.${k}</span></div>`,
       });
-      L.marker(sois[k].center, { icon, zIndexOffset: 500 }).on("click", () => onSoi(k)).addTo(layer);
+      L.marker(sois[k].center, { icon, zIndexOffset: 500 })
+        .on("click", () => onSoi(k))
+        .addTo(layer);
     }
     if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [10, 10], animate: false });
   }, [rows, sois, soi, zones, zone]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -491,7 +517,15 @@ function TechMap({ zones, rows, zone, soi, me, onSoi }) {
     if (!zones) return;
     const go = () =>
       tapi(`/tech/${SURVEY}/pos`)
-        .then((list) => teamsRef.current && drawTeams(teamsRef.current, list.filter((t) => t.name !== me || watchRef.current == null), me))
+        .then(
+          (list) =>
+            teamsRef.current &&
+            drawTeams(
+              teamsRef.current,
+              list.filter((t) => t.name !== me || watchRef.current == null),
+              me,
+            ),
+        )
         .catch(() => {});
     go();
     const t = setInterval(go, 20000);
@@ -546,7 +580,10 @@ function TechMap({ zones, rows, zone, soi, me, onSoi }) {
         </button>
       </div>
       {gps && !["wait", "on"].includes(gps) && <p className="mt-1 rounded bg-amber-100 p-2 text-xs">{gps}</p>}
-      <p className="mt-1 text-xs text-neutral-600">จุดเล็กสี = บ้านในแต่ละโซน · วงกลม = จำนวนบ้านที่ยังต้องไปในซอยนั้น (🔴 มีบ้านด่วน · 🟠 รอตรวจ · 🟢 เสร็จหมด) · แตะวงกลม = ดูเฉพาะซอยนั้น · 📍 = ตำแหน่งมือถือคุณ (จุดสีน้ำเงิน) · 👷 = ทีมช่างที่เปิดตำแหน่งอยู่ · เมื่อเปิด 📍 ทีมอื่นและหน้าเว็บหมู่บ้านจะเห็นชื่อทีมคุณบนแผนที่ (ปิดแล้วหายทันที)</p>
+      <p className="mt-1 text-xs text-neutral-600">
+        จุดเล็กสี = บ้านในแต่ละโซน · วงกลม = จำนวนบ้านที่ยังต้องไปในซอยนั้น (🔴 มีบ้านด่วน · 🟠 รอตรวจ · 🟢 เสร็จหมด) · แตะวงกลม = ดูเฉพาะซอยนั้น · 📍 = ตำแหน่งมือถือคุณ (จุดสีน้ำเงิน) · 👷 =
+        ทีมช่างที่เปิดตำแหน่งอยู่ · เมื่อเปิด 📍 ทีมอื่นและหน้าเว็บหมู่บ้านจะเห็นชื่อทีมคุณบนแผนที่ (ปิดแล้วหายทันที)
+      </p>
     </div>
   );
 }

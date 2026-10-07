@@ -7,7 +7,7 @@ import { createBaseMap } from "./MapView";
 // hand-written plan. 8 rubbish trucks by zone (A+B share truck 1), 4 water trucks by odd/even inner sois.
 // /cleanup?poster=1 — the same without buttons, for a LINE image.
 const POSTER = new URLSearchParams(window.location.search).has("poster");
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 const TRUCKS = [
   { n: 1, zones: ["A", "B"], sois: "1–12" },
@@ -23,14 +23,147 @@ const odd = (s) => parseInt(s, 10) % 2 === 1;
 const even = (s) => !odd(s);
 // water trucks: "ซอยใน" by odd / even numbers in these zones (the plan's wording)
 const WATER = [
-  { n: 1, color: "#dc2626", text: "ซอยเลขคี่ โซน G และโซน C–D", pick: [["G", odd], ["C", odd], ["D", odd]] },
-  { n: 2, color: "#2563eb", text: "ซอยเลขคู่ โซน A–D", pick: [["A", even], ["B", even], ["C", even], ["D", even]] },
-  { n: 3, color: "#16a34a", text: "ซอยเลขคู่ โซน E–F", pick: [["E", even], ["F", even]] },
-  { n: 4, color: "#9333ea", text: "ซอยเลขคู่ โซน G–H–I", pick: [["G", even], ["H", even], ["I", even]] },
+  {
+    n: 1,
+    color: "#dc2626",
+    text: "ซอยเลขคี่ โซน G และโซน C–D",
+    pick: [
+      ["G", odd],
+      ["C", odd],
+      ["D", odd],
+    ],
+  },
+  {
+    n: 2,
+    color: "#2563eb",
+    text: "ซอยเลขคู่ โซน A–D",
+    pick: [
+      ["A", even],
+      ["B", even],
+      ["C", even],
+      ["D", even],
+    ],
+  },
+  {
+    n: 3,
+    color: "#16a34a",
+    text: "ซอยเลขคู่ โซน E–F",
+    pick: [
+      ["E", even],
+      ["F", even],
+    ],
+  },
+  {
+    n: 4,
+    color: "#9333ea",
+    text: "ซอยเลขคู่ โซน G–H–I",
+    pick: [
+      ["G", even],
+      ["H", even],
+      ["I", even],
+    ],
+  },
 ];
 // the inner roads (parallel to the main road, through the middle of the sois) each water truck drives,
 // as marked by the team on the plan — geometry © OpenStreetMap contributors (ODbL)
-const INNER = {"1": [[[13.792372, 100.672938], [13.79288, 100.67269], [13.793362, 100.672462], [13.793874, 100.672222]], [[13.794319, 100.672671], [13.793604, 100.672978]], [[13.798637, 100.67029], [13.798803, 100.670206], [13.79917, 100.670033], [13.79949, 100.66989], [13.799827, 100.669761], [13.800185, 100.66967], [13.800592, 100.669556], [13.800689, 100.669526]], [[13.800021, 100.669195], [13.799667, 100.669306], [13.799516, 100.669345], [13.799344, 100.669396], [13.799315, 100.669405], [13.798969, 100.669534], [13.798607, 100.669662]]], "2": [[[13.787343, 100.672801], [13.787856, 100.672496], [13.788077, 100.672365], [13.788109, 100.672344], [13.788553, 100.672054], [13.789013, 100.671776], [13.789478, 100.671483], [13.789958, 100.671234], [13.790444, 100.670939], [13.790892, 100.670659], [13.791356, 100.670356], [13.791801, 100.670084], [13.792263, 100.669789], [13.792691, 100.66948], [13.793014, 100.669291]]], "3": [[[13.793107, 100.669236], [13.793475, 100.669107], [13.793851, 100.668999], [13.794179, 100.668879], [13.794395, 100.668796], [13.794496, 100.668758], [13.794857, 100.668637], [13.794908, 100.668619], [13.795182, 100.66852], [13.795409, 100.668437], [13.795556, 100.668378], [13.795882, 100.668256]], [[13.795882, 100.668256], [13.795928, 100.668241], [13.796389, 100.668058], [13.796745, 100.667916]]], "4": [[[13.796745, 100.667916], [13.797099, 100.667787], [13.797432, 100.667667], [13.797801, 100.667544], [13.798156, 100.667437], [13.798697, 100.667318], [13.799204, 100.667218], [13.799723, 100.667123], [13.800124, 100.667025], [13.800302, 100.666995], [13.800483, 100.666954], [13.800844, 100.6669], [13.801219, 100.666807], [13.801342, 100.666782], [13.801567, 100.666745], [13.801872, 100.666687], [13.801949, 100.666666], [13.802309, 100.666601], [13.802397, 100.666594], [13.802913, 100.666483]]]};
+const INNER = {
+  1: [
+    [
+      [13.792372, 100.672938],
+      [13.79288, 100.67269],
+      [13.793362, 100.672462],
+      [13.793874, 100.672222],
+    ],
+    [
+      [13.794319, 100.672671],
+      [13.793604, 100.672978],
+    ],
+    [
+      [13.798637, 100.67029],
+      [13.798803, 100.670206],
+      [13.79917, 100.670033],
+      [13.79949, 100.66989],
+      [13.799827, 100.669761],
+      [13.800185, 100.66967],
+      [13.800592, 100.669556],
+      [13.800689, 100.669526],
+    ],
+    [
+      [13.800021, 100.669195],
+      [13.799667, 100.669306],
+      [13.799516, 100.669345],
+      [13.799344, 100.669396],
+      [13.799315, 100.669405],
+      [13.798969, 100.669534],
+      [13.798607, 100.669662],
+    ],
+  ],
+  2: [
+    [
+      [13.787343, 100.672801],
+      [13.787856, 100.672496],
+      [13.788077, 100.672365],
+      [13.788109, 100.672344],
+      [13.788553, 100.672054],
+      [13.789013, 100.671776],
+      [13.789478, 100.671483],
+      [13.789958, 100.671234],
+      [13.790444, 100.670939],
+      [13.790892, 100.670659],
+      [13.791356, 100.670356],
+      [13.791801, 100.670084],
+      [13.792263, 100.669789],
+      [13.792691, 100.66948],
+      [13.793014, 100.669291],
+    ],
+  ],
+  3: [
+    [
+      [13.793107, 100.669236],
+      [13.793475, 100.669107],
+      [13.793851, 100.668999],
+      [13.794179, 100.668879],
+      [13.794395, 100.668796],
+      [13.794496, 100.668758],
+      [13.794857, 100.668637],
+      [13.794908, 100.668619],
+      [13.795182, 100.66852],
+      [13.795409, 100.668437],
+      [13.795556, 100.668378],
+      [13.795882, 100.668256],
+    ],
+    [
+      [13.795882, 100.668256],
+      [13.795928, 100.668241],
+      [13.796389, 100.668058],
+      [13.796745, 100.667916],
+    ],
+  ],
+  4: [
+    [
+      [13.796745, 100.667916],
+      [13.797099, 100.667787],
+      [13.797432, 100.667667],
+      [13.797801, 100.667544],
+      [13.798156, 100.667437],
+      [13.798697, 100.667318],
+      [13.799204, 100.667218],
+      [13.799723, 100.667123],
+      [13.800124, 100.667025],
+      [13.800302, 100.666995],
+      [13.800483, 100.666954],
+      [13.800844, 100.6669],
+      [13.801219, 100.666807],
+      [13.801342, 100.666782],
+      [13.801567, 100.666745],
+      [13.801872, 100.666687],
+      [13.801949, 100.666666],
+      [13.802309, 100.666601],
+      [13.802397, 100.666594],
+      [13.802913, 100.666483],
+    ],
+  ],
+};
 const circled = (n) => "①②③④⑤⑥⑦⑧"[n - 1];
 
 function waterSois(zones) {
@@ -89,7 +222,12 @@ function TruckMap({ data, visible }) {
       const c = [0, 1].map((k) => zs.reduce((a, z) => a + z.center[k] * z.houses, 0) / w);
       L.marker(c, {
         interactive: false,
-        icon: L.divIcon({ className: "", iconSize: [110, 40], iconAnchor: [55, 20], html: `<div class="zone-label" style="--c:${zs[0].color};font-size:16px;padding:2px 8px">🚛${circled(t.n)} ${esc(t.zones.join("+"))}</div>` }),
+        icon: L.divIcon({
+          className: "",
+          iconSize: [110, 40],
+          iconAnchor: [55, 20],
+          html: `<div class="zone-label" style="--c:${zs[0].color};font-size:16px;padding:2px 8px">🚛${circled(t.n)} ${esc(t.zones.join("+"))}</div>`,
+        }),
       }).addTo(map);
     }
   };
@@ -110,7 +248,10 @@ function WaterMap({ data, visible }) {
         for (const line of lines) L.polyline(line, { color: w ? w.color : "#9ca3af", weight: w ? 7 : 3, opacity: w ? 0.95 : 0.5, interactive: false }).addTo(map);
         if (w && lines.length) {
           const longest = lines.reduce((a, b) => (b.length > a.length ? b : a));
-          L.marker(longest[Math.floor(longest.length / 2)], { interactive: false, icon: L.divIcon({ className: "", iconSize: [66, 24], iconAnchor: [33, 12], html: `<div class="soi-tag" style="--c:${w.color};font-size:12px">💧${w.n} ซ.${esc(s)}</div>` }) }).addTo(map);
+          L.marker(longest[Math.floor(longest.length / 2)], {
+            interactive: false,
+            icon: L.divIcon({ className: "", iconSize: [66, 24], iconAnchor: [33, 12], html: `<div class="soi-tag" style="--c:${w.color};font-size:12px">💧${w.n} ซ.${esc(s)}</div>` }),
+          }).addTo(map);
         }
       }
     // the inner road each water truck runs along (vertical lines the team drew on the plan)
@@ -124,7 +265,16 @@ function WaterMap({ data, visible }) {
       const longest = roads.reduce((a, b) => (b.length > a.length ? b : a));
       const at = longest[Math.floor(longest.length / 2)];
       // one tag per truck, beside its road (to the outer side, away from the soi tags)
-      L.marker(at, { interactive: false, zIndexOffset: 500, icon: L.divIcon({ className: "", iconSize: [96, 24], iconAnchor: [w.n === 1 ? -8 : 104, 12], html: `<div class="soi-tag" style="--c:${w.color};font-size:13px;background:${w.color};color:#fff">💧${w.n} ถนนใน</div>` }) }).addTo(map);
+      L.marker(at, {
+        interactive: false,
+        zIndexOffset: 500,
+        icon: L.divIcon({
+          className: "",
+          iconSize: [96, 24],
+          iconAnchor: [w.n === 1 ? -8 : 104, 12],
+          html: `<div class="soi-tag" style="--c:${w.color};font-size:13px;background:${w.color};color:#fff">💧${w.n} ถนนใน</div>`,
+        }),
+      }).addTo(map);
     }
   };
   useMap(el, data, draw, visible);
@@ -172,10 +322,12 @@ export function CleanupPlan({ embedded = false }) {
   return (
     <div className={embedded ? "space-y-3" : "min-h-screen bg-stone-100 p-3 text-neutral-900"}>
       <div className="mx-auto max-w-5xl space-y-3">
-        {!embedded && <header className="rounded-xl bg-black p-3 text-white">
-          <h1 className="text-xl font-bold">🧹 แผนรถ Big Cleaning Day · หมู่บ้านสหกรณ์ เสรีไทย 57</h1>
-          <p className="text-sm text-neutral-300">อาทิตย์ 4 ต.ค. 2569 · เริ่ม 9:00 น. · รถขยะ 8 คันตามโซน + รถน้ำ 4 คันตามซอยคู่/คี่ · เส้นเหลือง = ถนนเมน</p>
-        </header>}
+        {!embedded && (
+          <header className="rounded-xl bg-black p-3 text-white">
+            <h1 className="text-xl font-bold">🧹 แผนรถ Big Cleaning Day · หมู่บ้านสหกรณ์ เสรีไทย 57</h1>
+            <p className="text-sm text-neutral-300">อาทิตย์ 4 ต.ค. 2569 · เริ่ม 9:00 น. · รถขยะ 8 คันตามโซน + รถน้ำ 4 คันตามซอยคู่/คี่ · เส้นเหลือง = ถนนเมน</p>
+          </header>
+        )}
         {error && <p className="rounded-lg bg-red-50 p-2 text-red-700">{error}</p>}
         {!POSTER && (
           <div className="grid grid-cols-2 gap-1 rounded-xl bg-white p-1">

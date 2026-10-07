@@ -71,7 +71,16 @@ export default function HqPage() {
     }
     return out;
   }, [cases]);
-  const total = useMemo(() => Object.values(perZone).reduce((a, o) => ({ open: a.open + o.open, helping: a.helping + o.helping, done: a.done + o.done, urgent: a.urgent + o.urgent }), { open: 0, helping: 0, done: 0, urgent: 0 }), [perZone]);
+  const total = useMemo(
+    () =>
+      Object.values(perZone).reduce((a, o) => ({ open: a.open + o.open, helping: a.helping + o.helping, done: a.done + o.done, urgent: a.urgent + o.urgent }), {
+        open: 0,
+        helping: 0,
+        done: 0,
+        urgent: 0,
+      }),
+    [perZone],
+  );
 
   if (locked) return <NoKey />;
   const b = board || { points: {}, hazards: [], boats: [], notes: [], people: [] };
@@ -106,10 +115,18 @@ export default function HqPage() {
           <button onClick={copy} className="min-h-[44px] rounded-lg bg-green-600 px-3 text-sm font-bold">
             {copied ? "✅ คัดลอกแล้ว" : "📋 สรุปส่ง LINE"}
           </button>
-          <button onClick={() => go("people")} className="min-h-[44px] rounded-lg bg-white/15 px-3 text-sm font-semibold">📞 รายชื่อ</button>
-          <a href="/team" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm font-semibold">🚶 หน้าทีมแจก</a>
-          <a href="/teamwork" title="หน้าสำหรับชาวบ้าน (ไม่มีข้อมูลส่วนตัว)" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm">🌐 หน้าชาวบ้าน</a>
-          <a href="/zones" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm">🗺️</a>
+          <button onClick={() => go("people")} className="min-h-[44px] rounded-lg bg-white/15 px-3 text-sm font-semibold">
+            📞 รายชื่อ
+          </button>
+          <a href="/team" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm font-semibold">
+            🚶 หน้าทีมแจก
+          </a>
+          <a href="/teamwork" title="หน้าสำหรับชาวบ้าน (ไม่มีข้อมูลส่วนตัว)" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm">
+            🌐 หน้าชาวบ้าน
+          </a>
+          <a href="/zones" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm">
+            🗺️
+          </a>
         </div>
       </header>
 
@@ -173,10 +190,13 @@ export default function HqPage() {
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {(updated ? zoneGroups(zones) : []).map((z) => {
               // a merged block (F·G·H) adds up its zones
-              const n = z.ids.reduce((a, id) => {
-                const o = perZone[id] || {};
-                return { open: a.open + (o.open || 0), helping: a.helping + (o.helping || 0), done: a.done + (o.done || 0), urgent: a.urgent + (o.urgent || 0) };
-              }, { open: 0, helping: 0, done: 0, urgent: 0 });
+              const n = z.ids.reduce(
+                (a, id) => {
+                  const o = perZone[id] || {};
+                  return { open: a.open + (o.open || 0), helping: a.helping + (o.helping || 0), done: a.done + (o.done || 0), urgent: a.urgent + (o.urgent || 0) };
+                },
+                { open: 0, helping: 0, done: 0, urgent: 0 },
+              );
               const p = b.points[z.id] || {};
               const pp = p;
               const here = !!pp.person && pp.manned !== false;
@@ -185,7 +205,10 @@ export default function HqPage() {
               return (
                 <div key={z.id} className="rounded-xl border-l-8 bg-white p-3 shadow" style={{ borderColor: z.color }}>
                   <div className="flex items-center gap-2">
-                    <span className={`flex h-10 shrink-0 items-center justify-center rounded-full font-black text-white ${z.ids.length > 1 ? "px-2 text-sm" : "w-10 text-xl"}`} style={{ background: z.color }}>
+                    <span
+                      className={`flex h-10 shrink-0 items-center justify-center rounded-full font-black text-white ${z.ids.length > 1 ? "px-2 text-sm" : "w-10 text-xl"}`}
+                      style={{ background: z.color }}
+                    >
                       {z.label}
                     </span>
                     <div className="grid flex-1 grid-cols-4 gap-1 text-center text-xs">
@@ -225,9 +248,7 @@ export default function HqPage() {
                       {p.boats_needed > 0 && ` / ต้องการ ${p.boats_needed}`}
                     </p>
                   )}
-                  <p className="text-xs text-neutral-500">
-                    {last ? `${ACTION[last.kind] || "📝"} ${last.note || ""} · ${timeAgo(last.at)} (${last.name})` : "ยังไม่มีบันทึกว่าเข้าไปทำอะไร"}
-                  </p>
+                  <p className="text-xs text-neutral-500">{last ? `${ACTION[last.kind] || "📝"} ${last.note || ""} · ${timeAgo(last.at)} (${last.name})` : "ยังไม่มีบันทึกว่าเข้าไปทำอะไร"}</p>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <a href={`/team#zone=${z.id}`} className="flex min-h-[40px] items-center justify-center rounded-lg bg-black text-sm font-bold text-white">
                       📋 ดูเคส {z.label}

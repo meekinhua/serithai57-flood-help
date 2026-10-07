@@ -10,7 +10,7 @@ export function useT() {
   const texts = useContext(TextsContext) || {};
   return (key, fallback, vars) => {
     let s = texts[key] ?? fallback;
-    if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? ""));
+    if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => vars[k] ?? "");
     return SHOW_KEYS ? `[${key}] ${s}` : s;
   };
 }

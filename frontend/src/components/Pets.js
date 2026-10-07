@@ -3,6 +3,7 @@ import { api, load, save } from "../api";
 import { mediaUrl } from "../media";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import { shareLost } from "./LostFound";
+import { seenVisits } from "../visits";
 
 // ---------- 🐾 สัตว์เลี้ยงบ้านฉัน: photos and markings kept ahead of time; the day one goes missing, one tap posts it ----------
 const KINDS = [
@@ -120,7 +121,7 @@ export default function PetsRow({ house, setErr, onLostPosted, onOpenLost }) {
   const [edit, setEdit] = useState(null); // "new" | pet id
   const [losing, setLosing] = useState(null);
   const [posted, setPosted] = useState(null);
-  const [no, setNo] = useState(() => load("petsNo", false));
+  const [no, setNo] = useState(() => load("petsNo", false) || seenVisits("pets:invite") > 3); // asked 3 visits, then just a link
   const reload = () =>
     api(`/myhome/pets?house=${encodeURIComponent(house)}`)
       .then((r) => setPets(r.pets))
@@ -201,7 +202,7 @@ export default function PetsRow({ house, setErr, onLostPosted, onOpenLost }) {
           <button onClick={() => shareLost(posted)} className={`${btn} w-full bg-[#06C755] text-white`}>
             📤 ส่งต่อในกลุ่ม LINE (ยิ่งแชร์ ยิ่งเจอเร็ว)
           </button>
-          <button onClick={onOpenLost} className="min-h-[40px] text-[15px] font-bold underline">
+          <button onClick={() => onOpenLost(posted.id)} className="min-h-[40px] text-[15px] font-bold underline">
             ดูประกาศ ›
           </button>
         </div>

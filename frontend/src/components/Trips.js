@@ -88,7 +88,11 @@ export function useStaffLocation(user, onTrip) {
       if (document.visibilityState !== "visible") return;
       keepAwake();
       // back from a locked screen: report where we are now instead of waiting for the next fix
-      navigator.geolocation.getCurrentPosition((pos) => send(pos, true), () => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+      navigator.geolocation.getCurrentPosition(
+        (pos) => send(pos, true),
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
+      );
     };
     document.addEventListener("visibilitychange", onVis);
 
@@ -117,7 +121,7 @@ export function useStaffLocation(user, onTrip) {
         send(pos);
       },
       (err) => setGps({ state: err.code === 1 ? "denied" : "error", msg: err.message }),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 }
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 },
     );
     // standing still still needs a heartbeat, or the public map drops us
     const beat = setInterval(() => latest && send(latest, true), SEND_EVERY_MS * 2);
@@ -206,7 +210,14 @@ export function DutyBar({ live, onTrip }) {
         <div className="-mx-1 mt-2 overflow-x-auto px-1">
           <div className="flex w-max gap-1" role="group" aria-label="ไอคอนของคุณบนแผนที่">
             {Object.entries(VEHICLES).map(([k, [e, t]]) => (
-              <button key={k} type="button" onClick={() => pickVehicle(k)} aria-pressed={vehicle === k} title={t} className={`flex min-h-[44px] items-center gap-1 rounded-full px-3 text-sm font-semibold ${vehicle === k ? "bg-emerald-600 text-white" : "bg-neutral-100"}`}>
+              <button
+                key={k}
+                type="button"
+                onClick={() => pickVehicle(k)}
+                aria-pressed={vehicle === k}
+                title={t}
+                className={`flex min-h-[44px] items-center gap-1 rounded-full px-3 text-sm font-semibold ${vehicle === k ? "bg-emerald-600 text-white" : "bg-neutral-100"}`}
+              >
                 <span className="text-lg">{k === "walk" ? "👷" : e}</span>
                 {t.split(" /")[0]}
               </button>
@@ -216,7 +227,14 @@ export function DutyBar({ live, onTrip }) {
       )}
       {open ? (
         <form onSubmit={saveNote} className="mt-2 grid grid-cols-[1fr_auto] gap-2">
-          <input autoFocus value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className="min-h-[44px] rounded-lg border border-neutral-300 px-3" placeholder="เช่น กำลังจะไปแจกข้าวซอย 30 / รับคนป่วยซอย 12" />
+          <input
+            autoFocus
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={200}
+            className="min-h-[44px] rounded-lg border border-neutral-300 px-3"
+            placeholder="เช่น กำลังจะไปแจกข้าวซอย 30 / รับคนป่วยซอย 12"
+          />
           <button className="min-h-[44px] rounded-lg bg-black px-3 font-semibold text-white">บันทึก</button>
         </form>
       ) : (
@@ -232,7 +250,11 @@ export function DutyBar({ live, onTrip }) {
           ตั้งค่ามือถือ: iPhone → การแสดงผลและความสว่าง → ล็อกอัตโนมัติ = <b>ไม่เลย</b> · Android → จอแสดงผล → ระยะหมดเวลาหน้าจอ = <b>นานสุด</b>
         </p>
       )}
-      {on && live.gps.state !== "ok" && <div className="mt-2"><GpsLine live={live} /></div>}
+      {on && live.gps.state !== "ok" && (
+        <div className="mt-2">
+          <GpsLine live={live} />
+        </div>
+      )}
     </section>
   );
 }
@@ -285,7 +307,13 @@ export function TripPanel({ user, live, trip, setTrip }) {
           <legend className="mb-1 font-medium">ยานพาหนะ</legend>
           <div className="grid grid-cols-3 gap-2">
             {Object.entries(VEHICLES).map(([k, [e, t]]) => (
-              <button key={k} type="button" onClick={() => setVehicle(k)} aria-pressed={vehicle === k} className={`${btn} flex flex-col items-center justify-center py-2 text-sm ${vehicle === k ? "bg-black text-white" : "border-2 border-neutral-200 bg-white"}`}>
+              <button
+                key={k}
+                type="button"
+                onClick={() => setVehicle(k)}
+                aria-pressed={vehicle === k}
+                className={`${btn} flex flex-col items-center justify-center py-2 text-sm ${vehicle === k ? "bg-black text-white" : "border-2 border-neutral-200 bg-white"}`}
+              >
                 <span className="text-2xl">{e}</span>
                 {t}
               </button>
@@ -298,15 +326,33 @@ export function TripPanel({ user, live, trip, setTrip }) {
             {Object.entries(MISSIONS)
               .filter(([k]) => k !== "standby")
               .map(([k, [e, t]]) => (
-                <button key={k} type="button" onClick={() => setMission(k)} aria-pressed={mission === k} className={`${btn} text-left ${mission === k ? "bg-black text-white" : "border-2 border-neutral-200 bg-white"}`}>
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setMission(k)}
+                  aria-pressed={mission === k}
+                  className={`${btn} text-left ${mission === k ? "bg-black text-white" : "border-2 border-neutral-200 bg-white"}`}
+                >
                   {e} {t}
                 </button>
               ))}
           </div>
         </fieldset>
         <div className="grid gap-3 sm:grid-cols-2">
-          <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={40} className="min-h-[48px] rounded-lg border border-neutral-300 px-3" placeholder={`ชื่อที่ชาวบ้านเห็น (เช่น ${VEHICLES[vehicle][1]}ทีม ${user.name})`} />
-          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className="min-h-[48px] rounded-lg border border-neutral-300 px-3" placeholder="รายละเอียด เช่น ข้าวกล่อง 80 / รับได้ 6 คน" />
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            maxLength={40}
+            className="min-h-[48px] rounded-lg border border-neutral-300 px-3"
+            placeholder={`ชื่อที่ชาวบ้านเห็น (เช่น ${VEHICLES[vehicle][1]}ทีม ${user.name})`}
+          />
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={200}
+            className="min-h-[48px] rounded-lg border border-neutral-300 px-3"
+            placeholder="รายละเอียด เช่น ข้าวกล่อง 80 / รับได้ 6 คน"
+          />
         </div>
         {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
         <button onClick={start} className={`${btn} w-full bg-blue-600 text-lg text-white`}>
@@ -336,25 +382,39 @@ export function TripPanel({ user, live, trip, setTrip }) {
           {Object.entries(PHASES)
             .filter(([k]) => k !== "standby")
             .map(([k, [e, t, cls]]) => (
-              <button key={k} onClick={() => phase(k)} aria-pressed={trip.phase === k} className={`${btn} min-h-[64px] text-left ${trip.phase === k ? `${cls} ring-4 ring-black` : "border-2 border-neutral-300 bg-white"}`}>
+              <button
+                key={k}
+                onClick={() => phase(k)}
+                aria-pressed={trip.phase === k}
+                className={`${btn} min-h-[64px] text-left ${trip.phase === k ? `${cls} ring-4 ring-black` : "border-2 border-neutral-300 bg-white"}`}
+              >
                 {e} {t}
               </button>
             ))}
         </div>
       </fieldset>
       <div className="grid grid-cols-[1fr_auto] gap-2">
-        <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className="min-h-[48px] rounded-lg border border-neutral-300 px-3" placeholder="อัปเดตข้อความ เช่น เหลือข้าว 20 กล่อง" />
-        <button onClick={() => phase(trip.phase)} className={`${btn} border-2 border-black bg-white`}>ส่ง</button>
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={200}
+          className="min-h-[48px] rounded-lg border border-neutral-300 px-3"
+          placeholder="อัปเดตข้อความ เช่น เหลือข้าว 20 กล่อง"
+        />
+        <button onClick={() => phase(trip.phase)} className={`${btn} border-2 border-black bg-white`}>
+          ส่ง
+        </button>
       </div>
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
-      <button onClick={end} className={`${btn} w-full bg-red-600 text-white`}>⏹ จบงาน</button>
+      <button onClick={end} className={`${btn} w-full bg-red-600 text-white`}>
+        ⏹ จบงาน
+      </button>
     </div>
   );
 }
 
 // ---------------- public side: what's moving in the village, and who is on duty ----------------
-export const tripWhere = (t) =>
-  !t.has_fix ? "📡 กำลังหาตำแหน่ง" : t.far ? `อยู่นอกพื้นที่ (${t.km} กม.)` : t.soi ? `อยู่ซอย ${t.soi}` : t.km > 3 ? `ห่างหมู่บ้าน ${t.km} กม.` : "นอกซอย/ถนนใหญ่";
+export const tripWhere = (t) => (!t.has_fix ? "📡 กำลังหาตำแหน่ง" : t.far ? `อยู่นอกพื้นที่ (${t.km} กม.)` : t.soi ? `อยู่ซอย ${t.soi}` : t.km > 3 ? `ห่างหมู่บ้าน ${t.km} กม.` : "นอกซอย/ถนนใหญ่");
 
 // no update for a few minutes: phone screen off / page closed; show the last known place, greyed
 export const isQuiet = (t) => Date.now() - new Date(t.updated_at).getTime() > 3 * 60000;
@@ -396,12 +456,19 @@ export function TripsStrip({ trips, onFocus }) {
                   <span className="text-neutral-600">{tripWhere(t)}</span>
                 </p>
                 {t.note && <p className="mt-0.5 truncate text-xs text-neutral-600">{t.note}</p>}
-                <p className="text-xs text-neutral-400">อัปเดต {timeAgo(t.updated_at)}{t.lat != null ? " · แตะดูบนแผนที่" : ""}</p>
+                <p className="text-xs text-neutral-400">
+                  อัปเดต {timeAgo(t.updated_at)}
+                  {t.lat != null ? " · แตะดูบนแผนที่" : ""}
+                </p>
               </button>
             );
           })}
           {online.map((t) => (
-            <button key={t.id} onClick={() => t.lat != null && onFocus(t)} className={`w-56 shrink-0 rounded-xl border p-2 text-left ${isQuiet(t) ? "border-neutral-300 opacity-60" : "border-emerald-300 bg-emerald-50/50 active:bg-emerald-50"}`}>
+            <button
+              key={t.id}
+              onClick={() => t.lat != null && onFocus(t)}
+              className={`w-56 shrink-0 rounded-xl border p-2 text-left ${isQuiet(t) ? "border-neutral-300 opacity-60" : "border-emerald-300 bg-emerald-50/50 active:bg-emerald-50"}`}
+            >
               <p className="truncate font-bold">👷 {t.label}</p>
               <p className="line-clamp-2 text-sm">{t.note || <span className="text-neutral-500">ออนไลน์ พร้อมช่วย</span>}</p>
               <p className="truncate text-xs text-neutral-600">

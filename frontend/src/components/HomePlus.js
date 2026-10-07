@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { api, load, save } from "../api";
 import { timeAgo } from "../config";
 import { PRO_GROUPS } from "./Community";
+import Fold from "./Fold";
+import { seenVisits } from "../visits";
 import { useT } from "./Texts";
 import { MediaStrip } from "./MediaGallery";
 
@@ -211,35 +213,35 @@ export function AidRow({ info, onChanged, setErr }) {
         <div className="flex items-start gap-2">
           <b className={`min-w-0 flex-1 leading-snug ${info_ ? "text-base" : "text-[15px] text-[#45504A]"}`}>{a.title}</b>
           {left != null && left >= 0 && (
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-bold ${left <= 3 ? "bg-[#B42318] text-white" : "bg-[#FDE8E6] text-[#B42318]"}`}>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-bold ${left <= 3 ? "bg-[#B42318] text-white" : "bg-[#FDE8E6] text-[#B42318]"} ${left <= 7 && a.mine === "none" ? "anim-breathe" : ""}`}
+            >
               {left === 0 ? "หมดเขตวันนี้" : `อีก ${left} วัน`}
             </span>
           )}
         </div>
         {a.amount && <p className={`mt-0.5 font-bold leading-snug text-[#154D33] ${info_ ? "text-lg" : "text-xl"}`}>{a.amount.split("\n")[0]}</p>}
         {a.deadline && <p className="text-[15px] font-bold text-[#B42318]">ยื่นภายใน {thaiDate(a.deadline)}</p>}
-        {shown && (
-          <>
-            <MediaStrip media={a.media || []} />
-            {a.amount?.includes("\n") && <p className="whitespace-pre-line text-sm text-[#33403A]">{a.amount.split("\n").slice(1).join("\n")}</p>}
-            {a.who && <p className="text-sm text-[#45504A]">{a.who}</p>}
-            {a.docs && (
-              <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed">
-                <b>{info_ ? "เงื่อนไข:" : "ต้องใช้:"}</b> {a.docs}
-              </p>
-            )}
-            {a.where && (
-              <p className="whitespace-pre-line text-[15px] leading-relaxed">
-                <b>{info_ ? "ติดต่อ:" : "ยื่นที่:"}</b> {a.where}
-              </p>
-            )}
-            {a.link && (
-              <a href={a.link} target="_blank" rel="noreferrer" className="mt-1 inline-flex min-h-[44px] items-center text-[15px] font-bold text-[#1F5FA8] underline">
-                {/claim\.bangkok|thainatcat/.test(a.link) ? "เข้าเว็บยื่นเรื่อง ›" : "ดูรายละเอียด ›"}
-              </a>
-            )}
-          </>
-        )}
+        <Fold open={shown}>
+          <MediaStrip media={a.media || []} />
+          {a.amount?.includes("\n") && <p className="whitespace-pre-line text-sm text-[#33403A]">{a.amount.split("\n").slice(1).join("\n")}</p>}
+          {a.who && <p className="text-sm text-[#45504A]">{a.who}</p>}
+          {a.docs && (
+            <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed">
+              <b>{info_ ? "เงื่อนไข:" : "ต้องใช้:"}</b> {a.docs}
+            </p>
+          )}
+          {a.where && (
+            <p className="whitespace-pre-line text-[15px] leading-relaxed">
+              <b>{info_ ? "ติดต่อ:" : "ยื่นที่:"}</b> {a.where}
+            </p>
+          )}
+          {a.link && (
+            <a href={a.link} target="_blank" rel="noreferrer" className="mt-1 inline-flex min-h-[44px] items-center text-[15px] font-bold text-[#1F5FA8] underline">
+              {/claim\.bangkok|thainatcat/.test(a.link) ? "เข้าเว็บยื่นเรื่อง ›" : "ดูรายละเอียด ›"}
+            </a>
+          )}
+        </Fold>
         {!info_ && (
           <div className="mt-2 flex gap-2">
             <button onClick={() => setHow((h) => (h.includes(a.id) ? h.filter((x) => x !== a.id) : [...h, a.id]))} aria-expanded={shown} className={`${btn} shrink-0 bg-[#F2F4F1]`}>
@@ -522,7 +524,16 @@ if (typeof window !== "undefined")
     deferred = e;
   });
 export function InstallCard() {
-  const [later, setLater] = useState(() => Date.now() - load("installLater", 0) < 14 * 864e5);
+  const [later, setLater] = useState(() => {
+    if (Date.now() - load("installLater", 0) < 14 * 864e5) return true;
+    if (seenVisits("install:card") <= 3) return false;
+    // shown on 3 visits, nobody tapped: rest 14 days, then try again
+    save("installLater", Date.now());
+    const all = load("seenVisits", {});
+    delete all["install:card"];
+    save("seenVisits", all);
+    return true;
+  });
   const [how, setHow] = useState(false);
   const [, force] = useState(0);
   useEffect(() => {

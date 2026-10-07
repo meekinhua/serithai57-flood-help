@@ -672,7 +672,7 @@ export function BottomNav({ page, badges = {}, onGo, onHotline }) {
                     <span className="relative">!</span>
                   </span>
                 )}
-                {badges[key] === "general" && !on && <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#1E9E5A]" aria-label="มีอัปเดตใหม่" />}
+                {badges[key] === "general" && !on && <span className="anim-pop absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#1E9E5A]" aria-label="มีอัปเดตใหม่" />}
                 {badges[key] === "muted" && (
                   <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#B42318] opacity-35" aria-label="มีเรื่องที่ยังค้าง (ล้างแจ้งเตือนแล้ว)" />
                 )}

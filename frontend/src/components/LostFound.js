@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { notify } from "../notify";
+import { seenVisits } from "../visits";
 import { api, load, save } from "../api";
 import { LOST_CATEGORIES, LOST_KINDS, timeAgo } from "../config";
 import { mediaUrl } from "../media";
@@ -37,7 +39,7 @@ export function LostPreview({ x, photo }) {
   );
 }
 
-export function LostBoard({ items, setItems, admin, onAdd }) {
+export function LostBoard({ items, setItems, admin, onAdd, reunited = [] }) {
   const [kind, setKind] = useState("all");
   const [cat, setCat] = useState("all");
   const keys = load("lostKeys", {});
@@ -82,6 +84,16 @@ export function LostBoard({ items, setItems, admin, onAdd }) {
           <LostCard key={x.id} item={x} editKey={keys[x.id]} admin={admin} onChanged={upsert} onDeleted={(id) => setItems((p) => p.filter((y) => y.id !== id))} />
         ))}
       </ul>
+      {reunited.length > 0 && (
+        <section className="space-y-2">
+          <p className="text-[15px] font-bold text-[#154D33]">🎉 ได้คืนแล้ว (2 วันล่าสุด) · ขอบคุณทุกคนที่ช่วยดู</p>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {reunited.map((x) => (
+              <LostCard key={x.id} item={x} editKey={keys[x.id]} admin={admin} onChanged={() => {}} onDeleted={() => {}} />
+            ))}
+          </ul>
+        </section>
+      )}
       {!shown.length && <p className="rounded-xl bg-white p-4 text-center text-neutral-600">ยังไม่มีรายการ · หมาแมวหายตอนน้ำขึ้น ลงรูปไว้ เพื่อนบ้านช่วยกันดู</p>}
       <p className="text-xs text-neutral-500">เจอสัตว์ที่เจ้าของยังไม่มาตาม ให้น้ำ อาหาร ถ่ายรูปลง “เจอ” ไว้ · ระวังมิจฉาชีพ: อย่าโอนเงินค่าไถ่/ค่าส่งก่อนเห็นตัวจริง</p>
     </div>
@@ -105,7 +117,7 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
   };
   const photo = x.media?.[0];
   return (
-    <li className="anim-row overflow-hidden rounded-xl border bg-white shadow-sm">
+    <li data-item={x.id} className={`anim-row scroll-mt-28 overflow-hidden rounded-xl border bg-white shadow-sm ${x.status === "reunited" ? "opacity-75" : ""}`}>
       {photo ? (
         <a href={mediaUrl(photo.id)} target="_blank" rel="noreferrer" className="block">
           <img src={mediaUrl(photo.id, "thumb")} alt={x.title} loading="lazy" className="aspect-[4/3] w-full max-w-full object-cover" />
@@ -370,7 +382,10 @@ export function PetAlert({ items, reunited = [], onOpen }) {
   const [shrunk, setShrunk] = useState(false);
   const seenNow = load("petSeen", {}); // live: an older post seen more than ~20 s ago stays small when a new one pops up
   const big = shrunk ? [] : pets.filter((x) => x.kind === "lost" && ageH(x) < 48 && (!seenNow[x.id] || now - seenNow[x.id] < 25e3));
-  const slim = pets.filter((x) => !big.includes(x) && ageH(x) < 7 * 24);
+  const slimAll = pets.filter((x) => !big.includes(x) && ageH(x) < 7 * 24);
+  const slimKey = slimAll.map((x) => x.id.slice(0, 6)).join(",");
+  const slimVisits = useMemo(() => (slimKey ? seenVisits(`petslim:${slimKey}`) : 0), [slimKey]);
+  const slim = slimVisits > 4 ? [] : slimAll; // still on the หาย·เจอ board and in เพื่อนบ้าน
   const bigIds = big.map((x) => x.id).join(",");
   useEffect(() => {
     const was = load("petSeen", {});
@@ -391,6 +406,7 @@ export function PetAlert({ items, reunited = [], onOpen }) {
     const next = [...hidden.slice(-100), ...ids];
     setHidden(next);
     save("petHidden", next);
+    notify("ซ่อนแล้ว · ดูได้ที่ เพื่อนบ้าน › 🐾 หาย · เจอ");
   };
   const thumb = (x, cls) => {
     const photo = x.media?.[0];
@@ -405,18 +421,18 @@ export function PetAlert({ items, reunited = [], onOpen }) {
   return (
     <div className="mb-3 space-y-2">
       {home.map((x) => (
-        <div key={x.id} className="flex items-center gap-2 rounded-2xl bg-[#E4F0E9] px-3 py-2">
+        <div key={x.id} className="anim-in flex items-center gap-2 rounded-2xl bg-[#E4F0E9] px-3 py-2">
           {thumb(x, "h-10 w-10 shrink-0 rounded-full text-xl")}
-          <p className="min-w-0 flex-1 text-[15px] leading-snug">
-            🎉 <b>เจอแล้ว!</b> {x.title} กลับบ้านแล้ว · ขอบคุณทุกคนที่ช่วยดู
-          </p>
+          <button onClick={() => onOpen(x.id)} className="min-w-0 flex-1 text-left text-[15px] leading-snug">
+            🎉 <b>เจอแล้ว!</b> {x.title} กลับบ้านแล้ว · ขอบคุณทุกคนที่ช่วยดู <span className="text-[#45504A]">›</span>
+          </button>
           <button onClick={() => hide([`r${x.id}`])} aria-label="ปิด" className="min-h-[40px] min-w-[40px] shrink-0 text-[#45504A]">
             ✕
           </button>
         </div>
       ))}
       {big.length > 0 && (
-        <section className="rounded-[20px] border-2 border-[#E0A100] bg-[#FFF8E1] p-3" aria-label="สัตว์เลี้ยงหาย">
+        <section className="anim-hop rounded-[20px] border-2 border-[#E0A100] bg-[#FFF8E1] p-3" aria-label="สัตว์เลี้ยงหาย">
           <div className="flex items-center gap-2">
             <p className="min-w-0 flex-1 text-lg font-bold leading-tight">🐾 ช่วยกันดู · สัตว์เลี้ยงหาย {big.length} ตัว</p>
             <button onClick={() => hide(big.map((x) => x.id))} className="min-h-[40px] shrink-0 text-sm font-bold text-[#45504A] underline">
@@ -425,7 +441,7 @@ export function PetAlert({ items, reunited = [], onOpen }) {
           </div>
           <div className="-mx-3 mt-2 flex gap-2 overflow-x-auto px-3 pb-1">
             {big.map((x) => (
-              <button key={x.id} onClick={onOpen} className="w-[168px] shrink-0 overflow-hidden rounded-2xl bg-white text-left shadow-sm">
+              <button key={x.id} onClick={() => onOpen(x.id)} className="w-[168px] shrink-0 overflow-hidden rounded-2xl bg-white text-left shadow-sm">
                 {thumb(x, "aspect-square w-full text-6xl")}
                 <div className="p-2">
                   <span className="rounded bg-[#B42318] px-1.5 text-sm font-bold text-white">😢 หาย</span>
@@ -436,15 +452,15 @@ export function PetAlert({ items, reunited = [], onOpen }) {
               </button>
             ))}
           </div>
-          <button onClick={onOpen} className="mt-1 min-h-[44px] w-full rounded-xl bg-white text-[15px] font-bold">
+          <button onClick={() => onOpen(big[0]?.id)} className="mt-1 min-h-[44px] w-full rounded-xl bg-white text-[15px] font-bold">
             เห็นตัวไหน? กดบอกเจ้าของ ›
           </button>
         </section>
       )}
       {slim.length > 0 && (
         // seen already: one quiet line that still says "they are still looking"
-        <div className="flex items-center gap-2 rounded-2xl border border-[#E0C27A] bg-[#FFFBEF] px-3 py-1.5">
-          <button onClick={onOpen} className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2 text-left">
+        <div className="anim-shrink flex items-center gap-2 rounded-2xl border border-[#E0C27A] bg-[#FFFBEF] px-3 py-1.5">
+          <button onClick={() => onOpen(slim[0]?.id)} className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2 text-left">
             <span className="flex shrink-0 -space-x-2">
               {slim.slice(0, 3).map((x) => (
                 <span key={x.id}>{thumb(x, "h-8 w-8 rounded-full border-2 border-white text-base")}</span>

@@ -93,8 +93,12 @@ export default function TeamworkPage() {
           <button onClick={share} className="min-h-[44px] rounded-lg bg-green-600 px-3 text-sm font-bold">
             {copied ? "✅ คัดลอกแล้ว" : "📤 แชร์ให้เพื่อนบ้าน"}
           </button>
-          <a href="/zones" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm">🗺️ โซน</a>
-          <a href="/" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm">🏠</a>
+          <a href="/zones" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm">
+            🗺️ โซน
+          </a>
+          <a href="/" className="min-h-[44px] rounded-lg bg-white/15 px-3 py-2.5 text-sm">
+            🏠
+          </a>
         </div>
       </header>
 
@@ -168,7 +172,7 @@ export default function TeamworkPage() {
                   const o = d.zones[id] || {};
                   return { open: a.open + (o.open || 0), helping: a.helping + (o.helping || 0), done: a.done + (o.done_24h || 0), urgent: a.urgent + (o.urgent || 0) };
                 },
-                { open: 0, helping: 0, done: 0, urgent: 0 }
+                { open: 0, helping: 0, done: 0, urgent: 0 },
               );
               const all = n.open + n.helping + n.done || 1;
               const pt = pointOf(g.id);
@@ -176,7 +180,10 @@ export default function TeamworkPage() {
               return (
                 <div key={g.id} className="rounded-xl border-l-8 bg-white p-3 shadow" style={{ borderColor: g.color }}>
                   <div className="flex items-center gap-2">
-                    <span className={`flex h-10 shrink-0 items-center justify-center rounded-full font-black text-white ${g.ids.length > 1 ? "px-2 text-sm" : "w-10 text-xl"}`} style={{ background: g.color }}>
+                    <span
+                      className={`flex h-10 shrink-0 items-center justify-center rounded-full font-black text-white ${g.ids.length > 1 ? "px-2 text-sm" : "w-10 text-xl"}`}
+                      style={{ background: g.color }}
+                    >
                       {g.label}
                     </span>
                     <div className="grid flex-1 grid-cols-4 gap-1 text-center text-xs">
@@ -201,7 +208,8 @@ export default function TeamworkPage() {
                   <p className="mt-2 text-sm font-semibold">🚚 {pt?.place || placeOf(g)}</p>
                   <p className="text-sm">{pt?.manned ? "✅ มีอาสาประจำจุด" : <span className="font-semibold text-amber-700">🙋 ยังไม่มีคนประจำจุด — มาช่วยได้</span>}</p>
                   <p className="text-xs text-neutral-500">
-                    ซอย {g.sois[0]}–{g.sois[g.sois.length - 1]} · {last ? `${(ACT[last.kind] || ACT.other)[0]} ${(ACT[last.kind] || ACT.other)[1]} · ${timeAgo(last.at)}` : "ยังไม่มีความเคลื่อนไหว 24 ชม."}
+                    ซอย {g.sois[0]}–{g.sois[g.sois.length - 1]} ·{" "}
+                    {last ? `${(ACT[last.kind] || ACT.other)[0]} ${(ACT[last.kind] || ACT.other)[1]} · ${timeAgo(last.at)}` : "ยังไม่มีความเคลื่อนไหว 24 ชม."}
                   </p>
                 </div>
               );

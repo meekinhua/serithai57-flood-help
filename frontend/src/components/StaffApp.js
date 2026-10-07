@@ -48,8 +48,12 @@ function Join({ onJoined }) {
     return (
       <div className="mx-auto max-w-sm space-y-3 rounded-2xl bg-white p-5 shadow">
         <h2 className="text-xl font-bold">👷 สำหรับเจ้าหน้าที่ / อาสา</h2>
-        <p>ขอ <b>ลิงก์เชิญ</b> จากผู้ดูแล แล้วเปิดลิงก์นั้นบนมือถือ ใส่ชื่อ ก็ใช้งานได้ทันที</p>
-        <a href="/admin" className="block text-center underline">ผู้ดูแลเข้าสู่ระบบที่นี่</a>
+        <p>
+          ขอ <b>ลิงก์เชิญ</b> จากผู้ดูแล แล้วเปิดลิงก์นั้นบนมือถือ ใส่ชื่อ ก็ใช้งานได้ทันที
+        </p>
+        <a href="/admin" className="block text-center underline">
+          ผู้ดูแลเข้าสู่ระบบที่นี่
+        </a>
       </div>
     );
   }
@@ -68,13 +72,19 @@ function Join({ onJoined }) {
   return (
     <form onSubmit={join} className="mx-auto max-w-sm space-y-3 rounded-2xl bg-white p-5 shadow">
       <h2 className="text-xl font-bold">👷 เข้าร่วมทีมเจ้าหน้าที่</h2>
-      <label className="block font-medium" htmlFor="staff-name">ชื่อที่ทีมจะเห็น</label>
+      <label className="block font-medium" htmlFor="staff-name">
+        ชื่อที่ทีมจะเห็น
+      </label>
       <input id="staff-name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} className={input} placeholder="เช่น ต้น" />
-      <label className="block font-medium" htmlFor="staff-team">มาจากหน่วยไหน <span className="font-normal text-neutral-500">(ไม่ใส่ก็ได้)</span></label>
+      <label className="block font-medium" htmlFor="staff-team">
+        มาจากหน่วยไหน <span className="font-normal text-neutral-500">(ไม่ใส่ก็ได้)</span>
+      </label>
       <input id="staff-team" maxLength={40} value={team} onChange={(e) => setTeam(e.target.value)} className={input} placeholder="เช่น มูลนิธิ… / เขตบึงกุ่ม / อาสาในหมู่บ้าน" />
       <p className="text-sm text-neutral-600">กดเริ่มแล้ว มือถือจะถามขอตำแหน่ง ให้กด “อนุญาต” ชาวบ้านจะเห็นว่ามีเจ้าหน้าที่อยู่ใกล้ (หยุดแชร์ได้ตลอด)</p>
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
-      <button type="submit" className={`${btn} w-full bg-black text-white`}>เริ่มทำงาน</button>
+      <button type="submit" className={`${btn} w-full bg-black text-white`}>
+        เริ่มทำงาน
+      </button>
     </form>
   );
 }
@@ -98,25 +108,52 @@ function TaskEditForm({ t, onSaved, onCancel }) {
     <div className="mt-2 space-y-3 rounded-xl bg-neutral-50 p-3">
       <div className="flex flex-wrap gap-1.5">
         {Object.entries(CATEGORIES.need).map(([k, [e, label]]) => (
-          <button key={k} type="button" onClick={() => setCategory(k)} aria-pressed={category === k} className={`min-h-[40px] rounded-full px-3 text-sm ${category === k ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}>
+          <button
+            key={k}
+            type="button"
+            onClick={() => setCategory(k)}
+            aria-pressed={category === k}
+            className={`min-h-[40px] rounded-full px-3 text-sm ${category === k ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}
+          >
             {e} {label.split(" /")[0]}
           </button>
         ))}
       </div>
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium">จำนวน (ที่/คน)</span>
-        <button type="button" onClick={() => setPeople((n) => Math.max(0, n - 1))} className={`${btn} min-w-[44px] border border-neutral-300 bg-white`} aria-label="ลด">−</button>
-        <input type="number" inputMode="numeric" min={0} max={500} value={people} onChange={(e) => setPeople(Math.max(0, Math.min(500, Number(e.target.value) || 0)))} className="min-h-[44px] w-20 rounded-lg border border-neutral-300 text-center text-lg" />
-        <button type="button" onClick={() => setPeople((n) => Math.min(500, n + 1))} className={`${btn} min-w-[44px] border border-neutral-300 bg-white`} aria-label="เพิ่ม">+</button>
+        <button type="button" onClick={() => setPeople((n) => Math.max(0, n - 1))} className={`${btn} min-w-[44px] border border-neutral-300 bg-white`} aria-label="ลด">
+          −
+        </button>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={500}
+          value={people}
+          onChange={(e) => setPeople(Math.max(0, Math.min(500, Number(e.target.value) || 0)))}
+          className="min-h-[44px] w-20 rounded-lg border border-neutral-300 text-center text-lg"
+        />
+        <button type="button" onClick={() => setPeople((n) => Math.min(500, n + 1))} className={`${btn} min-w-[44px] border border-neutral-300 bg-white`} aria-label="เพิ่ม">
+          +
+        </button>
       </div>
-      <button type="button" onClick={() => setUrgent((u) => !u)} aria-pressed={urgent} className={`${btn} w-full ${urgent ? "bg-red-600 text-white" : "border-2 border-red-600 bg-white text-red-700"}`}>
+      <button
+        type="button"
+        onClick={() => setUrgent((u) => !u)}
+        aria-pressed={urgent}
+        className={`${btn} w-full ${urgent ? "bg-red-600 text-white" : "border-2 border-red-600 bg-white text-red-700"}`}
+      >
         {urgent ? "🚨 ด่วน (แตะเพื่อยกเลิก)" : "ตั้งเป็นงานด่วน"}
       </button>
       <textarea value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={1000} rows={3} className={`${input} py-2`} placeholder="รายละเอียด" />
       {error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={save} className={`${btn} bg-black text-white`}>💾 บันทึก</button>
-        <button type="button" onClick={onCancel} className={`${btn} border border-neutral-300 bg-white`}>ยกเลิก</button>
+        <button type="button" onClick={save} className={`${btn} bg-black text-white`}>
+          💾 บันทึก
+        </button>
+        <button type="button" onClick={onCancel} className={`${btn} border border-neutral-300 bg-white`}>
+          ยกเลิก
+        </button>
       </div>
     </div>
   );
@@ -173,12 +210,18 @@ function TaskCard({ t, user, onUpdate, onLocate }) {
         )}
         {!taken && t.status !== "done" && !finishing && !editing && (
           <>
-            <button onClick={() => setFinishing(true)} className={`${btn} bg-emerald-600 text-white`}>{mine ? "✅ เสร็จแล้ว" : "✅ เคลียร์ (ช่วยแล้ว)"}</button>
-            <button onClick={() => setEditing(true)} className={`${btn} border-2 border-black bg-white`}>✏️ แก้ไข</button>
+            <button onClick={() => setFinishing(true)} className={`${btn} bg-emerald-600 text-white`}>
+              {mine ? "✅ เสร็จแล้ว" : "✅ เคลียร์ (ช่วยแล้ว)"}
+            </button>
+            <button onClick={() => setEditing(true)} className={`${btn} border-2 border-black bg-white`}>
+              ✏️ แก้ไข
+            </button>
           </>
         )}
         {mine && t.status !== "done" && !finishing && !editing && (
-          <button onClick={() => act("release")} className={`${btn} col-span-2 border border-neutral-300 bg-white text-sm`}>↩️ ปล่อยงาน (ให้คนอื่นรับ)</button>
+          <button onClick={() => act("release")} className={`${btn} col-span-2 border border-neutral-300 bg-white text-sm`}>
+            ↩️ ปล่อยงาน (ให้คนอื่นรับ)
+          </button>
         )}
         {t.phone && (
           <a href={`tel:${t.phone.replace(/[^\d+]/g, "")}`} className={`${btn} flex items-center justify-center border border-neutral-300 bg-white`}>
@@ -210,8 +253,12 @@ function TaskCard({ t, user, onUpdate, onLocate }) {
         <div className="mt-2 space-y-2">
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className={input} placeholder="บันทึก เช่น ส่งข้าว 5 กล่อง น้ำ 1 แพ็ค" />
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => act("done", { note: note.trim() })} className={`${btn} bg-emerald-600 text-white`}>ยืนยันเสร็จ</button>
-            <button onClick={() => setFinishing(false)} className={`${btn} border border-neutral-300 bg-white`}>ยกเลิก</button>
+            <button onClick={() => act("done", { note: note.trim() })} className={`${btn} bg-emerald-600 text-white`}>
+              ยืนยันเสร็จ
+            </button>
+            <button onClick={() => setFinishing(false)} className={`${btn} border border-neutral-300 bg-white`}>
+              ยกเลิก
+            </button>
           </div>
         </div>
       )}
@@ -239,7 +286,7 @@ function Tasks({ user, tasks, reload, setTasks, onLocate }) {
       all: tasks.filter((t) => t.status !== "done").length,
       urgent: tasks.filter((t) => t.status !== "done" && t.urgent).length,
     }),
-    [tasks, user.id]
+    [tasks, user.id],
   );
   const shown = tasks.filter((t) => {
     if (view === "free" && (t.status === "done" || t.assignee)) return false;
@@ -272,7 +319,10 @@ function Tasks({ user, tasks, reload, setTasks, onLocate }) {
 
   async function copyMine() {
     const mine = tasks.filter((t) => t.status !== "done" && t.assignee?.id === user.id).sort((a, b) => soiKey(a.soi) - soiKey(b.soi));
-    const text = [`งานของ ${user.name} (${mine.length} หลัง)`, ...mine.map((t) => `- ${t.soi ? `ซ.${t.soi} ` : ""}${t.house || ""} ${categoryOf(t)[1]}${t.people ? ` ${t.people} ที่` : ""}${t.phone ? ` ☎ ${t.phone}` : ""}`)].join("\n");
+    const text = [
+      `งานของ ${user.name} (${mine.length} หลัง)`,
+      ...mine.map((t) => `- ${t.soi ? `ซ.${t.soi} ` : ""}${t.house || ""} ${categoryOf(t)[1]}${t.people ? ` ${t.people} ที่` : ""}${t.phone ? ` ☎ ${t.phone}` : ""}`),
+    ].join("\n");
     try {
       await navigator.clipboard.writeText(text);
       setMsg("คัดลอกรายการงานของคุณแล้ว");
@@ -304,24 +354,37 @@ function Tasks({ user, tasks, reload, setTasks, onLocate }) {
         <div className="flex w-max items-center gap-1.5">
           <span className="text-sm font-semibold">โซน</span>
           {[["all", null], ...zones].map(([z, n]) => (
-            <button key={z} onClick={() => setZone(z)} aria-pressed={zone === z} className={`min-h-[40px] min-w-[40px] rounded-full px-3 text-sm font-bold ${zone === z ? "bg-black text-white" : "border border-neutral-300 bg-white"}`}>
+            <button
+              key={z}
+              onClick={() => setZone(z)}
+              aria-pressed={zone === z}
+              className={`min-h-[40px] min-w-[40px] rounded-full px-3 text-sm font-bold ${zone === z ? "bg-black text-white" : "border border-neutral-300 bg-white"}`}
+            >
               {z === "all" ? "ทุกโซน" : z}
               {n != null && <span className="ml-1 text-xs font-normal opacity-70">{n}</span>}
             </button>
           ))}
-          <a href="/zones" className="ml-1 text-sm underline">🗺️ แผนที่โซน</a>
-          <a href="/ops" className="ml-1 text-sm underline">🤝 ประสานงาน</a>
+          <a href="/zones" className="ml-1 text-sm underline">
+            🗺️ แผนที่โซน
+          </a>
+          <a href="/ops" className="ml-1 text-sm underline">
+            🤝 ประสานงาน
+          </a>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
         <select value={soi} onChange={(e) => setSoi(e.target.value)} className={`${input} w-auto`}>
           <option value="all">ทุกซอย</option>
           {sois.map((s) => (
-            <option key={s} value={s}>{s === "none" ? "ไม่ทราบซอย" : `ซอย ${s}`}</option>
+            <option key={s} value={s}>
+              {s === "none" ? "ไม่ทราบซอย" : `ซอย ${s}`}
+            </option>
           ))}
         </select>
         {view === "mine" && counts.mine > 0 && (
-          <button onClick={copyMine} className={`${btn} border-2 border-black bg-white`}>📋 คัดลอกงานของฉัน</button>
+          <button onClick={copyMine} className={`${btn} border-2 border-black bg-white`}>
+            📋 คัดลอกงานของฉัน
+          </button>
         )}
       </div>
       {msg && <p className="rounded-lg bg-emerald-50 p-2 text-sm whitespace-pre-wrap">{msg}</p>}
@@ -334,7 +397,9 @@ function Tasks({ user, tasks, reload, setTasks, onLocate }) {
                 {s === "none" ? "❓ ไม่ทราบซอย" : `🛣️ ซอย ${s}`} <span className="font-normal text-neutral-600">· {items.length} หลัง</span>
               </h3>
               {s !== "none" && free > 1 && view !== "done" && (
-                <button onClick={() => claimSoi(s)} className={`${btn} bg-blue-600 text-sm text-white`}>รับทั้งซอย ({free})</button>
+                <button onClick={() => claimSoi(s)} className={`${btn} bg-blue-600 text-sm text-white`}>
+                  รับทั้งซอย ({free})
+                </button>
               )}
             </div>
             <ul className="mt-1 space-y-2">
@@ -361,7 +426,11 @@ function TaskMap({ user, tasks, sois, onUpdate, onLocate }) {
   const [team, setTeam] = useState([]);
   // teammates (boats, trucks, people on duty) on the same map, refreshed like the public page
   useEffect(() => {
-    const load = () => document.visibilityState === "visible" && api("/trips").then(setTeam).catch(() => {});
+    const load = () =>
+      document.visibilityState === "visible" &&
+      api("/trips")
+        .then(setTeam)
+        .catch(() => {});
     load();
     const t = setInterval(load, 10000);
     return () => clearInterval(t);
@@ -371,7 +440,10 @@ function TaskMap({ user, tasks, sois, onUpdate, onLocate }) {
     const soiLayer = L.layerGroup().addTo(map);
     for (const [name, s] of Object.entries(sois)) {
       for (const line of s.lines) L.polyline(line, { color: "#64748b", weight: 3, opacity: 0.5, interactive: false }).addTo(soiLayer);
-      L.marker(s.center, { interactive: false, icon: L.divIcon({ className: "", html: `<span style="font:600 10px sans-serif;background:#fff;border:1px solid #94a3b8;border-radius:4px;padding:0 3px;white-space:nowrap">ซ.${name}</span>` }) }).addTo(soiLayer);
+      L.marker(s.center, {
+        interactive: false,
+        icon: L.divIcon({ className: "", html: `<span style="font:600 10px sans-serif;background:#fff;border:1px solid #94a3b8;border-radius:4px;padding:0 3px;white-space:nowrap">ซ.${name}</span>` }),
+      }).addTo(soiLayer);
     }
     layer.current = L.layerGroup().addTo(map);
     map.createPane("staff").style.zIndex = 650;
@@ -429,7 +501,10 @@ function TaskMap({ user, tasks, sois, onUpdate, onLocate }) {
           <p className="rounded-xl bg-white p-3 text-center font-semibold shadow">👆 แตะจุดบนแผนที่ เพื่อ รับงาน · เคลียร์ · แก้ไข</p>
         )}
       </div>
-      <p className="mt-2 text-xs text-neutral-600">🔴 ด่วนยังไม่มีคนรับ · 🟠 ยังไม่มีคนรับ · 🔵 งานของคุณ · ⚫ คนอื่นรับแล้ว · วงประ = ตำแหน่งโดยประมาณ (ต้นซอย) · เส้นเทา = ซอยจาก OpenStreetMap · วงใหญ่ = ทีม (🔵 กำลังออกงาน 🟢 ออนไลน์ ⚪ ไม่มีสัญญาณเกิน 3 นาที)</p>
+      <p className="mt-2 text-xs text-neutral-600">
+        🔴 ด่วนยังไม่มีคนรับ · 🟠 ยังไม่มีคนรับ · 🔵 งานของคุณ · ⚫ คนอื่นรับแล้ว · วงประ = ตำแหน่งโดยประมาณ (ต้นซอย) · เส้นเทา = ซอยจาก OpenStreetMap · วงใหญ่ = ทีม (🔵 กำลังออกงาน 🟢 ออนไลน์ ⚪
+        ไม่มีสัญญาณเกิน 3 นาที)
+      </p>
     </div>
   );
 }
@@ -461,7 +536,9 @@ function Import({ onDone }) {
   async function commit() {
     setBusy(true);
     try {
-      const rows = preview.rows.filter((r) => picked[r.house]).map((r) => ({ house: r.house, soi: r.soi, soi_from_text: r.soi_from_text, text: r.text, phone: r.phone || "", portions: r.portions, force: !!r.recently_done }));
+      const rows = preview.rows
+        .filter((r) => picked[r.house])
+        .map((r) => ({ house: r.house, soi: r.soi, soi_from_text: r.soi_from_text, text: r.text, phone: r.phone || "", portions: r.portions, force: !!r.recently_done }));
       const res = await api("/staff/import/commit", { method: "POST", body: JSON.stringify({ rows }) });
       onDone(`สร้างงานใหม่ ${res.created} หลัง · รวมเข้ากับงานเดิม ${res.merged_into_existing} หลัง${res.skipped_recently_done ? ` · ข้ามบ้านที่เพิ่งช่วยเสร็จ ${res.skipped_recently_done}` : ""}`);
       setPreview(null);
@@ -481,13 +558,16 @@ function Import({ onDone }) {
       </div>
       <input type="file" accept=".txt,text/plain" onChange={readFile} className="block w-full text-sm" />
       <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} className={`${input} py-2`} placeholder="หรือวางข้อความจากแชตที่นี่" />
-      <button disabled={!text.trim() || busy} onClick={run} className={`${btn} w-full bg-black text-white`}>{busy ? "กำลังอ่าน…" : "อ่านแชต"}</button>
+      <button disabled={!text.trim() || busy} onClick={run} className={`${btn} w-full bg-black text-white`}>
+        {busy ? "กำลังอ่าน…" : "อ่านแชต"}
+      </button>
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
       {preview && (
         <div className="space-y-2">
           <p className="rounded-lg bg-yellow-100 p-3 text-sm">
             อ่าน {preview.messages} ข้อความ · ข้ามโพสต์ขายของ {preview.skipped_sales} · เลขที่บ้านถูกพูดถึง {preview.mentions} ครั้ง → <b>{preview.houses} หลังจริง</b>
-            <br />ใหม่ {preview.new} · มีงานอยู่แล้ว {preview.already_open} · เพิ่งช่วยเสร็จ (ไม่เลือกไว้) {preview.recently_done}
+            <br />
+            ใหม่ {preview.new} · มีงานอยู่แล้ว {preview.already_open} · เพิ่งช่วยเสร็จ (ไม่เลือกไว้) {preview.recently_done}
           </p>
           <ul className="max-h-[50vh] space-y-1 overflow-y-auto">
             {preview.rows.map((r) => (
@@ -503,7 +583,9 @@ function Import({ onDone }) {
               </li>
             ))}
           </ul>
-          <button disabled={!n || busy} onClick={commit} className={`${btn} w-full bg-black text-white`}>สร้างงาน {n} หลัง</button>
+          <button disabled={!n || busy} onClick={commit} className={`${btn} w-full bg-black text-white`}>
+            สร้างงาน {n} หลัง
+          </button>
         </div>
       )}
     </div>
@@ -543,7 +625,10 @@ function Addresses({ sois, initial, onSaved }) {
     const soiLayer = L.layerGroup().addTo(map);
     for (const [name, s] of Object.entries(sois)) {
       for (const line of s.lines) L.polyline(line, { color: "#64748b", weight: 3, opacity: 0.45, interactive: false }).addTo(soiLayer);
-      L.marker(s.center, { interactive: false, icon: L.divIcon({ className: "", html: `<span style="font:600 10px sans-serif;background:#fff;border:1px solid #94a3b8;border-radius:4px;padding:0 3px">ซ.${name}</span>` }) }).addTo(soiLayer);
+      L.marker(s.center, {
+        interactive: false,
+        icon: L.divIcon({ className: "", html: `<span style="font:600 10px sans-serif;background:#fff;border:1px solid #94a3b8;border-radius:4px;padding:0 3px">ซ.${name}</span>` }),
+      }).addTo(soiLayer);
     }
     bLayer.current = L.layerGroup().addTo(map);
     mapRef.current = map;
@@ -603,7 +688,9 @@ function Addresses({ sois, initial, onSaved }) {
         <select value={soi} onChange={(e) => setSoi(e.target.value)} className={`${input} w-auto`}>
           <option value="">ซอย (ถ้ารู้)</option>
           {Object.keys(sois).map((s) => (
-            <option key={s} value={s}>ซอย {s}</option>
+            <option key={s} value={s}>
+              ซอย {s}
+            </option>
           ))}
         </select>
         {house && (
@@ -613,7 +700,9 @@ function Addresses({ sois, initial, onSaved }) {
         )}
       </div>
       <div ref={el} className="h-[55vh] w-full overflow-hidden rounded-xl border border-neutral-300" />
-      <p className="text-xs text-neutral-600">แตะ <b>จุดอาคาร</b> (เทา = ยังไม่มีเลขที่, เขียว = มีแล้ว) หรือแตะตรงไหนก็ได้ แล้วกดบันทึก · อาคารจาก OpenStreetMap</p>
+      <p className="text-xs text-neutral-600">
+        แตะ <b>จุดอาคาร</b> (เทา = ยังไม่มีเลขที่, เขียว = มีแล้ว) หรือแตะตรงไหนก็ได้ แล้วกดบันทึก · อาคารจาก OpenStreetMap
+      </p>
       {picked?.taken && <p className="rounded-lg bg-yellow-100 p-2 text-sm">อาคารนี้ตั้งเป็น {picked.taken} ไว้แล้ว</p>}
       <button onClick={saveIt} disabled={!picked} className={`${btn} w-full bg-black text-white`}>
         💾 บันทึก: จุดนี้คือบ้าน {house || "…"}
@@ -678,7 +767,11 @@ function ZoneGroups() {
   const [text, setText] = useState("");
   const [custom, setCustom] = useState(false);
   const [msg, setMsg] = useState("");
-  const fmt = (groups) => groups.filter((g) => g.length > 1).map((g) => g.join("+")).join(" ");
+  const fmt = (groups) =>
+    groups
+      .filter((g) => g.length > 1)
+      .map((g) => g.join("+"))
+      .join(" ");
   useEffect(() => {
     api("/admin/zone-groups")
       .then((r) => {
@@ -688,9 +781,16 @@ function ZoneGroups() {
       .catch((e) => setMsg(e.message));
   }, []);
   async function save() {
-    const groups = text.toUpperCase().split(/[\s,]+/).filter(Boolean).map((g) => g.split("+").filter(Boolean));
-    if (!window.confirm(`ตั้งโซนรวมเป็น: ${fmt(groups) || "(ทุกโซนแยกกัน)"} ?
-หน้า /hq /team /zones จะเปลี่ยนทันที`)) return;
+    const groups = text
+      .toUpperCase()
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map((g) => g.split("+").filter(Boolean));
+    if (
+      !window.confirm(`ตั้งโซนรวมเป็น: ${fmt(groups) || "(ทุกโซนแยกกัน)"} ?
+หน้า /hq /team /zones จะเปลี่ยนทันที`)
+    )
+      return;
     try {
       const r = await api("/admin/zone-groups", { method: "PUT", body: JSON.stringify({ groups }) });
       setText(fmt(r.groups));
@@ -715,10 +815,18 @@ function ZoneGroups() {
   return (
     <div className="mt-4 space-y-2 rounded-xl border-2 border-black bg-white p-3">
       <p className="text-lg font-bold">🗺️ รวมโซน (ทีมเดียว จุดลงของเดียว)</p>
-      <p className="text-sm text-neutral-700">พิมพ์โซนที่รวมกัน เว้นวรรคระหว่างกลุ่ม เช่น <b>A+B G+H</b> · โซนที่ไม่ได้พิมพ์ = แยกเดี่ยว · จุดลงของใช้ของโซนแรกในกลุ่ม</p>
+      <p className="text-sm text-neutral-700">
+        พิมพ์โซนที่รวมกัน เว้นวรรคระหว่างกลุ่ม เช่น <b>A+B G+H</b> · โซนที่ไม่ได้พิมพ์ = แยกเดี่ยว · จุดลงของใช้ของโซนแรกในกลุ่ม
+      </p>
       <input value={text} onChange={(e) => setText(e.target.value)} className="min-h-[44px] w-full rounded-lg border-2 border-black px-3 font-mono text-lg" placeholder="A+B G+H" />
-      <button onClick={save} className="min-h-[44px] w-full rounded-lg bg-black text-sm font-bold text-white">💾 บันทึกการรวมโซน</button>
-      {custom && <button onClick={reset} className="min-h-[40px] w-full rounded-lg border border-black text-sm">↩️ กลับเป็นค่าตั้งต้น</button>}
+      <button onClick={save} className="min-h-[44px] w-full rounded-lg bg-black text-sm font-bold text-white">
+        💾 บันทึกการรวมโซน
+      </button>
+      {custom && (
+        <button onClick={reset} className="min-h-[40px] w-full rounded-lg border border-black text-sm">
+          ↩️ กลับเป็นค่าตั้งต้น
+        </button>
+      )}
       {msg && <p className="text-sm">{msg}</p>}
     </div>
   );
@@ -759,7 +867,11 @@ function TeamLinks() {
       setMsg(e.message);
     }
   }
-  const copy = (text) => navigator.clipboard?.writeText(text).then(() => setMsg("✅ คัดลอกแล้ว"), () => window.prompt("คัดลอก", text));
+  const copy = (text) =>
+    navigator.clipboard?.writeText(text).then(
+      () => setMsg("✅ คัดลอกแล้ว"),
+      () => window.prompt("คัดลอก", text),
+    );
   if (!key) return msg ? <p className="text-sm text-red-700">{msg}</p> : null;
   const hq = `${window.location.origin}/hq#k=${key}`;
   const team = `${window.location.origin}/team#k=${key}`;
@@ -775,10 +887,16 @@ function TeamLinks() {
         </div>
       )}
       <p className="text-sm text-neutral-700">ส่งในกลุ่มไลน์ทีมเท่านั้น อย่าโพสต์ในกลุ่มหมู่บ้าน · เปิดครั้งเดียว เครื่องจะจำไว้</p>
-      <button onClick={() => copy(hq)} className="min-h-[44px] w-full rounded-lg bg-black text-sm font-bold text-white">🧭 คัดลอกลิงก์ศูนย์ทีมงาน (/hq)</button>
-      <button onClick={() => copy(team)} className="min-h-[44px] w-full rounded-lg border-2 border-black text-sm font-bold">🚶 คัดลอกลิงก์ทีมแจก (/team)</button>
+      <button onClick={() => copy(hq)} className="min-h-[44px] w-full rounded-lg bg-black text-sm font-bold text-white">
+        🧭 คัดลอกลิงก์ศูนย์ทีมงาน (/hq)
+      </button>
+      <button onClick={() => copy(team)} className="min-h-[44px] w-full rounded-lg border-2 border-black text-sm font-bold">
+        🚶 คัดลอกลิงก์ทีมแจก (/team)
+      </button>
       {qr && <img src={qr} alt="QR ลิงก์ทีมแจก" className="mx-auto h-48 w-48" />}
-      <button onClick={rotate} className="min-h-[40px] w-full rounded-lg border border-red-600 text-sm text-red-700">🔄 เปลี่ยนลิงก์ทีม (ถ้าลิงก์หลุด)</button>
+      <button onClick={rotate} className="min-h-[40px] w-full rounded-lg border border-red-600 text-sm text-red-700">
+        🔄 เปลี่ยนลิงก์ทีม (ถ้าลิงก์หลุด)
+      </button>
       {msg && <p className="text-sm">{msg}</p>}
     </div>
   );
@@ -814,13 +932,17 @@ ${inv.url}`;
   return (
     <div className="space-y-3 rounded-2xl bg-white p-4 text-center shadow">
       <h2 className="text-xl font-bold">👥 ชวนคนมาช่วย</h2>
-      <p className="text-sm">ให้อีกคน <b>สแกน QR</b> ด้วยกล้องมือถือ หรือส่งลิงก์ทาง LINE · เปิดแล้วใส่ชื่อ ใช้งานได้ทันที</p>
+      <p className="text-sm">
+        ให้อีกคน <b>สแกน QR</b> ด้วยกล้องมือถือ หรือส่งลิงก์ทาง LINE · เปิดแล้วใส่ชื่อ ใช้งานได้ทันที
+      </p>
       {qr && <img src={qr} alt="QR เข้าร่วมทีม" className="mx-auto w-64 max-w-full rounded-lg border" />}
       <div className="grid gap-2 sm:grid-cols-2">
         <a href={`https://line.me/R/share?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer" className={`${btn} flex items-center justify-center bg-[#06C755] text-white`}>
           ส่งทาง LINE
         </a>
-        <button onClick={copy} className={`${btn} border-2 border-black bg-white`}>คัดลอกลิงก์ + ข้อความ</button>
+        <button onClick={copy} className={`${btn} border-2 border-black bg-white`}>
+          คัดลอกลิงก์ + ข้อความ
+        </button>
       </div>
       <details className="rounded-xl bg-neutral-50 p-3 text-left">
         <summary className="min-h-[40px] cursor-pointer font-semibold">📖 สอนเปิดในเบราว์เซอร์ (เผื่อ LINE / Messenger ในมือถือบางรุ่นเปิดจอค้างไม่ได้)</summary>
@@ -828,7 +950,9 @@ ${inv.url}`;
           <BrowserHowTo />
         </div>
       </details>
-      <p className="text-xs text-neutral-500">ลิงก์ใช้ได้ถึง {new Date(inv.expires_at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })} · ผู้ดูแลยกเลิกได้ทุกเมื่อ · อย่าโพสต์ในที่สาธารณะ</p>
+      <p className="text-xs text-neutral-500">
+        ลิงก์ใช้ได้ถึง {new Date(inv.expires_at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })} · ผู้ดูแลยกเลิกได้ทุกเมื่อ · อย่าโพสต์ในที่สาธารณะ
+      </p>
     </div>
   );
 }
@@ -846,13 +970,30 @@ function MoveToBrowser({ live }) {
       setErr(e.message);
     }
   }
-  if (url) return <div className="mb-3"><InAppGate env={IN_APP} url={url} onContinue={() => setUrl("")} /></div>;
+  if (url)
+    return (
+      <div className="mb-3">
+        <InAppGate env={IN_APP} url={url} onContinue={() => setUrl("")} />
+      </div>
+    );
   return (
     <section className="mb-3 rounded-xl border-2 border-yellow-400 bg-yellow-50 p-3">
       <p className="text-sm">
-        ⚠️ {live.awake === "denied" ? <>แอปแชตนี้<b>สั่งให้จอเปิดค้างไม่ได้</b> จอดับเมื่อไหร่ GPS หยุด</> : <>แอปแชตนี้<b>ไม่ให้ใช้ GPS</b></>} — ใช้ Safari/Chrome แทนดีกว่า
+        ⚠️{" "}
+        {live.awake === "denied" ? (
+          <>
+            แอปแชตนี้<b>สั่งให้จอเปิดค้างไม่ได้</b> จอดับเมื่อไหร่ GPS หยุด
+          </>
+        ) : (
+          <>
+            แอปแชตนี้<b>ไม่ให้ใช้ GPS</b>
+          </>
+        )}{" "}
+        — ใช้ Safari/Chrome แทนดีกว่า
       </p>
-      <button onClick={move} className={`${btn} mt-2 w-full bg-blue-600 text-white`}>🌐 ย้ายไป{IN_APP.os === "ios" ? " Safari" : " Chrome"} (ไม่ต้องใส่ชื่อใหม่)</button>
+      <button onClick={move} className={`${btn} mt-2 w-full bg-blue-600 text-white`}>
+        🌐 ย้ายไป{IN_APP.os === "ios" ? " Safari" : " Chrome"} (ไม่ต้องใส่ชื่อใหม่)
+      </button>
       {err && <p className="mt-1 text-sm text-red-700">{err}</p>}
     </section>
   );
@@ -895,12 +1036,25 @@ export default function StaffApp() {
         .then(setUser)
         .catch((e) => setToast(e.message))
         .finally(() => setChecked(true));
-    } else api("/auth/me").then(setUser).catch(() => {}).finally(() => setChecked(true));
+    } else
+      api("/auth/me")
+        .then(setUser)
+        .catch(() => {})
+        .finally(() => setChecked(true));
     api("/sois").then((d) => setSois(d.sois));
   }, []);
-  const reload = useCallback(() => api("/staff/tasks?include_done=true").then(setTasks).catch(() => {}), []);
+  const reload = useCallback(
+    () =>
+      api("/staff/tasks?include_done=true")
+        .then(setTasks)
+        .catch(() => {}),
+    [],
+  );
   useEffect(() => {
-    if (user) api("/staff/trips/mine").then((t) => setTrip(t || null)).catch(() => setTrip(null));
+    if (user)
+      api("/staff/trips/mine")
+        .then((t) => setTrip(t || null))
+        .catch(() => setTrip(null));
   }, [user]);
   useEffect(() => {
     if (!user) return;
@@ -915,20 +1069,31 @@ export default function StaffApp() {
         <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2">
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-bold">👷 เจ้าหน้าที่ · เสรีไทย 57</h1>
-            {user && <p className="truncate text-xs text-neutral-400">{user.name} · งานค้าง {tasks.filter((t) => t.status !== "done").length} · ยังไม่มีคนรับ {tasks.filter((t) => t.status !== "done" && !t.assignee).length}</p>}
+            {user && (
+              <p className="truncate text-xs text-neutral-400">
+                {user.name} · งานค้าง {tasks.filter((t) => t.status !== "done").length} · ยังไม่มีคนรับ {tasks.filter((t) => t.status !== "done" && !t.assignee).length}
+              </p>
+            )}
           </div>
           {user && (
             <button onClick={() => setShowGuide(true)} aria-label="เปิดวิธีใช้งานเจ้าหน้าที่" className="min-h-[44px] min-w-[44px] rounded-lg bg-white/10 px-3 font-bold">
               ❓
             </button>
           )}
-          <a href="/" className="min-h-[44px] rounded-lg bg-white/10 px-3 py-2 text-sm">หน้าหลัก</a>
+          <a href="/" className="min-h-[44px] rounded-lg bg-white/10 px-3 py-2 text-sm">
+            หน้าหลัก
+          </a>
         </div>
         {user && (
           <div className="mx-auto max-w-3xl overflow-x-auto px-2 pb-2">
             <div className="flex w-max gap-1">
               {(user?.role === "admin" || user?.importer ? [...TABS, IMPORT_TAB] : TABS).map(([k, text]) => (
-                <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className={`min-h-[40px] whitespace-nowrap rounded-lg px-3 text-sm font-semibold ${tab === k ? "bg-white text-black" : "bg-white/10"}`}>
+                <button
+                  key={k}
+                  onClick={() => setTab(k)}
+                  aria-pressed={tab === k}
+                  className={`min-h-[40px] whitespace-nowrap rounded-lg px-3 text-sm font-semibold ${tab === k ? "bg-white text-black" : "bg-white/10"}`}
+                >
                   {text}
                 </button>
               ))}

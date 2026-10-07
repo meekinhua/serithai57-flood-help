@@ -5,7 +5,7 @@ import { isQuiet, tripClaims, tripWhere } from "./Trips";
 // Staff on the map must stand out from residents' pins: a big filled disc in the team colour,
 // white rim, pulsing ring, the vehicle as the icon, and a name tag. Used by the public map and
 // the staff console map. Styles: .staff-pin* in index.css.
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 const TRIP_COLOR = "#2563eb"; // on a trip (moving boat/truck)
 const ONLINE_COLOR = "#059669"; // on duty, not on a trip
@@ -37,9 +37,7 @@ function popupHtml(t) {
   }
   const [me, mt] = MISSIONS[t.mission] || ["🤝", ""];
   const [pe, pt] = PHASES[t.phase] || PHASES.enroute;
-  return `<b>${ve} ${esc(t.label)}</b><br>${me} ${mt}<br>${pe} ${pt} · ${esc(tripWhere(t))}${t.note ? `<br>📝 ${esc(t.note)}` : ""}${
-    claims ? `<br>📋 ${esc(claims)}` : ""
-  }<br>${when}`;
+  return `<b>${ve} ${esc(t.label)}</b><br>${me} ${mt}<br>${pe} ${pt} · ${esc(tripWhere(t))}${t.note ? `<br>📝 ${esc(t.note)}` : ""}${claims ? `<br>📋 ${esc(claims)}` : ""}<br>${when}`;
 }
 
 export function drawStaff(layer, trips, pane) {

@@ -31,7 +31,7 @@ export default function LocationPicker({ value, onChange, onTouched = () => {} }
         setGps(`ได้ตำแหน่งแล้ว (แม่นยำ ~${Math.round(pos.coords.accuracy)} ม.) เลื่อนแผนที่ปรับได้`);
       },
       () => setGps("หาตำแหน่งไม่ได้ กรุณาเลื่อนแผนที่เอง"),
-      { enableHighAccuracy: true, timeout: 15000 }
+      { enableHighAccuracy: true, timeout: 15000 },
     );
   }
 
@@ -39,9 +39,7 @@ export default function LocationPicker({ value, onChange, onTouched = () => {} }
     <div>
       <div className="relative h-56 overflow-hidden rounded-lg border border-neutral-300 sm:h-64">
         <div ref={elRef} className="h-full w-full" />
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-[500] -translate-x-1/2 -translate-y-full text-4xl drop-shadow">
-          📍
-        </div>
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-[500] -translate-x-1/2 -translate-y-full text-4xl drop-shadow">📍</div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <button type="button" onClick={useGps} className="min-h-[44px] rounded-lg border border-neutral-300 bg-white px-4 font-medium active:bg-neutral-100">

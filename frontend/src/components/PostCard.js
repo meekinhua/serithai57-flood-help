@@ -28,7 +28,9 @@ export function PostSummary({ post, onOpen, fresh = false }) {
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
             {post.pinned && <span className="rounded bg-black px-1.5 font-bold text-white">📌 ปักหมุด</span>}
             {post.urgent && post.status === "open" && <span className="rounded bg-red-600 px-1.5 font-bold text-white">ด่วน</span>}
-            <span className="font-semibold" style={{ color: k.color }}>{catLabel}</span>
+            <span className="font-semibold" style={{ color: k.color }}>
+              {catLabel}
+            </span>
             <span className={`rounded px-1.5 ${STATUS[post.status].cls}`}>{STATUS[post.status][post.kind]}</span>
             {waited >= 3 && <span className="rounded bg-yellow-300 px-1.5 font-bold text-black">⏳ รอมา {Math.floor(waited)} ชม.</span>}
             {post.general && <span className="rounded bg-neutral-100 px-1.5">🏘️ ทั้งหมู่บ้าน</span>}
@@ -162,8 +164,18 @@ export function PostDetail({ post, admin, onChanged, onDeleted, onShowOnMap }) {
       <MediaGallery media={post.media} />
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-neutral-700">
-        {post.place && (<><dt className="text-neutral-500">ที่อยู่</dt><dd className="break-words">{post.place}</dd></>)}
-        {post.people != null && (<><dt className="text-neutral-500">จำนวน</dt><dd>{post.people} คน</dd></>)}
+        {post.place && (
+          <>
+            <dt className="text-neutral-500">ที่อยู่</dt>
+            <dd className="break-words">{post.place}</dd>
+          </>
+        )}
+        {post.people != null && (
+          <>
+            <dt className="text-neutral-500">จำนวน</dt>
+            <dd>{post.people} คน</dd>
+          </>
+        )}
         <dt className="text-neutral-500">ผู้แจ้ง</dt>
         <dd className="break-words">{post.name}</dd>
         <dt className="text-neutral-500">แจ้งเมื่อ</dt>
@@ -185,7 +197,9 @@ export function PostDetail({ post, admin, onChanged, onDeleted, onShowOnMap }) {
           <p className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-600">🏘️ ข่าวทั้งหมู่บ้าน ไม่ได้ระบุจุด</p>
         ) : (
           <>
-            <button onClick={() => onShowOnMap(post)} className={`${btn} border border-neutral-300 bg-white`}>🗺️ ดูบนแผนที่</button>
+            <button onClick={() => onShowOnMap(post)} className={`${btn} border border-neutral-300 bg-white`}>
+              🗺️ ดูบนแผนที่
+            </button>
             <a href={osmLink(post.lat, post.lng)} target="_blank" rel="noreferrer" className={`${btn} flex items-center justify-center border border-neutral-300 bg-white`}>
               🧭 เปิดใน OpenStreetMap
             </a>
@@ -200,7 +214,13 @@ export function PostDetail({ post, admin, onChanged, onDeleted, onShowOnMap }) {
         <h3 className="mb-2 font-semibold">อัปเดตสถานะ</h3>
         <div className="grid gap-2 sm:grid-cols-2">
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="ชื่อของคุณ *" className="min-h-[44px] rounded-lg border border-neutral-300 px-3" />
-          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="ข้อความ เช่น ติดต่อไม่ได้ / ได้ของแล้ว" className="min-h-[44px] rounded-lg border border-neutral-300 px-3" />
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={300}
+            placeholder="ข้อความ เช่น ติดต่อไม่ได้ / ได้ของแล้ว"
+            className="min-h-[44px] rounded-lg border border-neutral-300 px-3"
+          />
         </div>
         <div className="mt-2 grid gap-2 min-[400px]:grid-cols-2">
           {post.status !== "helping" && (
