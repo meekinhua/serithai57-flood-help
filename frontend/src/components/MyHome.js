@@ -548,8 +548,88 @@ export function homeBadgeOf(info) {
   if (!info) return null;
   const seen = load("soonSeen", []);
   const fresh = (info.soon || []).filter((x) => !seen.includes(x.id));
-  if ((info.checkin && !info.checkin.mine) || fresh.some((x) => x.when === "วันนี้" || x.id.startsWith("aid_"))) return "important";
-  return fresh.length > 0 || (info.questions || []).some((q) => !q.answer) ? "general" : null;
+  const important = [];
+  const general = [];
+  if (info.checkin && !info.checkin.mine) important.push(`🆘 ${info.checkin.title} · ยังไม่ได้ตอบ`);
+  for (const x of fresh) (x.when === "วันนี้" || x.id.startsWith("aid_") ? important : general).push(`${x.icon || "📅"} ${x.when}: ${x.text}`);
+  for (const q of info.questions || []) if (!q.answer) general.push(`${q.icon || "❓"} คำถามจากทีม: ${q.q}`);
+  if (info.handy_wanted > 0) general.push(`🤝 มีคนอยากให้ช่วยเรื่องที่คุณถนัด ${info.handy_wanted} เรื่อง`);
+  const reasons = [...important, ...general];
+  if (!reasons.length) return null;
+  return { level: important.length ? "important" : "general", reasons, sig: reasons.join("|") };
+}
+
+// ---------- 🤝 อาสาข้างบ้าน: what this house can do for the neighbours (backend nearby.py SKILLS) ----------
+const SKILL_LIST = [
+  ["fix", "🔧", "ซ่อมเล็กๆ ในบ้าน"],
+  ["elec", "💡", "ไฟฟ้าเบื้องต้น"],
+  ["plumb", "🚰", "ประปาเบื้องต้น"],
+  ["strong", "💪", "ยกของหนัก"],
+  ["tech", "📱", "มือถือ / แอป"],
+  ["drive", "🚗", "ขับรถพาไป"],
+  ["errand", "🛒", "ซื้อของ / ธุระ"],
+];
+function HandyRow({ house, handy, onSaved, onClose, setErr }) {
+  const [f, setF] = useState(() => ({
+    name: handy?.name || load("myName", ""),
+    phone: load("myReach", ""),
+    skills: handy?.skills || [],
+    note: handy?.note || "",
+    on: handy ? handy.on !== false : true,
+  }));
+  const toggle = (k) => setF({ ...f, skills: f.skills.includes(k) ? f.skills.filter((x) => x !== k) : [...f.skills, k] });
+  async function save_() {
+    setErr("");
+    try {
+      const r = await api("/myhome/handy", { method: "POST", body: JSON.stringify({ house, ...f }) });
+      save("myName", f.name);
+      if (f.phone) save("myReach", f.phone);
+      onSaved(r);
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+  const box = "min-h-[50px] w-full rounded-xl border border-[#A9B4AD] bg-white px-3 text-base";
+  return (
+    <div id="myhome-handy" className="space-y-3 border-t border-[#E6EBE7] py-3">
+      <div>
+        <p className="text-base font-bold">🤝 อาสาข้างบ้าน · คุณช่วยเพื่อนบ้านเรื่องไหนได้</p>
+        <p className="text-sm text-[#45504A]">
+          บ้านที่มีแต่ผู้สูงอายุหรือผู้หญิง ซ่อมของเองไม่ได้ จะขอให้ช่วยได้ คำขอที่ตรงกับที่คุณถนัดจะขึ้นในบ้านฉันของคุณ ช่วยได้ก็กดรับ ไม่ว่างก็ข้ามได้ ไม่มีบังคับ
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {SKILL_LIST.map(([k, icon, label]) => (
+          <button
+            key={k}
+            onClick={() => toggle(k)}
+            aria-pressed={f.skills.includes(k)}
+            className={`min-h-[52px] rounded-xl border-2 px-2 text-left text-[15px] font-bold leading-tight ${f.skills.includes(k) ? "border-[#1E6B47] bg-[#1E6B47] text-white" : "border-[#C9D1CB] bg-white"}`}
+          >
+            <span aria-hidden="true">{icon} </span>
+            {label}
+          </button>
+        ))}
+      </div>
+      <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="ชื่อเรียก (เพื่อนบ้านเห็น)" className={box} />
+      <input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} placeholder="เบอร์ / LINE (คนขอจะเห็นเมื่อคุณกดรับช่วยเท่านั้น)" inputMode="tel" className={box} />
+      <input value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="ว่างช่วงไหน เช่น เย็นๆ / เสาร์อาทิตย์ (ไม่บังคับ)" className={box} />
+      {handy && (
+        <label className="flex min-h-[44px] items-center gap-3 text-[15px]">
+          <input type="checkbox" checked={!f.on} onChange={(e) => setF({ ...f, on: !e.target.checked })} className="h-5 w-5 accent-[#1E6B47]" />
+          พักไว้ก่อน (ไม่ต้องเห็นคำขอช่วงนี้)
+        </label>
+      )}
+      <div className="flex gap-2">
+        <button onClick={save_} disabled={!f.name.trim() || !f.skills.length} className="min-h-[52px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-40">
+          บันทึก
+        </button>
+        <button onClick={onClose} className="min-h-[52px] rounded-xl border border-[#C9D1CB] px-4 font-bold">
+          ปิด
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge }) {
@@ -563,6 +643,14 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const [input, setInput] = useState(house || "");
   const [info, setInfo] = useState(null);
   const [reloadN, setReloadN] = useState(0);
+  const [handy, setHandy] = useState(null); // this house's อาสาข้างบ้าน profile
+  const [handyOpen, setHandyOpen] = useState(false);
+  useEffect(() => {
+    if (!house) return;
+    api(`/handy?house=${encodeURIComponent(house)}`)
+      .then((r) => setHandy(r.me))
+      .catch(() => {});
+  }, [house]);
   const [seenN, setSeenN] = useState(0); // "รับทราบ" pressed: the tab badge looks again
   // the tab button's badge (homeBadgeOf below)
   useEffect(() => {
@@ -919,7 +1007,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <ReviewPrompt services={services} />
 
           <div ref={nearRef}>
-            <Nearby info={info} form={nearForm} setForm={setNearForm} setErr={setErr} />
+            <Nearby info={info} form={nearForm} setForm={setNearForm} setErr={setErr} handy={handy} onPros={onPros} />
           </div>
 
           {info.issues_open > 0 && (
@@ -946,9 +1034,41 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           {/* things you may want to do some day: one grid instead of a section each */}
           <div className="border-t border-[#E6EBE7] py-3">
             <p className="text-base font-bold text-[#15201A]">{t("myhome.tools.title", "ทำอะไรได้อีก")}</p>
+            <button
+              onClick={() => setHandyOpen((o) => !o)}
+              className={`mt-2 flex min-h-[64px] w-full items-center gap-3 rounded-2xl px-3 py-2 text-left ${handy?.on ? "border-2 border-[#1E6B47] bg-[#E4F0E9]" : "bg-[#15201A] text-white"}`}
+            >
+              <span className="text-2xl" aria-hidden="true">
+                🤝
+              </span>
+              <span className="min-w-0 flex-1">
+                <b className="block text-base leading-tight">{handy?.on ? `คุณเป็นอาสาข้างบ้าน ✓` : t("myhome.handy.cta", "ทำเป็น ช่วยเพื่อนบ้านได้? เป็นอาสาข้างบ้าน")}</b>
+                <span className={`block text-sm ${handy?.on ? "text-[#33403A]" : "text-[#C5D1CA]"}`}>
+                  {handy?.on
+                    ? `${SKILL_LIST.filter(([k]) => handy.skills.includes(k))
+                        .map(([, , l]) => l)
+                        .join(" · ")}${handy.thanks ? ` · ช่วยแล้ว ${handy.thanks} ครั้ง 🙏` : ""}`
+                    : "ซ่อมเล็กๆ ยกของ ช่วยใช้มือถือ พาไปหาหมอ · ตามที่สะดวก"}
+                </span>
+              </span>
+              <span aria-hidden="true">{handyOpen ? "▴" : "›"}</span>
+            </button>
+            {handyOpen && (
+              <HandyRow
+                house={info.house}
+                handy={handy}
+                setErr={setErr}
+                onClose={() => setHandyOpen(false)}
+                onSaved={(r) => {
+                  setHandy(r);
+                  setHandyOpen(false);
+                  reload();
+                }}
+              />
+            )}
             <div className="mt-2 grid grid-cols-2 gap-2">
               {[
-                ["🙏", t("myhome.tools.ask", "ฝากเพื่อนบ้าน"), t("myhome.tools.ask_sub", "ช่วยดูบ้าน รับของ"), () => startNear("ask")],
+                ["🙏", t("myhome.tools.ask", "ฝากเพื่อนบ้าน"), t("myhome.tools.ask_sub", "ซ่อมเล็กๆ ยกของ ดูบ้าน"), () => startNear("ask")],
                 ["⚠️", t("myhome.tools.alert", "เตือนเพื่อนบ้าน"), t("myhome.tools.alert_sub", "ฝาท่อแตก ของหาย"), () => startNear("alert")],
                 ["🛠️", t("myhome.tools.office", "แจ้งสำนักงาน"), t("myhome.tools.office_sub", "ไฟถนน ขยะ ถ่ายรูปได้"), onIssue],
                 [

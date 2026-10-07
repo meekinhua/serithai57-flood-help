@@ -103,7 +103,7 @@ export function WaterPill({ water, canal, onOpen }) {
       className={`flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-lg px-2 text-left leading-tight ${st.alarm ? "bg-red-600" : "bg-white/10"} active:bg-white/20`}
     >
       <span className={`inline-block h-3.5 w-3.5 shrink-0 rounded-full ring-2 ring-white ${st.alarm ? "animate-pulse" : ""}`} style={{ background: st.color }} aria-hidden="true" />
-      <span className="text-xs font-bold sm:text-sm">
+      <span className="hidden text-xs font-bold min-[400px]:inline sm:text-sm">
         💧 {st.text}
         <span className="hidden text-[11px] font-normal opacity-80 min-[420px]:block">{st.sub}</span>
       </span>

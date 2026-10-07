@@ -23,6 +23,12 @@ Kind = Literal["ask", "alert"]
 # topic: (label, hours it stays up by default, issue type for the office or None)
 TOPICS = {
     "ask": {
+        "fix": ("ซ่อมเล็กๆ ในบ้าน (ก๊อกรั่ว อุดรู ประตู)", 72, None),
+        "elec": ("ไฟ ปลั๊ก หลอดไฟ เบรกเกอร์", 72, None),
+        "plumb": ("น้ำ ท่อ ปั๊มน้ำ ห้องน้ำ", 72, None),
+        "tech": ("ช่วยใช้มือถือ / ลงทะเบียนแอป", 72, None),
+        "ride": ("พาไปหาหมอ / ไปเขต", 48, None),
+        "errand": ("ซื้อของ / ธุระให้", 24, None),
         "water": ("ดูน้ำหน้าบ้านให้หน่อย", 12, None),
         "photo": ("ถ่ายรูปหน้าบ้าน / ในบ้านให้ดู", 24, None),
         "parcel": ("ช่วยรับพัสดุ / ของ", 24, None),
@@ -42,6 +48,20 @@ TOPICS = {
     },
 }
 RADIUS = {"ask": 250, "alert": 400}  # metres an item reaches
+
+# 7 Oct: "อาสาข้างบ้าน" — neighbours say what they can do; an ask about that reaches them anywhere in the village
+# (a house of old people and women with a leaking pipe finds the handy one three sois away, not only next door).
+SKILLS = {
+    "fix": "ซ่อมเล็กๆ ในบ้าน",
+    "elec": "ไฟฟ้าเบื้องต้น",
+    "plumb": "ประปาเบื้องต้น",
+    "strong": "ยกของหนัก",
+    "tech": "มือถือ / แอป",
+    "drive": "ขับรถพาไป",
+    "errand": "ซื้อของ / ธุระ",
+}
+SKILL_OF = {"fix": "fix", "elec": "elec", "plumb": "plumb", "carry": "strong", "tech": "tech", "ride": "drive", "errand": "errand"}
+VILLAGE_M = 3000  # how far a skill match reaches
 
 
 def now():
@@ -74,6 +94,16 @@ class HelpBody(BaseModel):
     name: str = Field(..., min_length=1, max_length=60)
     phone: str = Field("", max_length=60)  # optional, only the owner sees it
     note: str = Field("", max_length=120)
+    house: str = Field("", max_length=20)  # the helper's house: counts their thanks
+
+
+class HandyBody(BaseModel):
+    house: str = Field(..., max_length=20)
+    name: str = Field(..., min_length=1, max_length=60)
+    phone: str = Field("", max_length=60)
+    skills: List[str] = Field(default_factory=list, max_length=7)
+    note: str = Field("", max_length=120)  # "ว่างเย็นๆ / เสาร์อาทิตย์"
+    on: bool = True
 
 
 class AlertBody(BaseModel):
@@ -98,20 +128,46 @@ def build_router(db, rate_limit, client_ip, require_admin, locate_house, norm_ho
         return d
 
     @router.get("/nearby")
-    async def nearby(house: str, request: Request):
+    async def nearby(house: str, request: Request, skills: str = ""):
         """What's open around this house: asks within 250 m, alerts within 400 m (wider while the house isn't pinned)."""
         rate_limit(request, "nearby", limit=80, window_s=600)
         h, loc = await where(house)
         here = (loc["lat"], loc["lng"])
         slack = 0 if loc.get("precision") == "house" else 150
-        box = 0.006
+        mine_skills = {x for x in skills.split(",") if x in SKILLS}
+        box = 0.03 if mine_skills else 0.006
         q = {"status": "open", "expires_at": {"$gt": now()}, "lat": {"$gt": here[0] - box, "$lt": here[0] + box}, "lng": {"$gt": here[1] - box, "$lt": here[1] + box}}
         out = []
-        async for d in db.nearby.find(q, {"_id": 0}).sort("created_at", -1).limit(200):
+        async for d in db.nearby.find(q, {"_id": 0}).sort("created_at", -1).limit(300):
             m = metres(here, (d["lat"], d["lng"]))
-            if d["house"] == h or m <= d.get("radius", RADIUS[d["kind"]]) + slack:
-                out.append({**public(d, here), "mine": d["house"] == h})
+            match = d["kind"] == "ask" and SKILL_OF.get(d["topic"]) in mine_skills and d["house"] != h
+            if d["house"] == h or m <= d.get("radius", RADIUS[d["kind"]]) + slack or (match and m <= VILLAGE_M):
+                out.append({**public(d, here), "mine": d["house"] == h, "match": match})
         return out
+
+    @router.get("/handy")
+    async def handy(house: str = "", request: Request = None):
+        """This house's helper profile (if any) and how many neighbours can do each thing."""
+        counts = {k: 0 for k in SKILLS}
+        async for x in db.handy.find({"on": True}, {"_id": 0, "skills": 1}):
+            for s in x.get("skills", []):
+                if s in counts:
+                    counts[s] += 1
+        me = await db.handy.find_one({"house": norm_house(house)}, {"_id": 0, "phone": 0}) if house else None
+        return {"me": me, "counts": counts, "skills": SKILLS}
+
+    @router.post("/myhome/handy")
+    async def set_handy(body: HandyBody, request: Request):
+        rate_limit(request, "handy", limit=20, window_s=600)
+        h, loc = await where(body.house)
+        doc = {"house": h, "soi": loc.get("soi") or "", "name": body.name.strip(), "phone": body.phone.strip(), "skills": [s for s in body.skills if s in SKILLS],
+               "note": body.note.strip(), "on": body.on, "updated_at": now()}
+        await db.handy.update_one({"house": h}, {"$set": doc, "$setOnInsert": {"thanks": 0, "created_at": now()}}, upsert=True)
+        return {k: v for k, v in (await db.handy.find_one({"house": h}, {"_id": 0, "phone": 0})).items()}
+
+    @router.get("/admin/handy")
+    async def admin_handy(admin: dict = Depends(require_admin)):
+        return await db.handy.find({}, {"_id": 0}).sort([("soi", 1), ("house", 1)]).to_list(2000)
 
     @router.post("/nearby", status_code=201)
     async def create(body: NearbyCreate, request: Request):
@@ -169,7 +225,8 @@ def build_router(db, rate_limit, client_ip, require_admin, locate_house, norm_ho
             raise HTTPException(404, "เรื่องนี้ปิดไปแล้ว")
         who = body.name.strip()
         if not any(x["name"] == who for x in d.get("helpers", [])):
-            await db.nearby.update_one({"id": item_id}, {"$push": {"helpers": {"name": who, "phone": body.phone.strip(), "note": body.note.strip(), "at": now()}}})
+            helper_house = norm_house(body.house) if body.house else ""
+            await db.nearby.update_one({"id": item_id}, {"$push": {"helpers": {"name": who, "phone": body.phone.strip(), "note": body.note.strip(), "house": helper_house, "at": now()}}})
         return {"phone": d["phone"], "name": d.get("name", ""), "house": d["house"]}
 
     @router.post("/nearby/{item_id}/alert")
@@ -196,9 +253,12 @@ def build_router(db, rate_limit, client_ip, require_admin, locate_house, norm_ho
 
     @router.post("/nearby/{item_id}/done")
     async def done(item_id: str, x_edit_key: str = Header("")):
-        d = await db.nearby.find_one({"id": item_id}, {"_id": 0, "edit_key_hash": 1})
+        d = await db.nearby.find_one({"id": item_id}, {"_id": 0, "edit_key_hash": 1, "helpers": 1, "status": 1})
         if not d or not x_edit_key or d["edit_key_hash"] != _hash(x_edit_key):
             raise HTTPException(403, "ไม่ใช่เจ้าของเรื่องนี้")
+        if d.get("status") == "open":
+            for hh in {x.get("house") for x in d.get("helpers", []) if x.get("house")}:
+                await db.handy.update_one({"house": hh}, {"$inc": {"thanks": 1}})
         await db.nearby.update_one({"id": item_id}, {"$set": {"status": "done", "closed_at": now()}})
         return {"ok": True}
 

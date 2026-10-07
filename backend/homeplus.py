@@ -176,6 +176,14 @@ def build(db, rate_limit, require_admin, locate_house, clean):
         return out
 
     # ---------------- what GET /api/myhome adds ----------------
+    async def handy_wanted(h: str) -> int:
+        from nearby import SKILL_OF  # the asks that need a skill
+        me = await db.handy.find_one({"house": h, "on": True}, {"_id": 0, "skills": 1})
+        topics = [t for t, s in SKILL_OF.items() if s in (me or {}).get("skills", [])]
+        if not topics:
+            return 0
+        return await db.nearby.count_documents({"kind": "ask", "status": "open", "expires_at": {"$gt": now()}, "topic": {"$in": topics}, "house": {"$ne": h}})
+
     async def extras(h: str, soi: Optional[str]) -> dict:
         c = await checkin_doc()
         check = None
@@ -195,6 +203,6 @@ def build(db, rate_limit, require_admin, locate_house, clean):
                     soon.append({"id": f"aid_{a['id']}_{a['deadline']}", "icon": "💰", "date": a["deadline"],
                                  "when": "วันนี้" if d == today else "พรุ่งนี้" if d == today + timedelta(days=1) else f"อีก {(d - today).days} วัน",
                                  "text": f"หมดเขต: {a['title']}"})
-        return {"checkin": check, "plan": (plan_doc or {}).get("items"), "aid": aid_list, "outage": await outage_view(h, soi), "_soon": soon}
+        return {"handy_wanted": await handy_wanted(h), "checkin": check, "plan": (plan_doc or {}).get("items"), "aid": aid_list, "outage": await outage_view(h, soi), "_soon": soon}
 
     return router, extras

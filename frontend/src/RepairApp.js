@@ -241,7 +241,13 @@ export default function RepairApp() {
   // first visit: nothing is "new" yet
   const [seenAt, setSeenAt] = useState(() => load("communitySeen", null) ?? Date.now());
   const [prosSeen, setProsSeen] = useState(() => load("prosSeen", null) ?? Date.now());
-  const [homeBadge, setHomeBadge] = useState(() => load("homeBadge", null));
+  const [homeBadge, setHomeBadge] = useState(() => {
+    const b = load("homeBadge", null);
+    return typeof b === "string" ? { level: b, reasons: [], sig: b } : b; // older phones kept a plain word
+  });
+  // the reader's "ล้างแจ้งเตือน": {tab: the signature cleared}; a badge with a new signature lights up again
+  const [ack, setAck] = useState(() => load("badgeAck", {}));
+  const [notifyOpen, setNotifyOpen] = useState(false);
   const onHomeBadge = useCallback((b) => {
     setHomeBadge(b);
     save("homeBadge", b);
@@ -268,6 +274,22 @@ export default function RepairApp() {
       save("communitySeen", newest);
     }
   }, [page, newest, seenAt]);
+
+  // what each page tab has to say (the bell lists it; ล้าง mutes it until it changes)
+  const ws = waterStatus(water, canal);
+  const notes = {
+    home: homeBadge,
+    pros: newestPro > prosSeen ? { level: "general", reasons: ["🔧 มีร้าน / ช่างใหม่ในหมู่บ้าน"], sig: `p${newestPro}` } : null,
+    community: newest > seenAt ? { level: "general", reasons: ["👥 มีโพสต์ใหม่จากเพื่อนบ้าน"], sig: `c${newest}` } : null,
+    map: ws.alarm ? { level: "important", reasons: [`💧 ระดับน้ำ: ${ws.text}${ws.sub ? ` · ${ws.sub}` : ""}`], sig: `m${ws.text}` } : null,
+  };
+  const live = Object.entries(notes).filter(([k, b]) => b && ack[k] !== b.sig);
+  const clearNotes = (keys) => {
+    const next = { ...ack };
+    for (const k of keys) if (notes[k]) next[k] = notes[k].sig;
+    setAck(next);
+    save("badgeAck", next);
+  };
 
   async function share() {
     const url = window.location.origin;
@@ -408,12 +430,7 @@ export default function RepairApp() {
       <div className="min-h-screen bg-[#F2F4F1] text-[#15201A]">
         <BottomNav
           page={page}
-          badges={{
-            home: homeBadge,
-            pros: newestPro > prosSeen ? "general" : null,
-            community: newest > seenAt ? "general" : null,
-            map: waterStatus(water, canal).alarm ? "important" : null,
-          }}
+          badges={Object.fromEntries(Object.entries(notes).map(([k, b]) => [k, b && (ack[k] === b.sig ? "muted" : b.level)]))}
           onGo={(p) => (p === "pros" ? openPros("") : goPage(p, p === "community" ? tab : undefined))}
           onHotline={() => setSheet({ type: "hotlines" })}
         />
@@ -427,6 +444,22 @@ export default function RepairApp() {
             </button>
             <WaterPill water={water} canal={canal} onOpen={openWater} />
             <WeatherChip weather={weather} onOpen={() => setSheet({ type: "weather" })} viewers={online ? viewers : 0} />
+            {Object.values(notes).some(Boolean) && (
+              <button
+                onClick={() => setNotifyOpen(true)}
+                aria-label={live.length ? `การแจ้งเตือน ${live.length} เรื่อง` : "การแจ้งเตือน (ล้างแล้ว)"}
+                className={`relative min-h-[44px] min-w-[44px] shrink-0 rounded-lg px-2.5 active:bg-white/20 ${live.length ? "bg-white/15" : "bg-white/5 opacity-60"}`}
+              >
+                🔔
+                {live.length > 0 && (
+                  <span
+                    className={`absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-xs font-bold ${live.some(([, b]) => b.level === "important") ? "bg-[#B42318]" : "bg-[#1E9E5A]"}`}
+                  >
+                    {live.length}
+                  </span>
+                )}
+              </button>
+            )}
             <button onClick={share} aria-label="แชร์ลิงก์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">
               🔗
             </button>
@@ -589,6 +622,64 @@ export default function RepairApp() {
           )}
         </main>
 
+        {notifyOpen && (
+          <Sheet title="🔔 การแจ้งเตือน" onClose={() => setNotifyOpen(false)}>
+            <div className="space-y-3">
+              {[
+                ["home", "🏠 บ้านฉัน"],
+                ["pros", "🔧 ช่าง · ร้าน"],
+                ["community", "👥 เพื่อนบ้าน"],
+                ["map", "🗺️ แผนที่น้ำ"],
+              ]
+                .filter(([k]) => notes[k])
+                .map(([k, name]) => {
+                  const b = notes[k];
+                  const muted = ack[k] === b.sig;
+                  return (
+                    <div
+                      key={k}
+                      className={`rounded-2xl border-2 p-3 ${muted ? "border-[#DCE2DD] opacity-60" : b.level === "important" ? "border-[#B42318] bg-[#FDE8E6]" : "border-[#1E6B47] bg-[#E4F0E9]"}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <b className="min-w-0 flex-1 text-base">{name}</b>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${b.level === "important" ? "bg-[#B42318] text-white" : "bg-[#1E6B47] text-white"}`}>
+                          {muted ? "ล้างแล้ว · ยังค้างอยู่" : b.level === "important" ? "สำคัญ" : "อัปเดต"}
+                        </span>
+                      </div>
+                      <ul className="mt-1 space-y-0.5 text-[15px] leading-snug">
+                        {(b.reasons || []).map((r, i) => (
+                          <li key={i}>{r}</li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          onClick={() => {
+                            setNotifyOpen(false);
+                            if (k === "pros") openPros("");
+                            else goPage(k, k === "community" ? tab : undefined);
+                          }}
+                          className="min-h-[44px] flex-1 rounded-xl bg-white text-[15px] font-bold"
+                        >
+                          ไปดู ›
+                        </button>
+                        {!muted && (
+                          <button onClick={() => clearNotes([k])} className="min-h-[44px] shrink-0 rounded-xl px-3 text-[15px] font-bold text-[#45504A] underline">
+                            ล้าง
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              {live.length > 0 && (
+                <button onClick={() => clearNotes(Object.keys(notes))} className="min-h-[52px] w-full rounded-xl border-2 border-[#15201A] text-base font-bold">
+                  🔕 ล้างการแจ้งเตือนทั้งหมด
+                </button>
+              )}
+              <p className="text-sm text-[#45504A]">ล้างแล้วจะเหลือจุดจางๆ บนปุ่มจนกว่าเรื่องนั้นจะจบ ไม่ต้องรีบ ช่วยได้เมื่อสะดวก · ถ้ามีเรื่องใหม่ จะเตือนอีกครั้ง</p>
+            </div>
+          </Sheet>
+        )}
         {sheet?.type === "lendForm" && (
           <Sheet title="ยืม · ให้ · ขาย" onClose={() => setSheet(null)}>
             <LendForm

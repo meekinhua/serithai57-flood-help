@@ -7,12 +7,18 @@ import { MediaStrip } from "./MediaGallery";
 // รอบบ้าน: small asks and warnings between houses close enough to help (backend/nearby.py)
 export const NEAR_TOPICS = {
   ask: [
+    ["fix", "🔧", "ซ่อมเล็กๆ ในบ้าน"],
+    ["elec", "💡", "ไฟ ปลั๊ก หลอดไฟ"],
+    ["plumb", "🚰", "น้ำ ท่อ ห้องน้ำ"],
+    ["carry", "💪", "ช่วยยกของ / ขนของ"],
+    ["tech", "📱", "ช่วยใช้มือถือ / แอป"],
+    ["ride", "🚗", "พาไปหาหมอ / ไปเขต"],
+    ["errand", "🛒", "ซื้อของ / ธุระให้"],
     ["water", "💧", "ดูน้ำหน้าบ้านให้หน่อย"],
     ["photo", "📷", "ถ่ายรูปหน้าบ้านให้ดู"],
     ["parcel", "📦", "ช่วยรับพัสดุ / ของ"],
     ["pet", "🐾", "ให้อาหารสัตว์เลี้ยง"],
     ["check", "🔒", "ดูประตู ปิดน้ำ ปิดไฟให้"],
-    ["carry", "💪", "ช่วยยกของ / ขนของ"],
     ["other", "✏️", "เรื่องอื่น"],
   ],
   alert: [
@@ -27,13 +33,16 @@ export const NEAR_TOPICS = {
 };
 const iconOf = (d) => (NEAR_TOPICS[d.kind].find((t) => t[0] === d.topic) || [])[1] || "•";
 const keys = () => load("nearbyKeys", {});
+// asks that reach the neighbours who can do them, anywhere in the village (backend SKILL_OF) · the board's group if nobody comes
+export const SKILL_OF = { fix: "fix", elec: "elec", plumb: "plumb", carry: "strong", tech: "tech", ride: "drive", errand: "errand" };
+const PROS_OF = { fix: "build", elec: "electric", plumb: "plumb", carry: "junk" };
 
 function ago(t) {
   const m = Math.max(1, Math.round((Date.now() - new Date(t).getTime()) / 60000));
   return m < 60 ? `${m} นาทีที่แล้ว` : m < 1440 ? `${Math.round(m / 60)} ชม.ที่แล้ว` : `${Math.round(m / 1440)} วันที่แล้ว`;
 }
 
-function Item({ d, onChange, setErr }) {
+function Item({ d, onChange, setErr, handy, onPros, onSkip, skipped }) {
   const t = useT();
   const key = keys()[d.id];
   const [helping, setHelping] = useState(null); // {name, phone} while filling, then {contact}
@@ -51,7 +60,7 @@ function Item({ d, onChange, setErr }) {
     setErr("");
     try {
       save("myName", helping.name);
-      const c = await api(`/nearby/${d.id}/help`, { method: "POST", body: JSON.stringify({ name: helping.name, phone: helping.phone || "" }) });
+      const c = await api(`/nearby/${d.id}/help`, { method: "POST", body: JSON.stringify({ name: helping.name, phone: helping.phone || "", house: load("myHouse", "") }) });
       setHelping({ contact: c });
       onChange();
     } catch (e) {
@@ -92,6 +101,7 @@ function Item({ d, onChange, setErr }) {
         {ask ? `บ้าน ${d.house} ฝาก: ` : "ระวัง: "}
         {d.label}
       </p>
+      {d.match && !skipped && <p className="-mt-1 mb-1 inline-block rounded-full bg-[#1E6B47] px-2.5 py-0.5 text-sm font-bold text-white">🤝 ตรงกับที่คุณถนัด</p>}
       {d.text && <p className="text-[15px]">{d.text}</p>}
       <MediaStrip media={d.media || []} />
       <p className="text-sm text-[#45504A]">
@@ -119,7 +129,14 @@ function Item({ d, onChange, setErr }) {
                 ))}
               </ul>
             ) : (
-              <p className="text-[15px] text-[#45504A]">ยังไม่มีใครรับ · คนที่รับจะโทรหาคุณ</p>
+              <div className="space-y-2">
+                <p className="text-[15px] text-[#45504A]">ยังไม่มีใครรับ · คนที่รับจะโทรหาคุณ</p>
+                {PROS_OF[d.topic] && Date.now() - new Date(d.created_at).getTime() > 6 * 3600e3 && (
+                  <button onClick={() => onPros && onPros(PROS_OF[d.topic])} className="min-h-[46px] w-full rounded-xl bg-[#FFF8E1] text-[15px] font-bold">
+                    รอนานแล้ว? ดูช่างที่เพื่อนบ้านแนะนำ ›
+                  </button>
+                )}
+              </div>
             ))}
           <button onClick={close} className="min-h-[46px] w-full rounded-xl border border-[#C9D1CB] bg-white text-[15px] font-bold">
             {ask ? "เรียบร้อยแล้ว ปิดเรื่อง" : "ไม่มีแล้ว ปิดเรื่อง"}
@@ -157,9 +174,19 @@ function Item({ d, onChange, setErr }) {
             </div>
           </div>
         ) : (
-          <button onClick={() => setHelping({ name: load("myName", ""), phone: "" })} className="mt-2 min-h-[48px] w-full rounded-xl bg-[#1E6B47] text-base font-bold text-white">
-            {t("nearby.help", "ฉันช่วยได้")}
-          </button>
+          <>
+            <button
+              onClick={() => setHelping({ name: handy?.name || load("myName", ""), phone: load("myReach", "") })}
+              className="mt-2 min-h-[48px] w-full rounded-xl bg-[#1E6B47] text-base font-bold text-white"
+            >
+              {t("nearby.help", "ฉันช่วยได้")}
+            </button>
+            {d.match && !skipped && (
+              <button onClick={() => onSkip(d.id)} className="mt-1 min-h-[40px] w-full text-[15px] font-bold text-[#45504A] underline">
+                ช่วยไม่ได้ตอนนี้
+              </button>
+            )}
+          </>
         )
       ) : (
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -175,7 +202,7 @@ function Item({ d, onChange, setErr }) {
   );
 }
 
-function NewForm({ form, setForm, house, onPosted, setErr }) {
+function NewForm({ form, setForm, house, onPosted, setErr, counts }) {
   const topics = NEAR_TOPICS[form.kind];
   const topic = topics.find((t) => t[0] === form.topic);
   const ask = form.kind === "ask";
@@ -241,7 +268,13 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
             </label>
           )}
           <MediaPicker items={files} setItems={setFiles} max={2} />
-          <p className="text-sm text-[#45504A]">{ask ? "เห็นเฉพาะบ้านในระยะ ~250 ม. · ปิดเองใน 1 วัน" : "เห็นเฉพาะบ้านในระยะ ~400 ม."}</p>
+          <p className="text-sm text-[#45504A]">
+            {ask && SKILL_OF[form.topic]
+              ? `🤝 เพื่อนบ้านที่ถนัดเรื่องนี้ ${counts?.[SKILL_OF[form.topic]] || 0} คนจะเห็นคำขอนี้ทั้งหมู่บ้าน · บ้านใกล้ๆ ก็เห็น`
+              : ask
+                ? "เห็นเฉพาะบ้านในระยะ ~250 ม. · ปิดเองใน 1 วัน"
+                : "เห็นเฉพาะบ้านในระยะ ~400 ม."}
+          </p>
         </>
       )}
       <div className="flex gap-2">
@@ -256,15 +289,30 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
   );
 }
 
-export default function Nearby({ info, form, setForm, setErr }) {
+export default function Nearby({ info, form, setForm, setErr, handy, onPros }) {
   const t = useT();
   const [items, setItems] = useState(null);
   const [posted, setPosted] = useState(null);
+  const [skips, setSkips] = useState(() => load("askSkip", []));
+  const [showSkipped, setShowSkipped] = useState(false);
+  const [handyCounts, setHandyCounts] = useState(null);
+  useEffect(() => {
+    if (form?.kind === "ask" && !handyCounts)
+      api("/handy")
+        .then((r) => setHandyCounts(r.counts))
+        .catch(() => {});
+  }, [form, handyCounts]);
+  const skills = handy?.on ? (handy.skills || []).join(",") : "";
   const refresh = useCallback(() => {
-    api(`/nearby?house=${encodeURIComponent(info.house)}`)
+    api(`/nearby?house=${encodeURIComponent(info.house)}${skills ? `&skills=${skills}` : ""}`)
       .then(setItems)
       .catch(() => setItems([]));
-  }, [info.house]);
+  }, [info.house, skills]);
+  const skip = (id) => {
+    const next = [...skips.slice(-80), id];
+    setSkips(next);
+    save("askSkip", next);
+  };
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, 120000);
@@ -280,17 +328,36 @@ export default function Nearby({ info, form, setForm, setErr }) {
     <div className="border-t border-[#E6EBE7] py-3">
       <p className="text-base font-bold text-[#15201A]">
         <span aria-hidden="true">🏘️ </span>
-        {t("nearby.title", "รอบบ้านฉัน")}
+        {items?.some((d) => d.match) ? t("nearby.title_match", "รอบบ้าน · งานที่คุณช่วยได้") : t("nearby.title", "รอบบ้านฉัน")}
       </p>
       <p className="text-sm text-[#45504A]">{t("nearby.sub", "เพื่อนบ้านระยะเดินถึง ฝากกันเรื่องเล็กๆ · เตือนกันให้ระวัง")}</p>
       <div className="mt-1 space-y-2">
         {items === null ? null : items.length ? (
           <ul className="space-y-2">
-            {items.map((d) => (
-              <Item key={d.id} d={d} onChange={refresh} setErr={setErr} />
-            ))}
+            {items
+              .filter((d) => !skips.includes(d.id))
+              .map((d) => (
+                <Item key={d.id} d={d} onChange={refresh} setErr={setErr} handy={handy} onPros={onPros} onSkip={skip} />
+              ))}
           </ul>
         ) : null}
+        {items && items.some((d) => skips.includes(d.id)) && (
+          // skipped asks stay in sight, faded, until someone helps: nobody is pushed, nobody is forgotten
+          <div className="opacity-60">
+            <button onClick={() => setShowSkipped((v) => !v)} className="min-h-[40px] text-[15px] font-bold text-[#45504A] underline">
+              ที่คุณข้ามไว้ {items.filter((d) => skips.includes(d.id)).length} เรื่อง · ยังไม่มีคนรับ {showSkipped ? "▴" : "▾"}
+            </button>
+            {showSkipped && (
+              <ul className="mt-1 space-y-2">
+                {items
+                  .filter((d) => skips.includes(d.id))
+                  .map((d) => (
+                    <Item key={d.id} d={d} onChange={refresh} setErr={setErr} handy={handy} onPros={onPros} skipped />
+                  ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         {posted && (
           <div className="rounded-2xl bg-[#E4F0E9] p-3">
@@ -308,6 +375,7 @@ export default function Nearby({ info, form, setForm, setErr }) {
 
         {form ? (
           <NewForm
+            counts={handyCounts}
             form={form}
             setForm={setForm}
             house={info.house}
