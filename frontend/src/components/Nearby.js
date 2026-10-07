@@ -203,7 +203,8 @@ function Item({ d, onChange, setErr, handy, onPros, onSkip, skipped }) {
 }
 
 function NewForm({ form, setForm, house, onPosted, setErr, counts }) {
-  const topics = NEAR_TOPICS[form.kind];
+  const HANDS = ["fix", "elec", "plumb", "carry", "tech", "ride", "errand"]; // asked on the ขอแรง board now
+  const topics = NEAR_TOPICS[form.kind].filter((t) => form.kind !== "ask" || !HANDS.includes(t[0]) || t[0] === form.topic);
   const topic = topics.find((t) => t[0] === form.topic);
   const ask = form.kind === "ask";
   const t = useT();

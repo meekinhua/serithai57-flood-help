@@ -660,9 +660,12 @@ function HandyRow({ house, handy, onSaved, onClose, setErr }) {
   );
 }
 
-export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], onNeeds }) {
+export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], onNeeds, onAskHelp }) {
   // the ขอแรง card can be hidden; it comes back only when a new ask appears
   const [needsHidden, setNeedsHidden] = useState(() => load("needsHidden", []));
+  // a ขอแรง ask this house's อาสาข้างบ้าน profile can do (job type → skill)
+  const JOB_SKILL = { clean: "strong", move: "strong", trash: "strong", fix: "fix", check: "elec", ride: "drive", errand: "errand" };
+  const fits = (j) => (handy?.on && (handy.skills || []).includes(JOB_SKILL[j.type]) ? 1 : 0);
   const hideNeeds = () => {
     const ids = needs.map((j) => j.id);
     setNeedsHidden(ids);
@@ -818,6 +821,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         <div className="px-4 pb-4 pt-3">
           <ul className="space-y-1 text-base">
             {[
+              ["💰", "เงินเยียวยาน้ำท่วมที่บ้านคุณขอได้"],
               ["🚛", "วันรถขยะซอยคุณ"],
               ["⚡", "ไฟดับ น้ำไม่ไหลแถวบ้าน"],
               ["💧", "น้ำหน้าบ้านตอนนี้"],
@@ -939,12 +943,16 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               <div className="min-w-0 flex-1">
                 <button onClick={onNeeds} className="block w-full text-left">
                   <b className="block text-base leading-snug">เพื่อนบ้านขอแรงอยู่ {needs.length} เรื่อง</b>
-                  {needs.slice(0, 2).map((j) => (
-                    <span key={j.id} className="mt-0.5 block text-[15px] leading-snug text-[#33403A]">
-                      {j.name}
-                      {j.soi ? ` (ซ.${j.soi})` : ""}: {j.detail.length > 60 ? `${j.detail.slice(0, 60)}…` : j.detail}
-                    </span>
-                  ))}
+                  {[...needs]
+                    .sort((x, y) => fits(y) - fits(x))
+                    .slice(0, 2)
+                    .map((j) => (
+                      <span key={j.id} className="mt-0.5 block text-[15px] leading-snug text-[#33403A]">
+                        {j.name}
+                        {j.soi ? ` (ซ.${j.soi})` : ""}: {j.detail.length > 60 ? `${j.detail.slice(0, 60)}…` : j.detail}
+                        {fits(j) ? <b className="ml-1 rounded-full bg-[#1E6B47] px-2 text-sm text-white">🤝 ตรงกับที่คุณถนัด</b> : null}
+                      </span>
+                    ))}
                   <span className="mt-1 block text-[15px] font-bold text-[#7A4104]">ช่วยได้? ดูและติดต่อ ›</span>
                 </button>
                 <button onClick={hideNeeds} className="mt-0.5 block min-h-[36px] text-sm font-bold text-[#45504A] underline">
@@ -953,6 +961,9 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               </div>
             </div>
           )}
+          <div className="mt-3">
+            <AidRow info={info} onChanged={reload} setErr={setErr} />
+          </div>
 
           {pinning ? (
             <Row title="ปักหมุดบ้านฉัน">
@@ -1060,7 +1071,6 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <div id="myhome-outage">
             <OutageRow info={info} forced={outageOpen} onFold={() => setOutageOpen(false)} onChanged={reload} setErr={setErr} />
           </div>
-          <AidRow info={info} onChanged={reload} setErr={setErr} />
           {!planSettled && <PlanRow info={info} services={services} onPros={onPros} onSaved={setInfo} onFold={() => setPlusOpen((o) => o.filter((x) => x !== "plan"))} setErr={setErr} />}
           <ReviewPrompt services={services} />
 
@@ -1126,7 +1136,8 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
             )}
             <div className="mt-2 grid grid-cols-2 gap-2">
               {[
-                ["🙏", t("myhome.tools.ask", "ฝากเพื่อนบ้าน"), t("myhome.tools.ask_sub", "ซ่อมเล็กๆ ยกของ ดูบ้าน"), () => startNear("ask")],
+                ["🙋", t("myhome.tools.help", "ขอแรงเพื่อนบ้าน"), t("myhome.tools.help_sub", "ซ่อมเล็กๆ ยกของ ติดรถ ฝากซื้อ"), onAskHelp],
+                ["👀", t("myhome.tools.ask", "ฝากดูบ้าน"), t("myhome.tools.ask_sub2", "น้ำหน้าบ้าน รับของ ดูประตู"), () => startNear("ask")],
                 ["⚠️", t("myhome.tools.alert", "เตือนเพื่อนบ้าน"), t("myhome.tools.alert_sub", "ฝาท่อแตก ของหาย"), () => startNear("alert")],
                 ["🛠️", t("myhome.tools.office", "แจ้งสำนักงาน"), t("myhome.tools.office_sub", "ไฟถนน ขยะ ถ่ายรูปได้"), onIssue],
                 [

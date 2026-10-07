@@ -376,7 +376,7 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
       <div className="flex items-center gap-2">
         <p className="min-w-0 flex-1 text-[15px] text-[#45504A]">เบอร์ที่เพื่อนบ้านแชร์กันมา · ตกลงราคากันเอง</p>
         <button onClick={onAdd} className="min-h-[44px] shrink-0 rounded-xl bg-[#1E6B47] px-3 text-[15px] font-bold text-white">
-          + แนะนำ
+          + ลงร้าน / แนะนำ
         </button>
       </div>
       <label className="flex min-h-[50px] items-center gap-2 rounded-xl border border-[#C9D1CB] bg-white px-3">

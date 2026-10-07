@@ -359,6 +359,7 @@ export default function RepairApp() {
         onBadge={onHomeBadge}
         needs={needs}
         onNeeds={() => showTab("jobs")}
+        onAskHelp={() => setSheet({ type: "jobForm", kind: "need" })}
       />
     ),
     announce: (
@@ -524,7 +525,7 @@ export default function RepairApp() {
 
           {page === "pros" && (
             <>
-              <PageTitle title="ช่าง · ร้าน ในหมู่บ้าน" sub={`${services.length} ราย · คนแนะนำเยอะขึ้นก่อน`} />
+              <PageTitle title="ช่าง · ร้าน ในหมู่บ้าน" sub={`${services.length} ราย · คนแนะนำเยอะขึ้นก่อน${hires.length ? ` · มีคนกำลังหาช่าง ${hires.length} เรื่อง (ท้ายหน้า)` : ""}`} />
               {/* 7 Oct: everyone (admins too) gets the same list; neighbours looking for a tradesman sit quietly at its end */}
               <ProsList
                 key={`${prosGroup}-${prosFocus}`}
