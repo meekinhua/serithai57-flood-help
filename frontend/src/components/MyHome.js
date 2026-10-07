@@ -925,15 +925,20 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <Soon items={info.soon} onSeen={() => setSeenN((n) => n + 1)} />
           {needs.length > 0 && (
             // the ขอแรง board, seen from home: who still needs hands (no one is pushed, the card just shows)
-            <button onClick={onNeeds} className="mb-3 block w-full rounded-2xl border-2 border-[#C77700] bg-[#FFF8E1] p-3 text-left">
-              <b className="block text-base">🙋 เพื่อนบ้านขอแรงอยู่ {needs.length} เรื่อง</b>
-              {needs.slice(0, 2).map((j) => (
-                <span key={j.id} className="mt-0.5 block text-[15px] leading-snug text-[#33403A]">
-                  {j.name}
-                  {j.soi ? ` (ซ.${j.soi})` : ""}: {j.detail.length > 60 ? `${j.detail.slice(0, 60)}…` : j.detail}
-                </span>
-              ))}
-              <span className="mt-1 block text-[15px] font-bold text-[#7A4B00]">ช่วยได้? ดูและติดต่อ ›</span>
+            <button onClick={onNeeds} className="mt-2 flex w-full items-center gap-3 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] p-3 text-left">
+              <span className="text-2xl" aria-hidden="true">
+                🙋
+              </span>
+              <span className="min-w-0 flex-1">
+                <b className="block text-base leading-snug">เพื่อนบ้านขอแรงอยู่ {needs.length} เรื่อง</b>
+                {needs.slice(0, 2).map((j) => (
+                  <span key={j.id} className="mt-0.5 block text-[15px] leading-snug text-[#33403A]">
+                    {j.name}
+                    {j.soi ? ` (ซ.${j.soi})` : ""}: {j.detail.length > 60 ? `${j.detail.slice(0, 60)}…` : j.detail}
+                  </span>
+                ))}
+                <span className="mt-1 block text-[15px] font-bold text-[#7A4104]">ช่วยได้? ดูและติดต่อ ›</span>
+              </span>
             </button>
           )}
 
