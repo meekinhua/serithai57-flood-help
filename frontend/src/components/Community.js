@@ -24,22 +24,24 @@ export const PRO_GROUPS = [
   { key: "shop", label: "ร้านค้า · บริษัท", cats: ["shop", "food", "supplies", "beauty", "tutor", "pets"] },
 ];
 const groupOf = (cat) => PRO_GROUPS.find((g) => g.cats.includes(cat));
+// ร้านเพื่อนบ้าน: the team marks the ones run by neighbours or selling in the village regularly; the rest are outside shops (ช่าง·ร้าน only)
+export const isLocal = (s) => s.local === true;
 
 export const NEED_CHOICES = [
-  { group: "จ้างช่าง (มีค่าจ้าง)", label: "เบอร์ช่าง หรือ ร้าน", hint: "ดูเบอร์ที่เพื่อนบ้านแนะนำ", go: { tab: "pros" } },
-  { group: "จ้างช่าง (มีค่าจ้าง)", label: "ประกาศหาช่าง", hint: "ช่างที่ว่างจะติดต่อกลับ", go: { sheet: { type: "jobForm", kind: "need", jobType: "hire" } } },
   { group: "ขอแรงเพื่อนบ้าน", label: "ช่วยล้างบ้าน", hint: "ขัดโคลน เก็บกวาด", go: { sheet: { type: "jobForm", kind: "need", jobType: "clean" } } },
   { group: "ขอแรงเพื่อนบ้าน", label: "ช่วยยกของ", hint: "ขนของพังออกหน้าบ้าน", go: { sheet: { type: "jobForm", kind: "need", jobType: "move" } } },
   { group: "ขอแรงเพื่อนบ้าน", label: "ติดรถ / ฝากซื้อ", hint: "ออกไปข้างนอก ยา ของใช้", go: { sheet: { type: "jobForm", kind: "need", jobType: "ride" } } },
   { group: "ขอแรงเพื่อนบ้าน", label: "อย่างอื่น", hint: "พิมพ์เล่าได้เลย", go: { sheet: { type: "jobForm", kind: "need", jobType: "" } } },
   { group: "หาของ", label: "ยืม / หาซื้อของ", hint: "เครื่องฉีดน้ำ บันได ของมือสอง", go: { sheet: { type: "lendForm", kind: "want" } } },
+  { group: "จ้างช่าง / หาร้าน (มีค่าจ้าง)", label: "ไปหน้า ช่าง · ร้าน ›", hint: "เบอร์ช่าง ร้าน · ประกาศหาช่าง", go: { tab: "pros" } },
+  { group: "จ้างช่าง / หาร้าน (มีค่าจ้าง)", label: "ประกาศหาช่าง", hint: "ช่างที่ว่างจะติดต่อกลับ", go: { sheet: { type: "jobForm", kind: "need", jobType: "hire" } } },
 ];
 export const OFFER_CHOICES = [
-  { group: "ช่าง · ร้าน (มีค่าจ้าง)", label: "ช่าง หรือ ร้าน ที่เคยใช้แล้วดี", hint: "หรือฉันเป็นช่าง / มีร้าน รับงานได้", go: { sheet: { type: "serviceForm" } } },
   { group: "ให้", label: "มีของให้ยืม", hint: "เครื่องมือ บันได ปั๊ม", go: { sheet: { type: "lendForm", kind: "lend" } } },
   { group: "ให้", label: "มีของให้ฟรี", hint: "ของใช้ที่ไม่ได้ใช้แล้ว", go: { sheet: { type: "lendForm", kind: "give" } } },
   { group: "ให้", label: "ไปช่วยแรงได้ / มีรถ", hint: "ช่วยด้วยน้ำใจ · บ้านที่ขอแรงจะเห็นชื่อคุณ", go: { sheet: { type: "jobForm", kind: "offer", jobType: "" } } },
   { group: "ขาย", label: "ขายของ / ของมือสอง", hint: "ตั้งราคาเอง นัดรับในหมู่บ้าน", go: { sheet: { type: "lendForm", kind: "sell" } } },
+  { group: "ร้านเพื่อนบ้าน", label: "ฉันมีร้าน / รับทำ อยู่ในหมู่บ้าน", hint: "ทีมตรวจแล้วขึ้นเป็นร้านเพื่อนบ้าน · ร้านข้างนอกอยู่หน้า ช่าง·ร้าน", go: { sheet: { type: "serviceForm" } } },
 ];
 
 const Chevron = () => (
@@ -165,7 +167,7 @@ export function CommunityIntro({ services, onGroup, onAll, onNeed, onOffer, onAs
           </svg>
           <span>
             <span className="font-display block text-[17px] font-bold leading-tight min-[400px]:text-lg">แนะนำ / ให้ / ขาย</span>
-            <span className="block text-sm text-[#45504A]">ช่างที่เคยใช้ · ของให้ยืม · ขายของ</span>
+            <span className="block text-sm text-[#45504A]">ของให้ยืม · ให้ฟรี · ขายของ</span>
           </span>
         </button>
       </div>
@@ -218,6 +220,7 @@ const TAG = {
   need: ["ขอแรง", "bg-[#FCEFD9] text-[#7A4104]"],
   offer: ["ช่วยได้", "bg-[#E4F0E9] text-[#154D33]"],
   pros: ["ช่าง · ร้าน", "bg-[#E3EDF9] text-[#1F4F8A]"],
+  local: ["🏠 ร้านเพื่อนบ้าน", "bg-[#E4F0E9] text-[#154D33]"],
   lend: ["ยืม · ให้", "bg-[#EEE8F7] text-[#5B3A92]"],
   sell: ["ขาย", "bg-[#FDE7E4] text-[#8F2A1C]"],
   forum: ["ถาม-ตอบ", "bg-[#ECEFEC] text-[#33403A]"],
@@ -229,7 +232,7 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
     const out = [];
     const fresh = (iso) => ageDays(iso) < FEED_DAYS;
     for (const j of jobs) {
-      if (j.status === "done" || !fresh(j.created_at)) continue;
+      if (j.status === "done" || j.type === "hire" || !fresh(j.created_at)) continue;
       const [, text] = JOB_TYPES[j.type] || ["", "ขอแรง"];
       out.push({
         id: `j${j.id}`,
@@ -242,9 +245,9 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
         at: j.created_at,
       });
     }
-    for (const s of services) {
+    for (const s of services.filter(isLocal)) {
       const g = groupOf(s.category);
-      out.push({ id: `s${s.id}`, tab: "pros", k: "pros", svc: s, media: s.media || [], title: s.name, sub: g ? g.label : SERVICE_CATEGORIES[s.category]?.[1] || "", at: s.created_at });
+      out.push({ id: `s${s.id}`, tab: "pros", k: "local", svc: s, media: s.media || [], title: s.name, sub: g ? g.label : SERVICE_CATEGORIES[s.category]?.[1] || "", at: s.created_at });
     }
     for (const x of lend) {
       if (x.status === "closed" || !fresh(x.created_at)) continue;
@@ -287,15 +290,15 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
             <li key={x.id} className="space-y-2 rounded-2xl border border-[#DCE2DD] bg-white p-3.5">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className={`rounded-md px-2 py-0.5 font-bold ${TAG[x.k][1]}`}>{TAG[x.k][0]}</span>
-                <span className="text-[#45504A]">{x.k === "pros" ? x.sub : ageText(x.at)}</span>
+                <span className="text-[#45504A]">{x.svc ? x.sub : ageText(x.at)}</span>
               </div>
               <b className="block break-words text-[17px] leading-snug">{x.title}</b>
               <MediaStrip media={x.media || []} />
               {x.price && <p className="text-lg font-bold text-[#8F2A1C]">{x.price}</p>}
-              {x.k === "pros" && x.svc.detail && <p className="line-clamp-2 break-words text-[15px] text-[#33403A]">{x.svc.detail}</p>}
-              {x.k !== "pros" && x.sub && <p className="break-words text-[15px] text-[#33403A]">{x.sub}</p>}
-              {x.k === "pros" && <Trust s={x.svc} />}
-              {x.k === "pros" && (
+              {x.svc && x.svc.detail && <p className="line-clamp-2 break-words text-[15px] text-[#33403A]">{x.svc.detail}</p>}
+              {!x.svc && x.sub && <p className="break-words text-[15px] text-[#33403A]">{x.sub}</p>}
+              {x.svc && <Trust s={x.svc} />}
+              {x.svc && (
                 <div className="flex gap-2">
                   <CallButton phone={x.svc.phone} onCall={() => rememberCall(x.svc)} />
                 </div>
@@ -410,7 +413,10 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
         <ul className="space-y-2.5">
           {shown.map((s) => (
             <li key={s.id} className="space-y-1.5 rounded-2xl border border-[#DCE2DD] bg-white p-3.5">
-              <p className="text-sm font-bold text-[#1F4F8A]">{groupOf(s.category)?.label || SERVICE_CATEGORIES[s.category]?.[1] || "อื่นๆ"}</p>
+              <p className="text-sm font-bold text-[#1F4F8A]">
+                {groupOf(s.category)?.label || SERVICE_CATEGORIES[s.category]?.[1] || "อื่นๆ"}
+                {isLocal(s) && <span className="ml-1.5 rounded-full bg-[#E4F0E9] px-2 py-0.5 text-[#154D33]">🏠 ร้านเพื่อนบ้าน</span>}
+              </p>
               <b className="block break-words text-lg leading-snug">{s.name}</b>
               <MediaStrip media={s.media || []} />
               {s.detail && <p className="whitespace-pre-line break-words text-[15px] leading-relaxed text-[#33403A]">{s.detail}</p>}

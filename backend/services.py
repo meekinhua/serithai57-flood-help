@@ -55,6 +55,7 @@ class ServiceUpdate(BaseModel):
 
 class ServiceAdminUpdate(BaseModel):
     category: Optional[str] = None
+    local: Optional[bool] = None  # ร้านเพื่อนบ้าน: shown in เพื่อนบ้าน too
     verified: Optional[bool] = None
     pinned: Optional[bool] = None
     media_ids: Optional[list[str]] = Field(None, max_length=3)
