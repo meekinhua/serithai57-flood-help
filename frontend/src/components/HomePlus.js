@@ -179,6 +179,7 @@ export function OutageRow({ info, forced, onFold, onChanged, setErr }) {
 // ---------- 💰 flood relief this house can claim ----------
 export function AidRow({ info, onChanged, setErr }) {
   const [open, setOpen] = useState(null); // the information-only items fold behind one line
+  const [how, setHow] = useState([]); // claim cards whose "วิธียื่น" is open
   // the ones to claim first; information (loans, social security, insurance) after
   const all = (info.aid || []).filter((a) => a.mine !== "received");
   const claim = all.filter((a) => a.track !== false);
@@ -200,6 +201,7 @@ export function AidRow({ info, onChanged, setErr }) {
   const card = (a) => {
     const left = a.deadline ? days(a.deadline) : null;
     const info_ = a.track === false;
+    const shown = info_ || how.includes(a.id); // a claim card shows the money and the date; how to claim folds
     return (
       <div key={a.id} className={`rounded-2xl border p-3 ${info_ ? "border-[#DCE2DD] bg-[#F7F8F6]" : "border-[#1E6B47] bg-white"}`}>
         <div className="flex items-start gap-2">
@@ -210,32 +212,35 @@ export function AidRow({ info, onChanged, setErr }) {
             </span>
           )}
         </div>
-        <MediaStrip media={a.media || []} />
-        {a.amount && (
-          <div className="mt-0.5">
-            <p className="text-lg font-bold leading-snug text-[#154D33]">{a.amount.split("\n")[0]}</p>
-            {a.amount.includes("\n") && <p className="whitespace-pre-line text-sm text-[#33403A]">{a.amount.split("\n").slice(1).join("\n")}</p>}
-          </div>
-        )}
-        {a.who && <p className="text-sm text-[#45504A]">{a.who}</p>}
-        {a.docs && (
-          <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed">
-            <b>{info_ ? "เงื่อนไข:" : "ต้องใช้:"}</b> {a.docs}
-          </p>
-        )}
-        {a.where && (
-          <p className="whitespace-pre-line text-[15px] leading-relaxed">
-            <b>{info_ ? "ติดต่อ:" : "ยื่นที่:"}</b> {a.where}
-          </p>
-        )}
+        {a.amount && <p className="mt-0.5 text-lg font-bold leading-snug text-[#154D33]">{a.amount.split("\n")[0]}</p>}
         {a.deadline && <p className="text-[15px] font-bold text-[#B42318]">ยื่นภายใน {thaiDate(a.deadline)}</p>}
-        {a.link && (
-          <a href={a.link} target="_blank" rel="noreferrer" className="mt-1 inline-flex min-h-[44px] items-center text-[15px] font-bold text-[#1F5FA8] underline">
-            {/claim\.bangkok|thainatcat/.test(a.link) ? "เข้าเว็บยื่นเรื่อง ›" : "ดูรายละเอียด ›"}
-          </a>
+        {shown && (
+          <>
+            <MediaStrip media={a.media || []} />
+            {a.amount?.includes("\n") && <p className="whitespace-pre-line text-sm text-[#33403A]">{a.amount.split("\n").slice(1).join("\n")}</p>}
+            {a.who && <p className="text-sm text-[#45504A]">{a.who}</p>}
+            {a.docs && (
+              <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed">
+                <b>{info_ ? "เงื่อนไข:" : "ต้องใช้:"}</b> {a.docs}
+              </p>
+            )}
+            {a.where && (
+              <p className="whitespace-pre-line text-[15px] leading-relaxed">
+                <b>{info_ ? "ติดต่อ:" : "ยื่นที่:"}</b> {a.where}
+              </p>
+            )}
+            {a.link && (
+              <a href={a.link} target="_blank" rel="noreferrer" className="mt-1 inline-flex min-h-[44px] items-center text-[15px] font-bold text-[#1F5FA8] underline">
+                {/claim\.bangkok|thainatcat/.test(a.link) ? "เข้าเว็บยื่นเรื่อง ›" : "ดูรายละเอียด ›"}
+              </a>
+            )}
+          </>
         )}
         {!info_ && (
           <div className="mt-2 flex gap-2">
+            <button onClick={() => setHow((h) => (h.includes(a.id) ? h.filter((x) => x !== a.id) : [...h, a.id]))} aria-expanded={shown} className={`${btn} shrink-0 bg-[#F2F4F1]`}>
+              วิธียื่น {shown ? "▴" : "▾"}
+            </button>
             {a.mine === "applied" ? (
               <>
                 <p className="flex min-h-[48px] flex-1 items-center text-[15px] font-bold text-[#154D33]">✓ ยื่นแล้ว รอเงิน</p>

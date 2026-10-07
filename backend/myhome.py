@@ -269,7 +269,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
 
     @router.get("/myhome")
     async def myhome(house: str, request: Request):
-        rate_limit(request, "myhome", limit=60, window_s=600)
+        rate_limit(request, "myhome", limit=300, window_s=600)  # many phones can share one mobile-network IP
         h = clean(house)
         sig = await db.survey_resp.find_one({"survey": "electric", "house": h}, {"_id": 0, "soi": 1, "job": 1, "updated_at": 1, "followup": 1})
         loc = await locate_house(h, (sig or {}).get("soi") or None)

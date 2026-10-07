@@ -255,7 +255,7 @@ export default function RepairApp() {
   // away from บ้านฉัน its tab still says when something there needs the reader (checked with the 30 s refresh)
   useEffect(() => {
     const h = load("myHouse", "");
-    if (page === "home" || !h) return;
+    if (page === "home" || !h || updatedTick % 4) return; // every ~2 minutes is plenty for a badge
     api(`/myhome?house=${encodeURIComponent(h)}`)
       .then((d) => onHomeBadge(homeBadgeOf(d)))
       .catch(() => {});

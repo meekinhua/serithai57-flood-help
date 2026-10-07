@@ -23,6 +23,9 @@ const WATER_PREV_HOURS = 9; // compared with the 3–9 h before, for the trend
 const IS_ADMIN_PAGE = window.location.pathname.replace(/\/+$/, "") === "/admin";
 
 export default function App({ archived = false }) {
+  useEffect(() => {
+    document.title = IS_ADMIN_PAGE ? "ผู้ดูแล · เสรีไทย 57" : archived ? "คลังภารกิจน้ำท่วม · เสรีไทย 57" : "ช่วยกันน้ำท่วม · เสรีไทย 57";
+  }, [archived]);
   const [posts, setPosts] = useState([]);
   const [water, setWater] = useState([]);
   const [canal, setCanal] = useState(null); // {reports, pumps}: canal level vs the flood wall, and the pumps

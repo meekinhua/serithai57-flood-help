@@ -130,7 +130,7 @@ def build_router(db, rate_limit, client_ip, require_admin, locate_house, norm_ho
     @router.get("/nearby")
     async def nearby(house: str, request: Request, skills: str = ""):
         """What's open around this house: asks within 250 m, alerts within 400 m (wider while the house isn't pinned)."""
-        rate_limit(request, "nearby", limit=80, window_s=600)
+        rate_limit(request, "nearby", limit=300, window_s=600)
         h, loc = await where(house)
         here = (loc["lat"], loc["lng"])
         slack = 0 if loc.get("precision") == "house" else 150
