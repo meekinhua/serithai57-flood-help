@@ -4,7 +4,7 @@ import LocationPicker from "./LocationPicker";
 import Nearby from "./Nearby";
 import { useT } from "./Texts";
 import { MYHOME_CHANGED, cleanHouse } from "./SurveyBox";
-import { PRO_GROUPS, rememberCall } from "./Community";
+import { PRO_GROUPS, goodOf, rememberCall } from "./Community";
 import { MediaStrip, MediaThumb } from "./MediaGallery";
 import { AidRow, CheckinCard, InstallCard, OutageRow, PlanRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
 import { waterOf } from "../config";
@@ -134,7 +134,7 @@ function ProsPick({ services, cats, title, none, all, add, onAll }) {
   // most recommended first ("เคยใช้ ดี"), then the ones the team checked, numbers that didn't answer last
   const all_ = (services || [])
     .filter((x) => cats.includes(x.category) && x.available !== false)
-    .sort((a, b) => (b.good || 0) - (a.good || 0) || (a.reports || 0) - (b.reports || 0) || b.verified - a.verified || b.pinned - a.pinned);
+    .sort((a, b) => goodOf(b) - goodOf(a) || (a.reports || 0) - (b.reports || 0) || b.verified - a.verified || b.pinned - a.pinned);
   const list = more ? all_ : all_.slice(0, 5);
   return (
     <div className="space-y-2 rounded-2xl bg-[#F2F4F1] p-3">
@@ -145,7 +145,7 @@ function ProsPick({ services, cats, title, none, all, add, onAll }) {
         <ul className="space-y-2">
           {list.map((x) => {
             const digits = (x.phone || "").replace(/[^\d]/g, "");
-            const good = x.good || 0;
+            const good = goodOf(x);
             return (
               <li key={x.id} className="flex items-center gap-3 rounded-xl bg-white p-3">
                 <MediaThumb media={x.media || []} />

@@ -56,6 +56,7 @@ class ServiceUpdate(BaseModel):
 class ServiceAdminUpdate(BaseModel):
     category: Optional[str] = None
     local: Optional[bool] = None  # ร้านเพื่อนบ้าน: shown in เพื่อนบ้าน too
+    line_good: Optional[int] = Field(None, ge=0, le=500)  # houses that praised it in the village LINE group
     verified: Optional[bool] = None
     pinned: Optional[bool] = None
     media_ids: Optional[list[str]] = Field(None, max_length=3)

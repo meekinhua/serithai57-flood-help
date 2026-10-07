@@ -342,9 +342,13 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
   );
 }
 
+// on-site "เคยใช้ ดี" votes + houses that praised it in the village LINE group (entered by the team)
+export const goodOf = (s) => (s.good || 0) + (s.line_good || 0);
 function Trust({ s }) {
   const good = s.good || 0;
-  return <p className="text-sm font-bold text-[#1E6B47]">{good ? `เพื่อนบ้าน ${good} คนบอกว่าดี` : /แนะนำ/.test(s.detail || "") ? "เพื่อนบ้านแนะนำ" : "ยังไม่มีคนบอกว่าเคยใช้"}</p>;
+  const line = s.line_good || 0;
+  if (!good && !line) return <p className="text-sm font-bold text-[#1E6B47]">{/แนะนำ/.test(s.detail || "") ? "เพื่อนบ้านแนะนำ" : "ยังไม่มีคนบอกว่าเคยใช้"}</p>;
+  return <p className="text-sm font-bold text-[#1E6B47]">👍 {[good && `เพื่อนบ้าน ${good} คนบอกว่าดี`, line && `ชมในกลุ่ม LINE หมู่บ้าน ${line} หลัง`].filter(Boolean).join(" · ")}</p>;
 }
 
 // ---------- the tradesmen & shops board: search, groups, a big call button, "เคยใช้ ดี" ----------
@@ -360,7 +364,7 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
         (!g || g.cats.includes(s.category)) &&
         (!query || `${s.name} ${s.detail} ${s.area} ${SERVICE_CATEGORIES[s.category]?.[1] || ""} ${groupOf(s.category)?.label || ""}`.toLowerCase().includes(query)),
     )
-    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.good || 0) - (a.good || 0) || (a.reports || 0) - (b.reports || 0));
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || goodOf(b) - goodOf(a) || (a.reports || 0) - (b.reports || 0));
   async function good(s) {
     setMsg("");
     try {
