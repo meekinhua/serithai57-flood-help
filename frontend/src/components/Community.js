@@ -567,7 +567,9 @@ export function PostedSheetBody({ text, onClose }) {
 }
 
 // ---------- the bottom bar: the four things people come back for ----------
-export function BottomNav({ page, dot, onGo, onHotline }) {
+// 7 Oct: badges = {home|pros|community|map: "important" | "general" | null}
+// important: a red "!" that pulses (act on it: a check-in, today's thing, the water) · general: a green dot (something new)
+export function BottomNav({ page, badges = {}, onGo, onHotline }) {
   const items = [
     ["home", "บ้านฉัน", <path key="p" d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />],
     ["pros", "ช่าง · ร้าน", <path key="p" d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" />],
@@ -607,7 +609,16 @@ export function BottomNav({ page, dot, onGo, onHotline }) {
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={on ? 2.4 : 2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   {icon}
                 </svg>
-                {key === "community" && dot && !on && <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#B42318]" aria-label="มีโพสต์ใหม่" />}
+                {badges[key] === "important" && (
+                  <span
+                    className="absolute -right-2.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-[#B42318] text-[11px] font-bold leading-none text-white"
+                    aria-label="มีเรื่องสำคัญ"
+                  >
+                    <span className="absolute inset-0 animate-ping rounded-full bg-[#B42318] opacity-60" aria-hidden="true" />
+                    <span className="relative">!</span>
+                  </span>
+                )}
+                {badges[key] === "general" && !on && <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#1E9E5A]" aria-label="มีอัปเดตใหม่" />}
               </span>
               <span className="whitespace-nowrap">{label}</span>
             </button>

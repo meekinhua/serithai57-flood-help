@@ -8,12 +8,12 @@ import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
 import { lookOf, ordered } from "./components/Look";
 import { TextsContext } from "./components/Texts";
-import MyHome from "./components/MyHome";
+import MyHome, { homeBadgeOf } from "./components/MyHome";
 import SurveyBoxes from "./components/SurveyBox";
 import { BottomNav, CommunityFeed, CommunityIntro, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PostedSheetBody, ProsList } from "./components/Community";
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
-import WatchPanel, { WaterPill, WaterView } from "./components/WatchPanel";
+import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/WatchPanel";
 import { LostBoard, LostForm } from "./components/LostFound";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
@@ -96,6 +96,7 @@ export default function RepairApp() {
   const [home, setHome] = useState(() => load("homeBlocks", { watch_on: true, watch_title: "", hub: { on: false } }));
   const [services, setServices] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [updatedTick, setUpdatedTick] = useState(0); // +1 after every refresh
   const [weather, setWeather] = useState(null);
   const [admin, setAdmin] = useState(null);
   const [sheet, setSheet] = useState(null);
@@ -168,6 +169,7 @@ export default function RepairApp() {
       setServices(s);
       setAnnouncements(a);
       setOnline(true);
+      setUpdatedTick((n) => n + 1);
     } catch {
       setOnline(false);
     }
@@ -235,7 +237,29 @@ export default function RepairApp() {
     issues: issues.length,
   };
 
-  const [seenAt, setSeenAt] = useState(() => load("communitySeen", 0));
+  // first visit: nothing is "new" yet
+  const [seenAt, setSeenAt] = useState(() => load("communitySeen", null) ?? Date.now());
+  const [prosSeen, setProsSeen] = useState(() => load("prosSeen", null) ?? Date.now());
+  const [homeBadge, setHomeBadge] = useState(() => load("homeBadge", null));
+  const onHomeBadge = useCallback((b) => {
+    setHomeBadge(b);
+    save("homeBadge", b);
+  }, []);
+  // away from บ้านฉัน its tab still says when something there needs the reader (checked with the 30 s refresh)
+  useEffect(() => {
+    const h = load("myHouse", "");
+    if (page === "home" || !h) return;
+    api(`/myhome?house=${encodeURIComponent(h)}`)
+      .then((d) => onHomeBadge(homeBadgeOf(d)))
+      .catch(() => {});
+  }, [page, updatedTick, onHomeBadge]);
+  const newestPro = Math.max(0, ...services.map((x) => new Date(x.created_at || 0).getTime() || 0));
+  useEffect(() => {
+    if (page === "pros" && newestPro > prosSeen) {
+      setProsSeen(newestPro);
+      save("prosSeen", newestPro);
+    }
+  }, [page, newestPro, prosSeen]);
   const newest = Math.max(0, ...[...lend, ...jobs, ...topics].map((x) => new Date(x.updated_at || x.created_at || 0).getTime() || 0));
   useEffect(() => {
     if (page === "community" && newest > seenAt) {
@@ -286,6 +310,7 @@ export default function RepairApp() {
         onIssues={() => showTab("issues")}
         onElectricians={() => openPros("electric")}
         onPros={(g) => openPros(g)}
+        onBadge={onHomeBadge}
       />
     ),
     announce: (
@@ -380,7 +405,17 @@ export default function RepairApp() {
   return (
     <TextsContext.Provider value={home.texts || {}}>
       <div className="min-h-screen bg-[#F2F4F1] text-[#15201A]">
-        <BottomNav page={page} dot={newest > seenAt} onGo={(p) => (p === "pros" ? openPros("") : goPage(p, p === "community" ? tab : undefined))} onHotline={() => setSheet({ type: "hotlines" })} />
+        <BottomNav
+          page={page}
+          badges={{
+            home: homeBadge,
+            pros: newestPro > prosSeen ? "general" : null,
+            community: newest > seenAt ? "general" : null,
+            map: waterStatus(water, canal).alarm ? "important" : null,
+          }}
+          onGo={(p) => (p === "pros" ? openPros("") : goPage(p, p === "community" ? tab : undefined))}
+          onHotline={() => setSheet({ type: "hotlines" })}
+        />
         <UrgentBar items={announcements} />
         {/* 7 Oct: one row — water, weather, people here, share; the village's name lives in the footer */}
         <header className="fixed inset-x-0 bottom-0 z-[900] bg-[#15201A] pb-[env(safe-area-inset-bottom)] text-white shadow-[0_-2px_8px_rgba(0,0,0,0.25)]">

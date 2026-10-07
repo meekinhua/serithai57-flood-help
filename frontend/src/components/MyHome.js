@@ -203,7 +203,7 @@ function Electricians({ services, onAll }) {
 }
 
 // ---------- "เร็วๆ นี้": what is about to happen to this house (backend myhome.py soon(); tools/site.py remind) ----------
-function Soon({ items }) {
+function Soon({ items, onSeen }) {
   const t = useT();
   const [seen, setSeen] = useState(() => load("soonSeen", []));
   const shown = (items || []).filter((x) => !seen.includes(x.id));
@@ -212,6 +212,7 @@ function Soon({ items }) {
     const next = [...seen.slice(-40), id];
     setSeen(next);
     save("soonSeen", next);
+    onSeen && onSeen();
   };
   return (
     <div className="mt-2 space-y-2" role="status">
@@ -540,7 +541,16 @@ function ElectricRow({ info, services, onSaved, onElectricians, onContact, conta
   );
 }
 
-export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros }) {
+// important = a check-in to answer, something today, a relief deadline · general = something new to read
+export function homeBadgeOf(info) {
+  if (!info) return null;
+  const seen = load("soonSeen", []);
+  const fresh = (info.soon || []).filter((x) => !seen.includes(x.id));
+  if ((info.checkin && !info.checkin.mine) || fresh.some((x) => x.when === "วันนี้" || x.id.startsWith("aid_"))) return "important";
+  return fresh.length > 0 || (info.questions || []).some((q) => !q.answer) ? "general" : null;
+}
+
+export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge }) {
   const fromSurvey = load("survey:electric", null)?.house || "";
   const [house, setHouse] = useState(() => takeFamilyParam() || load("myHouse", "") || fromSurvey);
   const [houses, setHouses] = useState(() => load("myHouses", []));
@@ -551,6 +561,11 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const [input, setInput] = useState(house || "");
   const [info, setInfo] = useState(null);
   const [reloadN, setReloadN] = useState(0);
+  const [seenN, setSeenN] = useState(0); // "รับทราบ" pressed: the tab badge looks again
+  // the tab button's badge (homeBadgeOf below)
+  useEffect(() => {
+    if (onBadge) onBadge(homeBadgeOf(info));
+  }, [info, onBadge, seenN]);
   const [err, setErr] = useState("");
   const [sent, setSent] = useState(null);
   const [contact, setContact] = useState(null);
@@ -789,7 +804,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
       ) : (
         <>
           <CheckinCard info={info} onSaved={setInfo} onContact={() => setContact({ name: load("myName", ""), from: "news" })} setErr={setErr} />
-          <Soon items={info.soon} />
+          <Soon items={info.soon} onSeen={() => setSeenN((n) => n + 1)} />
 
           {pinning ? (
             <Row title="ปักหมุดบ้านฉัน">
