@@ -25,7 +25,11 @@ export function LostBoard({ items, setItems, admin, onAdd }) {
         ))}
       </div>
       <div className="grid grid-cols-3 gap-1 rounded-xl bg-neutral-200 p-1">
-        {[["all", "ทั้งหมด"], ["lost", "😢 ตามหา"], ["found", "🙌 มีคนเจอ"]].map(([k, t]) => (
+        {[
+          ["all", "ทั้งหมด"],
+          ["lost", "😢 ตามหา"],
+          ["found", "🙌 มีคนเจอ"],
+        ].map(([k, t]) => (
           <button key={k} onClick={() => setKind(k)} aria-pressed={kind === k} className={`min-h-[40px] rounded-lg text-sm font-semibold ${kind === k ? "bg-white shadow" : "text-neutral-600"}`}>
             {t}
           </button>
@@ -34,7 +38,12 @@ export function LostBoard({ items, setItems, admin, onAdd }) {
       <div className="-mx-3 overflow-x-auto px-3 pb-1">
         <div className="flex w-max gap-2">
           {[["all", ["", "ทั้งหมด"]], ...Object.entries(LOST_CATEGORIES)].map(([k, [emoji, text]]) => (
-            <button key={k} onClick={() => setCat(k)} aria-pressed={cat === k} className={`min-h-[40px] whitespace-nowrap rounded-full px-3 text-sm ${cat === k ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}>
+            <button
+              key={k}
+              onClick={() => setCat(k)}
+              aria-pressed={cat === k}
+              className={`min-h-[40px] whitespace-nowrap rounded-full px-3 text-sm ${cat === k ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}
+            >
               {emoji} {text}
             </button>
           ))}
@@ -74,21 +83,23 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
           <img src={mediaUrl(photo.id, "thumb")} alt={x.title} loading="lazy" className="aspect-[4/3] w-full max-w-full object-cover" />
         </a>
       ) : (
-        <div className="flex aspect-[4/3] max-w-full items-center justify-center bg-neutral-100 text-6xl" aria-hidden="true">{emoji}</div>
+        <div className="flex aspect-[4/3] max-w-full items-center justify-center bg-neutral-100 text-6xl" aria-hidden="true">
+          {emoji}
+        </div>
       )}
       <div className="space-y-2 p-3">
         <div className="flex flex-wrap items-center gap-1.5 text-sm">
           <span className={`rounded px-1.5 font-bold ${x.kind === "lost" ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}>
             {k.emoji} {k.label}
           </span>
-          <span className="text-neutral-600">{emoji} {catText}</span>
+          <span className="text-neutral-600">
+            {emoji} {catText}
+          </span>
           {mine && <span className="rounded bg-yellow-200 px-1.5 font-semibold">ของฉัน</span>}
         </div>
         <p className="break-words text-lg font-bold leading-snug">{x.title}</p>
         {x.detail && <p className="whitespace-pre-wrap break-words text-sm">{x.detail}</p>}
-        <p className="text-xs text-neutral-500">
-          {[x.soi && `ซ.${x.soi}`, x.when_seen, x.name, timeAgo(x.created_at)].filter(Boolean).join(" · ")}
-        </p>
+        <p className="text-xs text-neutral-500">{[x.soi && `ซ.${x.soi}`, x.when_seen, x.name, timeAgo(x.created_at)].filter(Boolean).join(" · ")}</p>
         {x.media?.length > 1 && (
           <div className="flex gap-2">
             {x.media.slice(1).map((m) => (
@@ -100,11 +111,14 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
         )}
         {x.sightings?.length > 0 && (
           <ul className="space-y-1 rounded-lg bg-sky-50 p-2 text-sm">
-            {[...x.sightings].reverse().slice(0, 4).map((s, i) => (
-              <li key={i}>
-                👀 <b>{s.name}</b> {s.note} <span className="text-xs text-neutral-500">{timeAgo(s.at)}</span>
-              </li>
-            ))}
+            {[...x.sightings]
+              .reverse()
+              .slice(0, 4)
+              .map((s, i) => (
+                <li key={i}>
+                  👀 <b>{s.name}</b> {s.note} <span className="text-xs text-neutral-500">{timeAgo(s.at)}</span>
+                </li>
+              ))}
           </ul>
         )}
         {phone ? (
@@ -118,10 +132,19 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
         )}
         {seen ? (
           <div className="space-y-2 rounded-lg border-2 border-black p-2">
-            <input aria-label="เห็นที่ไหน" maxLength={200} value={seen.note} onChange={(e) => setSeen({ ...seen, note: e.target.value })} className={input} placeholder="เห็นที่ไหน เมื่อไหร่ เช่น ปากซอย 24 เมื่อเช้า" />
+            <input
+              aria-label="เห็นที่ไหน"
+              maxLength={200}
+              value={seen.note}
+              onChange={(e) => setSeen({ ...seen, note: e.target.value })}
+              className={input}
+              placeholder="เห็นที่ไหน เมื่อไหร่ เช่น ปากซอย 24 เมื่อเช้า"
+            />
             <input aria-label="ชื่อของคุณ" maxLength={60} value={seen.name} onChange={(e) => setSeen({ ...seen, name: e.target.value })} className={input} placeholder="ชื่อเล่น (ไม่บังคับ)" />
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setSeen(null)} className="min-h-[44px] rounded-lg border-2 border-black">ยกเลิก</button>
+              <button onClick={() => setSeen(null)} className="min-h-[44px] rounded-lg border-2 border-black">
+                ยกเลิก
+              </button>
               <button
                 onClick={() =>
                   run(async () => {
@@ -198,7 +221,13 @@ export function LostForm({ kind: initialKind = "lost", onDone }) {
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1">
         {Object.entries(LOST_KINDS).map(([k, v]) => (
-          <button type="button" key={k} onClick={() => set({ kind: k })} aria-pressed={form.kind === k} className={`min-h-[44px] rounded-lg text-sm font-semibold ${form.kind === k ? "bg-white shadow" : "text-neutral-600"}`}>
+          <button
+            type="button"
+            key={k}
+            onClick={() => set({ kind: k })}
+            aria-pressed={form.kind === k}
+            className={`min-h-[44px] rounded-lg text-sm font-semibold ${form.kind === k ? "bg-white shadow" : "text-neutral-600"}`}
+          >
             {v.emoji} {v.verb}
           </button>
         ))}
@@ -207,7 +236,13 @@ export function LostForm({ kind: initialKind = "lost", onDone }) {
         <legend className={label}>เป็นอะไร *</legend>
         <div className="grid grid-cols-2 gap-2">
           {Object.entries(LOST_CATEGORIES).map(([k, [emoji, text]]) => (
-            <button type="button" key={k} onClick={() => set({ category: k })} aria-pressed={form.category === k} className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.category === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}>
+            <button
+              type="button"
+              key={k}
+              onClick={() => set({ category: k })}
+              aria-pressed={form.category === k}
+              className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.category === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}
+            >
               <span className="text-xl">{emoji}</span>
               <span className="leading-tight">{text}</span>
             </button>
@@ -219,28 +254,57 @@ export function LostForm({ kind: initialKind = "lost", onDone }) {
         <MediaPicker items={media} setItems={setMedia} max={3} allowVideo={false} />
       </div>
       <div>
-        <label className={label} htmlFor="lost-title">{lost ? "หายอะไร *" : "เจออะไร *"}</label>
-        <input id="lost-title" required minLength={2} maxLength={80} value={form.title} onChange={(e) => set({ title: e.target.value })} className={input} placeholder={lost ? "เช่น หมาไทยสีน้ำตาล ปลอกคอแดง ชื่อโบ้" : "เช่น แมวส้ม ตัวผู้ ไม่มีปลอกคอ"} />
+        <label className={label} htmlFor="lost-title">
+          {lost ? "หายอะไร *" : "เจออะไร *"}
+        </label>
+        <input
+          id="lost-title"
+          required
+          minLength={2}
+          maxLength={80}
+          value={form.title}
+          onChange={(e) => set({ title: e.target.value })}
+          className={input}
+          placeholder={lost ? "เช่น หมาไทยสีน้ำตาล ปลอกคอแดง ชื่อโบ้" : "เช่น แมวส้ม ตัวผู้ ไม่มีปลอกคอ"}
+        />
       </div>
       <div>
-        <label className={label} htmlFor="lost-detail">ลักษณะ / รายละเอียด</label>
-        <textarea id="lost-detail" rows={3} maxLength={400} value={form.detail} onChange={(e) => set({ detail: e.target.value })} className={input} placeholder={lost ? "จุดสังเกต นิสัย กลัวคนไหม มีรางวัลไหม" : "ตอนนี้อยู่ที่ไหน ฝากเลี้ยงไว้ที่ใคร"} />
+        <label className={label} htmlFor="lost-detail">
+          ลักษณะ / รายละเอียด
+        </label>
+        <textarea
+          id="lost-detail"
+          rows={3}
+          maxLength={400}
+          value={form.detail}
+          onChange={(e) => set({ detail: e.target.value })}
+          className={input}
+          placeholder={lost ? "จุดสังเกต นิสัย กลัวคนไหม มีรางวัลไหม" : "ตอนนี้อยู่ที่ไหน ฝากเลี้ยงไว้ที่ใคร"}
+        />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className={label} htmlFor="lost-soi">{lost ? "หายแถวซอย" : "เจอแถวซอย"}</label>
+          <label className={label} htmlFor="lost-soi">
+            {lost ? "หายแถวซอย" : "เจอแถวซอย"}
+          </label>
           <input id="lost-soi" maxLength={12} value={form.soi} onChange={(e) => set({ soi: e.target.value })} className={input} placeholder="เช่น 24" />
         </div>
         <div>
-          <label className={label} htmlFor="lost-when">เมื่อไหร่</label>
+          <label className={label} htmlFor="lost-when">
+            เมื่อไหร่
+          </label>
           <input id="lost-when" maxLength={60} value={form.when_seen} onChange={(e) => set({ when_seen: e.target.value })} className={input} placeholder="เช่น หายตั้งแต่ 29 ก.ย. ตอนน้ำขึ้น" />
         </div>
         <div>
-          <label className={label} htmlFor="lost-name">ชื่อเล่น *</label>
+          <label className={label} htmlFor="lost-name">
+            ชื่อเล่น *
+          </label>
           <input id="lost-name" required maxLength={60} value={form.name} onChange={(e) => set({ name: e.target.value })} className={input} />
         </div>
         <div>
-          <label className={label} htmlFor="lost-phone">เบอร์โทร *</label>
+          <label className={label} htmlFor="lost-phone">
+            เบอร์โทร *
+          </label>
           <input id="lost-phone" required type="tel" inputMode="tel" maxLength={40} value={form.phone} onChange={(e) => set({ phone: e.target.value })} className={input} />
         </div>
       </div>
@@ -250,5 +314,54 @@ export function LostForm({ kind: initialKind = "lost", onDone }) {
         {busy ? "กำลังส่ง…" : attached.busy ? "รอรูปอัปโหลด…" : lost ? "😢 ลงประกาศตามหา" : "🙌 ลงประกาศว่าเจอ"}
       </button>
     </form>
+  );
+}
+
+// ---------- the top of the home page: a lost (or found) dog / cat, big with its photo — hideable, back when a new one comes ----------
+const PETS = ["dog", "cat", "pet"];
+export function PetAlert({ items, onOpen }) {
+  const pets = items.filter((x) => PETS.includes(x.category) && x.status !== "reunited");
+  const [hidden, setHidden] = useState(() => load("petHidden", []));
+  if (!pets.length || pets.every((x) => hidden.includes(x.id))) return null;
+  const hide = () => {
+    const ids = pets.map((x) => x.id);
+    setHidden(ids);
+    save("petHidden", ids);
+  };
+  const lost = pets.filter((x) => x.kind === "lost").length;
+  return (
+    <section className="mb-3 rounded-[20px] border-2 border-[#B42318] bg-[#FDE8E6] p-3" aria-label="สัตว์เลี้ยงหาย">
+      <div className="flex items-center gap-2">
+        <p className="min-w-0 flex-1 text-lg font-bold leading-tight text-[#7A1A12]">🐾 {lost ? `ช่วยกันดู! สัตว์เลี้ยงหาย ${lost} ตัว` : "มีคนเจอสัตว์เลี้ยง · เจ้าของอยู่ไหน?"}</p>
+        <button onClick={hide} className="min-h-[40px] shrink-0 text-sm font-bold text-[#45504A] underline">
+          ซ่อน
+        </button>
+      </div>
+      <div className="-mx-3 mt-2 flex gap-2 overflow-x-auto px-3 pb-1">
+        {pets.slice(0, 6).map((x) => {
+          const [emoji] = LOST_CATEGORIES[x.category] || ["🐾"];
+          const photo = x.media?.[0];
+          return (
+            <button key={x.id} onClick={onOpen} className="w-[168px] shrink-0 overflow-hidden rounded-2xl bg-white text-left shadow-sm">
+              {photo ? (
+                <img src={mediaUrl(photo.id, "thumb")} alt={x.title} loading="lazy" className="aspect-square w-full object-cover" />
+              ) : (
+                <div className="flex aspect-square w-full items-center justify-center bg-neutral-100 text-6xl" aria-hidden="true">
+                  {emoji}
+                </div>
+              )}
+              <div className="p-2">
+                <span className={`rounded px-1.5 text-sm font-bold text-white ${x.kind === "lost" ? "bg-[#B42318]" : "bg-[#1E6B47]"}`}>{x.kind === "lost" ? "😢 หาย" : "🙌 มีคนเจอ"}</span>
+                <p className="mt-1 line-clamp-2 text-[15px] font-bold leading-snug">{x.title}</p>
+                <p className="text-sm text-[#45504A]">{[x.soi && `ซ.${x.soi}`, timeAgo(x.created_at)].filter(Boolean).join(" · ")}</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={onOpen} className="mt-1 min-h-[44px] w-full rounded-xl bg-white text-[15px] font-bold text-[#7A1A12]">
+        {lost ? "เห็นตัวนี้? กดบอกเจ้าของ ›" : "ดูรูป · ติดต่อ ›"}
+      </button>
+    </section>
   );
 }

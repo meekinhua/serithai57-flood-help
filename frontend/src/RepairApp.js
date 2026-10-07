@@ -15,7 +15,7 @@ import { BottomNav, CommunityFeed, CommunityIntro, IntentChoices, JoinSheetBody,
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/WatchPanel";
-import { LostBoard, LostForm } from "./components/LostFound";
+import { LostBoard, LostForm, PetAlert } from "./components/LostFound";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, HireList, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
@@ -505,6 +505,7 @@ export default function RepairApp() {
         <main className="mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
           {page === "home" ? (
             <>
+              <PetAlert items={lost} onOpen={() => showTab("lost")} />
               {ordered(home.layout, Object.keys(blocks)).map((k) => (
                 <Fragment key={k}>{blocks[k]}</Fragment>
               ))}
