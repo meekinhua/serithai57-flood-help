@@ -175,6 +175,7 @@ class WasteBody(BaseModel):
     schedule: list[WasteRound] = Field(default_factory=list, max_length=40)
     guide: list[WasteSection] = Field(default_factory=list, max_length=15)
     contacts: list[WasteContact] = Field(default_factory=list, max_length=10)
+    media: Optional[list[dict]] = Field(None, max_length=4)  # None = keep (the page's editor doesn't send it)  # 7 Oct: photo / clip previews (attached via /admin/media/claim)
     # 7 Oct: the regular rounds by soi parity for บ้านฉัน, e.g. {"even": "จันทร์ · พฤหัส", "odd": "พุธ · เสาร์"}
     # None = keep what is stored (the page's editor doesn't send it)
     rounds: Optional[Dict[Literal["even", "odd"], str]] = None
@@ -243,6 +244,7 @@ class EventBlock(BaseModel):
     items: List[str] = Field(default_factory=list, max_length=12)  # "what to do" bullets shown in full on the home page
     icon: str = Field("", max_length=8)  # 🧹 / 🧱 …
     link: str = Field("", max_length=200)  # e.g. "/cleanup" — a big button in the box
+    media: List[dict] = Field(default_factory=list, max_length=4)  # 7 Oct: photo / clip previews (attached via /admin/media/claim)
     link_label: str = Field("", max_length=60)
 
 
@@ -695,6 +697,8 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             data.pop("rounds")
         else:
             data["rounds"] = {k: v.strip()[:60] for k, v in data["rounds"].items() if v.strip()}
+        if data["media"] is None:
+            data.pop("media")
         doc = {**data, "notice": data["notice"].strip(), "updated_at": now(), "by": admin["name"]}
         await db.settings.update_one({"id": "waste"}, {"$set": {"id": "waste", **doc}}, upsert=True)
         await audit(admin, "update_waste", "waste", f"{len(doc['schedule'])} rounds, {len(doc['guide'])} sections")

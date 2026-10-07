@@ -4,6 +4,7 @@ import { HOTLINE_GROUPS, JOB_TYPES, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
 import Announcements, { UrgentBar } from "./components/Announcements";
 import { WeatherAlerts, WeatherChip, WindyMap } from "./components/Weather";
+import { MediaStrip } from "./components/MediaGallery";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
 import { lookOf, ordered } from "./components/Look";
@@ -864,6 +865,7 @@ function EventBox({ ev, onMap }) {
           {ev.sub && <p className="text-sm text-neutral-700">{ev.sub}</p>}
         </div>
       </div>
+      <MediaStrip media={ev.media || []} size={88} />
       {ev.items?.length > 0 && (
         <ol className="mt-2 space-y-1.5">
           {ev.items.map((t, i) => (

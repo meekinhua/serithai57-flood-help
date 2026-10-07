@@ -85,6 +85,7 @@ class Question(BaseModel):
     group: str = Field("", max_length=20)  # PRO_GROUPS key on the page: list those tradesmen after "yes"
     action: Literal["", "issue", "ask"] = ""  # a button after "yes": the office list / ask the neighbours
     done: str = Field("แก้ได้แล้ว", max_length=30)  # the button that turns a yes into a no
+    media: List[dict] = Field(default_factory=list, max_length=4)  # 7 Oct: photo / clip previews (attached via /admin/media/claim)
 
 
 class QuestionsBody(BaseModel):
@@ -110,6 +111,7 @@ class Reminder(BaseModel):
     date: date  # the day it happens
     start: Optional[date] = None  # shown from (default: the day before)
     sois: str = Field("", max_length=80)  # "" all · "22-57,60" · "odd" · "even"
+    media: List[dict] = Field(default_factory=list, max_length=4)  # 7 Oct: photo / clip previews (attached via /admin/media/claim)
 
 
 class RemindersBody(BaseModel):
@@ -257,7 +259,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             d = date.fromisoformat(r["date"])
             start = date.fromisoformat(r["start"]) if r.get("start") else d - timedelta(days=1)
             if start <= today <= d and soi_in(soi, r.get("sois", "")):
-                out.append({"id": f"{r['id']}_{r['date']}", "icon": r.get("icon") or "📅", "when": when_word(d, today), "date": r["date"], "text": r["text"]})
+                out.append({"id": f"{r['id']}_{r['date']}", "icon": r.get("icon") or "📅", "when": when_word(d, today), "date": r["date"], "text": r["text"], "media": r.get("media") or []})
         return sorted(out, key=lambda x: x["date"])
 
     @router.get("/myhome")

@@ -5,7 +5,7 @@ import Nearby from "./Nearby";
 import { useT } from "./Texts";
 import { MYHOME_CHANGED, cleanHouse } from "./SurveyBox";
 import { PRO_GROUPS, rememberCall } from "./Community";
-import { MediaThumb } from "./MediaGallery";
+import { MediaStrip, MediaThumb } from "./MediaGallery";
 import { AidRow, CheckinCard, InstallCard, OutageRow, PlanRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
 import { waterOf } from "../config";
 
@@ -225,6 +225,7 @@ function Soon({ items, onSeen }) {
           <div className="min-w-0 flex-1">
             <span className={`mr-1.5 inline-block rounded-full px-2 py-0.5 text-sm font-bold ${x.when === "วันนี้" ? "bg-[#B42318] text-white" : "bg-[#15201A] text-white"}`}>{x.when}</span>
             <span className="text-base font-bold leading-snug">{x.text}</span>
+            <MediaStrip media={x.media || []} size={64} />
             <button onClick={() => ok(x.id)} className="mt-0.5 block min-h-[36px] text-sm font-bold text-[#45504A] underline">
               รับทราบแล้ว ซ่อน
             </button>
@@ -382,6 +383,7 @@ function QuestionRow({ q, info, services, onAnswered, onPros, onIssue, onAsk, se
   return (
     <Row id={`myhome-${q.id}`} icon={q.icon} title={q.q} hi={open} onFold={q.answer === "no" && !again ? onFold : null}>
       {open && <p className="-mt-1 text-sm text-[#7A4104]">{t("myhome.q.from", "คำถามจากทีมอาสา · กดตอบครั้งเดียว")}</p>}
+      <MediaStrip media={q.media || []} />
       {q.answer === "no" && !again ? (
         <div className="flex items-center gap-2 rounded-2xl bg-[#E4F0E9] p-3">
           <p className="min-w-0 flex-1 text-[15px] font-bold text-[#154D33]">คุณตอบ: {q.no}</p>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MediaStrip } from "./MediaGallery";
 import { api } from "../api";
 import { timeAgo } from "../config";
 import { input } from "./RepairBoards";
@@ -15,10 +16,17 @@ export default function WasteBoard({ admin, onReportTrash }) {
       .catch((e) => setErr(e.message));
   }, []);
   if (!waste) return <p className="rounded-xl bg-white p-4 text-center text-neutral-500">{err || "กำลังโหลด…"}</p>;
-  if (edit) return <WasteEditor value={edit} onCancel={() => setEdit(null)} onSaved={(w) => {
+  if (edit)
+    return (
+      <WasteEditor
+        value={edit}
+        onCancel={() => setEdit(null)}
+        onSaved={(w) => {
           setWaste(w);
           setEdit(null);
-        }} />;
+        }}
+      />
+    );
 
   return (
     <div className="space-y-3">
@@ -31,6 +39,7 @@ export default function WasteBoard({ admin, onReportTrash }) {
         </button>
       )}
       {waste.notice && <p className="rounded-xl border-2 border-black bg-yellow-50 p-3 font-semibold">📢 {waste.notice}</p>}
+      <MediaStrip media={waste.media || []} size={96} />
 
       <section className="rounded-xl bg-white p-3">
         <h3 className="mb-2 text-lg font-bold">🚛 ตารางรถเก็บขยะ</h3>
@@ -61,7 +70,9 @@ export default function WasteBoard({ admin, onReportTrash }) {
             <h4 className="mb-1 font-bold">{g.title}</h4>
             <ul className="list-disc space-y-1 pl-5">
               {g.items.map((t, j) => (
-                <li key={j} className="break-words">{t}</li>
+                <li key={j} className="break-words">
+                  {t}
+                </li>
               ))}
             </ul>
           </section>
@@ -86,7 +97,12 @@ export default function WasteBoard({ admin, onReportTrash }) {
           </ul>
         </section>
       )}
-      {waste.updated_at && <p className="text-xs text-neutral-500">อัปเดต {timeAgo(waste.updated_at)}{waste.by && ` · ${waste.by}`}</p>}
+      {waste.updated_at && (
+        <p className="text-xs text-neutral-500">
+          อัปเดต {timeAgo(waste.updated_at)}
+          {waste.by && ` · ${waste.by}`}
+        </p>
+      )}
     </div>
   );
 }
@@ -128,7 +144,9 @@ function WasteEditor({ value, onCancel, onSaved }) {
     <div className="space-y-4 rounded-xl border-4 border-black bg-white p-3">
       <p className="text-lg font-bold">✏️ แก้ไขหน้าขยะ · กดบันทึกแล้วทุกคนเห็นทันที</p>
       <div>
-        <label className="mb-1 block font-medium" htmlFor="waste-notice">ประกาศบนสุด</label>
+        <label className="mb-1 block font-medium" htmlFor="waste-notice">
+          ประกาศบนสุด
+        </label>
         <textarea id="waste-notice" rows={2} maxLength={300} value={w.notice} onChange={(e) => set({ notice: e.target.value })} className={input} />
       </div>
 
@@ -137,19 +155,35 @@ function WasteEditor({ value, onCancel, onSaved }) {
         {w.schedule.map((r, i) => (
           <div key={i} className="space-y-2 rounded-lg bg-neutral-50 p-2">
             <div className="grid gap-2 sm:grid-cols-2">
-              <input aria-label="วัน เวลา" maxLength={60} value={r.when} onChange={(e) => setRow("schedule", i, { when: e.target.value })} className={input} placeholder="วัน เวลา เช่น ทุกวันอังคาร 8:00" />
+              <input
+                aria-label="วัน เวลา"
+                maxLength={60}
+                value={r.when}
+                onChange={(e) => setRow("schedule", i, { when: e.target.value })}
+                className={input}
+                placeholder="วัน เวลา เช่น ทุกวันอังคาร 8:00"
+              />
               <input aria-label="พื้นที่" maxLength={80} value={r.area} onChange={(e) => setRow("schedule", i, { area: e.target.value })} className={input} placeholder="พื้นที่ เช่น ซอย 1–35" />
               <input aria-label="ประเภทขยะ" maxLength={60} value={r.kind} onChange={(e) => setRow("schedule", i, { kind: e.target.value })} className={input} placeholder="ประเภท เช่น ขยะชิ้นใหญ่" />
               <input aria-label="หมายเหตุ" maxLength={160} value={r.note} onChange={(e) => setRow("schedule", i, { note: e.target.value })} className={input} placeholder="หมายเหตุ" />
             </div>
             <div className="flex gap-2">
-              <button onClick={() => move("schedule", i, -1)} className={small}>▲</button>
-              <button onClick={() => move("schedule", i, 1)} className={small}>▼</button>
-              <button onClick={() => dropRow("schedule", i)} className={`${small} ml-auto text-red-700`}>ลบแถว</button>
+              <button onClick={() => move("schedule", i, -1)} className={small}>
+                ▲
+              </button>
+              <button onClick={() => move("schedule", i, 1)} className={small}>
+                ▼
+              </button>
+              <button onClick={() => dropRow("schedule", i)} className={`${small} ml-auto text-red-700`}>
+                ลบแถว
+              </button>
             </div>
           </div>
         ))}
-        <button onClick={() => set({ schedule: [...w.schedule, { when: "", area: "", kind: "", note: "" }] })} className="min-h-[44px] w-full rounded-lg border-2 border-dashed border-black font-semibold">
+        <button
+          onClick={() => set({ schedule: [...w.schedule, { when: "", area: "", kind: "", note: "" }] })}
+          className="min-h-[44px] w-full rounded-lg border-2 border-dashed border-black font-semibold"
+        >
           ➕ เพิ่มรอบรถ
         </button>
       </section>
@@ -161,9 +195,15 @@ function WasteEditor({ value, onCancel, onSaved }) {
             <input aria-label="หัวข้อ" maxLength={60} value={g.title} onChange={(e) => setRow("guide", i, { title: e.target.value })} className={`${input} font-bold`} />
             <textarea aria-label="รายการ" rows={Math.max(2, g.text.split("\n").length)} value={g.text} onChange={(e) => setRow("guide", i, { text: e.target.value })} className={input} />
             <div className="flex gap-2">
-              <button onClick={() => move("guide", i, -1)} className={small}>▲</button>
-              <button onClick={() => move("guide", i, 1)} className={small}>▼</button>
-              <button onClick={() => dropRow("guide", i)} className={`${small} ml-auto text-red-700`}>ลบหัวข้อ</button>
+              <button onClick={() => move("guide", i, -1)} className={small}>
+                ▲
+              </button>
+              <button onClick={() => move("guide", i, 1)} className={small}>
+                ▼
+              </button>
+              <button onClick={() => dropRow("guide", i)} className={`${small} ml-auto text-red-700`}>
+                ลบหัวข้อ
+              </button>
             </div>
           </div>
         ))}
@@ -176,9 +216,18 @@ function WasteEditor({ value, onCancel, onSaved }) {
         <h3 className="font-bold">☎️ เบอร์ติดต่อ</h3>
         {w.contacts.map((c, i) => (
           <div key={i} className="flex gap-2">
-            <input aria-label="ชื่อ" maxLength={80} value={c.label} onChange={(e) => setRow("contacts", i, { label: e.target.value })} className={input} placeholder="เช่น เขตบึงกุ่ม ฝ่ายรักษาความสะอาด" />
+            <input
+              aria-label="ชื่อ"
+              maxLength={80}
+              value={c.label}
+              onChange={(e) => setRow("contacts", i, { label: e.target.value })}
+              className={input}
+              placeholder="เช่น เขตบึงกุ่ม ฝ่ายรักษาความสะอาด"
+            />
             <input aria-label="เบอร์" maxLength={40} value={c.phone} onChange={(e) => setRow("contacts", i, { phone: e.target.value })} className={`${input} max-w-[9rem]`} placeholder="เบอร์" />
-            <button onClick={() => dropRow("contacts", i)} className={`${small} text-red-700`} aria-label="ลบ">✕</button>
+            <button onClick={() => dropRow("contacts", i)} className={`${small} text-red-700`} aria-label="ลบ">
+              ✕
+            </button>
           </div>
         ))}
         <button onClick={() => set({ contacts: [...w.contacts, { label: "", phone: "" }] })} className="min-h-[44px] w-full rounded-lg border-2 border-dashed border-black font-semibold">
@@ -188,7 +237,9 @@ function WasteEditor({ value, onCancel, onSaved }) {
 
       {err && <p className="rounded-lg bg-red-50 p-2 text-red-700">{err}</p>}
       <div className="sticky bottom-2 grid grid-cols-2 gap-2">
-        <button onClick={onCancel} className="min-h-[52px] rounded-xl border-2 border-black bg-white font-semibold">ยกเลิก</button>
+        <button onClick={onCancel} className="min-h-[52px] rounded-xl border-2 border-black bg-white font-semibold">
+          ยกเลิก
+        </button>
         <button onClick={save} disabled={busy} className="min-h-[52px] rounded-xl bg-black font-bold text-white disabled:opacity-60">
           {busy ? "กำลังบันทึก…" : "💾 บันทึก"}
         </button>

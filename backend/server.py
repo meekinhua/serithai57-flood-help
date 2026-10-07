@@ -527,6 +527,17 @@ async def admin_delete_water(water_id: str, admin: dict = Depends(require_admin)
     await audit(admin, "delete_water", water_id, f"level {doc['level']} {doc.get('note', '')}")
 
 
+class MediaClaim(BaseModel):
+    ids: list[str] = Field(..., min_length=1, max_length=4)
+    owner: str = Field(..., pattern=r"^[a-z_]{2,20}:[A-Za-z0-9_.-]{1,60}$")  # "event:2", "remind:bigwaste"
+
+
+@api.post("/admin/media/claim")
+async def admin_claim_media(body: MediaClaim, admin: dict = Depends(require_admin)):
+    """Attach uploads to something stored in the settings, so cleanup keeps them; returns what to store with it."""
+    return await claim_media(body.ids, body.owner, {"image", "video"})
+
+
 @api.get("/admin/announcements")
 async def admin_list_announcements(admin: dict = Depends(require_admin)):
     return await db.announcements.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)

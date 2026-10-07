@@ -51,6 +51,7 @@ class Aid(BaseModel):
     deadline: Optional[date] = None
     link: str = Field("", max_length=300)
     short: str = Field("", max_length=24)  # the label on the folded line ("ประกันสังคม")
+    media: List[dict] = Field(default_factory=list, max_length=4)  # 7 Oct: photo / clip previews (attached via /admin/media/claim)
     track: bool = True  # False = information only (loans, social security, insurance): no "ยื่นแล้ว" buttons
 
 

@@ -3,6 +3,7 @@ import { api, load, save } from "../api";
 import { timeAgo } from "../config";
 import { PRO_GROUPS } from "./Community";
 import { useT } from "./Texts";
+import { MediaStrip } from "./MediaGallery";
 
 // บ้านฉัน, the parts that make a household keep the page (7 Oct 2026; backend homeplus.py)
 
@@ -209,6 +210,7 @@ export function AidRow({ info, onChanged, setErr }) {
             </span>
           )}
         </div>
+        <MediaStrip media={a.media || []} />
         {a.amount && (
           <div className="mt-0.5">
             <p className="text-lg font-bold leading-snug text-[#154D33]">{a.amount.split("\n")[0]}</p>

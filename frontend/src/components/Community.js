@@ -236,6 +236,7 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
         tab: "jobs",
         k: j.kind === "offer" ? "offer" : "need",
         job: j,
+        media: j.media || [],
         title: j.detail,
         sub: [text, j.soi && `ซ.${j.soi}`, j.house && `บ้าน ${j.house}`].filter(Boolean).join(" · "),
         at: j.created_at,
@@ -243,7 +244,7 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
     }
     for (const s of services) {
       const g = groupOf(s.category);
-      out.push({ id: `s${s.id}`, tab: "pros", k: "pros", svc: s, title: s.name, sub: g ? g.label : SERVICE_CATEGORIES[s.category]?.[1] || "", at: s.created_at });
+      out.push({ id: `s${s.id}`, tab: "pros", k: "pros", svc: s, media: s.media || [], title: s.name, sub: g ? g.label : SERVICE_CATEGORIES[s.category]?.[1] || "", at: s.created_at });
     }
     for (const x of lend) {
       if (x.status === "closed" || !fresh(x.created_at)) continue;
@@ -251,6 +252,7 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
         id: `l${x.id}`,
         tab: "lend",
         k: x.kind === "sell" ? "sell" : "lend",
+        media: x.media || [],
         title: x.title,
         price: x.price,
         sub: [LEND_KINDS[x.kind]?.verb, LEND_CATEGORIES[x.category]?.[1], x.soi && `ซ.${x.soi}`].filter(Boolean).join(" · "),
@@ -263,6 +265,7 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
         tab: "forum",
         k: "forum",
         topic: t.id,
+        media: t.media || [],
         title: t.title,
         sub: [FORUM_CATEGORIES[t.category]?.[1], `${t.reply_count} คำตอบ`].filter(Boolean).join(" · "),
         at: t.last_at,
@@ -287,6 +290,7 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
                 <span className="text-[#45504A]">{x.k === "pros" ? x.sub : ageText(x.at)}</span>
               </div>
               <b className="block break-words text-[17px] leading-snug">{x.title}</b>
+              <MediaStrip media={x.media || []} />
               {x.price && <p className="text-lg font-bold text-[#8F2A1C]">{x.price}</p>}
               {x.k === "pros" && x.svc.detail && <p className="line-clamp-2 break-words text-[15px] text-[#33403A]">{x.svc.detail}</p>}
               {x.k !== "pros" && x.sub && <p className="break-words text-[15px] text-[#33403A]">{x.sub}</p>}
