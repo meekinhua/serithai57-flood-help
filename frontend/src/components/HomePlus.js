@@ -177,8 +177,12 @@ export function OutageRow({ info, forced, onFold, onChanged, setErr }) {
 
 // ---------- 💰 flood relief this house can claim ----------
 export function AidRow({ info, onChanged, setErr }) {
-  const list = (info.aid || []).filter((a) => a.mine !== "received");
-  if (!list.length) return null;
+  const [open, setOpen] = useState(null); // the information-only items fold behind one line
+  // the ones to claim first; information (loans, social security, insurance) after
+  const all = (info.aid || []).filter((a) => a.mine !== "received");
+  const claim = all.filter((a) => a.track !== false);
+  const facts = all.filter((a) => a.track === false);
+  if (!all.length) return null;
   async function mark(aid, status) {
     setErr("");
     try {
@@ -191,54 +195,76 @@ export function AidRow({ info, onChanged, setErr }) {
   // whole days left, counted in Bangkok dates (the same as the "เร็วๆ นี้" reminder)
   const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   const days = (d) => Math.round((Date.parse(d) - Date.parse(today)) / 864e5);
-  return (
-    <Box icon="💰" title="สิทธิ์ช่วยเหลือน้ำท่วม" sub="ทีมอาสารวบรวมจากประกาศของหน่วยงาน · กดบอกได้ว่ายื่นแล้ว">
-      {list.map((a) => {
-        const left = a.deadline ? days(a.deadline) : null;
-        return (
-          <div key={a.id} className="rounded-2xl border border-[#DCE2DD] bg-white p-3">
-            <div className="flex items-start gap-2">
-              <b className="min-w-0 flex-1 text-base leading-snug">{a.title}</b>
-              {left != null && left >= 0 && (
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-bold ${left <= 3 ? "bg-[#B42318] text-white" : "bg-[#F2F4F1]"}`}>
-                  {left === 0 ? "หมดเขตวันนี้" : `อีก ${left} วัน`}
-                </span>
-              )}
-            </div>
-            {a.amount && <p className="text-lg font-bold text-[#154D33]">{a.amount}</p>}
-            {a.who && <p className="text-sm text-[#45504A]">{a.who}</p>}
-            {a.docs && (
-              <p className="mt-1 text-[15px]">
-                <b>ต้องใช้:</b> {a.docs}
-              </p>
-            )}
-            {a.where && (
-              <p className="text-[15px]">
-                <b>ยื่นที่:</b> {a.where}
-              </p>
-            )}
-            {a.link && (
-              <a href={a.link} target="_blank" rel="noreferrer" className="text-[15px] font-bold text-[#1F5FA8] underline">
-                ดูประกาศ ›
-              </a>
-            )}
-            <div className="mt-2 flex gap-2">
-              {a.mine === "applied" ? (
-                <>
-                  <p className="flex min-h-[48px] flex-1 items-center text-[15px] font-bold text-[#154D33]">✓ ยื่นแล้ว รอเงิน</p>
-                  <button onClick={() => mark(a.id, "received")} className={`${btn} bg-[#1E6B47] text-white`}>
-                    ได้เงินแล้ว
-                  </button>
-                </>
-              ) : (
-                <button onClick={() => mark(a.id, "applied")} className={`${btn} flex-1 border-2 border-[#1E6B47] bg-white text-[#154D33]`}>
-                  ✓ ยื่นแล้ว
-                </button>
-              )}
-            </div>
+  const thaiDate = (d) => new Date(`${d}T12:00:00+07:00`).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+  const card = (a) => {
+    const left = a.deadline ? days(a.deadline) : null;
+    const info_ = a.track === false;
+    return (
+      <div key={a.id} className={`rounded-2xl border p-3 ${info_ ? "border-[#DCE2DD] bg-[#F7F8F6]" : "border-[#1E6B47] bg-white"}`}>
+        <div className="flex items-start gap-2">
+          <b className="min-w-0 flex-1 text-base leading-snug">{a.title}</b>
+          {left != null && left >= 0 && (
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-bold ${left <= 3 ? "bg-[#B42318] text-white" : "bg-[#FDE8E6] text-[#B42318]"}`}>
+              {left === 0 ? "หมดเขตวันนี้" : `อีก ${left} วัน`}
+            </span>
+          )}
+        </div>
+        {a.amount && (
+          <div className="mt-0.5">
+            <p className="text-lg font-bold leading-snug text-[#154D33]">{a.amount.split("\n")[0]}</p>
+            {a.amount.includes("\n") && <p className="whitespace-pre-line text-sm text-[#33403A]">{a.amount.split("\n").slice(1).join("\n")}</p>}
           </div>
-        );
-      })}
+        )}
+        {a.who && <p className="text-sm text-[#45504A]">{a.who}</p>}
+        {a.docs && (
+          <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed">
+            <b>{info_ ? "เงื่อนไข:" : "ต้องใช้:"}</b> {a.docs}
+          </p>
+        )}
+        {a.where && (
+          <p className="whitespace-pre-line text-[15px] leading-relaxed">
+            <b>{info_ ? "ติดต่อ:" : "ยื่นที่:"}</b> {a.where}
+          </p>
+        )}
+        {a.deadline && <p className="text-[15px] font-bold text-[#B42318]">ยื่นภายใน {thaiDate(a.deadline)}</p>}
+        {a.link && (
+          <a href={a.link} target="_blank" rel="noreferrer" className="mt-1 inline-flex min-h-[44px] items-center text-[15px] font-bold text-[#1F5FA8] underline">
+            {/claim\.bangkok|thainatcat/.test(a.link) ? "เข้าเว็บยื่นเรื่อง ›" : "ดูรายละเอียด ›"}
+          </a>
+        )}
+        {!info_ && (
+          <div className="mt-2 flex gap-2">
+            {a.mine === "applied" ? (
+              <>
+                <p className="flex min-h-[48px] flex-1 items-center text-[15px] font-bold text-[#154D33]">✓ ยื่นแล้ว รอเงิน</p>
+                <button onClick={() => mark(a.id, "received")} className={`${btn} bg-[#1E6B47] text-white`}>
+                  ได้เงินแล้ว
+                </button>
+              </>
+            ) : (
+              <button onClick={() => mark(a.id, "applied")} className={`${btn} flex-1 border-2 border-[#1E6B47] bg-white text-[#154D33]`}>
+                ✓ ยื่นแล้ว
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+  return (
+    <Box icon="💰" title="เงินเยียวยาน้ำท่วม ที่บ้านคุณขอได้" sub="ทีมอาสารวบรวมจากประกาศของหน่วยงาน · ยื่นแล้วกดบอกไว้ จะได้ไม่ลืม">
+      {claim.map(card)}
+      {facts.length > 0 &&
+        (open ? (
+          <>
+            <p className="pt-1 text-[15px] font-bold">ความช่วยเหลืออื่นที่ควรรู้</p>
+            {facts.map(card)}
+          </>
+        ) : (
+          <button onClick={() => setOpen(true)} className="min-h-[48px] w-full rounded-xl bg-[#F2F4F1] px-3 text-left text-[15px] font-bold">
+            + ความช่วยเหลืออื่น: {facts.map((a) => a.short || a.title.split(" ")[0]).join(" · ")} ▾
+          </button>
+        ))}
     </Box>
   );
 }

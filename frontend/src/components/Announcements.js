@@ -70,3 +70,37 @@ export default function Announcements({ items, preview = false }) {
     </section>
   );
 }
+
+// 7 Oct: a "ด่วนมาก" announcement also sticks under the page tabs on every page, so it is in sight whatever
+// the reader is doing; one line, a tap opens the whole text. Ends when the team turns the announcement off.
+export function UrgentBar({ items }) {
+  const [open, setOpen] = useState(false);
+  const urgent = (items || []).filter((a) => a.level === "danger");
+  useEffect(() => {
+    // things scrolled into view stop below the tabs and this bar
+    document.documentElement.style.scrollPaddingTop = urgent.length ? "124px" : "";
+    return () => {
+      document.documentElement.style.scrollPaddingTop = "";
+    };
+  }, [urgent.length]);
+  if (!urgent.length) return null;
+  const a = urgent[0];
+  return (
+    <div role="alert" className="sticky top-[64px] z-[940] border-b-2 border-red-900 bg-red-600 text-white shadow-md">
+      <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="mx-auto flex min-h-[44px] w-full max-w-5xl items-center gap-2 px-3 py-1.5 text-left">
+        <span className="announce-flash shrink-0 text-xl" aria-hidden="true">
+          🚨
+        </span>
+        <span className={`min-w-0 flex-1 text-[15px] font-bold leading-snug ${open ? "whitespace-pre-wrap break-words" : "truncate"}`}>{a.text}</span>
+        {urgent.length > 1 && <span className="shrink-0 rounded-full bg-white px-2 text-xs font-bold text-red-700">+{urgent.length - 1}</span>}
+        <span className="shrink-0 text-sm font-bold underline">{open ? "ย่อ" : "อ่าน"}</span>
+      </button>
+      {open &&
+        urgent.slice(1).map((x) => (
+          <p key={x.id} className="mx-auto max-w-5xl whitespace-pre-wrap break-words border-t border-red-400 px-3 py-2 text-[15px] font-bold">
+            🚨 {x.text}
+          </p>
+        ))}
+    </div>
+  );
+}

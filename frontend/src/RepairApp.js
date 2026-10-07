@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { API, api, load, save, viewerId } from "./api";
 import { HOTLINE_GROUPS, JOB_TYPES, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
-import Announcements from "./components/Announcements";
+import Announcements, { UrgentBar } from "./components/Announcements";
 import { WeatherAlerts, WeatherChip, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
 import WasteBoard from "./components/WasteBoard";
@@ -381,6 +381,7 @@ export default function RepairApp() {
     <TextsContext.Provider value={home.texts || {}}>
       <div className="min-h-screen bg-[#F2F4F1] text-[#15201A]">
         <BottomNav page={page} dot={newest > seenAt} onGo={(p) => (p === "pros" ? openPros("") : goPage(p, p === "community" ? tab : undefined))} onHotline={() => setSheet({ type: "hotlines" })} />
+        <UrgentBar items={announcements} />
         {/* 7 Oct: one row — water, weather, people here, share; the village's name lives in the footer */}
         <header className="fixed inset-x-0 bottom-0 z-[900] bg-[#15201A] pb-[env(safe-area-inset-bottom)] text-white shadow-[0_-2px_8px_rgba(0,0,0,0.25)]">
           {!online && <p className="bg-red-700 px-3 py-1 text-center text-sm font-bold">⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่</p>}

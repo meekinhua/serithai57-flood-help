@@ -44,12 +44,14 @@ class Aid(BaseModel):
     id: str = Field(..., pattern=r"^[a-z0-9_]{1,30}$")
     on: bool = True
     title: str = Field(..., min_length=3, max_length=100)
-    amount: str = Field("", max_length=40)
+    amount: str = Field("", max_length=300)
     who: str = Field("", max_length=80)  # the agency
-    docs: str = Field("", max_length=300)
-    where: str = Field("", max_length=200)
+    docs: str = Field("", max_length=400)
+    where: str = Field("", max_length=400)
     deadline: Optional[date] = None
     link: str = Field("", max_length=300)
+    short: str = Field("", max_length=24)  # the label on the folded line ("ประกันสังคม")
+    track: bool = True  # False = information only (loans, social security, insurance): no "ยื่นแล้ว" buttons
 
 
 class AidBody(BaseModel):
