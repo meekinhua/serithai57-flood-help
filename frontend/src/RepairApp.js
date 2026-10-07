@@ -32,6 +32,7 @@ const REFRESH_MS = 30000;
 const MAIN_TABS = {
   feed: ["📰", "ล่าสุด"],
   jobs: ["🙋", "ขอแรง"],
+  lost: ["🐾", "หาย · เจอ"],
   lend: ["🧰", "ยืม · ซื้อขาย"],
   forum: ["💬", "ถาม-ตอบ"],
 };
@@ -39,7 +40,6 @@ const MORE_TABS = {
   waste: ["♻️", "ขยะ · รถเก็บ"],
   guide: ["📋", "เช็กลิสต์หลังน้ำลด"],
   issues: ["📍", "ปัญหาซอย"],
-  lost: ["🐾", "หาย · เจอ"],
 };
 const TABS = { ...MAIN_TABS, ...MORE_TABS };
 // which bottom-bar page a link's #hash opens (old links keep working: #water → the map, #feed → เพื่อนบ้าน)
@@ -278,6 +278,8 @@ export default function RepairApp() {
   // neighbours still waiting for hands (ขอแรง, nobody has come yet)
   const needs = jobs.filter((j) => j.kind === "need" && j.status === "open" && j.type !== "hire");
   const hires = jobs.filter((j) => j.type === "hire" && j.status !== "done");
+  const lostOpen = lost.filter((x) => x.status !== "reunited");
+  const lostPets = lostOpen.filter((x) => x.kind === "lost" && ["dog", "cat", "pet"].includes(x.category));
   const needSig = needs.map((j) => j.id.slice(0, 6)).join(",");
 
   // what each page tab has to say (the bell lists it; ล้าง mutes it until it changes)
@@ -286,14 +288,15 @@ export default function RepairApp() {
     home: homeBadge,
     pros: newestPro > prosSeen ? { level: "general", reasons: ["🔧 มีร้าน / ช่างใหม่ในหมู่บ้าน"], sig: `p${newestPro}` } : null,
     community:
-      needs.length || newest > seenAt
+      needs.length || lostPets.length || newest > seenAt
         ? {
             level: "general",
             reasons: [
+              ...lostPets.slice(0, 3).map((x) => `🐾 สัตว์เลี้ยงหาย: ${x.title}${x.soi ? ` (ซ.${x.soi})` : ""}`),
               ...needs.slice(0, 4).map((j) => `🙋 ${j.name} ขอแรง: ${j.detail.length > 70 ? `${j.detail.slice(0, 70)}…` : j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`),
               ...(newest > seenAt && !needs.length ? ["👥 มีโพสต์ใหม่จากเพื่อนบ้าน"] : []),
             ],
-            sig: needs.length ? `n${needSig}` : `c${newest}`,
+            sig: needs.length || lostPets.length ? `n${needSig}|p${lostPets.map((x) => x.id.slice(0, 6)).join(",")}` : `c${newest}`,
           }
         : null,
     map: ws.alarm ? { level: "important", reasons: [`💧 ระดับน้ำ: ${ws.text}${ws.sub ? ` · ${ws.sub}` : ""}`], sig: `m${ws.text}` } : null,
@@ -360,6 +363,7 @@ export default function RepairApp() {
         needs={needs}
         onNeeds={() => showTab("jobs")}
         onAskHelp={() => setSheet({ type: "jobForm", kind: "need" })}
+        onLost={() => showTab("lost")}
       />
     ),
     announce: (
@@ -576,9 +580,11 @@ export default function RepairApp() {
                         key={k}
                         onClick={() => pick(k)}
                         aria-current={tab === k ? "page" : undefined}
-                        className={`min-h-[44px] whitespace-nowrap rounded-full px-4 text-[15px] ${tab === k ? "bg-[#15201A] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}
+                        className={`min-h-[44px] whitespace-nowrap rounded-full px-4 text-[15px] ${tab === k ? "bg-[#15201A] font-bold text-white" : k === "lost" && lostOpen.length ? "border-2 border-[#B42318] bg-[#FDE8E6] font-bold text-[#7A1A12]" : "border border-[#C9D1CB] bg-white"}`}
                       >
+                        {k === "lost" ? "🐾 " : ""}
                         {text}
+                        {k === "lost" && lostOpen.length > 0 && <span className="ml-1.5 rounded-full bg-[#B42318] px-1.5 text-sm text-white">{lostOpen.length}</span>}
                       </button>
                     ))}
                   </div>
@@ -587,6 +593,7 @@ export default function RepairApp() {
                 <div className="mt-3">
                   {tab === "feed" && (
                     <CommunityFeed
+                      lost={lostOpen}
                       lend={lend}
                       jobs={jobs}
                       services={services}

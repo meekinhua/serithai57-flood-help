@@ -660,7 +660,7 @@ function HandyRow({ house, handy, onSaved, onClose, setErr }) {
   );
 }
 
-export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], onNeeds, onAskHelp }) {
+export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], onNeeds, onAskHelp, onLost }) {
   // the ขอแรง card can be hidden; it comes back only when a new ask appears
   const [needsHidden, setNeedsHidden] = useState(() => load("needsHidden", []));
   // a ขอแรง ask this house's อาสาข้างบ้าน profile can do (job type → skill)
@@ -1138,7 +1138,8 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               {[
                 ["🙋", t("myhome.tools.help", "ขอแรงเพื่อนบ้าน"), t("myhome.tools.help_sub", "ซ่อมเล็กๆ ยกของ ติดรถ ฝากซื้อ"), onAskHelp],
                 ["👀", t("myhome.tools.ask", "ฝากดูบ้าน"), t("myhome.tools.ask_sub2", "น้ำหน้าบ้าน รับของ ดูประตู"), () => startNear("ask")],
-                ["⚠️", t("myhome.tools.alert", "เตือนเพื่อนบ้าน"), t("myhome.tools.alert_sub", "ฝาท่อแตก ของหาย"), () => startNear("alert")],
+                ["🐾", t("myhome.tools.lost", "หาย · เจอ"), t("myhome.tools.lost_sub", "หมาแมวหาย เจอของ ลงรูปไว้"), onLost],
+                ["⚠️", t("myhome.tools.alert", "เตือนเพื่อนบ้าน"), t("myhome.tools.alert_sub2", "ฝาท่อแตก กิ่งไม้ สายไฟ"), () => startNear("alert")],
                 ["🛠️", t("myhome.tools.office", "แจ้งสำนักงาน"), t("myhome.tools.office_sub", "ไฟถนน ขยะ ถ่ายรูปได้"), onIssue],
                 [
                   "⚡",

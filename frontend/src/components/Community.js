@@ -32,6 +32,7 @@ export const NEED_CHOICES = [
   { group: "ขอแรงเพื่อนบ้าน", label: "ช่วยยกของ", hint: "ขนของพังออกหน้าบ้าน", go: { sheet: { type: "jobForm", kind: "need", jobType: "move" } } },
   { group: "ขอแรงเพื่อนบ้าน", label: "ติดรถ / ฝากซื้อ", hint: "ออกไปข้างนอก ยา ของใช้", go: { sheet: { type: "jobForm", kind: "need", jobType: "ride" } } },
   { group: "ขอแรงเพื่อนบ้าน", label: "อย่างอื่น", hint: "พิมพ์เล่าได้เลย", go: { sheet: { type: "jobForm", kind: "need", jobType: "" } } },
+  { group: "หาย · เจอ", label: "สัตว์เลี้ยงหาย / ของหาย", hint: "ลงรูปไว้ เพื่อนบ้านทั้งหมู่บ้านช่วยกันดู", go: { sheet: { type: "lostForm", kind: "lost" } } },
   { group: "หาของ", label: "ยืม / หาซื้อของ", hint: "เครื่องฉีดน้ำ บันได ของมือสอง", go: { sheet: { type: "lendForm", kind: "want" } } },
   { group: "จ้างช่าง / หาร้าน (มีค่าจ้าง)", label: "ไปหน้า ช่าง · ร้าน ›", hint: "เบอร์ช่าง ร้าน · ประกาศหาช่าง", go: { tab: "pros" } },
   { group: "จ้างช่าง / หาร้าน (มีค่าจ้าง)", label: "ประกาศหาช่าง", hint: "ช่างที่ว่างจะติดต่อกลับ", go: { sheet: { type: "jobForm", kind: "need", jobType: "hire" } } },
@@ -40,6 +41,7 @@ export const OFFER_CHOICES = [
   { group: "ให้", label: "มีของให้ยืม", hint: "เครื่องมือ บันได ปั๊ม", go: { sheet: { type: "lendForm", kind: "lend" } } },
   { group: "ให้", label: "มีของให้ฟรี", hint: "ของใช้ที่ไม่ได้ใช้แล้ว", go: { sheet: { type: "lendForm", kind: "give" } } },
   { group: "ให้", label: "ไปช่วยแรงได้ / มีรถ", hint: "ช่วยด้วยน้ำใจ · บ้านที่ขอแรงจะเห็นชื่อคุณ", go: { sheet: { type: "jobForm", kind: "offer", jobType: "" } } },
+  { group: "เจอ", label: "เจอสัตว์หลง / เก็บของได้", hint: "ถ่ายรูปลงไว้ เจ้าของจะเห็น", go: { sheet: { type: "lostForm", kind: "found" } } },
   { group: "ขาย", label: "ขายของ / ของมือสอง", hint: "ตั้งราคาเอง นัดรับในหมู่บ้าน", go: { sheet: { type: "lendForm", kind: "sell" } } },
   { group: "ร้านเพื่อนบ้าน", label: "ฉันมีร้าน / รับทำ อยู่ในหมู่บ้าน", hint: "ทีมตรวจแล้วขึ้นเป็นร้านเพื่อนบ้าน · ร้านข้างนอกอยู่หน้า ช่าง·ร้าน", go: { sheet: { type: "serviceForm" } } },
 ];
@@ -158,7 +160,7 @@ export function CommunityIntro({ services, onGroup, onAll, onNeed, onOffer, onAs
           </svg>
           <span>
             <span className="font-display block text-[17px] font-bold leading-tight min-[400px]:text-lg">ขอความช่วยเหลือ</span>
-            <span className="block text-sm text-[#D4EADC]">ขอแรง · ยืมของ · ติดรถ</span>
+            <span className="block text-sm text-[#D4EADC]">ขอแรง · ของหาย · ยืมของ</span>
           </span>
         </button>
         <button onClick={onOffer} className="flex min-h-[108px] flex-col justify-between rounded-2xl border-2 border-[#15201A] bg-white p-3 text-left active:bg-[#F2F4F1]">
@@ -224,12 +226,29 @@ const TAG = {
   lend: ["ยืม · ให้", "bg-[#EEE8F7] text-[#5B3A92]"],
   sell: ["ขาย", "bg-[#FDE7E4] text-[#8F2A1C]"],
   forum: ["ถาม-ตอบ", "bg-[#ECEFEC] text-[#33403A]"],
+  lost: ["😢 หาย", "bg-[#B42318] text-white"],
+  found: ["🙌 มีคนเจอ", "bg-[#1E6B47] text-white"],
 };
 
 // Everything at once, newest first; each card does its job right there (call, "I'll help", open the topic).
-export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, onJoin, onNeed }) {
+export function CommunityFeed({ lost = [], lend, jobs, services, topics, onTab, onTopic, onJoin, onNeed }) {
   const items = useMemo(() => {
     const out = [];
+    // หาย · เจอ: a lost pet stays on top for its first 2 days, then takes its turn by date
+    for (const x of lost) {
+      const pet = ["dog", "cat", "pet"].includes(x.category);
+      const fresh2 = ageDays(x.created_at) < 2;
+      out.push({
+        id: `x${x.id}`,
+        tab: "lost",
+        k: x.kind === "found" ? "found" : "lost",
+        media: x.media || [],
+        title: x.title,
+        sub: [x.soi && `ซ.${x.soi}`, x.when_seen].filter(Boolean).join(" · "),
+        at: pet && x.kind === "lost" && fresh2 ? "9999" + x.created_at : x.created_at,
+        when: x.created_at,
+      });
+    }
     const fresh = (iso) => ageDays(iso) < FEED_DAYS;
     for (const j of jobs) {
       if (j.status === "done" || j.type === "hire" || !fresh(j.created_at)) continue;
@@ -275,14 +294,14 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
       });
     }
     return out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
-  }, [lend, jobs, services, topics]);
+  }, [lost, lend, jobs, services, topics]);
   const shown = items; // the tab row above already filters by kind
 
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="text-lg font-bold">ประกาศล่าสุด</h3>
-        <span className="text-sm text-[#45504A]">ขอแรง ยืม ขาย หายเองใน {FEED_DAYS} วัน</span>
+        <span className="text-sm text-[#45504A]">ขอแรง ยืม ขาย หายเองใน {FEED_DAYS} วัน · ของหายอยู่จนเจอ</span>
       </div>
       {shown.length ? (
         <ul className="space-y-2.5">
@@ -290,7 +309,7 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
             <li key={x.id} className="space-y-2 rounded-2xl border border-[#DCE2DD] bg-white p-3.5">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className={`rounded-md px-2 py-0.5 font-bold ${TAG[x.k][1]}`}>{TAG[x.k][0]}</span>
-                <span className="text-[#45504A]">{x.svc ? x.sub : ageText(x.at)}</span>
+                <span className="text-[#45504A]">{x.svc ? x.sub : ageText(x.when || x.at)}</span>
               </div>
               <b className="block break-words text-[17px] leading-snug">{x.title}</b>
               <MediaStrip media={x.media || []} />
@@ -320,6 +339,11 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
               {(x.k === "lend" || x.k === "sell") && (
                 <button onClick={() => onTab("lend")} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-base font-bold">
                   ดูรายละเอียด / ติดต่อ
+                </button>
+              )}
+              {(x.k === "lost" || x.k === "found") && (
+                <button onClick={() => onTab("lost")} className="min-h-[50px] w-full rounded-xl bg-[#FDE8E6] text-base font-bold text-[#7A1A12]">
+                  {x.k === "lost" ? "เห็น? บอกเจ้าของ · ดูเบอร์ ›" : "เป็นของคุณ? ดูเบอร์ ›"}
                 </button>
               )}
               {x.k === "forum" && (
