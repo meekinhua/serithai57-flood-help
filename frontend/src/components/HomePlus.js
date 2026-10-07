@@ -203,16 +203,19 @@ export function AidRow({ info, onChanged, setErr }) {
     const info_ = a.track === false;
     const shown = info_ || how.includes(a.id); // a claim card shows the money and the date; how to claim folds
     return (
-      <div key={a.id} className={`rounded-2xl border p-3 ${info_ ? "border-[#DCE2DD] bg-[#F7F8F6]" : "border-[#1E6B47] bg-white"}`}>
+      <div
+        key={a.id}
+        className={`rounded-2xl border p-3 ${info_ ? "border-[#DCE2DD] bg-[#F7F8F6]" : a.mine === "applied" ? "border-[#1E6B47] border-l-[6px] bg-[#EEF7F1]" : "border-[#E0A100] border-l-[6px] bg-white shadow-sm"}`}
+      >
         <div className="flex items-start gap-2">
-          <b className="min-w-0 flex-1 text-base leading-snug">{a.title}</b>
+          <b className={`min-w-0 flex-1 leading-snug ${info_ ? "text-base" : "text-[15px] text-[#45504A]"}`}>{a.title}</b>
           {left != null && left >= 0 && (
             <span className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-bold ${left <= 3 ? "bg-[#B42318] text-white" : "bg-[#FDE8E6] text-[#B42318]"}`}>
               {left === 0 ? "หมดเขตวันนี้" : `อีก ${left} วัน`}
             </span>
           )}
         </div>
-        {a.amount && <p className="mt-0.5 text-lg font-bold leading-snug text-[#154D33]">{a.amount.split("\n")[0]}</p>}
+        {a.amount && <p className={`mt-0.5 font-bold leading-snug text-[#154D33] ${info_ ? "text-lg" : "text-xl"}`}>{a.amount.split("\n")[0]}</p>}
         {a.deadline && <p className="text-[15px] font-bold text-[#B42318]">ยื่นภายใน {thaiDate(a.deadline)}</p>}
         {shown && (
           <>
@@ -259,20 +262,41 @@ export function AidRow({ info, onChanged, setErr }) {
     );
   };
   return (
-    <Box icon="💰" title="เงินเยียวยาน้ำท่วม ที่บ้านคุณขอได้" sub="ทีมอาสารวบรวมจากประกาศของหน่วยงาน · ยื่นแล้วกดบอกไว้ จะได้ไม่ลืม">
-      {claim.map(card)}
-      {facts.length > 0 &&
-        (open ? (
-          <>
-            <p className="pt-1 text-[15px] font-bold">ความช่วยเหลืออื่นที่ควรรู้</p>
-            {facts.map(card)}
-          </>
-        ) : (
-          <button onClick={() => setOpen(true)} className="min-h-[48px] w-full rounded-xl bg-[#F2F4F1] px-3 text-left text-[15px] font-bold">
-            + ความช่วยเหลืออื่น: {facts.map((a) => a.short || a.title.split(" ")[0]).join(" · ")} ▾
-          </button>
-        ))}
-    </Box>
+    <div id="myhome-aid" className="-mx-4 border-y-2 border-[#E0A100] bg-gradient-to-b from-[#FFF1C2] to-[#FFFBEA] px-4 py-4">
+      <div className="flex items-center gap-3">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#E0A100] text-2xl shadow-sm" aria-hidden="true">
+          💰
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-lg font-bold leading-tight text-[#15201A]">เงินเยียวยาน้ำท่วม ที่บ้านคุณขอได้</p>
+          {(() => {
+            const todo = claim.filter((a) => a.mine !== "applied");
+            const next = todo.filter((a) => a.deadline && days(a.deadline) >= 0).sort((x, y) => x.deadline.localeCompare(y.deadline))[0];
+            return (
+              <p className="mt-0.5 text-[15px] font-bold text-[#7A4104]">
+                {todo.length ? `ยังไม่ได้ยื่น ${todo.length} รายการ` : "ยื่นครบแล้ว ✓"}
+                {next && <span className="text-[#B42318]"> · ใกล้หมดเขต {thaiDate(next.deadline)}</span>}
+              </p>
+            );
+          })()}
+        </div>
+      </div>
+      <p className="mt-1 text-sm text-[#45504A]">ทีมอาสารวบรวมจากประกาศของหน่วยงาน · ยื่นแล้วกดบอกไว้ จะได้ไม่ลืม</p>
+      <div className="mt-3 space-y-2">
+        {claim.map(card)}
+        {facts.length > 0 &&
+          (open ? (
+            <>
+              <p className="pt-1 text-[15px] font-bold">ความช่วยเหลืออื่นที่ควรรู้</p>
+              {facts.map(card)}
+            </>
+          ) : (
+            <button onClick={() => setOpen(true)} className="min-h-[48px] w-full rounded-xl bg-white/70 px-3 text-left text-[15px] font-bold">
+              + ความช่วยเหลืออื่น: {facts.map((a) => a.short || a.title.split(" ")[0]).join(" · ")} ▾
+            </button>
+          ))}
+      </div>
+    </div>
   );
 }
 
