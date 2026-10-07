@@ -18,7 +18,7 @@ import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/Watc
 import { LostBoard, LostForm } from "./components/LostFound";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
-import { AfterFloodGuide, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
+import { AfterFloodGuide, HireList, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
 
 // ซ่อมบ้าน mode (2 Oct 2026): the water is gone. Lend & borrow, ask for hands, tradesmen with neighbours'
 // reviews, soi problems for the district, and an after-flood checklist. The flood board is at /flood (read-only).
@@ -276,7 +276,8 @@ export default function RepairApp() {
   }, [page, newest, seenAt]);
 
   // neighbours still waiting for hands (ขอแรง, nobody has come yet)
-  const needs = jobs.filter((j) => j.kind === "need" && j.status === "open");
+  const needs = jobs.filter((j) => j.kind === "need" && j.status === "open" && j.type !== "hire");
+  const hires = jobs.filter((j) => j.type === "hire" && j.status !== "done");
   const needSig = needs.map((j) => j.id.slice(0, 6)).join(",");
 
   // what each page tab has to say (the bell lists it; ล้าง mutes it until it changes)
@@ -533,10 +534,15 @@ export default function RepairApp() {
                 setGroup={setProsGroup}
                 autoFocus={prosFocus}
                 onAdd={() => setSheet({ type: "serviceForm" })}
-                hires={jobs.filter((j) => j.type === "hire" && j.status !== "done")}
                 onHire={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })}
-                onHires={() => showTab("jobs")}
               />
+              {hires.length > 0 && (
+                <section className="mt-4 space-y-2">
+                  <h3 className="text-lg font-bold">🧑‍🔧 เพื่อนบ้านกำลังหาช่าง ({hires.length})</h3>
+                  <p className="text-[15px] text-[#45504A]">มีค่าจ้าง · เป็นช่าง? กดดูเบอร์ แล้วโทรตกลงราคากันเอง</p>
+                  <HireList jobs={hires} setJobs={setJobs} admin={admin} />
+                </section>
+              )}
               {admin && (
                 <details className="mt-4 rounded-xl bg-white p-3">
                   <summary className="min-h-[44px] cursor-pointer font-bold">🛡️ เครื่องมือผู้ดูแล · แก้ ยืนยัน ปักหมุด ลบ ร้าน</summary>
@@ -591,7 +597,7 @@ export default function RepairApp() {
                   )}
                   {tab === "forum" && <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />}
                   {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
-                  {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} />}
+                  {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} onPaid={() => openPros("")} />}
                   {tab === "lost" && <LostBoard items={lost} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />}
                   {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
                   {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
@@ -719,7 +725,7 @@ export default function RepairApp() {
               jobType={sheet.jobType}
               onDone={(j) => {
                 setJobs((p) => [j, ...p]);
-                posted("jobs", `${j.kind === "need" ? "🙋 ขอแรง" : "💪 ช่วยได้"}: ${j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`);
+                posted(j.type === "hire" ? "pros" : "jobs", `${j.type === "hire" ? "🧑‍🔧 หาช่าง" : j.kind === "need" ? "🙋 ขอแรง" : "💪 ช่วยได้"}: ${j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`);
               }}
             />
           </Sheet>

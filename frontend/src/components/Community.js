@@ -26,8 +26,8 @@ export const PRO_GROUPS = [
 const groupOf = (cat) => PRO_GROUPS.find((g) => g.cats.includes(cat));
 
 export const NEED_CHOICES = [
-  { group: "หาคนทำให้", label: "เบอร์ช่าง หรือ ร้าน", hint: "ดูเบอร์ที่เพื่อนบ้านแนะนำ", go: { tab: "pros" } },
-  { group: "หาคนทำให้", label: "ประกาศหาช่าง (มีค่าจ้าง)", hint: "ช่างที่ว่างจะติดต่อกลับ", go: { sheet: { type: "jobForm", kind: "need", jobType: "hire" } } },
+  { group: "จ้างช่าง (มีค่าจ้าง)", label: "เบอร์ช่าง หรือ ร้าน", hint: "ดูเบอร์ที่เพื่อนบ้านแนะนำ", go: { tab: "pros" } },
+  { group: "จ้างช่าง (มีค่าจ้าง)", label: "ประกาศหาช่าง", hint: "ช่างที่ว่างจะติดต่อกลับ", go: { sheet: { type: "jobForm", kind: "need", jobType: "hire" } } },
   { group: "ขอแรงเพื่อนบ้าน", label: "ช่วยล้างบ้าน", hint: "ขัดโคลน เก็บกวาด", go: { sheet: { type: "jobForm", kind: "need", jobType: "clean" } } },
   { group: "ขอแรงเพื่อนบ้าน", label: "ช่วยยกของ", hint: "ขนของพังออกหน้าบ้าน", go: { sheet: { type: "jobForm", kind: "need", jobType: "move" } } },
   { group: "ขอแรงเพื่อนบ้าน", label: "ติดรถ / ฝากซื้อ", hint: "ออกไปข้างนอก ยา ของใช้", go: { sheet: { type: "jobForm", kind: "need", jobType: "ride" } } },
@@ -35,10 +35,10 @@ export const NEED_CHOICES = [
   { group: "หาของ", label: "ยืม / หาซื้อของ", hint: "เครื่องฉีดน้ำ บันได ของมือสอง", go: { sheet: { type: "lendForm", kind: "want" } } },
 ];
 export const OFFER_CHOICES = [
-  { group: "แนะนำ", label: "ช่าง หรือ ร้าน ที่เคยใช้แล้วดี", hint: "หรือฉันเป็นช่าง / มีร้าน รับงานได้", go: { sheet: { type: "serviceForm" } } },
+  { group: "ช่าง · ร้าน (มีค่าจ้าง)", label: "ช่าง หรือ ร้าน ที่เคยใช้แล้วดี", hint: "หรือฉันเป็นช่าง / มีร้าน รับงานได้", go: { sheet: { type: "serviceForm" } } },
   { group: "ให้", label: "มีของให้ยืม", hint: "เครื่องมือ บันได ปั๊ม", go: { sheet: { type: "lendForm", kind: "lend" } } },
   { group: "ให้", label: "มีของให้ฟรี", hint: "ของใช้ที่ไม่ได้ใช้แล้ว", go: { sheet: { type: "lendForm", kind: "give" } } },
-  { group: "ให้", label: "ไปช่วยแรงได้ / มีรถ", hint: "บ้านที่ขอแรงจะเห็นชื่อคุณ", go: { sheet: { type: "jobForm", kind: "offer", jobType: "" } } },
+  { group: "ให้", label: "ไปช่วยแรงได้ / มีรถ", hint: "ช่วยด้วยน้ำใจ · บ้านที่ขอแรงจะเห็นชื่อคุณ", go: { sheet: { type: "jobForm", kind: "offer", jobType: "" } } },
   { group: "ขาย", label: "ขายของ / ของมือสอง", hint: "ตั้งราคาเอง นัดรับในหมู่บ้าน", go: { sheet: { type: "lendForm", kind: "sell" } } },
 ];
 
@@ -156,7 +156,7 @@ export function CommunityIntro({ services, onGroup, onAll, onNeed, onOffer, onAs
           </svg>
           <span>
             <span className="font-display block text-[17px] font-bold leading-tight min-[400px]:text-lg">ขอความช่วยเหลือ</span>
-            <span className="block text-sm text-[#D4EADC]">ขอแรง · ยืมของ · หาช่าง</span>
+            <span className="block text-sm text-[#D4EADC]">ขอแรง · ยืมของ · ติดรถ</span>
           </span>
         </button>
         <button onClick={onOffer} className="flex min-h-[108px] flex-col justify-between rounded-2xl border-2 border-[#15201A] bg-white p-3 text-left active:bg-[#F2F4F1]">

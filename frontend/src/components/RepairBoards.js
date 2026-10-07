@@ -129,7 +129,9 @@ function History({ items }) {
 function NameField({ value, onChange, id, labelText = "ชื่อเล่น *" }) {
   return (
     <div>
-      <label className={label} htmlFor={id}>{labelText}</label>
+      <label className={label} htmlFor={id}>
+        {labelText}
+      </label>
       <input id={id} required maxLength={60} value={value} onChange={(e) => onChange(e.target.value)} className={input} />
     </div>
   );
@@ -138,7 +140,9 @@ function NameField({ value, onChange, id, labelText = "ชื่อเล่น 
 function SoiField({ value, onChange, id }) {
   return (
     <div>
-      <label className={label} htmlFor={id}>ซอย / แยก</label>
+      <label className={label} htmlFor={id}>
+        ซอย / แยก
+      </label>
       <input id={id} maxLength={12} value={value} onChange={(e) => onChange(e.target.value)} className={input} placeholder="เช่น 15, 34/5" />
     </div>
   );
@@ -155,7 +159,7 @@ export function LendBoard({ items, setItems, admin, onAdd }) {
   const counts = useMemo(() => items.reduce((c, x) => ({ ...c, [x.category]: (c[x.category] || 0) + 1 }), {}), [items]);
   const query = q.trim().toLowerCase();
   const shown = items.filter(
-    (x) => (kind === "all" || x.kind === kind) && (cat === "all" || x.category === cat) && (!query || `${x.title} ${x.detail} ${x.soi} ${x.name}`.toLowerCase().includes(query))
+    (x) => (kind === "all" || x.kind === kind) && (cat === "all" || x.category === cat) && (!query || `${x.title} ${x.detail} ${x.soi} ${x.name}`.toLowerCase().includes(query)),
   );
   const upsert = (x) => setItems((prev) => prev.map((y) => (y.id === x.id ? x : y)));
 
@@ -170,7 +174,12 @@ export function LendBoard({ items, setItems, admin, onAdd }) {
       </div>
       <div className="grid grid-cols-5 gap-1 rounded-xl bg-neutral-200 p-1">
         {[["all", "ทั้งหมด"], ...Object.entries(LEND_KINDS).map(([k, v]) => [k, `${v.emoji} ${v.label}`])].map(([k, t]) => (
-          <button key={k} onClick={() => setKind(k)} aria-pressed={kind === k} className={`min-h-[40px] rounded-lg text-xs font-semibold sm:text-sm ${kind === k ? "bg-white shadow" : "text-neutral-600"}`}>
+          <button
+            key={k}
+            onClick={() => setKind(k)}
+            aria-pressed={kind === k}
+            className={`min-h-[40px] rounded-lg text-xs font-semibold sm:text-sm ${kind === k ? "bg-white shadow" : "text-neutral-600"}`}
+          >
             {t}
           </button>
         ))}
@@ -179,10 +188,17 @@ export function LendBoard({ items, setItems, admin, onAdd }) {
       <Chips options={LEND_CATEGORIES} value={cat} onChange={setCat} counts={counts} />
       <ul className="space-y-2">
         {shown.map((x) => (
-          <LendCard key={x.id} item={x} editKey={keys[x.id]} admin={admin} onChanged={upsert} onDeleted={(id) => {
-            dropKey(id);
-            setItems((p) => p.filter((y) => y.id !== id));
-          }} />
+          <LendCard
+            key={x.id}
+            item={x}
+            editKey={keys[x.id]}
+            admin={admin}
+            onChanged={upsert}
+            onDeleted={(id) => {
+              dropKey(id);
+              setItems((p) => p.filter((y) => y.id !== id));
+            }}
+          />
         ))}
       </ul>
       {!shown.length && (
@@ -204,11 +220,20 @@ function LendCard({ item: x, editKey, admin, onChanged, onDeleted }) {
   return (
     <li className={`anim-row rounded-xl border bg-white p-3 shadow-sm ${x.status === "closed" ? "opacity-60" : ""}`}>
       <button onClick={() => setOpen((v) => !v)} className="flex w-full items-start gap-3 text-left">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl" aria-hidden="true">{emoji}</span>
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl" aria-hidden="true">
+          {emoji}
+        </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
-            <Badge cls="bg-black text-white">{k.emoji} {k.label}</Badge>
-            {x.kind !== "want" && <Badge cls={st.cls}>{st.label}{x.status === "lent" && x.until ? ` · ${x.until}` : ""}</Badge>}
+            <Badge cls="bg-black text-white">
+              {k.emoji} {k.label}
+            </Badge>
+            {x.kind !== "want" && (
+              <Badge cls={st.cls}>
+                {st.label}
+                {x.status === "lent" && x.until ? ` · ${x.until}` : ""}
+              </Badge>
+            )}
             {x.queue_count > 0 && <Badge cls="bg-sky-100 text-sky-800">รอคิว {x.queue_count}</Badge>}
             {mine && <Badge cls="bg-yellow-200">ของฉัน</Badge>}
           </span>
@@ -239,8 +264,7 @@ function LendVisitor({ item: x, onChanged }) {
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
   if (x.status === "closed") return <p className="text-sm text-neutral-500">รายการนี้ปิดแล้ว</p>;
-  if (x.kind !== "lend")
-    return <ContactButton path={`/lend/${x.id}/contact`} text={x.kind === "give" ? "📞 ติดต่อขอรับ" : x.kind === "sell" ? "📞 ติดต่อผู้ขาย" : "📞 ฉันมี · ติดต่อคนตามหา"} />;
+  if (x.kind !== "lend") return <ContactButton path={`/lend/${x.id}/contact`} text={x.kind === "give" ? "📞 ติดต่อขอรับ" : x.kind === "sell" ? "📞 ติดต่อผู้ขาย" : "📞 ฉันมี · ติดต่อคนตามหา"} />;
   async function join(e) {
     e.preventDefault();
     setErr("");
@@ -261,14 +285,18 @@ function LendVisitor({ item: x, onChanged }) {
           <div className="grid gap-2 sm:grid-cols-2">
             <NameField id={`q-name-${x.id}`} value={form.name} onChange={(name) => setForm({ ...form, name })} />
             <div>
-              <label className={label} htmlFor={`q-phone-${x.id}`}>เบอร์โทร *</label>
+              <label className={label} htmlFor={`q-phone-${x.id}`}>
+                เบอร์โทร *
+              </label>
               <input id={`q-phone-${x.id}`} required type="tel" inputMode="tel" maxLength={40} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={input} />
             </div>
           </div>
           <input maxLength={160} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className={input} placeholder="ใช้เมื่อไหร่ นานแค่ไหน เช่น เสาร์เช้า ครึ่งวัน" />
           <p className="text-xs text-neutral-500">ชื่อ/เบอร์ เห็นเฉพาะเจ้าของของชิ้นนี้</p>
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setForm(null)} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">ยกเลิก</button>
+            <button type="button" onClick={() => setForm(null)} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">
+              ยกเลิก
+            </button>
             <button className="min-h-[48px] rounded-xl bg-black font-bold text-white">ต่อคิว</button>
           </div>
         </form>
@@ -314,11 +342,19 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
           <ul className="space-y-1">
             {queue.map((q, i) => (
               <li key={q.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-white p-2 text-sm">
-                <b>{i + 1}. {q.name}</b>
-                <a href={telHref(q.phone)} className="font-semibold underline">📞 {q.phone}</a>
+                <b>
+                  {i + 1}. {q.name}
+                </b>
+                <a href={telHref(q.phone)} className="font-semibold underline">
+                  📞 {q.phone}
+                </a>
                 {q.note && <span className="w-full text-neutral-600">{q.note}</span>}
-                <button onClick={() => setLendTo({ lent_to: q.name, until: "" })} className="min-h-[40px] rounded-lg bg-black px-2 text-white">ให้คนนี้ยืม</button>
-                <button onClick={() => run(async () => setFull(await api(`/lend/${x.id}/queue/${q.id}/done`, { method: "POST", headers })))} className="min-h-[40px] px-2 underline">เอาออกจากคิว</button>
+                <button onClick={() => setLendTo({ lent_to: q.name, until: "" })} className="min-h-[40px] rounded-lg bg-black px-2 text-white">
+                  ให้คนนี้ยืม
+                </button>
+                <button onClick={() => run(async () => setFull(await api(`/lend/${x.id}/queue/${q.id}/done`, { method: "POST", headers })))} className="min-h-[40px] px-2 underline">
+                  เอาออกจากคิว
+                </button>
               </li>
             ))}
             {!queue.length && <li className="text-sm text-neutral-500">ยังไม่มีคนขอคิว</li>}
@@ -328,21 +364,34 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
               <input maxLength={60} value={lendTo.lent_to} onChange={(e) => setLendTo({ ...lendTo, lent_to: e.target.value })} className={input} placeholder="ให้ใครยืม" />
               <input maxLength={40} value={lendTo.until} onChange={(e) => setLendTo({ ...lendTo, until: e.target.value })} className={input} placeholder="คืนเมื่อไหร่ เช่น คืนเสาร์ 4 ต.ค." />
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => setLendTo(null)} className="min-h-[44px] rounded-lg border-2 border-black">ยกเลิก</button>
-                <button onClick={() => {
+                <button onClick={() => setLendTo(null)} className="min-h-[44px] rounded-lg border-2 border-black">
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={() => {
                     patch({ status: "lent", ...lendTo });
                     setLendTo(null);
-                  }} className="min-h-[44px] rounded-lg bg-black font-bold text-white">บันทึก ให้ยืมแล้ว</button>
+                  }}
+                  className="min-h-[44px] rounded-lg bg-black font-bold text-white"
+                >
+                  บันทึก ให้ยืมแล้ว
+                </button>
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
               {x.status !== "lent" ? (
-                <button onClick={() => setLendTo({ lent_to: queue[0]?.name || "", until: "" })} className="min-h-[44px] rounded-lg bg-black font-semibold text-white">📤 ให้ยืมไปแล้ว</button>
+                <button onClick={() => setLendTo({ lent_to: queue[0]?.name || "", until: "" })} className="min-h-[44px] rounded-lg bg-black font-semibold text-white">
+                  📤 ให้ยืมไปแล้ว
+                </button>
               ) : (
-                <button onClick={() => patch({ status: "available" })} className="min-h-[44px] rounded-lg bg-black font-semibold text-white">📥 ได้คืนแล้ว · ว่าง</button>
+                <button onClick={() => patch({ status: "available" })} className="min-h-[44px] rounded-lg bg-black font-semibold text-white">
+                  📥 ได้คืนแล้ว · ว่าง
+                </button>
               )}
-              <button onClick={() => patch({ status: "closed" })} className="min-h-[44px] rounded-lg border-2 border-black font-semibold">ปิดรายการ</button>
+              <button onClick={() => patch({ status: "closed" })} className="min-h-[44px] rounded-lg border-2 border-black font-semibold">
+                ปิดรายการ
+              </button>
             </div>
           )}
         </>
@@ -353,7 +402,9 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
         </button>
       )}
       {x.status === "closed" && (
-        <button onClick={() => patch({ status: "available" })} className="min-h-[44px] w-full rounded-lg border-2 border-black font-semibold">เปิดรายการอีกครั้ง</button>
+        <button onClick={() => patch({ status: "available" })} className="min-h-[44px] w-full rounded-lg border-2 border-black font-semibold">
+          เปิดรายการอีกครั้ง
+        </button>
       )}
       <button
         onClick={() =>
@@ -402,7 +453,13 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 min-[400px]:grid-cols-4">
         {Object.entries(LEND_KINDS).map(([k, v]) => (
-          <button type="button" key={k} onClick={() => set({ kind: k })} aria-pressed={form.kind === k} className={`min-h-[44px] rounded-lg text-sm font-semibold ${form.kind === k ? "bg-white shadow" : "text-neutral-600"}`}>
+          <button
+            type="button"
+            key={k}
+            onClick={() => set({ kind: k })}
+            aria-pressed={form.kind === k}
+            className={`min-h-[44px] rounded-lg text-sm font-semibold ${form.kind === k ? "bg-white shadow" : "text-neutral-600"}`}
+          >
             {v.emoji} {v.label}
           </button>
         ))}
@@ -411,7 +468,13 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
         <legend className={label}>เป็นของประเภทไหน *</legend>
         <div className="grid grid-cols-2 gap-2">
           {Object.entries(LEND_CATEGORIES).map(([k, [emoji, text]]) => (
-            <button type="button" key={k} onClick={() => set({ category: k })} aria-pressed={form.category === k} className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.category === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}>
+            <button
+              type="button"
+              key={k}
+              onClick={() => set({ category: k })}
+              aria-pressed={form.category === k}
+              className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.category === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}
+            >
               <span className="text-xl">{emoji}</span>
               <span className="leading-tight">{text}</span>
             </button>
@@ -419,18 +482,41 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
         </div>
       </fieldset>
       <div>
-        <label className={label} htmlFor="lend-title">{want ? "ตามหาอะไร *" : form.kind === "sell" ? "ขายอะไร *" : "ของอะไร *"}</label>
-        <input id="lend-title" required minLength={2} maxLength={80} value={form.title} onChange={(e) => set({ title: e.target.value })} className={input} placeholder={want ? "เช่น บันไดสูง 3 เมตร ขอยืมครึ่งวัน" : "เช่น เครื่องฉีดน้ำแรงดันสูง Karcher K3"} />
+        <label className={label} htmlFor="lend-title">
+          {want ? "ตามหาอะไร *" : form.kind === "sell" ? "ขายอะไร *" : "ของอะไร *"}
+        </label>
+        <input
+          id="lend-title"
+          required
+          minLength={2}
+          maxLength={80}
+          value={form.title}
+          onChange={(e) => set({ title: e.target.value })}
+          className={input}
+          placeholder={want ? "เช่น บันไดสูง 3 เมตร ขอยืมครึ่งวัน" : "เช่น เครื่องฉีดน้ำแรงดันสูง Karcher K3"}
+        />
       </div>
       {form.kind === "sell" && (
         <div>
-          <label className={label} htmlFor="lend-price">ราคา *</label>
+          <label className={label} htmlFor="lend-price">
+            ราคา *
+          </label>
           <input id="lend-price" required maxLength={60} value={form.price} onChange={(e) => set({ price: e.target.value })} className={input} placeholder="เช่น 150 บาท, ต่อรองได้" />
         </div>
       )}
       <div>
-        <label className={label} htmlFor="lend-detail">รายละเอียด</label>
-        <textarea id="lend-detail" rows={3} maxLength={400} value={form.detail} onChange={(e) => set({ detail: e.target.value })} className={input} placeholder={want ? "ใช้ทำอะไร ใช้เมื่อไหร่" : "สภาพ / ยืมได้นานเท่าไหร่ / มัดจำไหม / มารับที่ไหน / ต้องใช้ปลั๊กหรือน้ำมัน"} />
+        <label className={label} htmlFor="lend-detail">
+          รายละเอียด
+        </label>
+        <textarea
+          id="lend-detail"
+          rows={3}
+          maxLength={400}
+          value={form.detail}
+          onChange={(e) => set({ detail: e.target.value })}
+          className={input}
+          placeholder={want ? "ใช้ทำอะไร ใช้เมื่อไหร่" : "สภาพ / ยืมได้นานเท่าไหร่ / มัดจำไหม / มารับที่ไหน / ต้องใช้ปลั๊กหรือน้ำมัน"}
+        />
       </div>
       {!want && (
         <div>
@@ -441,7 +527,9 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
       <div className="grid gap-3 sm:grid-cols-3">
         <NameField id="lend-name" value={form.name} onChange={(name) => set({ name })} />
         <div>
-          <label className={label} htmlFor="lend-phone">เบอร์โทร {want ? "" : "*"}</label>
+          <label className={label} htmlFor="lend-phone">
+            เบอร์โทร {want ? "" : "*"}
+          </label>
           <input id="lend-phone" required={!want} type="tel" inputMode="tel" maxLength={40} value={form.phone} onChange={(e) => set({ phone: e.target.value })} className={input} />
         </div>
         <SoiField id="lend-soi" value={form.soi} onChange={(soi) => set({ soi })} />
@@ -458,10 +546,12 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
 // =====================================================================
 // 🙋 ขอแรง / อาสาไปช่วย
 // =====================================================================
-export function JobBoard({ jobs, setJobs, admin, onAdd }) {
+const FREE_TYPES = Object.fromEntries(Object.entries(JOB_TYPES).filter(([k]) => k !== "hire"));
+export function JobBoard({ jobs: all, setJobs, admin, onAdd, onPaid }) {
   const [kind, setKind] = useState("need");
   const [type, setType] = useState("all");
   const [keys, , dropKey] = useKeys("jobKeys");
+  const jobs = all.filter((j) => j.type !== "hire"); // paid "หาช่าง" posts are listed on ช่าง·ร้าน
   const list = jobs.filter((j) => j.kind === kind && (type === "all" || j.type === type));
   const counts = useMemo(() => jobs.filter((j) => j.kind === kind).reduce((c, x) => ({ ...c, [x.type]: (c[x.type] || 0) + 1 }), {}), [jobs, kind]);
   const upsert = (j) => setJobs((prev) => prev.map((y) => (y.id === j.id ? j : y)));
@@ -470,23 +560,43 @@ export function JobBoard({ jobs, setJobs, admin, onAdd }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
-        <button onClick={() => onAdd("need")} className="min-h-[56px] rounded-xl bg-black px-2 font-bold text-white">🙋 ขอแรง / ขอติดรถ / ฝากซื้อ</button>
-        <button onClick={() => onAdd("offer")} className="min-h-[56px] rounded-xl border-2 border-black bg-white px-2 font-bold">💪 ฉันช่วยได้ / มีรถออกไป</button>
+        <button onClick={() => onAdd("need")} className="min-h-[56px] rounded-xl bg-black px-2 font-bold text-white">
+          🙋 ขอแรง / ขอติดรถ / ฝากซื้อ
+        </button>
+        <button onClick={() => onAdd("offer")} className="min-h-[56px] rounded-xl border-2 border-black bg-white px-2 font-bold">
+          💪 ฉันช่วยได้ / มีรถออกไป
+        </button>
       </div>
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1">
-        {[["need", `ขอความช่วยเหลือ (${needs})`], ["offer", `พร้อมช่วย / มีรถ (${offers})`]].map(([k, t]) => (
+        {[
+          ["need", `ขอความช่วยเหลือ (${needs})`],
+          ["offer", `พร้อมช่วย / มีรถ (${offers})`],
+        ].map(([k, t]) => (
           <button key={k} onClick={() => setKind(k)} aria-pressed={kind === k} className={`min-h-[44px] rounded-lg text-sm font-semibold ${kind === k ? "bg-white shadow" : "text-neutral-600"}`}>
             {t}
           </button>
         ))}
       </div>
-      <Chips options={JOB_TYPES} value={type} onChange={setType} counts={counts} />
+      {onPaid && (
+        <button onClick={onPaid} className="min-h-[44px] w-full rounded-xl bg-[#F2F4F1] px-3 text-left text-[15px]">
+          ช่วยกันด้วยน้ำใจ ไม่มีค่าจ้าง · <b>จะจ้างช่าง หรือรับจ้าง/มีร้าน → ช่าง·ร้าน ›</b>
+        </button>
+      )}
+      <Chips options={FREE_TYPES} value={type} onChange={setType} counts={counts} />
       <ul className="space-y-2">
         {list.map((j) => (
-          <JobCard key={j.id} job={j} mine={!!keys[j.id]} editKey={keys[j.id]} admin={admin} onChanged={upsert} onDeleted={(id) => {
-            dropKey(id);
-            setJobs((p) => p.filter((y) => y.id !== id));
-          }} />
+          <JobCard
+            key={j.id}
+            job={j}
+            mine={!!keys[j.id]}
+            editKey={keys[j.id]}
+            admin={admin}
+            onChanged={upsert}
+            onDeleted={(id) => {
+              dropKey(id);
+              setJobs((p) => p.filter((y) => y.id !== id));
+            }}
+          />
         ))}
       </ul>
       {!list.length && (
@@ -495,6 +605,30 @@ export function JobBoard({ jobs, setJobs, admin, onAdd }) {
         </p>
       )}
     </div>
+  );
+}
+
+// the paid "หาช่าง" posts, shown on ช่าง·ร้าน for the tradesmen
+export function HireList({ jobs, setJobs, admin }) {
+  const [keys, , dropKey] = useKeys("jobKeys");
+  const upsert = (j) => setJobs((prev) => prev.map((y) => (y.id === j.id ? j : y)));
+  return (
+    <ul className="space-y-2">
+      {jobs.map((j) => (
+        <JobCard
+          key={j.id}
+          job={j}
+          mine={!!keys[j.id]}
+          editKey={keys[j.id]}
+          admin={admin}
+          onChanged={upsert}
+          onDeleted={(id) => {
+            dropKey(id);
+            setJobs((p) => p.filter((y) => y.id !== id));
+          }}
+        />
+      ))}
+    </ul>
   );
 }
 
@@ -524,7 +658,9 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
   return (
     <li className={`anim-row rounded-xl border bg-white p-3 shadow-sm ${j.status === "done" ? "opacity-60" : ""}`}>
       <button onClick={() => setOpen((v) => !v)} className="flex w-full items-start gap-3 text-left">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl" aria-hidden="true">{emoji}</span>
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl" aria-hidden="true">
+          {emoji}
+        </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
             <Badge cls={st.cls}>{j.kind === "offer" && j.status === "open" ? "ว่าง พร้อมช่วย" : st.label}</Badge>
@@ -547,7 +683,11 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
       {open && (
         <div className="mt-2 space-y-2">
           <p className="whitespace-pre-wrap break-words">{j.detail}</p>
-          {j.helpers.length > 0 && <p className="text-sm">{j.kind === "need" ? "💪 ไปช่วย:" : "🏠 ขอให้มาช่วย:"} {j.helpers.map((h) => h.name).join(" · ")}</p>}
+          {j.helpers.length > 0 && (
+            <p className="text-sm">
+              {j.kind === "need" ? "💪 ไปช่วย:" : "🏠 ขอให้มาช่วย:"} {j.helpers.map((h) => h.name).join(" · ")}
+            </p>
+          )}
           {j.status !== "done" && !mine && (
             <div className="flex gap-2">
               <input aria-label="ชื่อของคุณ" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} className={input} placeholder="ชื่อเล่นของคุณ" />
@@ -558,9 +698,21 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
           )}
           <ContactButton path={`/jobs/${j.id}/contact`} text={j.kind === "need" ? "📞 ดูเบอร์ / บ้านเลขที่ เพื่อนัดเวลา" : "📞 ดูเบอร์อาสา"} />
           <div className="flex flex-wrap gap-2 text-sm">
-            {j.status !== "scheduled" && j.status !== "done" && <button onClick={() => setStatus("scheduled")} className="min-h-[40px] rounded-lg border border-black px-2">🗓️ นัดกันแล้ว</button>}
-            {j.status !== "done" && <button onClick={() => setStatus("done")} className="min-h-[40px] rounded-lg border border-black px-2">✅ เสร็จแล้ว</button>}
-            {j.status !== "open" && <button onClick={() => setStatus("open")} className="min-h-[40px] rounded-lg border border-black px-2">↩️ ยังต้องการคน</button>}
+            {j.status !== "scheduled" && j.status !== "done" && (
+              <button onClick={() => setStatus("scheduled")} className="min-h-[40px] rounded-lg border border-black px-2">
+                🗓️ นัดกันแล้ว
+              </button>
+            )}
+            {j.status !== "done" && (
+              <button onClick={() => setStatus("done")} className="min-h-[40px] rounded-lg border border-black px-2">
+                ✅ เสร็จแล้ว
+              </button>
+            )}
+            {j.status !== "open" && (
+              <button onClick={() => setStatus("open")} className="min-h-[40px] rounded-lg border border-black px-2">
+                ↩️ ยังต้องการคน
+              </button>
+            )}
             {(mine || admin) && (
               <button
                 onClick={() =>
@@ -612,9 +764,16 @@ export function JobForm({ kind = "need", jobType = "", onDone }) {
     <form onSubmit={submit} className="space-y-4">
       <fieldset>
         <legend className={label}>{need ? "ต้องการอะไร *" : "ช่วยอะไรได้ *"}</legend>
+        {jobType !== "hire" && <p className="mb-2 text-sm text-neutral-600">{need ? "ขอแรงเพื่อนบ้าน ช่วยกันด้วยน้ำใจ" : "ช่วยเพื่อนบ้านด้วยน้ำใจ"} · ถ้าคิดค่าจ้าง ลงที่ ช่าง·ร้าน</p>}
         <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
-          {Object.entries(JOB_TYPES).map(([k, [emoji, text]]) => (
-            <button type="button" key={k} onClick={() => set({ type: k })} aria-pressed={form.type === k} className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.type === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}>
+          {Object.entries(jobType === "hire" ? { hire: JOB_TYPES.hire } : FREE_TYPES).map(([k, [emoji, text]]) => (
+            <button
+              type="button"
+              key={k}
+              onClick={() => set({ type: k })}
+              aria-pressed={form.type === k}
+              className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.type === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}
+            >
               <span className="text-xl">{emoji}</span>
               <span className="leading-tight">{text}</span>
             </button>
@@ -622,8 +781,19 @@ export function JobForm({ kind = "need", jobType = "", onDone }) {
         </div>
       </fieldset>
       <div>
-        <label className={label} htmlFor="job-detail">รายละเอียด *</label>
-        <textarea id="job-detail" required minLength={3} rows={3} maxLength={400} value={form.detail} onChange={(e) => set({ detail: e.target.value })} className={input} placeholder={
+        <label className={label} htmlFor="job-detail">
+          รายละเอียด *
+        </label>
+        <textarea
+          id="job-detail"
+          required
+          minLength={3}
+          rows={3}
+          maxLength={400}
+          value={form.detail}
+          onChange={(e) => set({ detail: e.target.value })}
+          className={input}
+          placeholder={
             form.type === "ride"
               ? need
                 ? "เช่น รถจมน้ำ ต้องไปหาหมอที่ รพ.นพรัตน์ พรุ่งนี้เช้า 2 คน"
@@ -642,12 +812,16 @@ export function JobForm({ kind = "need", jobType = "", onDone }) {
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className={label} htmlFor="job-when">{need ? "สะดวกวันไหน" : "ว่างวันไหน"}</label>
+          <label className={label} htmlFor="job-when">
+            {need ? "สะดวกวันไหน" : "ว่างวันไหน"}
+          </label>
           <input id="job-when" maxLength={60} value={form.when} onChange={(e) => set({ when: e.target.value })} className={input} placeholder="เช่น เสาร์ 4 ต.ค. 9 โมง" />
         </div>
         {(need || form.type === "ride") && (
           <div>
-            <label className={label} htmlFor="job-people">{form.type === "ride" ? (need ? "กี่คนจะไป" : "ว่างกี่ที่นั่ง") : "ต้องการกี่คน"}</label>
+            <label className={label} htmlFor="job-people">
+              {form.type === "ride" ? (need ? "กี่คนจะไป" : "ว่างกี่ที่นั่ง") : "ต้องการกี่คน"}
+            </label>
             <input id="job-people" type="number" min={1} max={30} value={form.people} onChange={(e) => set({ people: e.target.value })} className={input} />
           </div>
         )}
@@ -655,13 +829,17 @@ export function JobForm({ kind = "need", jobType = "", onDone }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <NameField id="job-name" value={form.name} onChange={(name) => set({ name })} />
         <div>
-          <label className={label} htmlFor="job-phone">เบอร์โทร *</label>
+          <label className={label} htmlFor="job-phone">
+            เบอร์โทร *
+          </label>
           <input id="job-phone" required type="tel" inputMode="tel" maxLength={40} value={form.phone} onChange={(e) => set({ phone: e.target.value })} className={input} />
         </div>
         <SoiField id="job-soi" value={form.soi} onChange={(soi) => set({ soi })} />
         {need && (
           <div>
-            <label className={label} htmlFor="job-house">บ้านเลขที่ (ไม่บังคับ)</label>
+            <label className={label} htmlFor="job-house">
+              บ้านเลขที่ (ไม่บังคับ)
+            </label>
             <input id="job-house" maxLength={20} value={form.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="4/xxx" />
           </div>
         )}
@@ -685,13 +863,20 @@ function OfficeSummary({ issues }) {
   for (const x of issues) (bySoi[x.soi || "ไม่ระบุซอย"] = bySoi[x.soi || "ไม่ระบุซอย"] || []).push(x);
   const sois = Object.keys(bySoi).sort((a, b) => (parseInt(a, 10) || 999) - (parseInt(b, 10) || 999));
   const lines = sois.flatMap((soi) =>
-    bySoi[soi].map((x) => `• ซ.${soi} ${ISSUE_TYPES[x.type]?.[1] || ""}${x.detail ? ` · ${x.detail}` : ""}${x.votes > 1 ? ` (เพื่อนบ้านยืนยัน ${x.votes})` : ""}${x.status === "reported" ? " · ส่งต่อแล้ว" : ""}`)
+    bySoi[soi].map(
+      (x) => `• ซ.${soi} ${ISSUE_TYPES[x.type]?.[1] || ""}${x.detail ? ` · ${x.detail}` : ""}${x.votes > 1 ? ` (เพื่อนบ้านยืนยัน ${x.votes})` : ""}${x.status === "reported" ? " · ส่งต่อแล้ว" : ""}`,
+    ),
   );
   const text = `เรื่องที่ลูกบ้านแจ้งไว้ ยังไม่เสร็จ ${issues.length} เรื่อง
 ${lines.join("\n")}
 รูป/ตำแหน่ง/อัปเดตสถานะ: ${window.location.origin}/#issues`;
   return (
-    <a href={`https://line.me/R/share?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer" className="flex min-h-[52px] w-full items-center justify-center rounded-xl border-2 border-[#06c755] bg-white text-base font-bold text-[#0B6B33]">
+    <a
+      href={`https://line.me/R/share?text=${encodeURIComponent(text)}`}
+      target="_blank"
+      rel="noreferrer"
+      className="flex min-h-[52px] w-full items-center justify-center rounded-xl border-2 border-[#06c755] bg-white text-base font-bold text-[#0B6B33]"
+    >
       ส่งสรุปให้สำนักงานคหบาลทาง LINE ({issues.length} เรื่อง)
     </a>
   );
@@ -702,7 +887,10 @@ export function IssueBoard({ issues, setIssues, admin, onAdd }) {
   const [showFixed, setShowFixed] = useState(false);
   const [all, setAll] = useState(null);
   useEffect(() => {
-    if (showFixed) api("/issues?include_fixed=true").then(setAll).catch(() => {});
+    if (showFixed)
+      api("/issues?include_fixed=true")
+        .then(setAll)
+        .catch(() => {});
   }, [showFixed, issues]);
   const source = showFixed && all ? all : issues;
   const list = source.filter((x) => type === "all" || x.type === type);
@@ -713,7 +901,9 @@ export function IssueBoard({ issues, setIssues, admin, onAdd }) {
   };
   return (
     <div className="space-y-3">
-      <button onClick={onAdd} className="min-h-[56px] w-full rounded-xl bg-black px-2 text-lg font-bold text-white">📍 แจ้งปัญหาในซอย</button>
+      <button onClick={onAdd} className="min-h-[56px] w-full rounded-xl bg-black px-2 text-lg font-bold text-white">
+        📍 แจ้งปัญหาในซอย
+      </button>
       {issues.length > 0 && <OfficeSummary issues={issues} />}
       <IssueMap issues={list} />
       <Chips options={ISSUE_TYPES} value={type} onChange={setType} counts={counts} />
@@ -728,7 +918,10 @@ export function IssueBoard({ issues, setIssues, admin, onAdd }) {
       {!list.length && <p className="rounded-xl bg-white p-4 text-center text-neutral-600">ยังไม่มีปัญหาที่ค้างอยู่ 🎉</p>}
       <div className="rounded-xl border-2 border-black bg-white p-3 text-sm">
         <b>ส่งต่อให้เขตแก้:</b> แจ้งผ่าน{" "}
-        <a href="https://citydata.traffy.in.th/" target="_blank" rel="noreferrer" className="font-semibold underline">Traffy Fondue</a> หรือโทร <b>1555</b> (กทม.) · สำนักงานเขตบึงกุ่ม · ไฟฟ้า/สายไฟ แจ้งการไฟฟ้ามีนบุรี
+        <a href="https://citydata.traffy.in.th/" target="_blank" rel="noreferrer" className="font-semibold underline">
+          Traffy Fondue
+        </a>{" "}
+        หรือโทร <b>1555</b> (กทม.) · สำนักงานเขตบึงกุ่ม · ไฟฟ้า/สายไฟ แจ้งการไฟฟ้ามีนบุรี
         <span className="block text-neutral-600">แจ้งแล้วกด “แจ้งเขตแล้ว” พร้อมเลขเรื่อง เพื่อนบ้านจะได้ไม่แจ้งซ้ำ</span>
       </div>
     </div>
@@ -796,7 +989,9 @@ function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
   return (
     <li className="anim-row rounded-xl border bg-white p-3 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl" aria-hidden="true">{emoji}</span>
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl" aria-hidden="true">
+          {emoji}
+        </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge cls={st.cls}>{st.label}</Badge>
@@ -815,10 +1010,20 @@ function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
       </div>
       {note ? (
         <div className="mt-2 space-y-2 rounded-lg border-2 border-black p-2">
-          <input maxLength={160} value={note.note} onChange={(e) => setNote({ ...note, note: e.target.value })} className={input} placeholder={note.status === "reported" ? "แจ้งที่ไหน เลขเรื่อง เช่น Traffy #2026-XXXX" : "หมายเหตุ เช่น รถเขตมาเก็บแล้ว"} />
+          <input
+            maxLength={160}
+            value={note.note}
+            onChange={(e) => setNote({ ...note, note: e.target.value })}
+            className={input}
+            placeholder={note.status === "reported" ? "แจ้งที่ไหน เลขเรื่อง เช่น Traffy #2026-XXXX" : "หมายเหตุ เช่น รถเขตมาเก็บแล้ว"}
+          />
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setNote(null)} className="min-h-[44px] rounded-lg border-2 border-black">ยกเลิก</button>
-            <button onClick={send} className="min-h-[44px] rounded-lg bg-black font-bold text-white">บันทึก</button>
+            <button onClick={() => setNote(null)} className="min-h-[44px] rounded-lg border-2 border-black">
+              ยกเลิก
+            </button>
+            <button onClick={send} className="min-h-[44px] rounded-lg bg-black font-bold text-white">
+              บันทึก
+            </button>
           </div>
         </div>
       ) : (
@@ -828,9 +1033,21 @@ function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
               {voted ? "✓ เจอด้วย" : "👀 ฉันก็เจอ"}
             </button>
           )}
-          {x.status === "open" && <button onClick={() => setNote({ status: "reported", note: "" })} className="min-h-[40px] rounded-lg border border-black px-2">📨 แจ้งเขตแล้ว</button>}
-          {x.status !== "fixed" && <button onClick={() => setNote({ status: "fixed", note: "" })} className="min-h-[40px] rounded-lg border border-black px-2">✅ แก้แล้ว</button>}
-          {x.status === "fixed" && <button onClick={() => setNote({ status: "open", note: "" })} className="min-h-[40px] rounded-lg border border-black px-2">↩️ ยังไม่หาย</button>}
+          {x.status === "open" && (
+            <button onClick={() => setNote({ status: "reported", note: "" })} className="min-h-[40px] rounded-lg border border-black px-2">
+              📨 แจ้งเขตแล้ว
+            </button>
+          )}
+          {x.status !== "fixed" && (
+            <button onClick={() => setNote({ status: "fixed", note: "" })} className="min-h-[40px] rounded-lg border border-black px-2">
+              ✅ แก้แล้ว
+            </button>
+          )}
+          {x.status === "fixed" && (
+            <button onClick={() => setNote({ status: "open", note: "" })} className="min-h-[40px] rounded-lg border border-black px-2">
+              ↩️ ยังไม่หาย
+            </button>
+          )}
           {admin && (
             <button
               onClick={() =>
@@ -884,7 +1101,13 @@ export function IssueForm({ onDone }) {
         <legend className={label}>ปัญหาอะไร *</legend>
         <div className="grid grid-cols-2 gap-2">
           {Object.entries(ISSUE_TYPES).map(([k, [emoji, text]]) => (
-            <button type="button" key={k} onClick={() => set({ type: k })} aria-pressed={form.type === k} className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.type === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}>
+            <button
+              type="button"
+              key={k}
+              onClick={() => set({ type: k })}
+              aria-pressed={form.type === k}
+              className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.type === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}
+            >
               <span className="text-xl">{emoji}</span>
               <span className="leading-tight">{text}</span>
             </button>
@@ -901,8 +1124,18 @@ export function IssueForm({ onDone }) {
         <NameField id="issue-name" labelText="ชื่อ (ไม่บังคับ)" value={form.name} onChange={(name) => set({ name })} />
       </div>
       <div>
-        <label className={label} htmlFor="issue-detail">รายละเอียด</label>
-        <textarea id="issue-detail" rows={2} maxLength={300} value={form.detail} onChange={(e) => set({ detail: e.target.value })} className={input} placeholder="เช่น ฟูก+ตู้พัง กองหน้าบ้าน 3 หลัง ปากซอย" />
+        <label className={label} htmlFor="issue-detail">
+          รายละเอียด
+        </label>
+        <textarea
+          id="issue-detail"
+          rows={2}
+          maxLength={300}
+          value={form.detail}
+          onChange={(e) => set({ detail: e.target.value })}
+          className={input}
+          placeholder="เช่น ฟูก+ตู้พัง กองหน้าบ้าน 3 หลัง ปากซอย"
+        />
       </div>
       <div>
         <p className={label}>รูป (ไม่บังคับ)</p>
@@ -941,12 +1174,7 @@ const AFTER_FLOOD = [
   },
   {
     title: "📸 ถ่ายรูปก่อนล้าง (ใช้ขอเยียวยา / เคลมประกัน)",
-    items: [
-      "ภาพรวมแต่ละห้อง และคราบระดับน้ำบนผนัง",
-      "ของเสียหายทีละชิ้น ก่อนยกไปทิ้ง",
-      "รถ / มอเตอร์ไซค์ที่จมน้ำ (อย่าสตาร์ทจนช่างตรวจ)",
-      "แจ้งบริษัทประกันบ้าน/รถ เร็วที่สุด",
-    ],
+    items: ["ภาพรวมแต่ละห้อง และคราบระดับน้ำบนผนัง", "ของเสียหายทีละชิ้น ก่อนยกไปทิ้ง", "รถ / มอเตอร์ไซค์ที่จมน้ำ (อย่าสตาร์ทจนช่างตรวจ)", "แจ้งบริษัทประกันบ้าน/รถ เร็วที่สุด"],
   },
   {
     title: "🧽 ล้างบ้าน",
@@ -960,11 +1188,7 @@ const AFTER_FLOOD = [
   },
   {
     title: "🔌 เครื่องใช้ไฟฟ้า",
-    items: [
-      "เครื่องใช้ที่จมน้ำ อย่าเสียบปลั๊กลองจนแห้งสนิทและช่างตรวจ",
-      "แอร์ (คอยล์ร้อนที่วางพื้น) ตู้เย็น เครื่องซักผ้า ให้ช่างดูก่อนเปิด",
-      "ปั๊มน้ำ / ถังเก็บน้ำ ล้างและตรวจก่อนใช้น้ำ",
-    ],
+    items: ["เครื่องใช้ที่จมน้ำ อย่าเสียบปลั๊กลองจนแห้งสนิทและช่างตรวจ", "แอร์ (คอยล์ร้อนที่วางพื้น) ตู้เย็น เครื่องซักผ้า ให้ช่างดูก่อนเปิด", "ปั๊มน้ำ / ถังเก็บน้ำ ล้างและตรวจก่อนใช้น้ำ"],
   },
   {
     title: "🚗 รถจมน้ำ",
@@ -1004,10 +1228,7 @@ const AFTER_FLOOD = [
   },
   {
     title: "🗑️ ขยะน้ำท่วม",
-    items: [
-      "แยกของพังชิ้นใหญ่ / ขยะทั่วไป / ของมีคม กองหน้าบ้านไม่ขวางทาง",
-      "กองรอเก็บนาน แจ้งในแท็บ “ปัญหาซอย” เพื่อนบ้านจะช่วยกดว่าเจอด้วย",
-    ],
+    items: ["แยกของพังชิ้นใหญ่ / ขยะทั่วไป / ของมีคม กองหน้าบ้านไม่ขวางทาง", "กองรอเก็บนาน แจ้งในแท็บ “ปัญหาซอย” เพื่อนบ้านจะช่วยกดว่าเจอด้วย"],
   },
 ];
 
@@ -1023,7 +1244,9 @@ export function AfterFloodGuide() {
   return (
     <div className="space-y-3">
       <div className="rounded-xl bg-white p-3">
-        <p className="font-bold">เช็กลิสต์บ้านของฉัน · ทำแล้ว {count}/{total}</p>
+        <p className="font-bold">
+          เช็กลิสต์บ้านของฉัน · ทำแล้ว {count}/{total}
+        </p>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-200">
           <div className="h-full rounded-full bg-emerald-600 transition-all" style={{ width: `${(count / total) * 100}%` }} />
         </div>
