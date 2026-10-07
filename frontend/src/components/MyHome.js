@@ -565,7 +565,10 @@ function WasteDays({ days }) {
   const bkk = new Date(Date.now() + 7 * 3600e3);
   const today = THAI_DAYS[bkk.getUTCDay()];
   const tomorrow = THAI_DAYS[(bkk.getUTCDay() + 1) % 7];
-  const parts = (days || "").split("·").map((x) => x.trim()).filter(Boolean);
+  const parts = (days || "")
+    .split("·")
+    .map((x) => x.trim())
+    .filter(Boolean);
   return parts.map((d, i) => (
     <span key={d}>
       {i > 0 && " · "}
@@ -657,7 +660,7 @@ function HandyRow({ house, handy, onSaved, onClose, setErr }) {
   );
 }
 
-export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge }) {
+export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], onNeeds }) {
   const fromSurvey = load("survey:electric", null)?.house || "";
   const [house, setHouse] = useState(() => takeFamilyParam() || load("myHouse", "") || fromSurvey);
   const [houses, setHouses] = useState(() => load("myHouses", []));
@@ -920,6 +923,19 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         <>
           <CheckinCard info={info} onSaved={setInfo} onContact={() => setContact({ name: load("myName", ""), from: "news" })} setErr={setErr} />
           <Soon items={info.soon} onSeen={() => setSeenN((n) => n + 1)} />
+          {needs.length > 0 && (
+            // the ขอแรง board, seen from home: who still needs hands (no one is pushed, the card just shows)
+            <button onClick={onNeeds} className="mb-3 block w-full rounded-2xl border-2 border-[#C77700] bg-[#FFF8E1] p-3 text-left">
+              <b className="block text-base">🙋 เพื่อนบ้านขอแรงอยู่ {needs.length} เรื่อง</b>
+              {needs.slice(0, 2).map((j) => (
+                <span key={j.id} className="mt-0.5 block text-[15px] leading-snug text-[#33403A]">
+                  {j.name}
+                  {j.soi ? ` (ซ.${j.soi})` : ""}: {j.detail.length > 60 ? `${j.detail.slice(0, 60)}…` : j.detail}
+                </span>
+              ))}
+              <span className="mt-1 block text-[15px] font-bold text-[#7A4B00]">ช่วยได้? ดูและติดต่อ ›</span>
+            </button>
+          )}
 
           {pinning ? (
             <Row title="ปักหมุดบ้านฉัน">

@@ -275,15 +275,37 @@ export default function RepairApp() {
     }
   }, [page, newest, seenAt]);
 
+  // neighbours still waiting for hands (ขอแรง, nobody has come yet)
+  const needs = jobs.filter((j) => j.kind === "need" && j.status === "open");
+  const needSig = needs.map((j) => j.id.slice(0, 6)).join(",");
+
   // what each page tab has to say (the bell lists it; ล้าง mutes it until it changes)
   const ws = waterStatus(water, canal);
   const notes = {
     home: homeBadge,
     pros: newestPro > prosSeen ? { level: "general", reasons: ["🔧 มีร้าน / ช่างใหม่ในหมู่บ้าน"], sig: `p${newestPro}` } : null,
-    community: newest > seenAt ? { level: "general", reasons: ["👥 มีโพสต์ใหม่จากเพื่อนบ้าน"], sig: `c${newest}` } : null,
+    community:
+      needs.length || newest > seenAt
+        ? {
+            level: "general",
+            reasons: [
+              ...needs.slice(0, 4).map((j) => `🙋 ${j.name} ขอแรง: ${j.detail.length > 70 ? `${j.detail.slice(0, 70)}…` : j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`),
+              ...(newest > seenAt && !needs.length ? ["👥 มีโพสต์ใหม่จากเพื่อนบ้าน"] : []),
+            ],
+            sig: needs.length ? `n${needSig}` : `c${newest}`,
+          }
+        : null,
     map: ws.alarm ? { level: "important", reasons: [`💧 ระดับน้ำ: ${ws.text}${ws.sub ? ` · ${ws.sub}` : ""}`], sig: `m${ws.text}` } : null,
   };
   const live = Object.entries(notes).filter(([k, b]) => b && ack[k] !== b.sig);
+  // having looked at the community page counts as seen: the dot stays faint until every ask is taken
+  const communitySig = notes.community?.sig;
+  useEffect(() => {
+    if (page !== "community" || !communitySig || ack.community === communitySig) return;
+    const next = { ...ack, community: communitySig };
+    setAck(next);
+    save("badgeAck", next);
+  }, [page, communitySig, ack]);
   const clearNotes = (keys) => {
     const next = { ...ack };
     for (const k of keys) if (notes[k]) next[k] = notes[k].sig;
@@ -334,6 +356,8 @@ export default function RepairApp() {
         onElectricians={() => openPros("electric")}
         onPros={(g) => openPros(g)}
         onBadge={onHomeBadge}
+        needs={needs}
+        onNeeds={() => showTab("jobs")}
       />
     ),
     announce: (
@@ -652,7 +676,8 @@ export default function RepairApp() {
                           onClick={() => {
                             setNotifyOpen(false);
                             if (k === "pros") openPros("");
-                            else goPage(k, k === "community" ? tab : undefined);
+                            else if (k === "community") showTab(needs.length ? "jobs" : tab);
+                            else goPage(k);
                           }}
                           className="min-h-[44px] flex-1 rounded-xl bg-white text-[15px] font-bold"
                         >
