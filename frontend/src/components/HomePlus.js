@@ -181,10 +181,11 @@ export function AidRow({ info, onChanged, setErr }) {
   const [open, setOpen] = useState(null); // the information-only items fold behind one line
   const [how, setHow] = useState([]); // claim cards whose "วิธียื่น" is open
   // the ones to claim first; information (loans, social security, insurance) after
+  const got = (info.aid || []).filter((a) => a.mine === "received");
   const all = (info.aid || []).filter((a) => a.mine !== "received");
   const claim = all.filter((a) => a.track !== false);
   const facts = all.filter((a) => a.track === false);
-  if (!all.length) return null;
+  if (!all.length && !got.length) return null;
   async function mark(aid, status) {
     setErr("");
     try {
@@ -246,8 +247,16 @@ export function AidRow({ info, onChanged, setErr }) {
             </button>
             {a.mine === "applied" ? (
               <>
-                <p className="flex min-h-[48px] flex-1 items-center text-[15px] font-bold text-[#154D33]">✓ ยื่นแล้ว รอเงิน</p>
-                <button onClick={() => mark(a.id, "received")} className={`${btn} bg-[#1E6B47] text-white`}>
+                <div className="flex min-h-[48px] flex-1 flex-col justify-center">
+                  <p className="text-[15px] font-bold leading-tight text-[#154D33]">✓ บันทึกว่ายื่นแล้ว รอเงิน</p>
+                  <button onClick={() => mark(a.id, "none")} className="self-start text-sm text-[#45504A] underline">
+                    กดผิด? ยกเลิก
+                  </button>
+                </div>
+                <button
+                  onClick={() => window.confirm(`บันทึกว่า "ได้รับเงินแล้ว" จริงไหม?\n${a.title}\n\n(เป็นแค่บันทึกกันลืมของบ้านคุณ แก้ทีหลังได้)`) && mark(a.id, "received")}
+                  className={`${btn} bg-[#1E6B47] text-white`}
+                >
                   ได้เงินแล้ว
                 </button>
               </>
@@ -281,7 +290,10 @@ export function AidRow({ info, onChanged, setErr }) {
           })()}
         </div>
       </div>
-      <p className="mt-1 text-sm text-[#45504A]">ทีมอาสารวบรวมจากประกาศของหน่วยงาน · ยื่นแล้วกดบอกไว้ จะได้ไม่ลืม</p>
+      <p className="mt-1 text-sm text-[#45504A]">ทีมอาสารวบรวมจากประกาศของหน่วยงาน · ต้องยื่นกับหน่วยงานเองตามลิงก์ในแต่ละข้อ</p>
+      <p className="mt-1.5 rounded-xl bg-white/70 px-3 py-2 text-sm leading-snug text-[#33403A]">
+        📝 ปุ่ม <b>“ยื่นแล้ว”</b> และ <b>“ได้เงินแล้ว”</b> เป็นแค่<b>บันทึกกันลืม</b>ของบ้านคุณ <b>ไม่ใช่การยื่นเรื่อง</b> และไม่ใช่ระบบของหน่วยงาน · กดผิดแก้ได้เสมอ
+      </p>
       <div className="mt-3 space-y-2">
         {claim.map(card)}
         {facts.length > 0 &&
@@ -295,6 +307,19 @@ export function AidRow({ info, onChanged, setErr }) {
               + ความช่วยเหลืออื่น: {facts.map((a) => a.short || a.title.split(" ")[0]).join(" · ")} ▾
             </button>
           ))}
+      {got.length > 0 && (
+        <div className="rounded-xl bg-white/70 px-3 py-2">
+          <p className="text-sm font-bold text-[#154D33]">✓ บันทึกว่าได้รับเงินแล้ว</p>
+          {got.map((a) => (
+            <div key={a.id} className="flex min-h-[44px] items-center gap-2">
+              <span className="min-w-0 flex-1 text-[15px] leading-snug">{a.title}</span>
+              <button onClick={() => mark(a.id, "applied")} className="shrink-0 text-sm font-bold text-[#45504A] underline">
+                ยังไม่ได้รับ? แก้
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       </div>
     </div>
   );

@@ -56,7 +56,8 @@ class ServiceUpdate(BaseModel):
 class ServiceAdminUpdate(BaseModel):
     category: Optional[str] = None
     local: Optional[bool] = None  # ร้านเพื่อนบ้าน: shown in เพื่อนบ้าน too
-    line_good: Optional[int] = Field(None, ge=0, le=500)  # houses that praised it in the village LINE group
+    line_good: Optional[int] = Field(None, ge=0, le=500)  # praise counted outside the site (LINE group, FB page, word of mouth)
+    good_note: Optional[str] = Field(None, max_length=60)  # where that praise came from, e.g. "ชมในกลุ่ม LINE หมู่บ้าน"
     verified: Optional[bool] = None
     pinned: Optional[bool] = None
     media_ids: Optional[list[str]] = Field(None, max_length=3)

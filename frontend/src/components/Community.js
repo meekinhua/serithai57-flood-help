@@ -342,13 +342,15 @@ export function CommunityFeed({ lend, jobs, services, topics, onTab, onTopic, on
   );
 }
 
-// on-site "เคยใช้ ดี" votes + houses that praised it in the village LINE group (entered by the team)
+// on-site "เคยใช้ ดี" votes + praise the team counted elsewhere (LINE group, FB page…; source in good_note)
 export const goodOf = (s) => (s.good || 0) + (s.line_good || 0);
 function Trust({ s }) {
   const good = s.good || 0;
   const line = s.line_good || 0;
   if (!good && !line) return <p className="text-sm font-bold text-[#1E6B47]">{/แนะนำ/.test(s.detail || "") ? "เพื่อนบ้านแนะนำ" : "ยังไม่มีคนบอกว่าเคยใช้"}</p>;
-  return <p className="text-sm font-bold text-[#1E6B47]">👍 {[good && `เพื่อนบ้าน ${good} คนบอกว่าดี`, line && `ชมในกลุ่ม LINE หมู่บ้าน ${line} หลัง`].filter(Boolean).join(" · ")}</p>;
+  return (
+    <p className="text-sm font-bold text-[#1E6B47]">👍 {[good && `เพื่อนบ้าน ${good} คนบอกว่าดี`, line && `${s.good_note || "ชมในกลุ่ม LINE หมู่บ้าน"} ${line} ราย`].filter(Boolean).join(" · ")}</p>
+  );
 }
 
 // ---------- the tradesmen & shops board: search, groups, a big call button, "เคยใช้ ดี" ----------
