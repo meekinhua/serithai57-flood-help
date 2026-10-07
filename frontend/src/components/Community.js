@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, load, save } from "../api";
+import { MediaStrip } from "./MediaGallery";
 import { JOB_TYPES, LEND_CATEGORIES, LEND_KINDS, SERVICE_CATEGORIES, timeAgo } from "../config";
 import { FORUM_CATEGORIES } from "./Forum";
 
@@ -407,6 +408,7 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
             <li key={s.id} className="space-y-1.5 rounded-2xl border border-[#DCE2DD] bg-white p-3.5">
               <p className="text-sm font-bold text-[#1F4F8A]">{groupOf(s.category)?.label || SERVICE_CATEGORIES[s.category]?.[1] || "อื่นๆ"}</p>
               <b className="block break-words text-lg leading-snug">{s.name}</b>
+              <MediaStrip media={s.media || []} />
               {s.detail && <p className="whitespace-pre-line break-words text-[15px] leading-relaxed text-[#33403A]">{s.detail}</p>}
               {(s.price || s.area) && <p className="text-sm text-[#45504A]">{[s.price, s.area].filter(Boolean).join(" · ")}</p>}
               <Trust s={s} />

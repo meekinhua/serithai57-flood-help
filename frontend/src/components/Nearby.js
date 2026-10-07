@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, load, save } from "../api";
 import { useT } from "./Texts";
+import MediaPicker, { mediaState } from "./MediaPicker";
+import { MediaStrip } from "./MediaGallery";
 
 // รอบบ้าน: small asks and warnings between houses close enough to help (backend/nearby.py)
 export const NEAR_TOPICS = {
@@ -91,6 +93,7 @@ function Item({ d, onChange, setErr }) {
         {d.label}
       </p>
       {d.text && <p className="text-[15px]">{d.text}</p>}
+      <MediaStrip media={d.media || []} />
       <p className="text-sm text-[#45504A]">
         {key ? "เรื่องของคุณ" : d.m != null ? `ห่างบ้านคุณ ~${Math.max(10, Math.round(d.m / 10) * 10)} ม.` : ""}
         {!ask && !key ? ` · แถวบ้าน ${d.house}` : ""} · {ago(d.created_at)}
@@ -177,12 +180,14 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
   const topic = topics.find((t) => t[0] === form.topic);
   const ask = form.kind === "ask";
   const t = useT();
+  const [files, setFiles] = useState([]);
   async function post() {
     setErr("");
+    if (mediaState(files).busy) return setErr("รอรูปอัปโหลดเสร็จก่อน");
     try {
       save("myName", form.name || "");
       if (ask) save("myReach", form.phone || "");
-      const d = await api("/nearby", { method: "POST", body: JSON.stringify({ ...form, house }) });
+      const d = await api("/nearby", { method: "POST", body: JSON.stringify({ ...form, house, media_ids: mediaState(files).ids }) });
       save("nearbyKeys", { ...keys(), [d.id]: d.edit_key });
       onPosted(d);
     } catch (e) {
@@ -235,6 +240,7 @@ function NewForm({ form, setForm, house, onPosted, setErr }) {
               ส่งเข้ารายการปัญหาในซอย ให้สำนักงานหมู่บ้านเห็นด้วย
             </label>
           )}
+          <MediaPicker items={files} setItems={setFiles} max={2} />
           <p className="text-sm text-[#45504A]">{ask ? "เห็นเฉพาะบ้านในระยะ ~250 ม. · ปิดเองใน 1 วัน" : "เห็นเฉพาะบ้านในระยะ ~400 ม."}</p>
         </>
       )}

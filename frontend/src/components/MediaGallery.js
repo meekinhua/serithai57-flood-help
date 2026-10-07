@@ -25,15 +25,7 @@ export default function MediaGallery({ media = [] }) {
   return (
     <div className="space-y-2">
       {videos.map((m) => (
-        <video
-          key={m.id}
-          controls
-          playsInline
-          preload="none"
-          poster={mediaUrl(m.id, "thumb")}
-          src={mediaUrl(m.id, "file")}
-          className="max-h-[70vh] w-full rounded-lg bg-black"
-        />
+        <video key={m.id} controls playsInline preload="none" poster={mediaUrl(m.id, "thumb")} src={mediaUrl(m.id, "file")} className="max-h-[70vh] w-full rounded-lg bg-black" />
       ))}
       {images.length > 0 && (
         <div className={`grid gap-2 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
@@ -58,9 +50,39 @@ export function MediaThumb({ media = [] }) {
       <img src={mediaUrl(first.id, "thumb")} alt="" loading="lazy" className="h-full w-full object-cover" />
       {first.type === "video" && <span className="absolute inset-0 flex items-center justify-center text-xl text-white drop-shadow">▶</span>}
       {media.length > 1 && <span className="absolute bottom-0 right-0 rounded-tl bg-black/75 px-1 text-xs text-white">+{media.length - 1}</span>}
-      {first.type === "video" && first.duration ? (
-        <span className="absolute bottom-0 left-0 rounded-tr bg-black/75 px-1 text-[10px] text-white">{formatDuration(first.duration)}</span>
-      ) : null}
+      {first.type === "video" && first.duration ? <span className="absolute bottom-0 left-0 rounded-tr bg-black/75 px-1 text-[10px] text-white">{formatDuration(first.duration)}</span> : null}
     </span>
+  );
+}
+
+// 7 Oct: a row of small thumbnails for cards (shops, รอบบ้าน); a tap opens the photo or plays the clip
+export function MediaStrip({ media = [], size = 72 }) {
+  const [open, setOpen] = useState(null);
+  if (!media.length) return null;
+  return (
+    <div className="flex gap-2 overflow-x-auto py-1">
+      {media.map((m) => (
+        <button
+          key={m.id}
+          type="button"
+          onClick={() => setOpen(m)}
+          aria-label={m.type === "video" ? "เล่นคลิป" : "ดูรูป"}
+          className="relative shrink-0 overflow-hidden rounded-lg bg-neutral-200"
+          style={{ width: size, height: size }}
+        >
+          <img src={mediaUrl(m.id, "thumb")} alt="" loading="lazy" className="h-full w-full object-cover" />
+          {m.type === "video" && <span className="absolute inset-0 flex items-center justify-center text-2xl text-white drop-shadow">▶</span>}
+        </button>
+      ))}
+      {open && open.type === "image" && <Lightbox src={mediaUrl(open.id, "file")} onClose={() => setOpen(null)} />}
+      {open && open.type === "video" && (
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/90 p-2" onClick={() => setOpen(null)} role="dialog" aria-label="ดูคลิป">
+          <video controls autoPlay playsInline src={mediaUrl(open.id, "file")} poster={mediaUrl(open.id, "thumb")} className="max-h-full max-w-full" onClick={(e) => e.stopPropagation()} />
+          <button onClick={() => setOpen(null)} aria-label="ปิด" className="absolute right-2 top-2 flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-2xl text-white">
+            ✕
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

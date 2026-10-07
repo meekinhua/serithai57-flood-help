@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { API, api } from "../api";
 import { ANNOUNCEMENT_LEVELS, timeAgo } from "../config";
 import Announcements from "./Announcements";
+import MediaPicker, { mediaState } from "./MediaPicker";
+import { MediaThumb } from "./MediaGallery";
+import { mediaUrl } from "../media";
 
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
 const btnPrimary = "min-h-[48px] rounded-xl bg-black px-5 font-semibold text-white active:bg-neutral-800 disabled:opacity-60";
@@ -51,11 +54,15 @@ export function AdminLogin({ onLogin }) {
       <h2 className="text-xl font-bold">🛡️ เข้าสู่ระบบผู้ดูแล</h2>
       <p className="text-sm text-neutral-600">สำหรับกรรมการ / ผู้ดูแลหมู่บ้านเท่านั้น ชาวบ้านทั่วไปใช้งานได้โดยไม่ต้องเข้าสู่ระบบ</p>
       <div>
-        <label className="mb-1 block font-medium" htmlFor="admin-email">อีเมล</label>
+        <label className="mb-1 block font-medium" htmlFor="admin-email">
+          อีเมล
+        </label>
         <input id="admin-email" type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} className={input} />
       </div>
       <div>
-        <label className="mb-1 block font-medium" htmlFor="admin-password">รหัสผ่าน</label>
+        <label className="mb-1 block font-medium" htmlFor="admin-password">
+          รหัสผ่าน
+        </label>
         <input id="admin-password" type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className={input} />
       </div>
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
@@ -73,8 +80,16 @@ function AnnouncementsAdmin({ admin, onPublicChange }) {
   const [expires, setExpires] = useState("24"); // old "food at 9:00" notices were lingering for hours
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [files, setFiles] = useState([]); // photos / a clip with the notice
+  const [editing, setEditing] = useState(null); // {id, files} — changing a notice's photos
 
-  const reload = useCallback(() => api("/admin/announcements").then(setItems).catch((e) => setError(e.message)), []);
+  const reload = useCallback(
+    () =>
+      api("/admin/announcements")
+        .then(setItems)
+        .catch((e) => setError(e.message)),
+    [],
+  );
   useEffect(() => {
     reload();
   }, [reload]);
@@ -85,8 +100,9 @@ function AnnouncementsAdmin({ admin, onPublicChange }) {
     setBusy(true);
     setError("");
     try {
-      await api("/admin/announcements", { method: "POST", body: JSON.stringify({ text: text.trim(), level, expires_hours: expires ? Number(expires) : null }) });
+      await api("/admin/announcements", { method: "POST", body: JSON.stringify({ text: text.trim(), level, expires_hours: expires ? Number(expires) : null, media_ids: mediaState(files).ids }) });
       setText("");
+      setFiles([]);
       await reload();
       onPublicChange();
     } catch (err) {
@@ -151,21 +167,29 @@ function AnnouncementsAdmin({ admin, onPublicChange }) {
           </div>
         </fieldset>
         <div>
-          <label className="mb-1 block font-medium" htmlFor="expires">แสดงนาน</label>
+          <label className="mb-1 block font-medium" htmlFor="expires">
+            แสดงนาน
+          </label>
           <select id="expires" value={expires} onChange={(e) => setExpires(e.target.value)} className={input}>
             {EXPIRY.map(([v, t]) => (
-              <option key={v} value={v}>{t}</option>
+              <option key={v} value={v}>
+                {t}
+              </option>
             ))}
           </select>
+        </div>
+        <div>
+          <p className="mb-1 font-medium">รูป / คลิปประกอบ (ไม่บังคับ · คลิปตัดเหลือ 60 วินาที)</p>
+          <MediaPicker items={files} setItems={setFiles} max={4} />
         </div>
         {text.trim() && (
           <div>
             <p className="mb-1 text-sm text-neutral-500">ตัวอย่างที่ชาวบ้านจะเห็น:</p>
-            <Announcements preview items={[{ id: "preview", text, level, created_by: admin.name }]} />
+            <Announcements preview items={[{ id: "preview", text, level, created_by: admin.name, media: files.filter((f) => f.status === "ready").map((f) => f.media) }]} />
           </div>
         )}
         {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
-        <button type="submit" disabled={busy || !text.trim()} className={`${btnPrimary} w-full sm:w-auto`}>
+        <button type="submit" disabled={busy || !text.trim() || mediaState(files).busy} className={`${btnPrimary} w-full sm:w-auto`}>
           {busy ? "กำลังประกาศ…" : "📢 ประกาศ"}
         </button>
       </form>
@@ -179,20 +203,58 @@ function AnnouncementsAdmin({ admin, onPublicChange }) {
             return (
               <li key={a.id} className="rounded-xl bg-white p-3 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className={`rounded border px-1.5 ${lv.cls}`}>{lv.icon} {lv.label}</span>
-                  <span className={`rounded px-1.5 ${live ? "bg-black text-white" : "border border-neutral-300 text-neutral-500"}`}>
-                    {live ? "กำลังแสดง" : expired(a) ? "หมดอายุ" : "ปิดอยู่"}
+                  <span className={`rounded border px-1.5 ${lv.cls}`}>
+                    {lv.icon} {lv.label}
                   </span>
-                  <span className="text-neutral-500">{a.created_by} · {timeAgo(a.created_at)}</span>
+                  <span className={`rounded px-1.5 ${live ? "bg-black text-white" : "border border-neutral-300 text-neutral-500"}`}>{live ? "กำลังแสดง" : expired(a) ? "หมดอายุ" : "ปิดอยู่"}</span>
+                  <span className="text-neutral-500">
+                    {a.created_by} · {timeAgo(a.created_at)}
+                  </span>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap break-words">{a.text}</p>
+                <div className="mt-1 flex gap-2">
+                  <MediaThumb media={a.media || []} />
+                  <p className="min-w-0 flex-1 whitespace-pre-wrap break-words">{a.text}</p>
+                </div>
+                {editing?.id === a.id && (
+                  <div className="mt-2 space-y-2 rounded-xl bg-neutral-50 p-2">
+                    <MediaPicker items={editing.files} setItems={(fn) => setEditing((e) => ({ ...e, files: typeof fn === "function" ? fn(e.files) : fn }))} max={4} />
+                    <button
+                      disabled={mediaState(editing.files).busy}
+                      onClick={async () => {
+                        await update(a.id, { media_ids: mediaState(editing.files).ids });
+                        setEditing(null);
+                      }}
+                      className={btnPrimary}
+                    >
+                      บันทึกรูป
+                    </button>
+                  </div>
+                )}
                 <div className="mt-2 flex flex-wrap gap-2">
                   {a.active ? (
-                    <button onClick={() => update(a.id, { active: false })} className={btnGhost}>⏸ ปิดประกาศ</button>
+                    <button onClick={() => update(a.id, { active: false })} className={btnGhost}>
+                      ⏸ ปิดประกาศ
+                    </button>
                   ) : (
-                    <button onClick={() => update(a.id, { active: true })} className={btnGhost}>▶️ เปิดอีกครั้ง</button>
+                    <button onClick={() => update(a.id, { active: true })} className={btnGhost}>
+                      ▶️ เปิดอีกครั้ง
+                    </button>
                   )}
-                  <button onClick={() => remove(a.id)} className="min-h-[44px] px-3 text-red-700 underline">ลบถาวร</button>
+                  <button
+                    onClick={() =>
+                      setEditing(
+                        editing?.id === a.id
+                          ? null
+                          : { id: a.id, files: (a.media || []).map((m) => ({ key: m.id, type: m.type, status: "ready", progress: 1, media: m, preview: mediaUrl(m.id, "thumb") })) },
+                      )
+                    }
+                    className={btnGhost}
+                  >
+                    🖼️ รูป / คลิป
+                  </button>
+                  <button onClick={() => remove(a.id)} className="min-h-[44px] px-3 text-red-700 underline">
+                    ลบถาวร
+                  </button>
                 </div>
               </li>
             );
@@ -210,7 +272,13 @@ function AdminsAdmin({ admin }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const reload = useCallback(() => api("/admin/admins").then(setItems).catch((e) => setError(e.message)), []);
+  const reload = useCallback(
+    () =>
+      api("/admin/admins")
+        .then(setItems)
+        .catch((e) => setError(e.message)),
+    [],
+  );
   useEffect(() => {
     reload();
   }, [reload]);
@@ -251,7 +319,9 @@ function AdminsAdmin({ admin }) {
               <p className="break-all text-sm text-neutral-600">{a.email}</p>
             </div>
             {a.id !== admin.id && (
-              <button onClick={() => remove(a)} className="min-h-[44px] px-3 text-red-700 underline">ลบ</button>
+              <button onClick={() => remove(a)} className="min-h-[44px] px-3 text-red-700 underline">
+                ลบ
+              </button>
             )}
           </li>
         ))}
@@ -260,10 +330,21 @@ function AdminsAdmin({ admin }) {
         <h3 className="text-lg font-bold">➕ เพิ่มผู้ดูแล</h3>
         <input required placeholder="ชื่อ" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={80} className={input} />
         <input required type="email" placeholder="อีเมล" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
-        <input required type="text" minLength={8} placeholder="รหัสผ่านเริ่มต้น (อย่างน้อย 8 ตัว)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" className={input} />
+        <input
+          required
+          type="text"
+          minLength={8}
+          placeholder="รหัสผ่านเริ่มต้น (อย่างน้อย 8 ตัว)"
+          value={form.password}
+          onChange={(e) => setForm({ ...form, password: e.target.value })}
+          autoComplete="new-password"
+          className={input}
+        />
         <p className="text-sm text-neutral-500">แจ้งรหัสผ่านให้ผู้ดูแลใหม่ทางช่องทางส่วนตัว และให้เปลี่ยนรหัสหลังเข้าใช้ครั้งแรก</p>
         {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
-        <button type="submit" disabled={busy} className={btnPrimary}>เพิ่มผู้ดูแล</button>
+        <button type="submit" disabled={busy} className={btnPrimary}>
+          เพิ่มผู้ดูแล
+        </button>
       </form>
     </div>
   );
@@ -272,7 +353,9 @@ function AdminsAdmin({ admin }) {
 function AuditAdmin() {
   const [items, setItems] = useState([]);
   useEffect(() => {
-    api("/admin/audit").then(setItems).catch(() => {});
+    api("/admin/audit")
+      .then(setItems)
+      .catch(() => {});
   }, []);
   return (
     <ol className="space-y-1 rounded-2xl bg-white p-4 text-sm shadow">
@@ -308,11 +391,30 @@ function AccountAdmin() {
   return (
     <form onSubmit={submit} className="max-w-md space-y-3 rounded-2xl bg-white p-4 shadow">
       <h3 className="text-lg font-bold">🔑 เปลี่ยนรหัสผ่าน</h3>
-      <input required type="password" placeholder="รหัสผ่านปัจจุบัน" autoComplete="current-password" value={form.current_password} onChange={(e) => setForm({ ...form, current_password: e.target.value })} className={input} />
-      <input required type="password" minLength={8} placeholder="รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)" autoComplete="new-password" value={form.new_password} onChange={(e) => setForm({ ...form, new_password: e.target.value })} className={input} />
+      <input
+        required
+        type="password"
+        placeholder="รหัสผ่านปัจจุบัน"
+        autoComplete="current-password"
+        value={form.current_password}
+        onChange={(e) => setForm({ ...form, current_password: e.target.value })}
+        className={input}
+      />
+      <input
+        required
+        type="password"
+        minLength={8}
+        placeholder="รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)"
+        autoComplete="new-password"
+        value={form.new_password}
+        onChange={(e) => setForm({ ...form, new_password: e.target.value })}
+        className={input}
+      />
       {msg && <p className="rounded-lg bg-neutral-100 p-3">{msg}</p>}
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
-      <button type="submit" className={btnPrimary}>บันทึก</button>
+      <button type="submit" className={btnPrimary}>
+        บันทึก
+      </button>
     </form>
   );
 }
@@ -344,8 +446,13 @@ function StaffAdmin() {
     <div className="space-y-4">
       <div className="space-y-2 rounded-2xl bg-white p-4 shadow">
         <h3 className="text-lg font-bold">👷 เชิญเจ้าหน้าที่ / อาสา</h3>
-        <p className="text-sm text-neutral-600">เจ้าหน้าที่เปิดลิงก์ ใส่ชื่อ แล้วใช้หน้า /staff ได้ทันที (รับงาน แบ่งซอย ออกงาน ตั้งตำแหน่งบ้าน · งานจาก LINE ส่วนกลางนำเข้าให้) — จัดการผู้ดูแล/ประกาศไม่ได้ · เจ้าหน้าที่ทุกคนส่งลิงก์ต่อ/โชว์ QR ได้เองที่แท็บ “👥 ชวนทีม” (ใช้ลิงก์ที่หมดอายุช้าสุด) ยกเลิกลิงก์ = หยุดรับคนใหม่ทันที</p>
-        <a href="/staff#share" className="inline-block min-h-[44px] rounded-lg border-2 border-black px-3 py-2 font-semibold">📱 เปิด QR ชวนทีม</a>
+        <p className="text-sm text-neutral-600">
+          เจ้าหน้าที่เปิดลิงก์ ใส่ชื่อ แล้วใช้หน้า /staff ได้ทันที (รับงาน แบ่งซอย ออกงาน ตั้งตำแหน่งบ้าน · งานจาก LINE ส่วนกลางนำเข้าให้) — จัดการผู้ดูแล/ประกาศไม่ได้ ·
+          เจ้าหน้าที่ทุกคนส่งลิงก์ต่อ/โชว์ QR ได้เองที่แท็บ “👥 ชวนทีม” (ใช้ลิงก์ที่หมดอายุช้าสุด) ยกเลิกลิงก์ = หยุดรับคนใหม่ทันที
+        </p>
+        <a href="/staff#share" className="inline-block min-h-[44px] rounded-lg border-2 border-black px-3 py-2 font-semibold">
+          📱 เปิด QR ชวนทีม
+        </a>
         <div className="flex flex-wrap gap-2">
           <select value={hours} onChange={(e) => setHours(e.target.value)} className={input + " w-auto"}>
             <option value="24">ลิงก์ใช้ได้ 24 ชม.</option>
@@ -353,7 +460,9 @@ function StaffAdmin() {
             <option value="168">ลิงก์ใช้ได้ 7 วัน</option>
             <option value="720">ลิงก์ใช้ได้ 30 วัน</option>
           </select>
-          <button onClick={create} className={btnPrimary}>สร้างลิงก์เชิญ</button>
+          <button onClick={create} className={btnPrimary}>
+            สร้างลิงก์เชิญ
+          </button>
         </div>
         {msg && <p className="break-all rounded-lg bg-neutral-100 p-3 text-sm">{msg}</p>}
       </div>
@@ -365,8 +474,12 @@ function StaffAdmin() {
             </span>
             {i.active && (
               <>
-                <button onClick={() => navigator.clipboard?.writeText(link(i.token)).then(() => setMsg("คัดลอกลิงก์แล้ว"))} className={btnGhost}>คัดลอกลิงก์</button>
-                <button onClick={() => api(`/admin/staff-invites/${i.token}`, { method: "DELETE" }).then(reload)} className="min-h-[44px] px-2 text-red-700 underline">ยกเลิกลิงก์</button>
+                <button onClick={() => navigator.clipboard?.writeText(link(i.token)).then(() => setMsg("คัดลอกลิงก์แล้ว"))} className={btnGhost}>
+                  คัดลอกลิงก์
+                </button>
+                <button onClick={() => api(`/admin/staff-invites/${i.token}`, { method: "DELETE" }).then(reload)} className="min-h-[44px] px-2 text-red-700 underline">
+                  ยกเลิกลิงก์
+                </button>
               </>
             )}
           </li>
@@ -378,7 +491,10 @@ function StaffAdmin() {
           {staff.map((s) => (
             <li key={s.id} className="flex items-center gap-2">
               <span className="flex-1">👷 {s.name}</span>
-              <button onClick={() => window.confirm(`ถอน ${s.name} ออกจากทีม?`) && api(`/admin/admins/${s.id}`, { method: "DELETE" }).then(reload)} className="min-h-[40px] px-2 text-red-700 underline">
+              <button
+                onClick={() => window.confirm(`ถอน ${s.name} ออกจากทีม?`) && api(`/admin/admins/${s.id}`, { method: "DELETE" }).then(reload)}
+                className="min-h-[40px] px-2 text-red-700 underline"
+              >
                 ถอนสิทธิ์
               </button>
             </li>
@@ -403,11 +519,21 @@ export default function AdminPanel({ admin, onPublicChange }) {
   return (
     <div>
       <p className="mb-3 rounded-xl bg-white p-3 text-sm shadow-sm">
-        การลบ / ปักหมุดรายการ และลบรายงานระดับน้ำ ทำได้ที่<a href="/" className="font-semibold underline">หน้าหลัก</a> (ปุ่มผู้ดูแลจะแสดงในหน้ารายละเอียดของแต่ละรายการ)
+        การลบ / ปักหมุดรายการ และลบรายงานระดับน้ำ ทำได้ที่
+        <a href="/" className="font-semibold underline">
+          หน้าหลัก
+        </a>{" "}
+        (ปุ่มผู้ดูแลจะแสดงในหน้ารายละเอียดของแต่ละรายการ)
       </p>
       <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 sm:grid-cols-5" role="tablist">
         {TABS.map(([key, text]) => (
-          <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`min-h-[44px] rounded-lg font-semibold ${tab === key ? "bg-white shadow" : "text-neutral-600"}`}>
+          <button
+            key={key}
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab(key)}
+            className={`min-h-[44px] rounded-lg font-semibold ${tab === key ? "bg-white shadow" : "text-neutral-600"}`}
+          >
             {text}
           </button>
         ))}
@@ -496,7 +622,14 @@ function HomeBlocks() {
             {h.watch_on ? "แสดงอยู่ · กดเพื่อซ่อน" : "ซ่อนอยู่ · กดเพื่อแสดง"}
           </button>
         </div>
-        <input maxLength={80} value={h.watch_title} onChange={(e) => setH({ ...h, watch_title: e.target.value })} className={input} placeholder="หัวข้อ (เว้นว่าง = 🌧️ ฝนตกอีกรอบ · เฝ้าระวังน้ำ)" aria-label="หัวข้อกล่องเฝ้าระวังน้ำ" />
+        <input
+          maxLength={80}
+          value={h.watch_title}
+          onChange={(e) => setH({ ...h, watch_title: e.target.value })}
+          className={input}
+          placeholder="หัวข้อ (เว้นว่าง = 🌧️ ฝนตกอีกรอบ · เฝ้าระวังน้ำ)"
+          aria-label="หัวข้อกล่องเฝ้าระวังน้ำ"
+        />
         <p className="text-xs text-neutral-500">ป้ายระดับน้ำมุมขวาบน และแท็บ 💧 ระดับน้ำ ยังอยู่เสมอ</p>
       </div>
       <div className="space-y-2 rounded-xl border p-3">
@@ -519,7 +652,9 @@ function HomeBlocks() {
           aria-label="พิกัดกล่องเหลือง"
         />
       </div>
-      <button disabled={busy} onClick={() => save()} className={btnPrimary}>💾 บันทึกข้อความ</button>
+      <button disabled={busy} onClick={() => save()} className={btnPrimary}>
+        💾 บันทึกข้อความ
+      </button>
       {msg && <p className="text-sm">{msg}</p>}
     </section>
   );
@@ -565,14 +700,35 @@ function FundAdmin() {
           <input type="checkbox" checked={acc.on} onChange={(e) => set({ on: e.target.checked })} className="h-5 w-5" /> แสดงบัญชีบนหน้า /fund
         </label>
       </div>
-      <input value={acc.note} maxLength={300} onChange={(e) => set({ note: e.target.value })} className={input} placeholder="หมายเหตุ เช่น สมทบค่าอาหาร น้ำ กระสอบทราย · ผู้ดูแลยอด: คุณเอ็ม" aria-label="หมายเหตุบัญชี" />
-      <button onClick={saveAcc} className={btnPrimary}>💾 บันทึกบัญชี</button>
+      <input
+        value={acc.note}
+        maxLength={300}
+        onChange={(e) => set({ note: e.target.value })}
+        className={input}
+        placeholder="หมายเหตุ เช่น สมทบค่าอาหาร น้ำ กระสอบทราย · ผู้ดูแลยอด: คุณเอ็ม"
+        aria-label="หมายเหตุบัญชี"
+      />
+      <button onClick={saveAcc} className={btnPrimary}>
+        💾 บันทึกบัญชี
+      </button>
       <div className="rounded-xl bg-amber-50 p-3 text-sm">
         <p className="font-semibold">🔑 ลิงก์เหรัญญิก (ส่งให้คนดูแลยอดเท่านั้น · ตรวจยอด/บันทึกรายจ่ายได้)</p>
         <p className="mt-1 break-all font-mono text-xs">{link || "…"}</p>
         <div className="mt-2 flex gap-2">
-          <button onClick={() => navigator.clipboard?.writeText(link).then(() => setMsg("คัดลอกลิงก์แล้ว")).catch(() => {})} className={btnGhost}>คัดลอกลิงก์</button>
-          <button onClick={rotate} className={btnGhost}>เปลี่ยนลิงก์</button>
+          <button
+            onClick={() =>
+              navigator.clipboard
+                ?.writeText(link)
+                .then(() => setMsg("คัดลอกลิงก์แล้ว"))
+                .catch(() => {})
+            }
+            className={btnGhost}
+          >
+            คัดลอกลิงก์
+          </button>
+          <button onClick={rotate} className={btnGhost}>
+            เปลี่ยนลิงก์
+          </button>
         </div>
       </div>
       {msg && <p className="text-sm">{msg}</p>}
@@ -612,8 +768,12 @@ function SurveysAdmin() {
             <button onClick={() => toggle(i)} className={`min-h-[40px] rounded-lg px-3 font-semibold ${s.on ? "bg-green-600 text-white" : "border-2 border-black"}`}>
               {s.on ? "เปิดอยู่ · กดปิด" : "ปิดอยู่ · กดเปิด"}
             </button>
-            <button onClick={() => show(s.key)} className="min-h-[40px] rounded-lg border-2 border-black px-3">ดูรายชื่อ</button>
-            <a href={`${API}/admin/surveys/${s.key}/csv`} className="min-h-[40px] rounded-lg border-2 border-black px-3 py-2">CSV</a>
+            <button onClick={() => show(s.key)} className="min-h-[40px] rounded-lg border-2 border-black px-3">
+              ดูรายชื่อ
+            </button>
+            <a href={`${API}/admin/surveys/${s.key}/csv`} className="min-h-[40px] rounded-lg border-2 border-black px-3 py-2">
+              CSV
+            </a>
           </div>
           {rows[s.key] && (
             <ol className="mt-2 list-decimal space-y-1 pl-6 text-sm">

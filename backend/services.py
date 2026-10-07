@@ -43,21 +43,33 @@ class ServiceCreate(BaseModel):
     pricing: Pricing = "paid"
     price: str = Field("", max_length=100)  # e.g. "300 บาท/เที่ยว"
     area: str = Field("", max_length=100)  # e.g. "ในหมู่บ้าน", "ทั่วบึงกุ่ม"
+    media_ids: list[str] = Field(default_factory=list, max_length=3)  # 7 Oct: photos of the shop / the work
 
 
 class ServiceUpdate(BaseModel):
     available: Optional[bool] = None
     detail: Optional[str] = Field(None, max_length=500)
     price: Optional[str] = Field(None, max_length=100)
+    media_ids: Optional[list[str]] = Field(None, max_length=3)  # replaces the photos
 
 
 class ServiceAdminUpdate(BaseModel):
     verified: Optional[bool] = None
     pinned: Optional[bool] = None
+    media_ids: Optional[list[str]] = Field(None, max_length=3)
 
 
-def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
+def build_router(db, rate_limit, require_admin, audit, client_ip, claim_media=None, delete_media=None) -> APIRouter:
     router = APIRouter(prefix="/api")
+
+    async def swap_media(service_id: str, ids: list[str]) -> list:
+        """The listing's photos become exactly `ids`: kept ones stay, dropped ones are deleted, new ones claimed."""
+        old = (await db.services.find_one({"id": service_id}, {"_id": 0, "media": 1}) or {}).get("media") or []
+        keep = [m for m in old if m["id"] in ids]
+        if delete_media:
+            await delete_media([m["id"] for m in old if m["id"] not in ids])
+        new_ids = [i for i in ids if i not in {m["id"] for m in keep}]
+        return keep + (await claim_media(new_ids, f"service:{service_id}", {"image", "video"}) if claim_media else [])
 
     @router.get("/services")
     async def list_services(category: Optional[str] = None):
@@ -72,9 +84,11 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
             raise HTTPException(422, "หมวดหมู่ไม่ถูกต้อง")
         edit_key = secrets.token_urlsafe(18)
         t = _now()
+        sid = str(uuid.uuid4())
         doc = {
-            "id": str(uuid.uuid4()),
-            **{k: v.strip() if isinstance(v, str) else v for k, v in body.model_dump().items()},
+            "id": sid,
+            **{k: v.strip() if isinstance(v, str) else v for k, v in body.model_dump(exclude={"media_ids"}).items()},
+            "media": await claim_media(body.media_ids, f"service:{sid}", {"image", "video"}) if claim_media and body.media_ids else [],
             "price": body.price.strip() if body.pricing == "paid" else "",
             "available": True,
             "verified": False,
@@ -92,7 +106,11 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
 
     @router.patch("/services/{service_id}")
     async def update_service(service_id: str, body: ServiceUpdate, x_edit_key: str = Header(...)):
-        changes = {k: v for k, v in body.model_dump().items() if v is not None}
+        changes = {k: v for k, v in body.model_dump(exclude={"media_ids"}).items() if v is not None}
+        if body.media_ids is not None:
+            if not await db.services.find_one({"id": service_id, "edit_key_hash": _hash(x_edit_key)}, {"_id": 1}):
+                raise HTTPException(403, "แก้ไขได้เฉพาะเจ้าของ (จากเครื่องที่ลงชื่อไว้)")
+            changes["media"] = await swap_media(service_id, body.media_ids)
         if not changes:
             raise HTTPException(422, "ไม่มีข้อมูลที่จะแก้ไข")
         doc = await db.services.find_one_and_update(
@@ -131,7 +149,9 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
 
     @router.patch("/admin/services/{service_id}")
     async def admin_update_service(service_id: str, body: ServiceAdminUpdate, admin: dict = Depends(require_admin)):
-        changes = {k: v for k, v in body.model_dump().items() if v is not None}
+        changes = {k: v for k, v in body.model_dump(exclude={"media_ids"}).items() if v is not None}
+        if body.media_ids is not None:
+            changes["media"] = await swap_media(service_id, body.media_ids)
         if not changes:
             raise HTTPException(422, "ไม่มีข้อมูลที่จะแก้ไข")
         doc = await db.services.find_one_and_update({"id": service_id}, {"$set": changes}, projection=HIDDEN, return_document=True)

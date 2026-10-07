@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ANNOUNCEMENT_LEVELS, timeAgo } from "../config";
 import { load, save } from "../api";
+import MediaGallery from "./MediaGallery";
 
 function expiryText(iso) {
   return new Date(iso).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -52,6 +53,11 @@ export default function Announcements({ items, preview = false }) {
                 <p className={`mt-1 whitespace-pre-wrap break-words font-bold leading-snug ${stale ? "text-base sm:text-lg" : "text-lg sm:text-2xl"} ${long && !open[a.id] ? "line-clamp-3" : ""}`}>
                   {a.text}
                 </p>
+                {a.media?.length > 0 && (
+                  <div className="mt-2">
+                    <MediaGallery media={a.media} />
+                  </div>
+                )}
                 {long && (
                   <button onClick={() => setOpen((o) => ({ ...o, [a.id]: !o[a.id] }))} className="min-h-[32px] text-sm font-semibold underline">
                     {open[a.id] ? "ย่อ" : "อ่านต่อ"}
@@ -91,10 +97,18 @@ export function UrgentBar({ items }) {
         <span className="announce-flash shrink-0 text-xl" aria-hidden="true">
           🚨
         </span>
-        <span className={`min-w-0 flex-1 text-[15px] font-bold leading-snug ${open ? "whitespace-pre-wrap break-words" : "truncate"}`}>{a.text}</span>
+        <span className={`min-w-0 flex-1 text-[15px] font-bold leading-snug ${open ? "whitespace-pre-wrap break-words" : "truncate"}`}>
+          {a.media?.length > 0 && !open ? "📷 " : ""}
+          {a.text}
+        </span>
         {urgent.length > 1 && <span className="shrink-0 rounded-full bg-white px-2 text-xs font-bold text-red-700">+{urgent.length - 1}</span>}
         <span className="shrink-0 text-sm font-bold underline">{open ? "ย่อ" : "อ่าน"}</span>
       </button>
+      {open && a.media?.length > 0 && (
+        <div className="mx-auto max-w-5xl px-3 pb-2">
+          <MediaGallery media={a.media} />
+        </div>
+      )}
       {open &&
         urgent.slice(1).map((x) => (
           <p key={x.id} className="mx-auto max-w-5xl whitespace-pre-wrap break-words border-t border-red-400 px-3 py-2 text-[15px] font-bold">

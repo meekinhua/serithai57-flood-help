@@ -217,12 +217,14 @@ class AnnouncementCreate(BaseModel):
     text: str = Field(min_length=1, max_length=500)
     level: AnnouncementLevel = "warning"
     expires_hours: Optional[int] = Field(None, ge=1, le=24 * 30)  # None = until turned off
+    media_ids: list[str] = Field(default_factory=list, max_length=4)  # 7 Oct: photos / a clip with the notice
 
 
 class AnnouncementUpdate(BaseModel):
     active: Optional[bool] = None
     text: Optional[str] = Field(None, min_length=1, max_length=500)
     level: Optional[AnnouncementLevel] = None
+    media_ids: Optional[list[str]] = Field(None, max_length=4)  # replaces the attachments
 
 
 class PostAdminUpdate(BaseModel):
@@ -542,6 +544,7 @@ async def admin_create_announcement(body: AnnouncementCreate, admin: dict = Depe
         "expires_at": t + timedelta(hours=body.expires_hours) if body.expires_hours else None,
         "created_by": admin["name"],
     }
+    doc["media"] = await claim_media(body.media_ids, f"announce:{doc['id']}", {"image", "video"})
     await db.announcements.insert_one(dict(doc))
     await audit(admin, "create_announcement", doc["id"], doc["text"])
     return doc
@@ -549,7 +552,16 @@ async def admin_create_announcement(body: AnnouncementCreate, admin: dict = Depe
 
 @api.patch("/admin/announcements/{ann_id}")
 async def admin_update_announcement(ann_id: str, body: AnnouncementUpdate, admin: dict = Depends(require_admin)):
-    changes = {k: v for k, v in body.model_dump().items() if v is not None}
+    changes = {k: v for k, v in body.model_dump(exclude={"media_ids"}).items() if v is not None}
+    if body.media_ids is not None:
+        old = await db.announcements.find_one({"id": ann_id}, {"_id": 0, "media": 1})
+        if old is None:
+            raise HTTPException(404, "ไม่พบประกาศ")
+        keep = set(body.media_ids)
+        await delete_media([m["id"] for m in old.get("media") or [] if m["id"] not in keep])
+        kept = [m for m in old.get("media") or [] if m["id"] in keep]
+        new_ids = [i for i in body.media_ids if i not in {m["id"] for m in kept}]
+        changes["media"] = kept + await claim_media(new_ids, f"announce:{ann_id}", {"image", "video"})
     if not changes:
         raise HTTPException(422, "ไม่มีข้อมูลที่จะแก้ไข")
     doc = await db.announcements.find_one_and_update({"id": ann_id}, {"$set": changes}, projection={"_id": 0}, return_document=True)
@@ -604,7 +616,7 @@ media_router, claim_media, delete_media, media_maintenance = media.build_router(
 app.include_router(api)
 app.include_router(media_router)
 app.include_router(weather.build_router(db))
-app.include_router(services.build_router(db, rate_limit, require_admin, audit, client_ip))
+app.include_router(services.build_router(db, rate_limit, require_admin, audit, client_ip, claim_media, delete_media))
 VILLAGE_CENTER = (13.7958, 100.67)
 staff_router, locate_house, learn_address, require_staff = staff.build_router(
     db, rate_limit, current_admin, require_admin, start_session, audit, public_post, VILLAGE_CENTER
@@ -630,7 +642,7 @@ def _house(h: str) -> str:
 homeplus_router, homeplus_extras = homeplus.build(db, rate_limit, require_admin, locate_house, _house)
 app.include_router(homeplus_router)
 app.include_router(myhome.build_router(db, rate_limit, require_admin, locate_house, learn_address, survey.norm_house, staff.SOIS, staff.BUILDINGS["buildings"], extras=homeplus_extras))
-app.include_router(nearby.build_router(db, rate_limit, client_ip, require_admin, locate_house, survey.norm_house))
+app.include_router(nearby.build_router(db, rate_limit, client_ip, require_admin, locate_house, survey.norm_house, claim_media))
 app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media, staff.SOIS, staff.ZONES["main_road"]))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 @app.middleware("http")

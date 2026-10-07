@@ -14,7 +14,7 @@ import math
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -67,6 +67,7 @@ class NearbyCreate(BaseModel):
     phone: str = Field("", max_length=60)  # phone or LINE id; asks need one, hidden until someone offers help
     hours: Optional[int] = Field(None, ge=1, le=168)
     to_office: bool = False  # alerts: also put it on the soi issue list for the office
+    media_ids: List[str] = Field(default_factory=list, max_length=2)  # 7 Oct: a photo or a short clip
 
 
 class HelpBody(BaseModel):
@@ -79,7 +80,7 @@ class AlertBody(BaseModel):
     still: bool  # True: still there (+1) · False: gone / fixed
 
 
-def build_router(db, rate_limit, client_ip, require_admin, locate_house, norm_house) -> APIRouter:
+def build_router(db, rate_limit, client_ip, require_admin, locate_house, norm_house, claim_media=None) -> APIRouter:
     router = APIRouter(prefix="/api")
 
     async def where(house: str):
@@ -124,8 +125,10 @@ def build_router(db, rate_limit, client_ip, require_admin, locate_house, norm_ho
             raise HTTPException(422, "เขียนสั้นๆ ว่าเรื่องอะไร")
         h, loc = await where(body.house)
         key, t = secrets.token_urlsafe(18), now()
+        nid = str(uuid.uuid4())
         doc = {
-            "id": str(uuid.uuid4()),
+            "id": nid,
+            "media": await claim_media(body.media_ids, f"nearby:{nid}", {"image", "video"}) if claim_media and body.media_ids else [],
             "kind": body.kind,
             "topic": body.topic,
             "label": topic[0],

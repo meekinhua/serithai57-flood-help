@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { api, load, save } from "../api";
+import MediaPicker, { mediaState } from "./MediaPicker";
 import { PRICING, REPAIR_SERVICE_ORDER, SERVICE_CATEGORIES, categoryOf, paymentBadge, timeAgo } from "../config";
 
 // Repair mode lists the after-flood trades first and hides the flood-only ones (boats, food, pets...).
@@ -77,8 +78,7 @@ function ServiceCard({ s, admin, onChanged, onDeleted, repair }) {
     }
   }
 
-  const toggleAvailable = () =>
-    run(async () => onChanged(await api(`/services/${s.id}`, { method: "PATCH", headers: { "X-Edit-Key": editKey }, body: JSON.stringify({ available: !s.available }) })));
+  const toggleAvailable = () => run(async () => onChanged(await api(`/services/${s.id}`, { method: "PATCH", headers: { "X-Edit-Key": editKey }, body: JSON.stringify({ available: !s.available }) })));
 
   const removeOwn = () =>
     run(async () => {
@@ -121,7 +121,10 @@ function ServiceCard({ s, admin, onChanged, onDeleted, repair }) {
             </span>
           </div>
           <p className="mt-0.5 break-words text-lg font-bold leading-snug">{s.name}</p>
-          <p className="text-sm text-neutral-600">{catText}{s.area && ` · ${s.area}`}</p>
+          <p className="text-sm text-neutral-600">
+            {catText}
+            {s.area && ` · ${s.area}`}
+          </p>
           {s.detail && <p className="mt-1 whitespace-pre-wrap break-words">{s.detail}</p>}
           <p className="mt-1 font-semibold">
             {pricing.badge} {s.pricing === "paid" && s.price ? s.price : pricing.label}
@@ -199,14 +202,26 @@ export function ServiceBoard({ services, setServices, posts, admin, initial = {}
 
   return (
     <div className="space-y-3">
-      {!repair && <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1" role="tablist">
-        <button role="tab" aria-selected={tab === "providers"} onClick={() => setTab("providers")} className={`min-h-[44px] rounded-lg text-sm font-semibold ${tab === "providers" ? "bg-white shadow" : "text-neutral-600"}`}>
-          📇 คนรับจ้าง / ให้บริการ ({services.length + paidOffers.length})
-        </button>
-        <button role="tab" aria-selected={tab === "hiring"} onClick={() => setTab("hiring")} className={`min-h-[44px] rounded-lg text-sm font-semibold ${tab === "hiring" ? "bg-white shadow" : "text-neutral-600"}`}>
-          🙋 คนกำลังหาคนจ้าง ({paidNeeds.length})
-        </button>
-      </div>}
+      {!repair && (
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1" role="tablist">
+          <button
+            role="tab"
+            aria-selected={tab === "providers"}
+            onClick={() => setTab("providers")}
+            className={`min-h-[44px] rounded-lg text-sm font-semibold ${tab === "providers" ? "bg-white shadow" : "text-neutral-600"}`}
+          >
+            📇 คนรับจ้าง / ให้บริการ ({services.length + paidOffers.length})
+          </button>
+          <button
+            role="tab"
+            aria-selected={tab === "hiring"}
+            onClick={() => setTab("hiring")}
+            className={`min-h-[44px] rounded-lg text-sm font-semibold ${tab === "hiring" ? "bg-white shadow" : "text-neutral-600"}`}
+          >
+            🙋 คนกำลังหาคนจ้าง ({paidNeeds.length})
+          </button>
+        </div>
+      )}
 
       {tab === "providers" ? (
         <>
@@ -301,15 +316,18 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
   const [self, setSelf] = useState(!repair); // repair mode: most people list a tradesman they used, not themselves
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [files, setFiles] = useState([]); // photos of the shop / the work
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   async function submit(e) {
     e.preventDefault();
     if (!form.category) return setError("กรุณาเลือกประเภทบริการ");
+    if (mediaState(files).busy) return setError("รอรูปอัปโหลดเสร็จก่อน");
     setBusy(true);
     setError("");
     try {
-      const body = repair && !self ? { ...form, detail: `${form.detail}${form.detail ? " · " : ""}เพื่อนบ้านแนะนำ` } : form;
+      const base = { ...form, media_ids: mediaState(files).ids };
+      const body = repair && !self ? { ...base, detail: `${form.detail}${form.detail ? " · " : ""}เพื่อนบ้านแนะนำ` } : base;
       const s = await api("/services", { method: "POST", body: JSON.stringify(body) });
       save("serviceKeys", { ...load("serviceKeys", {}), [s.id]: s.edit_key });
       if (self) save("contact", { ...load("contact", {}), name: form.name, phone: form.phone });
@@ -324,12 +342,25 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
     <form onSubmit={submit} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className={label} htmlFor="svc-name">{repair ? "ชื่อช่าง หรือ ชื่อร้าน *" : "ชื่อ / ชื่อร้าน *"}</label>
+          <label className={label} htmlFor="svc-name">
+            {repair ? "ชื่อช่าง หรือ ชื่อร้าน *" : "ชื่อ / ชื่อร้าน *"}
+          </label>
           <input id="svc-name" required maxLength={80} value={form.name} onChange={(e) => set({ name: e.target.value })} className={input} />
         </div>
         <div>
-          <label className={label} htmlFor="svc-phone">{repair ? "เบอร์โทร หรือ LINE / ชื่อ Facebook *" : "เบอร์โทร *"}</label>
-          <input id="svc-phone" required type={repair ? "text" : "tel"} inputMode={repair ? "text" : "tel"} maxLength={40} value={form.phone} onChange={(e) => set({ phone: e.target.value })} className={input} />
+          <label className={label} htmlFor="svc-phone">
+            {repair ? "เบอร์โทร หรือ LINE / ชื่อ Facebook *" : "เบอร์โทร *"}
+          </label>
+          <input
+            id="svc-phone"
+            required
+            type={repair ? "text" : "tel"}
+            inputMode={repair ? "text" : "tel"}
+            maxLength={40}
+            value={form.phone}
+            onChange={(e) => set({ phone: e.target.value })}
+            className={input}
+          />
         </div>
       </div>
       <fieldset>
@@ -350,8 +381,18 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
         </div>
       </fieldset>
       <div>
-        <label className={label} htmlFor="svc-detail">รายละเอียดบริการ</label>
-        <textarea id="svc-detail" rows={3} maxLength={500} value={form.detail} onChange={(e) => set({ detail: e.target.value })} className={input} placeholder="เช่น กระบะยกสูง 1 คัน รับส่งคน/ของ เข้า-ออกหมู่บ้าน ถึงถนนเสรีไทย" />
+        <label className={label} htmlFor="svc-detail">
+          รายละเอียดบริการ
+        </label>
+        <textarea
+          id="svc-detail"
+          rows={3}
+          maxLength={500}
+          value={form.detail}
+          onChange={(e) => set({ detail: e.target.value })}
+          className={input}
+          placeholder="เช่น กระบะยกสูง 1 คัน รับส่งคน/ของ เข้า-ออกหมู่บ้าน ถึงถนนเสรีไทย"
+        />
       </div>
       <fieldset>
         <legend className={label}>ค่าบริการ</legend>
@@ -374,11 +415,15 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
       </fieldset>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className={label} htmlFor="svc-area">พื้นที่ให้บริการ</label>
+          <label className={label} htmlFor="svc-area">
+            พื้นที่ให้บริการ
+          </label>
           <input id="svc-area" maxLength={100} value={form.area} onChange={(e) => set({ area: e.target.value })} className={input} placeholder="เช่น ในหมู่บ้าน, ทั่วบึงกุ่ม" />
         </div>
         <div>
-          <label className={label} htmlFor="svc-line">LINE ID (ไม่บังคับ)</label>
+          <label className={label} htmlFor="svc-line">
+            LINE ID (ไม่บังคับ)
+          </label>
           <input id="svc-line" maxLength={40} value={form.line_id} onChange={(e) => set({ line_id: e.target.value })} className={input} />
         </div>
       </div>
@@ -390,6 +435,10 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
       )}
       <p className="text-sm text-neutral-500">ชื่อ เบอร์ และ LINE จะแสดงให้ทุกคนเห็น</p>
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
+      <div>
+        <p className="mb-1 font-medium">รูปร้าน / ผลงาน (ไม่บังคับ · ช่วยให้คนเลือกง่ายขึ้น)</p>
+        <MediaPicker items={files} setItems={setFiles} max={3} />
+      </div>
       <button type="submit" disabled={busy} className="min-h-[52px] w-full rounded-xl bg-black text-lg font-semibold text-white disabled:opacity-60">
         {busy ? "กำลังส่ง…" : repair ? "ลงให้เพื่อนบ้านเห็น" : "📇 ลงชื่อในบอร์ดติดต่อ"}
       </button>
@@ -433,16 +482,33 @@ function Reviews({ s, onChanged }) {
       {form && (
         <form onSubmit={send} className="mt-2 space-y-2">
           <div className="grid grid-cols-2 gap-2">
-            {[[true, "👍 ดี แนะนำ"], [false, "👎 ไม่แนะนำ"]].map(([v, t]) => (
-              <button type="button" key={t} onClick={() => setForm({ ...form, good: v })} aria-pressed={form.good === v} className={`min-h-[44px] rounded-lg border-2 font-semibold ${form.good === v ? "border-black bg-black text-white" : "border-neutral-300 bg-white"}`}>
+            {[
+              [true, "👍 ดี แนะนำ"],
+              [false, "👎 ไม่แนะนำ"],
+            ].map(([v, t]) => (
+              <button
+                type="button"
+                key={t}
+                onClick={() => setForm({ ...form, good: v })}
+                aria-pressed={form.good === v}
+                className={`min-h-[44px] rounded-lg border-2 font-semibold ${form.good === v ? "border-black bg-black text-white" : "border-neutral-300 bg-white"}`}
+              >
                 {t}
               </button>
             ))}
           </div>
           <input required maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={input} placeholder="ชื่อเล่นของคุณ" />
-          <input maxLength={200} value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} className={input} placeholder="เช่น มาตรงเวลา ราคา 800 ล้างแอร์ 2 เครื่อง งานเรียบร้อย" />
+          <input
+            maxLength={200}
+            value={form.text}
+            onChange={(e) => setForm({ ...form, text: e.target.value })}
+            className={input}
+            placeholder="เช่น มาตรงเวลา ราคา 800 ล้างแอร์ 2 เครื่อง งานเรียบร้อย"
+          />
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setForm(null)} className="min-h-[44px] rounded-lg border-2 border-black">ยกเลิก</button>
+            <button type="button" onClick={() => setForm(null)} className="min-h-[44px] rounded-lg border-2 border-black">
+              ยกเลิก
+            </button>
             <button className="min-h-[44px] rounded-lg bg-black font-bold text-white">ส่ง</button>
           </div>
         </form>

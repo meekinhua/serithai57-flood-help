@@ -5,6 +5,7 @@ import Nearby from "./Nearby";
 import { useT } from "./Texts";
 import { MYHOME_CHANGED, cleanHouse } from "./SurveyBox";
 import { PRO_GROUPS, rememberCall } from "./Community";
+import { MediaThumb } from "./MediaGallery";
 import { AidRow, CheckinCard, InstallCard, OutageRow, PlanRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
 import { waterOf } from "../config";
 
@@ -147,6 +148,7 @@ function ProsPick({ services, cats, title, none, all, add, onAll }) {
             const good = x.good || 0;
             return (
               <li key={x.id} className="flex items-center gap-3 rounded-xl bg-white p-3">
+                <MediaThumb media={x.media || []} />
                 <div className="min-w-0 flex-1">
                   <b className="block text-base leading-snug">{x.name}</b>
                   {x.detail && <p className="line-clamp-1 text-sm text-[#33403A]">{x.detail}</p>}
