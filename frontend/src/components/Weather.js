@@ -185,7 +185,7 @@ export function WeatherTopBar({ weather, onOpen }) {
 }
 
 // 7 Oct: the bottom bar's weather — one line, warning colours when there is a warning, opens the weather sheet
-export function WeatherChip({ weather, onOpen, extra }) {
+export function WeatherChip({ weather, onOpen, viewers }) {
   const c = weather?.current;
   const alerts = weather?.alerts || [];
   const level = alerts.some((a) => a.level === "danger") ? "danger" : alerts.length ? "warning" : "ok";
@@ -202,10 +202,16 @@ export function WeatherChip({ weather, onOpen, extra }) {
           <b>{Math.round(c.temp)}°</b>
           <span className="truncate">{c.text}</span>
           {level !== "ok" && <span className="shrink-0 rounded bg-black/20 px-1.5 text-xs font-bold">⚠️ {alerts.length}</span>}
-          {extra && <span className="ml-auto hidden shrink-0 text-xs opacity-80 min-[420px]:inline">{extra}</span>}
         </>
       ) : (
         <span className="truncate">🌦️ อากาศ</span>
+      )}
+      {viewers > 0 && (
+        <span className="ml-auto flex shrink-0 items-center gap-1 rounded-full bg-black/25 px-2 py-0.5 text-xs font-bold" aria-label={`${viewers} คนกำลังดูอยู่`}>
+          <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" aria-hidden="true" />
+          {viewers.toLocaleString("th-TH")}
+          <span className="hidden min-[420px]:inline">คนดูอยู่</span>
+        </span>
       )}
     </button>
   );

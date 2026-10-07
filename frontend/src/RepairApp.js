@@ -389,7 +389,7 @@ export default function RepairApp() {
               <img src={`${process.env.PUBLIC_URL}/logo-mark.png`} alt="" className="h-full w-full object-contain" />
             </button>
             <WaterPill water={water} canal={canal} onOpen={openWater} />
-            <WeatherChip weather={weather} onOpen={() => setSheet({ type: "weather" })} extra={online && viewers > 1 ? `👀 ${viewers.toLocaleString("th-TH")} คนดูอยู่` : ""} />
+            <WeatherChip weather={weather} onOpen={() => setSheet({ type: "weather" })} viewers={online ? viewers : 0} />
             <button onClick={share} aria-label="แชร์ลิงก์" className="min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-white/10 px-3 active:bg-white/20">
               🔗
             </button>
