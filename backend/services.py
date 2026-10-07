@@ -54,6 +54,7 @@ class ServiceUpdate(BaseModel):
 
 
 class ServiceAdminUpdate(BaseModel):
+    category: Optional[str] = None
     verified: Optional[bool] = None
     pinned: Optional[bool] = None
     media_ids: Optional[list[str]] = Field(None, max_length=3)
@@ -149,6 +150,8 @@ def build_router(db, rate_limit, require_admin, audit, client_ip, claim_media=No
 
     @router.patch("/admin/services/{service_id}")
     async def admin_update_service(service_id: str, body: ServiceAdminUpdate, admin: dict = Depends(require_admin)):
+        if body.category is not None and body.category not in SERVICE_CATEGORIES:
+            raise HTTPException(422, "หมวดไม่ถูกต้อง")
         changes = {k: v for k, v in body.model_dump(exclude={"media_ids"}).items() if v is not None}
         if body.media_ids is not None:
             changes["media"] = await swap_media(service_id, body.media_ids)

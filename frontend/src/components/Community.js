@@ -21,7 +21,7 @@ export const PRO_GROUPS = [
   { key: "junk", label: "ขนขยะ", cats: ["junk", "porter", "truck"] },
   { key: "build", label: "ช่างไม้ ทาสี", cats: ["carpenter", "painter", "roof", "pest"] },
   { key: "car", label: "ซักพรม ซ่อมรถ", cats: ["vehicle", "rental", "boat"] },
-  { key: "shop", label: "ร้านในหมู่บ้าน", cats: ["shop", "food", "supplies", "beauty", "tutor", "pets"] },
+  { key: "shop", label: "ร้านค้า · บริษัท", cats: ["shop", "food", "supplies", "beauty", "tutor", "pets"] },
 ];
 const groupOf = (cat) => PRO_GROUPS.find((g) => g.cats.includes(cat));
 
@@ -100,7 +100,7 @@ export function ProsQuick({ services, onOpen, look }) {
         หาช่าง ร้าน เช่น แอร์ ปั๊ม ขนขยะ
       </button>
       <div className="-mx-3 mt-2 flex gap-2 overflow-x-auto px-3 pb-1">
-        {PRO_GROUPS.map((g) => (
+        {PRO_GROUPS.filter((g) => count(g)).map((g) => (
           <button
             key={g.key}
             onClick={() => onOpen(g.key)}
@@ -131,7 +131,7 @@ export function CommunityIntro({ services, onGroup, onAll, onNeed, onOffer, onAs
         <div>
           <h3 className="mb-2 text-lg font-bold">หาเบอร์ช่าง / ร้าน</h3>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-            {PRO_GROUPS.map((g) => (
+            {PRO_GROUPS.filter((g) => counts[g.key]).map((g) => (
               <button
                 key={g.key}
                 onClick={() => onGroup(g.key)}
@@ -394,7 +394,7 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
         />
       </label>
       <div className="flex flex-wrap gap-2">
-        {[{ key: "", label: "ทั้งหมด" }, ...PRO_GROUPS].map((x) => (
+        {[{ key: "", label: "ทั้งหมด" }, ...PRO_GROUPS.filter((x) => x.key === group || services.some((s) => x.cats.includes(s.category)))].map((x) => (
           <button
             key={x.key || "all"}
             onClick={() => setGroup(x.key)}
