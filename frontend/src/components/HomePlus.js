@@ -284,13 +284,13 @@ export function AidRow({ info, onChanged, setErr }) {
     );
   };
   return (
-    <div id="myhome-aid" className="-mx-4 border-y-2 border-[#E0A100] bg-gradient-to-b from-[#FFF1C2] to-[#FFFBEA] px-4 py-4">
+    <div id="myhome-aid" className="card card-gold p-3">
       <button onClick={() => toggleBox(!boxOpen)} aria-expanded={boxOpen} className="flex w-full items-center gap-3 text-left">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#E0A100] text-2xl shadow-sm" aria-hidden="true">
+        <span className="ic ic-gold" aria-hidden="true">
           💰
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-lg font-bold leading-tight text-[#15201A]">เงินเยียวยาน้ำท่วม ที่บ้านคุณขอได้</p>
+          <p className="text-base font-bold leading-snug text-[#15201A]">เงินเยียวยาน้ำท่วม ที่บ้านคุณขอได้</p>
           {(() => {
             const todo = claim.filter((a) => a.mine !== "applied");
             const next = todo.filter((a) => a.deadline && days(a.deadline) >= 0).sort((x, y) => x.deadline.localeCompare(y.deadline))[0];
@@ -302,7 +302,7 @@ export function AidRow({ info, onChanged, setErr }) {
             );
           })()}
         </div>
-        <span className="shrink-0 rounded-full bg-white/80 px-3 py-1.5 text-sm font-bold text-[#7A4104]">{boxOpen ? "หุบ ▴" : "ดู ▾"}</span>
+        <span className="shrink-0 text-[15px] font-bold text-[#7A4104]">{boxOpen ? "หุบ ▴" : "ดู ▾"}</span>
       </button>
       {boxOpen && (
         <div className="anim-in">

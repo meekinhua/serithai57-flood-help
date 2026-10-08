@@ -97,12 +97,17 @@ function WaterRow({ info, water, onAsk, sent, onTap }) {
   );
 }
 
-function Row({ icon, title, children, hi, onFold, id }) {
+function Row({ icon, title, children, hi, onFold, id, card }) {
   return (
-    <div id={id} className={`border-t border-[#E6EBE7] py-3 ${hi ? "-mx-4 bg-[#FFF8E1] px-4" : ""}`}>
-      <div className="flex items-start gap-2">
-        <p className="min-w-0 flex-1 text-base font-bold text-[#15201A]">
-          {icon && <span aria-hidden="true">{icon} </span>}
+    <div id={id} className={card ? `card mt-2 p-3 ${card === "hero" ? "card-hero" : ""}` : `border-t border-[#E6EBE7] py-3 ${hi ? "-mx-4 bg-[#FFF8E1] px-4" : ""}`}>
+      <div className={`flex gap-2 ${card ? "items-center" : "items-start"}`}>
+        {card && icon && (
+          <span className="ic ic-sm ic-green" aria-hidden="true">
+            {icon}
+          </span>
+        )}
+        <p className="min-w-0 flex-1 text-base font-bold leading-snug text-[#15201A]">
+          {!card && icon && <span aria-hidden="true">{icon} </span>}
           {title}
         </p>
         {onFold && (
@@ -150,10 +155,11 @@ function Slides({ items, foldKey, icon, title, slide, onOpen, onAll, allLabel = 
     return () => clearTimeout(t);
   }, [folded, mini, n, i, paused]);
   if (!n) return null;
-  const C =
-    tone === "red"
-      ? { box: "border-[#E0A100] bg-[#FFF8E1]", line: "border-[#E0C27A] bg-[#FFFBEF]", ink: "text-[#7A1A12]" }
-      : { box: "border-[#E0A100] bg-[#FFF8E1]", line: "border-[#E0C27A] bg-[#FFFBEF]", ink: "text-[#7A4104]" };
+  const C = { red: { tile: "ic-red", ink: "text-[#B42318]", dot: "bg-[#B42318]" }, green: { tile: "ic-green", ink: "text-[#1E6B47]", dot: "bg-[#1E6B47]" } }[tone] || {
+    tile: "ic-amber",
+    ink: "text-[#7A4104]",
+    dot: "bg-[#7A4104]",
+  };
   const fold = () => {
     save(store, key);
     setFolded(true);
@@ -167,7 +173,7 @@ function Slides({ items, foldKey, icon, title, slide, onOpen, onAll, allLabel = 
   if (folded && mini)
     return (
       <div
-        className={`anim-shrink mt-2 flex min-h-[64px] w-full items-center gap-2 overflow-hidden rounded-2xl border p-1.5 pr-2 ${C.line}`}
+        className="card anim-shrink mt-2 flex min-h-[64px] w-full items-center gap-2 overflow-hidden p-2 pr-3"
         onTouchStart={() => setPaused(true)}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
@@ -189,9 +195,11 @@ function Slides({ items, foldKey, icon, title, slide, onOpen, onAll, allLabel = 
           setManual(true);
           setI(0);
         }}
-        className={`anim-shrink mt-2 flex min-h-[48px] w-full items-center gap-2 rounded-2xl border px-3 text-left text-[15px] ${C.line}`}
+        className="card anim-shrink mt-2 flex min-h-[56px] w-full items-center gap-2.5 p-2 pr-3 text-left text-[15px]"
       >
-        <span aria-hidden="true">{icon}</span>
+        <span className={`ic ic-sm ${C.tile}`} aria-hidden="true">
+          {icon}
+        </span>
         <span className="min-w-0 flex-1 truncate">
           <b>{title(n)}</b> · {(items[0].title || items[0].detail || "").slice(0, 36)}
         </span>
@@ -199,31 +207,32 @@ function Slides({ items, foldKey, icon, title, slide, onOpen, onAll, allLabel = 
       </button>
     );
   return (
-    <div className={`anim-in mt-2 rounded-2xl border-2 p-3 ${C.box}`} onTouchStart={() => setPaused(true)} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+    <div className="card anim-in mt-2 p-3" onTouchStart={() => setPaused(true)} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       <div className="flex items-center gap-2">
-        <b className="min-w-0 flex-1 text-base leading-snug">
-          {icon} {title(n)}
-        </b>
+        <span className={`ic ic-sm ${C.tile}`} aria-hidden="true">
+          {icon}
+        </span>
+        <b className="min-w-0 flex-1 text-base leading-snug">{title(n)}</b>
         <button onClick={fold} className="min-h-[40px] shrink-0 text-sm font-bold text-[#45504A] underline">
           ย่อ ▴
         </button>
       </div>
-      <button key={x.id} onClick={() => onOpen(x.id)} className="anim-in mt-1.5 block min-h-[76px] w-full rounded-xl bg-white p-3 text-left shadow-sm">
+      <button key={x.id} onClick={() => onOpen(x.id)} className="anim-in mt-2 block min-h-[76px] w-full rounded-xl bg-[#F7F8F6] p-3 text-left">
         {slide(x)}
       </button>
       <div className="mt-2 flex items-center gap-2">
         {n > 1 && (
-          <button onClick={() => setI((v) => (v - 1 + n) % n)} aria-label="ก่อนหน้า" className="min-h-[40px] min-w-[40px] rounded-full bg-white text-lg">
+          <button onClick={() => setI((v) => (v - 1 + n) % n)} aria-label="ก่อนหน้า" className="min-h-[40px] min-w-[40px] rounded-full bg-[#F2F4F1] text-lg">
             ‹
           </button>
         )}
         <span className="flex flex-1 justify-center gap-1.5" aria-hidden="true">
           {items.map((y, k) => (
-            <span key={y.id} className={`h-2 rounded-full transition-all ${k === i ? `w-5 ${tone === "red" ? "bg-[#B42318]" : "bg-[#7A4104]"}` : "w-2 bg-[#E0C27A]"}`} />
+            <span key={y.id} className={`h-2 rounded-full transition-all ${k === i ? `w-5 ${C.dot}` : "w-2 bg-[#D5DBD6]"}`} />
           ))}
         </span>
         {n > 1 && (
-          <button onClick={() => setI((v) => (v + 1) % n)} aria-label="ถัดไป" className="min-h-[40px] min-w-[40px] rounded-full bg-white text-lg">
+          <button onClick={() => setI((v) => (v + 1) % n)} aria-label="ถัดไป" className="min-h-[40px] min-w-[40px] rounded-full bg-[#F2F4F1] text-lg">
             ›
           </button>
         )}
@@ -407,7 +416,7 @@ function ElectricRound({ info, setErr, onActive, onEditSoi }) {
   }
   if (done && !edit)
     return (
-      <Row id="myhome-electric-round" icon="⚡" title={`ตรวจไฟฟรี ${s.round_label}`}>
+      <Row id="myhome-electric-round" icon="⚡" title={`ตรวจไฟฟรี ${s.round_label}`} card>
         <div className="anim-in flex items-center gap-2 rounded-2xl bg-[#E4F0E9] p-3">
           <span className="text-2xl" aria-hidden="true">
             ✅
@@ -423,7 +432,7 @@ function ElectricRound({ info, setErr, onActive, onEditSoi }) {
       </Row>
     );
   return (
-    <Row id="myhome-electric-round" icon="⚡" title={`ตรวจไฟฟรี ${s.round_label} · บ้าน ${info.house} ยืนยันคิวเลย`} hi>
+    <Row id="myhome-electric-round" icon="⚡" title={`ตรวจไฟฟรี ${s.round_label} · บ้าน ${info.house} ยืนยันคิวเลย`} card="hero">
       <div className="space-y-2">
         {s.teams.map((t) => {
           const on = f.teams.includes(t.key);
@@ -614,10 +623,10 @@ function Soon({ items, onSeen }) {
   };
   return (
     <div className="mt-2 space-y-2" role="status">
-      <p className="text-sm font-bold text-[#7A4104]">{t("myhome.soon.title", "เร็วๆ นี้ที่บ้านคุณ")}</p>
+      <p className="text-sm font-bold text-[#45504A]">{t("myhome.soon.title", "เร็วๆ นี้ที่บ้านคุณ")}</p>
       {shown.map((x) => (
-        <div key={x.id} className="flex items-center gap-3 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] p-3">
-          <span className="text-2xl" aria-hidden="true">
+        <div key={x.id} className="card flex items-center gap-3 p-3">
+          <span className="ic ic-amber" aria-hidden="true">
             {x.icon}
           </span>
           <div className="min-w-0 flex-1">
@@ -984,7 +993,7 @@ function WasteDays({ days }) {
     <span key={d}>
       {i > 0 && " · "}
       {d === today ? (
-        <span className="rounded-md bg-[#E4F0E9] px-1.5 text-lg font-extrabold text-[#154D33]">
+        <span className="whitespace-nowrap rounded-md bg-[#E4F0E9] px-1.5 text-lg font-extrabold text-[#154D33]">
           {d} <span className="text-xs font-bold">วันนี้</span>
         </span>
       ) : d === tomorrow ? (
@@ -1405,9 +1414,9 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
             mini={(x) => (
               <>
                 {x.media?.[0] ? (
-                  <img src={mediaUrl(x.media[0].id, "thumb")} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                  <img src={mediaUrl(x.media[0].id, "thumb")} alt="" className="h-12 w-12 shrink-0 rounded-xl bg-[#FDE8E6] object-cover" />
                 ) : (
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-2xl" aria-hidden="true">
+                  <span className="ic ic-red h-12 w-12" aria-hidden="true">
                     {{ dog: "🐕", cat: "🐈", pet: "🐾", document: "📄", vehicle: "🛵" }[x.category] || "🎒"}
                   </span>
                 )}
@@ -1444,6 +1453,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
             items={[...needs].sort((x, y) => fits(y) - fits(x))}
             foldKey="needs"
             startFolded
+            tone="green"
             icon="🙋"
             title={(n) => `เพื่อนบ้านขอแรงอยู่ ${n} เรื่อง`}
             onOpen={(id) => onNeeds(id)}
@@ -1456,7 +1466,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
                   {fits(j) ? <b className="ml-1 rounded-full bg-[#1E6B47] px-2 text-xs text-white">🤝 ตรงกับที่คุณถนัด</b> : null}
                 </span>
                 <span className="line-clamp-2 block text-[16px] font-bold leading-snug">{j.detail}</span>
-                <span className="mt-0.5 block text-sm font-bold text-[#7A4104]">ช่วยได้? ดูและติดต่อ ›</span>
+                <span className="mt-0.5 block text-sm font-bold text-[#1E6B47]">ช่วยได้? ดูและติดต่อ ›</span>
               </>
             )}
           />
@@ -1469,7 +1479,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
           />
-          <div className="mt-3">
+          <div className="mt-2">
             <AidRow info={info} onChanged={reload} setErr={setErr} />
           </div>
           <PetsRow house={info.house} setErr={setErr} onLostPosted={onLostPosted} onOpenLost={onLost} />

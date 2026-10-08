@@ -295,3 +295,15 @@ details[open] > :not(summary) { animation: row-in 0.25s ease-out backwards; }
 }
 .slide-in-x { animation: slide-in-x 0.35s ease-out backwards; }
 @media (prefers-reduced-motion: reduce) { .slide-in-x { animation: none; } }
+
+/* 8 Oct: one card for everything stacked under บ้านฉัน. White, thin line; the colour lives only in the icon tile:
+   red = หาย·เจอ / urgent, green = act or help (ขอแรง, ตรวจไฟ), amber = notice (รถขยะ), gold = money (เยียวยา) */
+.card { border-radius: 1rem; border: 1px solid #E3E7E2; background: #fff; box-shadow: 0 1px 2px rgba(21, 32, 26, 0.06); }
+.card-hero { border: 2px solid #1E6B47; }
+.card-gold { border-color: #E9CF7E; background: linear-gradient(180deg, #FFF8E3 0%, #fff 100%); }
+.ic { display: flex; flex-shrink: 0; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: 0.875rem; font-size: 1.4rem; line-height: 1; }
+.ic-sm { width: 2.25rem; height: 2.25rem; border-radius: 0.75rem; font-size: 1.15rem; }
+.ic-red { background: #FDE8E6; }
+.ic-green { background: #E4F0E9; }
+.ic-amber { background: #FFF1C9; }
+.ic-gold { background: #FFE39A; }
