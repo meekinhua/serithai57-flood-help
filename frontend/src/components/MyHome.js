@@ -8,6 +8,7 @@ import { MYHOME_CHANGED, cleanHouse } from "./SurveyBox";
 import { PRO_GROUPS, goodOf, rememberCall } from "./Community";
 import PetsRow from "./Pets";
 import { notify } from "../notify";
+import { mediaUrl } from "../media";
 import { MediaStrip, MediaThumb } from "./MediaGallery";
 import { AidRow, CheckinCard, InstallCard, OutageRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
 import { waterOf } from "../config";
@@ -115,35 +116,44 @@ function Row({ icon, title, children, hi, onFold, id }) {
   );
 }
 
-// ---------- 🙋 ขอแรง as a slide show: one ask at a time, then it folds to a line once every ask has been shown ----------
-function NeedsSlides({ needs, fits, onOpen, onHide }) {
-  const key = needs.map((j) => j.id.slice(0, 6)).join(",");
-  const [folded, setFolded] = useState(() => load("needsSeenAll", "") === key); // this set was already shown in full
+// ---------- a slide show card (ขอแรง, หาย·เจอ): one item at a time, folds to a line once every item has been shown ----------
+function Slides({ items, foldKey, icon, title, slide, onOpen, onAll, allLabel = "ดูทั้งหมด ›", tone = "amber" }) {
+  const key = items.map((x) => x.id.slice(0, 6)).join(",");
+  const store = `slidesSeen:${foldKey}`;
+  const [folded, setFolded] = useState(() => load(store, "") === key); // this set was already shown in full
   const [manual, setManual] = useState(false); // opened by hand: stays open, no auto-fold
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
   const seen = useRef(new Set());
   useEffect(() => {
-    setFolded(load("needsSeenAll", "") === key);
+    setFolded(load(store, "") === key);
     setI(0);
     seen.current = new Set();
-  }, [key]);
-  const n = needs.length;
-  const j = needs[Math.min(i, n - 1)];
+  }, [key, store]);
+  const n = items.length;
+  const x = items[Math.min(i, n - 1)];
   useEffect(() => {
-    if (folded || !j) return;
-    seen.current.add(j.id);
+    if (folded || !x) return;
+    seen.current.add(x.id);
     if (paused) return;
     const t = setTimeout(() => {
       if (!manual && seen.current.size >= n) {
-        // everything has been on screen once: step back to one line
-        save("needsSeenAll", key);
+        save(store, key); // everything has been on screen once: step back to one line
         setFolded(true);
-      } else setI((x) => (x + 1) % n);
+      } else setI((v) => (v + 1) % n);
     }, 4500);
     return () => clearTimeout(t);
-  }, [i, folded, paused, manual, n, key, j]);
+  }, [i, folded, paused, manual, n, key, store, x]);
   if (!n) return null;
+  const C =
+    tone === "red"
+      ? { box: "border-[#E0A100] bg-[#FFF8E1]", line: "border-[#E0C27A] bg-[#FFFBEF]", ink: "text-[#7A1A12]" }
+      : { box: "border-[#E0A100] bg-[#FFF8E1]", line: "border-[#E0C27A] bg-[#FFFBEF]", ink: "text-[#7A4104]" };
+  const fold = () => {
+    save(store, key);
+    setFolded(true);
+    setManual(false);
+  };
   if (folded)
     return (
       <button
@@ -152,72 +162,53 @@ function NeedsSlides({ needs, fits, onOpen, onHide }) {
           setManual(true);
           setI(0);
         }}
-        className="anim-shrink mt-2 flex min-h-[48px] w-full items-center gap-2 rounded-2xl border border-[#E0C27A] bg-[#FFFBEF] px-3 text-left text-[15px]"
+        className={`anim-shrink mt-2 flex min-h-[48px] w-full items-center gap-2 rounded-2xl border px-3 text-left text-[15px] ${C.line}`}
       >
-        <span aria-hidden="true">🙋</span>
+        <span aria-hidden="true">{icon}</span>
         <span className="min-w-0 flex-1 truncate">
-          <b>เพื่อนบ้านขอแรง {n} เรื่อง</b> · {needs[0].detail.slice(0, 36)}
+          <b>{title(n)}</b> · {(items[0].title || items[0].detail || "").slice(0, 36)}
         </span>
-        <span className="shrink-0 font-bold text-[#7A4104]">ดู ▾</span>
+        <span className={`shrink-0 font-bold ${C.ink}`}>ดู ▾</span>
       </button>
     );
   return (
-    <div
-      className="anim-in mt-2 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] p-3"
-      onTouchStart={() => setPaused(true)}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-    >
+    <div className={`anim-in mt-2 rounded-2xl border-2 p-3 ${C.box}`} onTouchStart={() => setPaused(true)} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       <div className="flex items-center gap-2">
-        <b className="min-w-0 flex-1 text-base leading-snug">🙋 เพื่อนบ้านขอแรงอยู่ {n} เรื่อง</b>
-        <button
-          onClick={() => {
-            save("needsSeenAll", key);
-            setFolded(true);
-            setManual(false);
-          }}
-          className="min-h-[40px] shrink-0 text-sm font-bold text-[#45504A] underline"
-        >
+        <b className="min-w-0 flex-1 text-base leading-snug">
+          {icon} {title(n)}
+        </b>
+        <button onClick={fold} className="min-h-[40px] shrink-0 text-sm font-bold text-[#45504A] underline">
           ย่อ ▴
         </button>
       </div>
-      {/* the slide: one ask, big enough to read; tap it to open that ask */}
-      <button key={j.id} onClick={() => onOpen(j.id)} className="anim-in mt-1.5 block min-h-[76px] w-full rounded-xl bg-white p-3 text-left shadow-sm">
-        <span className="block text-sm text-[#45504A]">
-          {j.name}
-          {j.soi ? ` · ซ.${j.soi}` : ""}
-          {fits(j) ? <b className="ml-1 rounded-full bg-[#1E6B47] px-2 text-xs text-white">🤝 ตรงกับที่คุณถนัด</b> : null}
-        </span>
-        <span className="line-clamp-2 block text-[16px] font-bold leading-snug">{j.detail}</span>
-        <span className="mt-0.5 block text-sm font-bold text-[#7A4104]">ช่วยได้? ดูและติดต่อ ›</span>
+      <button key={x.id} onClick={() => onOpen(x.id)} className="anim-in mt-1.5 block min-h-[76px] w-full rounded-xl bg-white p-3 text-left shadow-sm">
+        {slide(x)}
       </button>
       <div className="mt-2 flex items-center gap-2">
         {n > 1 && (
-          <button onClick={() => setI((x) => (x - 1 + n) % n)} aria-label="เรื่องก่อนหน้า" className="min-h-[40px] min-w-[40px] rounded-full bg-white text-lg">
+          <button onClick={() => setI((v) => (v - 1 + n) % n)} aria-label="ก่อนหน้า" className="min-h-[40px] min-w-[40px] rounded-full bg-white text-lg">
             ‹
           </button>
         )}
         <span className="flex flex-1 justify-center gap-1.5" aria-hidden="true">
-          {needs.map((x, k) => (
-            <span key={x.id} className={`h-2 rounded-full transition-all ${k === i ? "w-5 bg-[#7A4104]" : "w-2 bg-[#E0C27A]"}`} />
+          {items.map((y, k) => (
+            <span key={y.id} className={`h-2 rounded-full transition-all ${k === i ? `w-5 ${tone === "red" ? "bg-[#B42318]" : "bg-[#7A4104]"}` : "w-2 bg-[#E0C27A]"}`} />
           ))}
         </span>
         {n > 1 && (
-          <button onClick={() => setI((x) => (x + 1) % n)} aria-label="เรื่องถัดไป" className="min-h-[40px] min-w-[40px] rounded-full bg-white text-lg">
+          <button onClick={() => setI((v) => (v + 1) % n)} aria-label="ถัดไป" className="min-h-[40px] min-w-[40px] rounded-full bg-white text-lg">
             ›
           </button>
         )}
       </div>
       <div className="mt-1 flex items-center justify-between">
-        <button onClick={() => onOpen()} className="min-h-[40px] text-[15px] font-bold text-[#7A4104]">
-          ดูทั้งหมด ›
+        <button onClick={() => onAll()} className={`min-h-[40px] text-[15px] font-bold ${C.ink}`}>
+          {allLabel}
         </button>
         <button
           onClick={() => {
-            save("needsSeenAll", key);
-            setFolded(true);
-            setManual(false);
-            onHide && onHide();
+            fold();
+            notify("ย่อไว้แล้ว · กด “ดู ▾” เพื่อเปิดอีกครั้ง");
           }}
           className="min-h-[40px] text-sm font-bold text-[#45504A] underline"
         >
@@ -1053,11 +1044,10 @@ function HandyRow({ house, handy, onSaved, onClose, setErr }) {
   );
 }
 
-export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], onNeeds, onAskHelp, onLost, onLostPosted }) {
+export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], lost = [], onNeeds, onAskHelp, onLost, onLostPosted }) {
   // a ขอแรง ask this house's อาสาข้างบ้าน profile can do (job type → skill)
   const JOB_SKILL = { clean: "strong", move: "strong", trash: "strong", fix: "fix", check: "elec", ride: "drive", errand: "errand" };
   const fits = (j) => (handy?.on && (handy.skills || []).includes(JOB_SKILL[j.type]) ? 1 : 0);
-  const hideNeeds = () => notify("ย่อไว้แล้ว · กด “ดู ▾” เพื่อเปิดอีกครั้ง");
   const fromSurvey = load("survey:electric", null)?.house || "";
   const [house, setHouse] = useState(() => takeFamilyParam() || load("myHouse", "") || fromSurvey);
   const [houses, setHouses] = useState(() => load("myHouses", []));
@@ -1372,7 +1362,50 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         <>
           <CheckinCard info={info} onSaved={setInfo} onContact={() => setContact({ name: load("myName", ""), from: "news" })} setErr={setErr} />
           <Soon items={info.soon} onSeen={() => setSeenN((n) => n + 1)} />
-          {needs.length > 0 && <NeedsSlides needs={[...needs].sort((x, y) => fits(y) - fits(x))} fits={fits} onOpen={onNeeds} onHide={hideNeeds} />}
+          <Slides
+            items={lost}
+            foldKey="lost"
+            icon="🐾"
+            tone="red"
+            title={(n) => `หาย · เจอ ${n} เรื่อง`}
+            onOpen={(id) => onLost(id)}
+            onAll={() => onLost()}
+            slide={(x) => (
+              <span className="flex items-center gap-3">
+                {x.media?.[0] ? (
+                  <img src={mediaUrl(x.media[0].id, "thumb")} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                ) : (
+                  <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#F2F4F1] text-3xl" aria-hidden="true">
+                    {{ dog: "🐕", cat: "🐈", pet: "🐾", document: "📄", vehicle: "🛵" }[x.category] || "🎒"}
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className={`rounded px-1.5 text-xs font-bold text-white ${x.kind === "found" ? "bg-[#1E6B47]" : "bg-[#B42318]"}`}>{x.kind === "found" ? "🙌 มีคนเจอ" : "😢 หาย"}</span>
+                  <span className="mt-0.5 line-clamp-2 block text-[16px] font-bold leading-snug">{x.title}</span>
+                  <span className="block text-sm text-[#45504A]">{[x.soi && `ซ.${x.soi}`, "เห็นไหม? แตะดูเบอร์ ›"].filter(Boolean).join(" · ")}</span>
+                </span>
+              </span>
+            )}
+          />
+          <Slides
+            items={[...needs].sort((x, y) => fits(y) - fits(x))}
+            foldKey="needs"
+            icon="🙋"
+            title={(n) => `เพื่อนบ้านขอแรงอยู่ ${n} เรื่อง`}
+            onOpen={(id) => onNeeds(id)}
+            onAll={() => onNeeds()}
+            slide={(j) => (
+              <>
+                <span className="block text-sm text-[#45504A]">
+                  {j.name}
+                  {j.soi ? ` · ซ.${j.soi}` : ""}
+                  {fits(j) ? <b className="ml-1 rounded-full bg-[#1E6B47] px-2 text-xs text-white">🤝 ตรงกับที่คุณถนัด</b> : null}
+                </span>
+                <span className="line-clamp-2 block text-[16px] font-bold leading-snug">{j.detail}</span>
+                <span className="mt-0.5 block text-sm font-bold text-[#7A4104]">ช่วยได้? ดูและติดต่อ ›</span>
+              </>
+            )}
+          />
           <ElectricRound
             info={info}
             setErr={setErr}

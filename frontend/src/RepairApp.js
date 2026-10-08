@@ -419,6 +419,7 @@ export default function RepairApp() {
         onPros={(g) => openPros(g)}
         onBadge={onHomeBadge}
         needs={needs}
+        lost={lostOpen}
         onNeeds={(id) => goItem("jobs", id)}
         onAskHelp={() => setSheet({ type: "jobForm", kind: "need" })}
         onLost={(id) => goItem("lost", id)}
