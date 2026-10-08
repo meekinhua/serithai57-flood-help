@@ -115,6 +115,117 @@ function Row({ icon, title, children, hi, onFold, id }) {
   );
 }
 
+// ---------- ⚡ this round of free electrical checks, confirmed from บ้านฉัน in one tap (the house is already known) ----------
+function ElectricRound({ info, setErr, onActive }) {
+  const [s, setS] = useState(null);
+  const [st, setSt] = useState(null);
+  const [edit, setEdit] = useState(false);
+  const saved = load(`myContact:${info.house}`, null);
+  const [f, setF] = useState(() => ({ teams: [], confirm: false, name: saved?.name || load("myName", ""), phone: saved?.phone || load("myReach", "") }));
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api("/surveys")
+      .then((l) => {
+        const x = l.find((y) => y.key === "electric" && y.round && (y.teams || []).length);
+        setS(x || null);
+        onActive && onActive(!!x);
+      })
+      .catch(() => {});
+    api(`/surveys/electric/check?house=${encodeURIComponent(info.house)}`)
+      .then((r) => {
+        setSt(r);
+        if (r.teams?.length) setF((v) => ({ ...v, teams: r.teams }));
+      })
+      .catch(() => {});
+  }, [info.house]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!s) return null;
+  const done = st?.signed && st.round === s.round;
+  const label = (k) => (s.teams.find((t) => t.key === k) || {}).label || k;
+  const phoneOk = (f.phone || "").replace(/[^\d]/g, "").length >= 9;
+  async function send() {
+    setErr("");
+    setBusy(true);
+    try {
+      await api("/surveys/electric", {
+        method: "POST",
+        body: JSON.stringify({ house: info.house, soi: info.soi || "", name: f.name, phone: f.phone, picks: st?.picks || [], note: "", teams: f.teams, confirm: true }),
+      });
+      save("myReach", f.phone);
+      if (f.name) save("myName", f.name);
+      setSt({ ...(st || {}), signed: true, round: s.round, teams: f.teams });
+      setEdit(false);
+      window.dispatchEvent(new Event(MYHOME_CHANGED));
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy(false);
+  }
+  if (done && !edit)
+    return (
+      <Row id="myhome-electric-round" icon="⚡" title={`ตรวจไฟฟรี ${s.round_label}`}>
+        <div className="anim-in flex items-center gap-2 rounded-2xl bg-[#E4F0E9] p-3">
+          <span className="text-2xl" aria-hidden="true">
+            ✅
+          </span>
+          <p className="min-w-0 flex-1 text-[15px] leading-snug">
+            <b>ยืนยันคิวแล้ว</b> · {(st.teams || []).map(label).join(" + ")}
+            <span className="block text-sm text-[#33403A]">อยู่บ้านรอเปิดประตู {s.round_label} · ช่างมาถึงแล้วไม่อยู่จะข้ามไป</span>
+          </p>
+          <button onClick={() => setEdit(true)} className="min-h-[40px] shrink-0 text-sm font-bold text-[#45504A] underline">
+            เปลี่ยน
+          </button>
+        </div>
+      </Row>
+    );
+  return (
+    <Row id="myhome-electric-round" icon="⚡" title={`ตรวจไฟฟรี ${s.round_label} · บ้าน ${info.house} ยืนยันคิวเลย`} hi>
+      <div className="space-y-2">
+        {s.teams.map((t) => {
+          const on = f.teams.includes(t.key);
+          return (
+            <button
+              key={t.key}
+              onClick={() => setF({ ...f, teams: on ? f.teams.filter((x) => x !== t.key) : [...f.teams, t.key] })}
+              aria-pressed={on}
+              className={`flex min-h-[60px] w-full items-start gap-3 rounded-2xl border-2 p-3 text-left ${on ? "border-[#1E6B47] bg-[#1E6B47] text-white" : "border-[#C9D1CB] bg-white"}`}
+            >
+              <span className="mt-0.5 text-lg" aria-hidden="true">
+                {on ? "☑" : "☐"}
+              </span>
+              <span className="min-w-0">
+                <b className="block text-base leading-tight">{t.label}</b>
+                {t.desc && <span className={`block text-sm leading-snug ${on ? "text-[#D4EADC]" : "text-[#45504A]"}`}>{t.desc}</span>}
+              </span>
+            </button>
+          );
+        })}
+        <p className="text-sm text-[#45504A]">เลือกทีมเดียวหรือทั้งสองทีมก็ได้</p>
+        {!phoneOk && (
+          <input
+            value={f.phone}
+            onChange={(e) => setF({ ...f, phone: e.target.value })}
+            inputMode="tel"
+            placeholder="เบอร์โทรให้ช่างโทรก่อนเข้า *"
+            className="min-h-[50px] w-full rounded-xl border border-[#A9B4AD] bg-white px-3 text-base"
+          />
+        )}
+        <label className={`flex min-h-[52px] items-center gap-3 rounded-xl border-2 p-3 ${f.confirm ? "border-[#1E6B47] bg-[#E4F0E9]" : "border-[#E0A100] bg-white"}`}>
+          <input type="checkbox" checked={f.confirm} onChange={(e) => setF({ ...f, confirm: e.target.checked })} className="h-5 w-5 accent-[#1E6B47]" />
+          <b className="text-[15px] leading-snug">อยู่บ้านรอเปิดประตู {s.round_label}</b>
+        </label>
+        <button onClick={send} disabled={busy || !f.teams.length || !f.confirm || !phoneOk} className="min-h-[54px] w-full rounded-xl bg-[#1E6B47] text-lg font-bold text-white disabled:opacity-40">
+          {busy ? "กำลังส่ง…" : `✅ ยืนยันคิว บ้าน ${info.house}`}
+        </button>
+        {phoneOk && (
+          <p className="text-sm text-[#45504A]">
+            ช่างจะโทร {f.phone} ก่อนเข้า · ซอย {info.soi || "?"} (จากบ้านเลขที่)
+          </p>
+        )}
+      </div>
+    </Row>
+  );
+}
+
 // ---------- the electrical check: what now for the houses the Ministry team didn't reach ----------
 // 7 Oct: only "still interested" (free) or "not any more" (fine); group / hired are older answers, still shown
 const WANTS = {
@@ -702,6 +813,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const [info, setInfo] = useState(null);
   const [reloadN, setReloadN] = useState(0);
   const [handy, setHandy] = useState(null); // this house's อาสาข้างบ้าน profile
+  const [roundOn, setRoundOn] = useState(false); // a dated electrical round is open: it replaces the old follow-up row
   const [handyOpen, setHandyOpen] = useState(false);
   useEffect(() => {
     if (!house) return;
@@ -872,6 +984,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
                 onChange={(e) => setInput(e.target.value)}
                 inputMode="text"
                 autoComplete="off"
+                id="myhome-house-input"
                 placeholder="เช่น 917"
                 className="min-h-[56px] w-full rounded-xl border-2 border-[#A9B4AD] px-3.5 text-xl focus:border-[#1E6B47] focus:outline-none"
               />
@@ -995,6 +1108,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               </div>
             </div>
           )}
+          <ElectricRound info={info} setErr={setErr} onActive={setRoundOn} />
           <div className="mt-3">
             <AidRow info={info} onChanged={reload} setErr={setErr} />
           </div>
@@ -1074,7 +1188,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               />
             ))}
 
-          {!isFolded("electric") && (
+          {!roundOn && !isFolded("electric") && (
             <ElectricRow
               onFold={() => foldIt("electric")}
               onSent={(w) => (w === "free" ? foldIt("electric") : openIt("electric"))}

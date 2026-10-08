@@ -54,12 +54,21 @@ def now():
     return datetime.now(timezone.utc)
 
 
+class Team(BaseModel):
+    key: str = Field(..., pattern=r"^[a-z0-9]{1,12}$")
+    label: str = Field(..., min_length=1, max_length=60)
+    desc: str = Field("", max_length=200)
+
+
 class Survey(BaseModel):
     key: str = Field(..., pattern=KEY_RE)
     on: bool = False
     title: str = Field(..., min_length=1, max_length=100)
     details: str = Field("", max_length=600)
     options: List[str] = Field(default_factory=list, max_length=15)
+    teams: List[Team] = Field(default_factory=list, max_length=4)  # residents pick one or more; each team has its own job status
+    round: str = Field("", max_length=20)  # the visit day, e.g. "2026-10-10": signing now = confirmed for that day
+    round_label: str = Field("", max_length=40)  # "เสาร์ 10 ต.ค."
 
 
 class TeamEntry(BaseModel):
@@ -84,6 +93,7 @@ class JobUpdate(BaseModel):
     house: str = Field(..., max_length=20)
     status: JobStatus
     note: str = Field("", max_length=300)
+    team: str = Field("", max_length=12)  # "" / the first team = the original `job`; other teams keep jobs.<team>
 
 
 class TechPos(BaseModel):
@@ -100,6 +110,8 @@ class Answer(BaseModel):
     phone: str = Field(..., min_length=9, max_length=20)
     picks: List[str] = Field(default_factory=list, max_length=15)
     note: str = Field("", max_length=300)
+    teams: List[str] = Field(default_factory=list, max_length=4)
+    confirm: bool = False  # "I'll be home to open the door on the day"
 
 
 def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
@@ -125,17 +137,33 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         house = norm_house(house)
         if not HOUSE_RE.match(house):
             raise HTTPException(422, "ใส่บ้านเลขที่แบบ 4/917")
-        r = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0, "updated_at": 1, "picks": 1, "source": 1, "job": 1, "followup": 1})
+        r = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0, "updated_at": 1, "picks": 1, "source": 1, "job": 1, "jobs": 1, "followup": 1, "teams": 1, "round": 1})
         if not r:
             return {"signed": False, "house": house}
         job = r.get("job") or {}
         return {"signed": True, "house": house, "at": r["updated_at"], "picks": r.get("picks", []), "via": "LINE" if r.get("source") == "line" else "เว็บ",
-                "job": {"status": job.get("status", "todo"), "at": job.get("at")}, "want": (r.get("followup") or {}).get("want")}
+                "job": {"status": job.get("status", "todo"), "at": job.get("at")}, "want": (r.get("followup") or {}).get("want"),
+                "teams": r.get("teams", []), "round": r.get("round", ""), "jobs": {k: {"status": v.get("status", "todo")} for k, v in (r.get("jobs") or {}).items()}}
 
     @router.get("/surveys/{key}/progress")
     async def progress(key: str):
         """Public follow-up for everyone: how many houses the technicians have done, per soi (no names, no phones)."""
-        rows = await db.survey_resp.find({"survey": key}, {"_id": 0, "soi": 1, "job": 1, "followup": 1}).to_list(5000)
+        rows = await db.survey_resp.find({"survey": key}, {"_id": 0, "soi": 1, "job": 1, "jobs": 1, "followup": 1, "teams": 1, "round": 1}).to_list(5000)
+        s = next((x for x in await surveys() if x["key"] == key), {}) or {}
+        rnd = None
+        if s.get("round"):
+            first = (s.get("teams") or [{}])[0].get("key")
+            rnd = {"date": s["round"], "label": s.get("round_label", ""), "confirmed": 0, "teams": {t["key"]: {"all": 0, "done": 0} for t in s.get("teams") or []}}
+            for r in rows:
+                if r.get("round") != s["round"]:
+                    continue
+                rnd["confirmed"] += 1
+                for t in r.get("teams", []):
+                    if t in rnd["teams"]:
+                        rnd["teams"][t]["all"] += 1
+                        j = r.get("job") if t == first else (r.get("jobs") or {}).get(t)
+                        if (j or {}).get("status") in ("done", "absent"):
+                            rnd["teams"][t]["done"] += 1
         total = {"all": 0, "todo": 0, "claimed": 0, "done": 0, "absent": 0, "again": 0, "waiting": 0, "free": 0, "no": 0}
         by = {}
         last = None
@@ -160,7 +188,7 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
             if st in ("done", "absent"):
                 b["done"] += 1
         sois = sorted(by.values(), key=lambda b: (int(b["soi"]) if b["soi"].isdigit() else 999, b["soi"]))
-        return {"total": total, "sois": sois, "last": last}
+        return {"total": total, "sois": sois, "last": last, "round": rnd}
 
     @router.post("/surveys/{key}", status_code=201)
     async def answer(key: str, body: Answer, request: Request):
@@ -175,6 +203,12 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         if len(phone) < 9:
             raise HTTPException(422, "ใส่เบอร์โทรให้ครบ")
         picks = [p for p in body.picks if p in s.get("options", [])]
+        team_keys = [t["key"] for t in s.get("teams") or []]
+        teams = [t for t in body.teams if t in team_keys]
+        if team_keys and not teams:
+            raise HTTPException(422, "เลือกทีมช่างอย่างน้อย 1 ทีม")
+        if s.get("round") and not body.confirm:
+            raise HTTPException(422, f"กดยืนยันว่าอยู่บ้านรอเปิดประตู {s.get('round_label') or 'วันนัด'}")
         doc = {
             "survey": key,
             "house": house,
@@ -186,6 +220,11 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
             "ip": hashlib.sha256(client_ip(request).encode()).hexdigest(),
             "updated_at": now(),
         }
+        if team_keys:
+            doc["teams"] = teams
+        if s.get("round"):
+            doc["round"] = s["round"]
+            doc["confirmed_at"] = now()
         # one row per house: signing again replaces the answer
         if key == "electric":
             doc["followup"] = {"want": "free", "slots": [], "note": "", "at": now()}
@@ -284,9 +323,13 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
         house = norm_house(body.house)
         at = now()
         job = {"status": body.status, "tech": who if body.status != "todo" else "", "at": at, "note": body.note.strip()}
+        s = next((x for x in await surveys() if x["key"] == key), {}) or {}
+        first = (s.get("teams") or [{}])[0].get("key")
+        team = body.team if body.team and body.team != first and body.team in [t["key"] for t in s.get("teams") or []] else ""
+        field = f"jobs.{team}" if team else "job"
         res = await db.survey_resp.update_one(
             {"survey": key, "house": house},
-            {"$set": {"job": job}, "$push": {"job_log": {"$each": [{"status": body.status, "by": who, "at": at, "note": job["note"]}], "$slice": -20}}},
+            {"$set": {field: job}, "$push": {"job_log": {"$each": [{"status": body.status, "by": who, "at": at, "note": job["note"], "team": team or first or ""}], "$slice": -30}}},
         )
         if not res.matched_count:
             raise HTTPException(404, f"ไม่มีบ้าน {house} ในรายชื่อ")

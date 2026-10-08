@@ -38,11 +38,30 @@ const mainSoi = (soi) => (String(soi || "").match(/\d+/) || [""])[0];
 const isUrgent = (r) => URGENT.test(`${(r.picks || []).join(" ")} ${r.note || ""}`) || (r.picks || []).includes("ไฟรั่ว / ไฟดูด");
 const time = (iso) => (iso ? new Date(iso).toLocaleString("th-TH", { weekday: "short", hour: "2-digit", minute: "2-digit" }) : "");
 
+// 10 Oct 2026: two teams the same day (military electricians + Q ช่าง). Each team sees the houses that asked for it,
+// with its own status; the first team keeps the original `job`, the others `jobs.<team>`.
+const TEAMS = [
+  ["army", "🪖 ทีมช่างทหาร"],
+  ["q", "🔧 ทีม Q ช่าง"],
+];
+
 export default function TechPage() {
   const [key] = useState(techKey);
+  const [team, setTeam] = useState(() => load("techTeam", ""));
+  const [all, setAll] = useState(null);
   const [me, setMe] = useState(() => load("techName", ""));
   const [nameDraft, setNameDraft] = useState(me);
-  const [rows, setRows] = useState(null);
+  // this team's view: its houses, its own job as `job` (so the rest of the page is unchanged)
+  const rows = useMemo(() => {
+    if (!all) return null;
+    if (!team) return all;
+    const asked = (r) => (r.teams || []).includes(team);
+    return all
+      .filter((r) => asked(r) || (team === "army" && !(r.teams || []).length))
+      .map((r) => ({ ...r, job: team === "army" ? r.job : r.jobs?.[team], confirmed: asked(r) }))
+      .sort((a, b) => b.confirmed - a.confirmed);
+  }, [all, team]);
+  const setRows = (fn) => setAll((rs) => fn(rs));
   const [zones, setZones] = useState(null);
   const [err, setErr] = useState("");
   const [show, setShow] = useState(() => load("techShow", "open")); // open | mine | done | all
@@ -60,7 +79,7 @@ export default function TechPage() {
   const refresh = () =>
     tapi(`/tech/${SURVEY}/jobs`)
       .then((r) => {
-        setRows(r);
+        setAll(r);
         setErr("");
       })
       .catch((e) => setErr(e.message));
@@ -77,8 +96,8 @@ export default function TechPage() {
   async function setStatus(r, status, note = "") {
     setBusy(r.house);
     try {
-      const res = await tapi(`/tech/${SURVEY}/jobs`, { method: "POST", body: JSON.stringify({ house: r.house, status, note }) });
-      setRows((rs) => rs.map((x) => (x.house === r.house ? { ...x, job: res.job } : x)));
+      const res = await tapi(`/tech/${SURVEY}/jobs`, { method: "POST", body: JSON.stringify({ house: r.house, status, note, team }) });
+      setRows((rs) => rs.map((x) => (x.house !== r.house ? x : team && team !== "army" ? { ...x, jobs: { ...(x.jobs || {}), [team]: res.job } } : { ...x, job: res.job })));
     } catch (e) {
       setErr(e.message);
     }
@@ -157,21 +176,55 @@ export default function TechPage() {
       </Shell>
     );
 
+  if (!team)
+    return (
+      <Shell>
+        <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-bold">คุณอยู่ทีมไหน</h2>
+          <p className="text-sm text-neutral-600">แต่ละทีมเห็นเฉพาะบ้านที่ขอทีมนั้น และบันทึกสถานะแยกกัน</p>
+          {TEAMS.map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => {
+                save("techTeam", k);
+                setTeam(k);
+              }}
+              className="min-h-[56px] w-full rounded-xl border-2 border-black text-lg font-bold"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Shell>
+    );
+
   const pct = counts.c.all ? Math.round(((counts.c.done + counts.c.absent) / counts.c.all) * 100) : 0;
   return (
     <Shell
       right={
-        <button
-          onClick={() => {
-            save("techName", "");
-            setNameDraft(me);
-            setMe("");
-          }}
-          title="เปลี่ยนชื่อช่าง"
-          className="rounded-full bg-white/15 px-3 py-1 text-sm"
-        >
-          👷 {me}
-        </button>
+        <span className="flex flex-col items-end gap-1">
+          <button
+            onClick={() => {
+              save("techName", "");
+              setNameDraft(me);
+              setMe("");
+            }}
+            title="เปลี่ยนชื่อช่าง"
+            className="rounded-full bg-white/15 px-3 py-1 text-sm"
+          >
+            👷 {me}
+          </button>
+          <button
+            onClick={() => {
+              save("techTeam", "");
+              setTeam("");
+            }}
+            title="เปลี่ยนทีม"
+            className="rounded-full bg-white/15 px-3 py-0.5 text-xs"
+          >
+            {(TEAMS.find(([k]) => k === team) || ["", team])[1]} ⇄
+          </button>
+        </span>
       }
     >
       {err && <p className="mb-2 rounded-lg bg-red-50 p-2 text-red-700">{err}</p>}
@@ -276,7 +329,7 @@ function Shell({ children, right }) {
       <header className="sticky top-0 z-20 flex items-center justify-between bg-[#0b1622] px-4 py-3 text-white">
         <div>
           <b>⚡ งานช่างไฟ ตรวจบ้านหลังน้ำท่วม</b>
-          <span className="block text-xs text-white/70">หมู่บ้านสหกรณ์เคหะสถาน 4 · จ.–พ. 5–7 ต.ค.</span>
+          <span className="block text-xs text-white/70">หมู่บ้านสหกรณ์เคหะสถาน 4 · เสาร์ 10 ต.ค.</span>
         </div>
         {right}
       </header>
@@ -309,6 +362,12 @@ function Job({ r, me, busy, onStatus }) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <b className="text-lg">{r.house}</b> <span className="text-neutral-600">ซ.{r.soi || "?"}</span>
+          {r.confirmed ? (
+            <span className="ml-1 rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-bold text-white">✅ ยืนยันเสาร์</span>
+          ) : (r.teams || []).length === 0 && r.round === undefined ? (
+            <span className="ml-1 rounded bg-neutral-200 px-1.5 py-0.5 text-xs font-bold text-neutral-700">รอบก่อน · ยังไม่ยืนยัน</span>
+          ) : null}
+          {(r.teams || []).length > 1 && <span className="ml-1 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-bold text-blue-900">ขอทั้ง 2 ทีม</span>}
           {urgent && <span className="ml-1 rounded bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white">ด่วน</span>}
           <span className="block text-sm">{r.name || "—"}</span>
         </div>
