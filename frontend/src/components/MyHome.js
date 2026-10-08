@@ -212,8 +212,16 @@ function NeedsSlides({ needs, fits, onOpen, onHide }) {
         <button onClick={() => onOpen()} className="min-h-[40px] text-[15px] font-bold text-[#7A4104]">
           ดูทั้งหมด ›
         </button>
-        <button onClick={onHide} className="min-h-[40px] text-sm font-bold text-[#45504A] underline">
-          รับทราบแล้ว ซ่อน
+        <button
+          onClick={() => {
+            save("needsSeenAll", key);
+            setFolded(true);
+            setManual(false);
+            onHide && onHide();
+          }}
+          className="min-h-[40px] text-sm font-bold text-[#45504A] underline"
+        >
+          รับทราบแล้ว ย่อไว้
         </button>
       </div>
     </div>
@@ -1046,17 +1054,10 @@ function HandyRow({ house, handy, onSaved, onClose, setErr }) {
 }
 
 export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], onNeeds, onAskHelp, onLost, onLostPosted }) {
-  // the ขอแรง card can be hidden; it comes back only when a new ask appears
-  const [needsHidden, setNeedsHidden] = useState(() => load("needsHidden", []));
   // a ขอแรง ask this house's อาสาข้างบ้าน profile can do (job type → skill)
   const JOB_SKILL = { clean: "strong", move: "strong", trash: "strong", fix: "fix", check: "elec", ride: "drive", errand: "errand" };
   const fits = (j) => (handy?.on && (handy.skills || []).includes(JOB_SKILL[j.type]) ? 1 : 0);
-  const hideNeeds = () => {
-    const ids = needs.map((j) => j.id);
-    setNeedsHidden(ids);
-    save("needsHidden", ids);
-    notify("ซ่อนแล้ว · ดูได้ที่ เพื่อนบ้าน › ขอแรง");
-  };
+  const hideNeeds = () => notify("ย่อไว้แล้ว · กด “ดู ▾” เพื่อเปิดอีกครั้ง");
   const fromSurvey = load("survey:electric", null)?.house || "";
   const [house, setHouse] = useState(() => takeFamilyParam() || load("myHouse", "") || fromSurvey);
   const [houses, setHouses] = useState(() => load("myHouses", []));
@@ -1371,7 +1372,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         <>
           <CheckinCard info={info} onSaved={setInfo} onContact={() => setContact({ name: load("myName", ""), from: "news" })} setErr={setErr} />
           <Soon items={info.soon} onSeen={() => setSeenN((n) => n + 1)} />
-          {needs.some((x) => !needsHidden.includes(x.id)) && <NeedsSlides needs={[...needs].sort((x, y) => fits(y) - fits(x))} fits={fits} onOpen={onNeeds} onHide={hideNeeds} />}
+          {needs.length > 0 && <NeedsSlides needs={[...needs].sort((x, y) => fits(y) - fits(x))} fits={fits} onOpen={onNeeds} onHide={hideNeeds} />}
           <ElectricRound
             info={info}
             setErr={setErr}
