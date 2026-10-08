@@ -354,19 +354,18 @@ function SurveyBox({ s, onCount, look }) {
                 </div>
               )}
               {msg && <p className="rounded-lg bg-red-50 p-2 text-red-700">{msg}</p>}
-              <div className={dup ? "grid grid-cols-2 gap-2" : ""}>
-                {dup && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDup(null);
-                      setOpen(false);
-                    }}
-                    className="min-h-[48px] w-full rounded-xl border-2 border-black font-semibold"
-                  >
-                    ไม่ต้องแล้ว
-                  </button>
-                )}
+              <div className="grid grid-cols-[auto_1fr] gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDup(null);
+                    setMsg("");
+                    setOpen(false);
+                  }}
+                  className="min-h-[48px] rounded-xl border-2 border-black px-4 font-semibold"
+                >
+                  {dup ? "ไม่ต้องแล้ว" : "ยกเลิก"}
+                </button>
                 <button disabled={busy} className={`min-h-[48px] w-full rounded-xl font-bold text-white disabled:opacity-40 ${dup ? "bg-amber-600" : "bg-blue-700"}`}>
                   {busy ? "กำลังส่ง…" : dup ? "ยืนยันแก้ไข" : s.round ? `ยืนยันคิว ${s.round_label || ""}` : "ลงชื่อ"}
                 </button>
