@@ -483,3 +483,77 @@ export function PetAlert({ items, reunited = [], onOpen }) {
     </div>
   );
 }
+
+// ---------- the หาย·เจอ hero at the top of เพื่อนบ้านช่วยกัน: photos first, the happy endings counted, one tap to post ----------
+const ICON = { dog: "🐕", cat: "🐈", pet: "🐾", document: "📄", vehicle: "🛵" };
+export function LostHero({ items, reunited = [], onOpen, onAll, onAdd, onPets }) {
+  const strip = [...items].sort((x, y) => String(y.created_at).localeCompare(String(x.created_at))).slice(0, 8);
+  const happy = [...reunited].sort((x, y) => String(y.updated_at || y.created_at).localeCompare(String(x.updated_at || x.created_at))).slice(0, 3);
+  const nLost = items.filter((x) => x.kind === "lost").length;
+  const nFound = items.filter((x) => x.kind === "found").length;
+  const tiles = [...strip.map((x) => ({ x, home: false })), ...happy.map((x) => ({ x, home: true }))];
+  return (
+    <section className="card mb-3 p-3" aria-label="หาย · เจอ">
+      <div className="flex items-center gap-2.5">
+        <span className="ic ic-red" aria-hidden="true">
+          🐾
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold leading-tight">หาย · เจอ ในหมู่บ้าน</h2>
+          <p className="text-sm text-[#45504A]">
+            {nLost ? <b className="text-[#B42318]">ตามหาอยู่ {nLost}</b> : "ตอนนี้ไม่มีใครตามหา"}
+            {nFound ? ` · มีคนเจอ รอเจ้าของ ${nFound}` : ""}
+            {reunited.length ? <b className="text-[#1E6B47]"> · กลับบ้านแล้ว {reunited.length} 🎉</b> : null}
+          </p>
+        </div>
+        <button onClick={onAll} className="min-h-[44px] shrink-0 text-[15px] font-bold text-[#B42318]">
+          ดูทั้งหมด ›
+        </button>
+      </div>
+      {tiles.length > 0 && (
+        <div className="-mx-3 mt-3 overflow-x-auto px-3 pb-1">
+          <div className="flex w-max snap-x gap-2.5">
+            {tiles.map(({ x, home }) => (
+              <button key={x.id} onClick={() => onOpen(x.id)} className="w-[132px] shrink-0 snap-start text-left">
+                <span className={`relative block h-[112px] overflow-hidden rounded-xl ${home ? "bg-[#E4F0E9]" : "bg-[#FDE8E6]"}`}>
+                  {x.media?.[0] ? (
+                    <img src={mediaUrl(x.media[0].id, "thumb")} alt="" loading="lazy" className={`h-full w-full object-cover ${home ? "opacity-90" : ""}`} />
+                  ) : (
+                    <span className="flex h-full items-center justify-center text-5xl" aria-hidden="true">
+                      {ICON[x.category] || "🎒"}
+                    </span>
+                  )}
+                  <span className={`absolute left-1.5 top-1.5 rounded-md px-1.5 text-xs font-bold text-white ${home ? "bg-[#1E6B47]" : x.kind === "found" ? "bg-[#1E6B47]" : "bg-[#B42318]"}`}>
+                    {home ? "🎉 กลับบ้านแล้ว" : x.kind === "found" ? "🙌 มีคนเจอ" : "😢 หาย"}
+                  </span>
+                </span>
+                <span className="mt-1 line-clamp-2 block text-[15px] font-bold leading-snug">{x.title}</span>
+                <span className="block truncate text-xs text-[#45504A]">{[x.soi && `ซ.${x.soi}`, timeAgo(home ? x.updated_at || x.created_at : x.created_at)].filter(Boolean).join(" · ")}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button onClick={() => onAdd("lost")} className="min-h-[52px] rounded-xl bg-[#B42318] px-2 text-[15px] font-bold text-white">
+          😢 ของ/สัตว์หาย
+        </button>
+        <button onClick={() => onAdd("found")} className="min-h-[52px] rounded-xl border-2 border-[#1E6B47] bg-white px-2 text-[15px] font-bold text-[#1E6B47]">
+          🙌 เจอ หาเจ้าของ
+        </button>
+      </div>
+      {onPets && !load("petsHave", false) && (
+        <button onClick={onPets} className="mt-2 flex min-h-[52px] w-full items-center gap-2.5 rounded-xl bg-[#F7F8F6] px-3 text-left">
+          <span className="text-2xl" aria-hidden="true">
+            🐶
+          </span>
+          <span className="min-w-0 flex-1 text-sm leading-snug">
+            <b className="block text-[15px]">มีสัตว์เลี้ยง? ลงรูปไว้ก่อน</b>
+            ถ้าหาย กดปุ่มเดียว ทั้งหมู่บ้านเห็นรูปทันที
+          </span>
+          <span aria-hidden="true">›</span>
+        </button>
+      )}
+    </section>
+  );
+}

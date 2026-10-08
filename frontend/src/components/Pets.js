@@ -124,7 +124,10 @@ export default function PetsRow({ house, setErr, onLostPosted, onOpenLost }) {
   const [no, setNo] = useState(() => load("petsNo", false) || seenVisits("pets:invite") > 3); // asked 3 visits, then just a link
   const reload = () =>
     api(`/myhome/pets?house=${encodeURIComponent(house)}`)
-      .then((r) => setPets(r.pets))
+      .then((r) => {
+        setPets(r.pets);
+        save("petsHave", r.pets.length > 0);
+      })
       .catch(() => setPets([]));
   useEffect(() => {
     setPets(null);

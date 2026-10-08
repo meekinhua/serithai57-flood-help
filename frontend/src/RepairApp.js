@@ -17,7 +17,7 @@ import { BottomNav, CommunityFeed, CommunityIntro, IntentChoices, JoinSheetBody,
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/WatchPanel";
-import { LostBoard, LostForm, LostPreview, shareLost } from "./components/LostFound";
+import { LostBoard, LostForm, LostHero, LostPreview, shareLost } from "./components/LostFound";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, HireList, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
@@ -658,7 +658,19 @@ export default function RepairApp() {
 
           {page === "community" && (
             <>
-              <PageTitle title="เพื่อนบ้านช่วยกัน" sub="ขอแรง · ยืม ให้ ขาย · ถามกัน · ข่าวในหมู่บ้าน" />
+              <PageTitle title="เพื่อนบ้านช่วยกัน" sub="หาย·เจอ · ขอแรง · ยืม ให้ ขาย · ถามกัน" />
+              {/* 8 Oct: หาย·เจอ is the reason people keep the app after the flood, so it leads this page */}
+              <LostHero
+                items={lostOpen}
+                reunited={reunited}
+                onOpen={(id) => goItem("lost", id)}
+                onAll={() => pick("lost")}
+                onAdd={(kind) => setSheet({ type: "lostForm", kind })}
+                onPets={() => {
+                  goPage("home");
+                  setTimeout(() => flashTo(document.getElementById("myhome-pets")), 450);
+                }}
+              />
               <section className="rounded-[20px] border border-[#DCE2DD] bg-white p-4">
                 <CommunityIntro
                   showPros={false}
@@ -669,18 +681,6 @@ export default function RepairApp() {
                   onOffer={() => setSheet({ type: "intent", need: false })}
                   onAsk={() => askForum()}
                 />
-                <button onClick={() => pick("lost")} className="mt-2.5 flex min-h-[56px] w-full items-center gap-3 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] px-3 text-left">
-                  <span className="text-2xl" aria-hidden="true">
-                    🐾
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <b className="block text-base leading-tight">หาย · เจอ</b>
-                    <span className="block text-sm text-[#45504A]">
-                      {lostOpen.length ? `ตามหาอยู่ ${lostOpen.filter((x) => x.kind === "lost").length} · มีคนเจอ ${lostOpen.filter((x) => x.kind === "found").length}` : "หมาแมวหาย เจอของ ลงรูปไว้"}
-                    </span>
-                  </span>
-                  <span aria-hidden="true">›</span>
-                </button>
                 <nav ref={navRef} className="-mx-4 mt-5 scroll-mt-32 overflow-x-auto border-t border-[#E6EBE7] px-4 pt-4" aria-label="หมวด">
                   <div className="flex w-max gap-2">
                     {Object.entries(MAIN_TABS).map(([k, [, text]]) => (
