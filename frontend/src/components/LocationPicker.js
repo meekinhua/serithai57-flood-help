@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createBaseMap } from "./MapView";
 
 // Pan the map so the centre pin sits on the spot. Easier with a thumb than tapping a tiny target.
-export default function LocationPicker({ value, onChange, onTouched = () => {} }) {
+export default function LocationPicker({ value, onChange, onTouched = () => {}, autoGps = false, big = false }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const [gps, setGps] = useState("");
@@ -17,6 +17,7 @@ export default function LocationPicker({ value, onChange, onTouched = () => {} }
     map.on("dragstart", () => onTouched()); // the user actually moved the pin
     emit();
     mapRef.current = map;
+    if (autoGps) setTimeout(useGps, 300); // opened from "📍 GPS": ask for the position straight away
     return () => map.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -37,12 +38,20 @@ export default function LocationPicker({ value, onChange, onTouched = () => {} }
 
   return (
     <div>
-      <div className="relative h-56 overflow-hidden rounded-lg border border-neutral-300 sm:h-64">
+      <div className={`relative overflow-hidden rounded-lg border border-neutral-300 ${big ? "h-[52vh]" : "h-56 sm:h-64"}`}>
         <div ref={elRef} className="h-full w-full" />
         <div className="pointer-events-none absolute left-1/2 top-1/2 z-[500] -translate-x-1/2 -translate-y-full text-4xl drop-shadow">📍</div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={useGps} className="min-h-[44px] rounded-lg border border-neutral-300 bg-white px-4 font-medium active:bg-neutral-100">
+        <button
+          type="button"
+          onClick={useGps}
+          className={
+            big
+              ? "min-h-[52px] w-full rounded-xl bg-[#15201A] px-4 text-base font-bold text-white"
+              : "min-h-[44px] rounded-lg border border-neutral-300 bg-white px-4 font-medium active:bg-neutral-100"
+          }
+        >
           📡 ใช้ตำแหน่งปัจจุบัน
         </button>
         <span className="text-sm text-neutral-600">{gps || "เลื่อนแผนที่ให้หมุดชี้ตรงจุด"}</span>

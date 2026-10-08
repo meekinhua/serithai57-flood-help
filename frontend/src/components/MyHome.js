@@ -1205,6 +1205,13 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         <p className="text-[15px] text-[#33403A]">
           <button onClick={() => setSoiEdit((v) => !v)} className="font-bold underline decoration-dotted underline-offset-4" aria-label="แก้ซอย">
             {info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย"} ✎
+          </button>{" "}
+          <button
+            onClick={() => setPinning({ pos: null, soi: info.soi || "", gps: true })}
+            className="font-bold underline decoration-dotted underline-offset-4"
+            aria-label={info.precision === "house" ? "ย้ายหมุดบ้าน" : "ปักหมุดบ้านด้วย GPS"}
+          >
+            📍{info.precision === "house" ? "หมุดแล้ว" : "GPS"}
           </button>
           {info.waste && (
             <>
@@ -1326,6 +1333,8 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
                 <div id="myhome-pin" className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
                   <p className="text-[15px]">กด "ใช้ตำแหน่งปัจจุบัน" ตอนอยู่ที่บ้าน หรือเลื่อนแผนที่ให้หมุดอยู่บนหลังคาบ้านคุณ</p>
                   <LocationPicker
+                    big
+                    autoGps={!!pinning.gps}
                     value={info.precision === "house" ? { lat: info.lat, lng: info.lng } : null}
                     onChange={(pos) => setPinning((p) => ({ ...p, pos }))}
                     onTouched={() => setPinning((p) => ({ ...p, touched: true }))}
