@@ -148,7 +148,7 @@ export default function InstallApp({ inSheet = false, why: whyProp = "" }) {
           📲
         </span>
         <span className="min-w-0 flex-1 truncate">
-          <b>ติดตั้งบ้านฉันไว้หน้าจอ</b> · เด้งเตือนหมาหาย รถขยะ
+          <b>ติดตั้งบ้านฉันไว้หน้าจอ</b> · เด้งเตือนของหาย รถขยะ
         </span>
         <span className="shrink-0 font-bold text-[#1E6B47]">ดู ▾</span>
       </button>
@@ -168,8 +168,8 @@ export default function InstallApp({ inSheet = false, why: whyProp = "" }) {
       {why && <p className="anim-in mt-2 rounded-xl bg-[#E4F0E9] p-2.5 text-[15px] font-bold text-[#154D33]">{why}</p>}
       <ul className="mt-2.5 space-y-1.5 text-[15px] leading-snug">
         <li className="flex gap-2">
-          <span aria-hidden="true">🐾</span>
-          <span>หมาแมวหายในหมู่บ้าน มือถือเด้งเตือนทันที พร้อมรูป</span>
+          <span aria-hidden="true">🔎</span>
+          <span>ของหาย·เจอ มือถือเด้งเตือนพร้อมรูป · หมาแมวทั้งหมู่บ้าน · กระเป๋าตัง มือถือ กุญแจ ในซอยคุณ</span>
         </li>
         <li className="flex gap-2">
           <span aria-hidden="true">🚛</span>

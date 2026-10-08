@@ -179,7 +179,7 @@ export default function PushCard({ house }) {
         </span>
         <div className="min-w-0 flex-1">
           <b className="block text-base leading-snug">ให้มือถือเตือนเรื่องบ้าน {house}</b>
-          <span className="block text-sm text-[#45504A]">รถขยะพรุ่งนี้ · หมาแมวหายในหมู่บ้าน · ประกาศสำคัญ · ไม่ต้องเปิดแอปค้างไว้</span>
+          <span className="block text-sm text-[#45504A]">รถขยะพรุ่งนี้ · ของหาย·เจอ หมาแมว กระเป๋าตัง มือถือ · ประกาศสำคัญ</span>
         </div>
       </div>
       {open && (
