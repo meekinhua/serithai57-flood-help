@@ -123,6 +123,7 @@ function ElectricRound({ info, setErr, onActive }) {
   const saved = load(`myContact:${info.house}`, null);
   const [f, setF] = useState(() => ({ teams: [], confirm: false, name: saved?.name || load("myName", ""), phone: saved?.phone || load("myReach", "") }));
   const [busy, setBusy] = useState(false);
+  const [miss, setMiss] = useState("");
   useEffect(() => {
     api("/surveys")
       .then((l) => {
@@ -213,7 +214,17 @@ function ElectricRound({ info, setErr, onActive }) {
           <input type="checkbox" checked={f.confirm} onChange={(e) => setF({ ...f, confirm: e.target.checked })} className="h-5 w-5 accent-[#1E6B47]" />
           <b className="text-[15px] leading-snug">อยู่บ้านรอเปิดประตู {s.round_label}</b>
         </label>
-        <button onClick={send} disabled={busy || !f.teams.length || !f.confirm || !phoneOk} className="min-h-[54px] w-full rounded-xl bg-[#1E6B47] text-lg font-bold text-white disabled:opacity-40">
+        {miss && <p className="anim-in rounded-xl bg-[#FDE8E6] p-2.5 text-[15px] font-bold text-[#B42318]">{miss}</p>}
+        <button
+          onClick={() => {
+            // say what is missing instead of a button that silently does nothing
+            const m = !f.teams.length ? "☝️ เลือกทีมช่างก่อน (แตะกล่องทีมด้านบน)" : !phoneOk ? "☝️ ใส่เบอร์โทรให้ช่างโทรก่อนเข้า" : !f.confirm ? "☝️ ติ๊ก “อยู่บ้านรอเปิดประตู” ก่อน" : "";
+            setMiss(m);
+            if (!m) send();
+          }}
+          disabled={busy}
+          className="min-h-[54px] w-full rounded-xl bg-[#1E6B47] text-lg font-bold text-white disabled:opacity-40"
+        >
           {busy ? "กำลังส่ง…" : `✅ ยืนยันคิว บ้าน ${info.house}`}
         </button>
         {phoneOk && (

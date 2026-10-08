@@ -134,6 +134,8 @@ function SurveyBox({ s, onCount, look }) {
 
   async function submit(e) {
     e.preventDefault();
+    if (s.teams?.length && !f.teams.length) return setMsg("☝️ เลือกทีมช่างก่อน");
+    if (s.round && !f.confirm) return setMsg("☝️ ติ๊ก “อยู่บ้านรอเปิดประตู” ก่อน");
     if (dup) return send(); // they saw the warning and confirmed
     setBusy(true);
     setMsg("");
@@ -356,10 +358,7 @@ function SurveyBox({ s, onCount, look }) {
                     ไม่ต้องแล้ว
                   </button>
                 )}
-                <button
-                  disabled={busy || (s.teams?.length > 0 && !f.teams.length) || (s.round && !f.confirm)}
-                  className={`min-h-[48px] w-full rounded-xl font-bold text-white disabled:opacity-40 ${dup ? "bg-amber-600" : "bg-blue-700"}`}
-                >
+                <button disabled={busy} className={`min-h-[48px] w-full rounded-xl font-bold text-white disabled:opacity-40 ${dup ? "bg-amber-600" : "bg-blue-700"}`}>
                   {busy ? "กำลังส่ง…" : dup ? "ยืนยันแก้ไข" : s.round ? `ยืนยันคิว ${s.round_label || ""}` : "ลงชื่อ"}
                 </button>
               </div>
