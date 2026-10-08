@@ -1086,6 +1086,15 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const [reloadN, setReloadN] = useState(0);
   const [handy, setHandy] = useState(null); // this house's อาสาข้างบ้าน profile
   const [roundOn, setRoundOn] = useState(false);
+  // หาย·เจอ in บ้านฉัน: only the newest few (2 weeks at most); the rest live on the หาย·เจอ page
+  const lostNew = useMemo(
+    () =>
+      [...lost]
+        .filter((x) => Date.now() - new Date(x.created_at).getTime() < 14 * 864e5)
+        .sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)))
+        .slice(0, 5),
+    [lost],
+  );
   const [soiEdit, setSoiEdit] = useState(false); // the soi guessed from the house number can be fixed in one step
   const [soiAsked, setSoiAsked] = useState(() => load("soiAsked", [])); // houses this phone already asked about // a dated electrical round is open: it replaces the old follow-up row
   const [handyOpen, setHandyOpen] = useState(false);
@@ -1390,7 +1399,8 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <CheckinCard info={info} onSaved={setInfo} onContact={() => setContact({ name: load("myName", ""), from: "news" })} setErr={setErr} />
           <Soon items={info.soon} onSeen={() => setSeenN((n) => n + 1)} />
           <Slides
-            items={lost}
+            items={lostNew}
+            allLabel={lost.length > lostNew.length ? `ดูทั้งหมด ${lost.length} เรื่อง ›` : "ดูทั้งหมด ›"}
             foldKey="lost"
             mini={(x) => (
               <>
@@ -1410,7 +1420,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
             )}
             icon="🐾"
             tone="red"
-            title={(n) => `หาย · เจอ ${n} เรื่อง`}
+            title={(n) => (lost.length > n ? `หาย · เจอ ล่าสุด ${n} เรื่อง` : `หาย · เจอ ${n} เรื่อง`)}
             onOpen={(id) => onLost(id)}
             onAll={() => onLost()}
             slide={(x) => (
