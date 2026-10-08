@@ -233,6 +233,14 @@ def build_router(db, rate_limit, require_admin, audit, locate_house, norm_house,
     async def key():
         return {"key": (await vapid()).pub}
 
+    count_cache = {"at": 0.0, "houses": 0}
+
+    @router.get("/push/count")
+    async def count():
+        if time.time() - count_cache["at"] > 300:
+            count_cache.update(at=time.time(), houses=len([h for h in await db.push_subs.distinct("house") if h]))
+        return {"houses": count_cache["houses"]}
+
     @router.post("/push/subscribe")
     async def subscribe(body: SubBody, request: Request):
         rate_limit(request, "push", limit=30, window_s=600)

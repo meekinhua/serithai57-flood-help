@@ -18,6 +18,7 @@ import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/WatchPanel";
 import { LostBoard, LostForm, LostHero, LostPreview, shareLost } from "./components/LostFound";
+import InstallApp from "./components/InstallApp";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, HireList, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
@@ -931,6 +932,7 @@ export default function RepairApp() {
             <div className="space-y-3">
               <p className="text-base">{["dog", "cat", "pet"].includes(sheet.item.category) ? "ขึ้นหน้าแรกของทุกคนในหมู่บ้านแล้ว แบบนี้ 👇" : "อยู่ในหาย · เจอ ของเพื่อนบ้านแล้ว แบบนี้ 👇"}</p>
               <LostPreview x={sheet.item} photo={sheet.item.media?.[0] ? mediaUrl(sheet.item.media[0].id, "thumb") : null} />
+              <InstallApp inSheet why="ติดตั้งไว้ ถ้ามีคนเห็นแล้วแจ้งมา มือถือจะเด้งบอกคุณทันที" />
               <button onClick={() => shareLost(sheet.item)} className="min-h-[56px] w-full rounded-xl bg-[#06C755] text-lg font-bold text-white">
                 📤 ส่งต่อในกลุ่ม LINE (ยิ่งแชร์ ยิ่งเจอเร็ว)
               </button>

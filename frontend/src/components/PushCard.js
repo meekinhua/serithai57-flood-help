@@ -45,7 +45,7 @@ export default function PushCard({ house }) {
   useEffect(() => {
     if (st === "on" && house && load("pushHouse", "") !== house) updatePush(house, defaultTopics()).catch(() => {});
   }, [st, house]);
-  if (!st || st === "unsupported") return null;
+  if (!st || st === "unsupported" || st === "ios-install") return null; // InstallApp teaches the iPhone home-screen step
 
   async function turnOn() {
     if (!topics.length) return notify("☝️ เลือกอย่างน้อย 1 เรื่อง");

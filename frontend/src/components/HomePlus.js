@@ -3,7 +3,6 @@ import { api, load, save } from "../api";
 import { timeAgo } from "../config";
 import { PRO_GROUPS } from "./Community";
 import Fold from "./Fold";
-import { seenVisits } from "../visits";
 import { useT } from "./Texts";
 import { MediaStrip } from "./MediaGallery";
 
@@ -530,93 +529,4 @@ export function takeFamilyParam() {
   const q = p.toString();
   window.history.replaceState(window.history.state, "", window.location.pathname + (q ? `?${q}` : "") + window.location.hash);
   return h;
-}
-
-// ---------- 📲 keep it on the home screen ----------
-let deferred = null;
-if (typeof window !== "undefined")
-  window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
-    deferred = e;
-  });
-export function InstallCard() {
-  const [later, setLater] = useState(() => {
-    if (Date.now() - load("installLater", 0) < 14 * 864e5) return true;
-    if (seenVisits("install:card") <= 3) return false;
-    // shown on 3 visits, nobody tapped: rest 14 days, then try again
-    save("installLater", Date.now());
-    const all = load("seenVisits", {});
-    delete all["install:card"];
-    save("seenVisits", all);
-    return true;
-  });
-  const [how, setHow] = useState(false);
-  const [, force] = useState(0);
-  useEffect(() => {
-    const t = setTimeout(() => force((n) => n + 1), 1500); // the browser's own prompt arrives a little after load
-    return () => clearTimeout(t);
-  }, []);
-  const standalone = window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone;
-  if (standalone || later) return null;
-  const ua = navigator.userAgent;
-  const inLine = /Line\//i.test(ua);
-  const ios = /iPhone|iPad|iPod/i.test(ua);
-  async function add() {
-    if (deferred) {
-      deferred.prompt();
-      await deferred.userChoice.catch(() => {});
-      deferred = null;
-      return force((n) => n + 1);
-    }
-    setHow(true);
-  }
-  const close = () => {
-    save("installLater", Date.now());
-    setLater(true);
-  };
-  if (!how)
-    return (
-      <div className="flex items-center gap-2 border-t border-[#E6EBE7] py-3">
-        <button onClick={add} className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2 rounded-xl bg-[#15201A] px-3 text-left text-white">
-          <span className="text-xl" aria-hidden="true">
-            📲
-          </span>
-          <span className="min-w-0">
-            <b className="block text-[15px] leading-tight">เก็บไว้หน้าจอมือถือ</b>
-            <span className="block text-xs text-[#C5D1CA]">เปิดจากไอคอนได้เลย</span>
-          </span>
-        </button>
-        <button onClick={close} aria-label="ไว้ทีหลัง" className="min-h-[52px] shrink-0 rounded-xl px-3 text-[15px] font-bold text-[#45504A]">
-          ไว้ทีหลัง
-        </button>
-      </div>
-    );
-  return (
-    <Box icon="📲" title="เก็บบ้านฉันไว้หน้าจอมือถือ">
-      <ol className="list-decimal space-y-1 rounded-xl bg-[#F2F4F1] p-3 pl-8 text-[15px] leading-relaxed">
-        {inLine ? (
-          <>
-            <li>กดปุ่ม ⋯ (หรือ ⋮) มุมขวาบนของ LINE</li>
-            <li>เลือก "เปิดในเบราว์เซอร์" (Safari / Chrome)</li>
-            <li>แล้วกดปุ่มนี้อีกครั้งในเบราว์เซอร์</li>
-          </>
-        ) : ios ? (
-          <>
-            <li>กดปุ่มแชร์ (สี่เหลี่ยมมีลูกศรชี้ขึ้น) ด้านล่างจอ</li>
-            <li>เลื่อนหา "เพิ่มไปยังหน้าจอโฮม"</li>
-            <li>กด "เพิ่ม" มุมขวาบน</li>
-          </>
-        ) : (
-          <>
-            <li>กดปุ่ม ⋮ มุมขวาบนของ Chrome</li>
-            <li>เลือก "เพิ่มลงในหน้าจอหลัก" หรือ "ติดตั้งแอป"</li>
-            <li>กด "เพิ่ม"</li>
-          </>
-        )}
-      </ol>
-      <button onClick={close} className="min-h-[40px] w-full text-[15px] font-bold text-[#45504A] underline">
-        ทำแล้ว / ไว้ทีหลัง
-      </button>
-    </Box>
-  );
 }

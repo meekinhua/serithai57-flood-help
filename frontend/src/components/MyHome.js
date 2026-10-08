@@ -11,7 +11,8 @@ import { notify } from "../notify";
 import PushCard from "./PushCard";
 import { mediaUrl } from "../media";
 import { MediaStrip, MediaThumb } from "./MediaGallery";
-import { AidRow, CheckinCard, InstallCard, OutageRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
+import { AidRow, CheckinCard, OutageRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
+import InstallApp from "./InstallApp";
 import { waterOf } from "../config";
 
 // บ้านฉัน (7 Oct 2026): a house number typed once (or taken from the electricians' sign-up on this phone) and
@@ -1486,6 +1487,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               <div className="mt-2">
                 <AidRow info={info} onChanged={reload} setErr={setErr} />
               </div>
+              <InstallApp />
               <PushCard house={info.house} />
               <div className="card stack mt-2 px-4">
                 <PetsRow house={info.house} setErr={setErr} onLostPosted={onLostPosted} onOpenLost={onLost} />
@@ -1692,8 +1694,6 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               ))}
             </div>
           </div>
-
-          <InstallCard />
 
           <Settled
             items={settled}

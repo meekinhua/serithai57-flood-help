@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, load, save } from "../api";
+import { nudgeInstall } from "./InstallApp";
 import { mediaUrl } from "../media";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import { shareLost } from "./LostFound";
@@ -195,6 +196,7 @@ export default function PetsRow({ house, setErr, onLostPosted, onOpenLost }) {
           onSaved={(p) => {
             setPets(p);
             setEdit(null);
+            nudgeInstall("ติดตั้งไว้ ถ้าน้องหาย กดปุ่มเดียวทั้งหมู่บ้านเห็น และมือถือเด้งทันทีเมื่อมีคนเจอ");
           }}
         />
       )}
