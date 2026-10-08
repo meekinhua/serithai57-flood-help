@@ -1542,14 +1542,15 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               if (k === "plan") setPlusOpen((o) => [...o, "plan"]);
               openIt(k);
               // a payout marked received is fixed in the 💰 box itself ("ยังไม่ได้รับ? แก้")
-              const target = k.startsWith("aid_") ? document.getElementById("myhome-aid-got") : document.getElementById(`myhome-${k}`);
+              if (k.startsWith("aid_")) window.dispatchEvent(new Event("aid:open"));
               setTimeout(() => {
+                const target = k.startsWith("aid_") ? document.getElementById("myhome-aid-got") : document.getElementById(`myhome-${k}`);
                 target?.scrollIntoView({ behavior: "smooth", block: "center" });
                 if (k.startsWith("aid_") && target) {
                   target.classList.add("ring-4", "ring-[#E0A100]");
                   setTimeout(() => target.classList.remove("ring-4", "ring-[#E0A100]"), 2500);
                 }
-              }, 50);
+              }, 150);
             }}
           />
         </>

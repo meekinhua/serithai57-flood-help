@@ -161,6 +161,8 @@ function SurveyBox({ s, onCount, look }) {
     }
   }
 
+  // a dated round with a house already set on this phone: บ้านฉัน shows the same card (one place, not two)
+  if (s.round && myHouse) return null;
   return (
     <section className="mb-3 rounded-xl border-4 border-blue-600 bg-blue-50 px-3 py-2" style={look?.frame}>
       <button

@@ -182,6 +182,17 @@ export function OutageRow({ info, forced, onFold, onChanged, setErr }) {
 export function AidRow({ info, onChanged, setErr }) {
   const [open, setOpen] = useState(null); // the information-only items fold behind one line
   const [how, setHow] = useState([]); // claim cards whose "วิธียื่น" is open
+  // 8 Oct: starts folded to one line (it took half the screen); remembered on this phone
+  const [boxOpen, setBoxOpen] = useState(() => load("aidOpen", false));
+  const toggleBox = (v) => {
+    setBoxOpen(v);
+    save("aidOpen", v);
+  };
+  useEffect(() => {
+    const on = () => setBoxOpen(true); // the "ได้เงินแล้ว" chip asks the box to open
+    window.addEventListener("aid:open", on);
+    return () => window.removeEventListener("aid:open", on);
+  }, []);
   // the ones to claim first; information (loans, social security, insurance) after
   const got = (info.aid || []).filter((a) => a.mine === "received");
   const all = (info.aid || []).filter((a) => a.mine !== "received");
@@ -274,7 +285,7 @@ export function AidRow({ info, onChanged, setErr }) {
   };
   return (
     <div id="myhome-aid" className="-mx-4 border-y-2 border-[#E0A100] bg-gradient-to-b from-[#FFF1C2] to-[#FFFBEA] px-4 py-4">
-      <div className="flex items-center gap-3">
+      <button onClick={() => toggleBox(!boxOpen)} aria-expanded={boxOpen} className="flex w-full items-center gap-3 text-left">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#E0A100] text-2xl shadow-sm" aria-hidden="true">
           💰
         </span>
@@ -291,38 +302,43 @@ export function AidRow({ info, onChanged, setErr }) {
             );
           })()}
         </div>
-      </div>
-      <p className="mt-1 text-sm text-[#45504A]">ทีมอาสารวบรวมจากประกาศของหน่วยงาน · ต้องยื่นกับหน่วยงานเองตามลิงก์ในแต่ละข้อ</p>
-      <p className="mt-1.5 rounded-xl bg-white/70 px-3 py-2 text-sm leading-snug text-[#33403A]">
-        📝 ปุ่ม <b>“ยื่นแล้ว”</b> และ <b>“ได้เงินแล้ว”</b> เป็นแค่<b>บันทึกกันลืม</b>ของบ้านคุณ <b>ไม่ใช่การยื่นเรื่อง</b> และไม่ใช่ระบบของหน่วยงาน · กดผิดแก้ได้เสมอ
-      </p>
-      <div className="mt-3 space-y-2">
-        {claim.map(card)}
-        {facts.length > 0 &&
-          (open ? (
-            <>
-              <p className="pt-1 text-[15px] font-bold">ความช่วยเหลืออื่นที่ควรรู้</p>
-              {facts.map(card)}
-            </>
-          ) : (
-            <button onClick={() => setOpen(true)} className="min-h-[48px] w-full rounded-xl bg-white/70 px-3 text-left text-[15px] font-bold">
-              + ความช่วยเหลืออื่น: {facts.map((a) => a.short || a.title.split(" ")[0]).join(" · ")} ▾
-            </button>
-          ))}
-        {got.length > 0 && (
-          <div id="myhome-aid-got" className="rounded-xl bg-white/70 px-3 py-2 transition-shadow">
-            <p className="text-sm font-bold text-[#154D33]">✓ บันทึกว่าได้รับเงินแล้ว</p>
-            {got.map((a) => (
-              <div key={a.id} className="flex min-h-[44px] items-center gap-2">
-                <span className="min-w-0 flex-1 text-[15px] leading-snug">{a.title}</span>
-                <button onClick={() => mark(a.id, "applied")} className="shrink-0 text-sm font-bold text-[#45504A] underline">
-                  ยังไม่ได้รับ? แก้
+        <span className="shrink-0 rounded-full bg-white/80 px-3 py-1.5 text-sm font-bold text-[#7A4104]">{boxOpen ? "หุบ ▴" : "ดู ▾"}</span>
+      </button>
+      {boxOpen && (
+        <div className="anim-in">
+          <p className="mt-1 text-sm text-[#45504A]">ทีมอาสารวบรวมจากประกาศของหน่วยงาน · ต้องยื่นกับหน่วยงานเองตามลิงก์ในแต่ละข้อ</p>
+          <p className="mt-1.5 rounded-xl bg-white/70 px-3 py-2 text-sm leading-snug text-[#33403A]">
+            📝 ปุ่ม <b>“ยื่นแล้ว”</b> และ <b>“ได้เงินแล้ว”</b> เป็นแค่<b>บันทึกกันลืม</b>ของบ้านคุณ <b>ไม่ใช่การยื่นเรื่อง</b> และไม่ใช่ระบบของหน่วยงาน · กดผิดแก้ได้เสมอ
+          </p>
+          <div className="mt-3 space-y-2">
+            {claim.map(card)}
+            {facts.length > 0 &&
+              (open ? (
+                <>
+                  <p className="pt-1 text-[15px] font-bold">ความช่วยเหลืออื่นที่ควรรู้</p>
+                  {facts.map(card)}
+                </>
+              ) : (
+                <button onClick={() => setOpen(true)} className="min-h-[48px] w-full rounded-xl bg-white/70 px-3 text-left text-[15px] font-bold">
+                  + ความช่วยเหลืออื่น: {facts.map((a) => a.short || a.title.split(" ")[0]).join(" · ")} ▾
                 </button>
+              ))}
+            {got.length > 0 && (
+              <div id="myhome-aid-got" className="rounded-xl bg-white/70 px-3 py-2 transition-shadow">
+                <p className="text-sm font-bold text-[#154D33]">✓ บันทึกว่าได้รับเงินแล้ว</p>
+                {got.map((a) => (
+                  <div key={a.id} className="flex min-h-[44px] items-center gap-2">
+                    <span className="min-w-0 flex-1 text-[15px] leading-snug">{a.title}</span>
+                    <button onClick={() => mark(a.id, "applied")} className="shrink-0 text-sm font-bold text-[#45504A] underline">
+                      ยังไม่ได้รับ? แก้
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
