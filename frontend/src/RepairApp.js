@@ -13,7 +13,7 @@ import { lookOf, ordered } from "./components/Look";
 import { TextsContext } from "./components/Texts";
 import MyHome, { homeBadgeOf } from "./components/MyHome";
 import SurveyBoxes from "./components/SurveyBox";
-import { BottomNav, CommunityFeed, CommunityIntro, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PostedSheetBody, ProsList } from "./components/Community";
+import { BottomNav, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PostedSheetBody, ProsList } from "./components/Community";
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/WatchPanel";
@@ -33,11 +33,17 @@ const REFRESH_MS = 30000;
 // feed shows everything at once; the boards stay one tap away. Waste and the checklist move under "อื่นๆ".
 const MAIN_TABS = {
   lost: ["🐾", "หาย · เจอ"],
-  feed: ["📰", "ล่าสุด"],
-  jobs: ["🙋", "ขอแรง"],
-  lend: ["🧰", "ยืม · ซื้อขาย"],
-  forum: ["💬", "ถาม-ตอบ"],
+  jobs: ["🙋", "ขอแรง · ช่วยได้"],
+  lend: ["🧰", "ยืม · ให้ · ขาย"],
+  forum: ["💬", "กระดานคุยกัน"],
 };
+// 8 Oct: เพื่อนบ้าน has its own three tabs; ขอแรง and ยืม·ให้·ขาย are one "ช่วยกัน" tab with two lists
+const GROUPS = [
+  ["lost", "🐾", "หาย · เจอ"],
+  ["help", "🤝", "ช่วยกัน"],
+  ["talk", "💬", "คุยกัน"],
+];
+const groupOf = (t) => (t === "jobs" || t === "lend" ? "help" : t === "forum" ? "talk" : t === "lost" ? "lost" : null);
 const MORE_TABS = {
   waste: ["♻️", "ขยะ · รถเก็บ"],
   guide: ["📋", "เช็กลิสต์หลังน้ำลด"],
@@ -45,7 +51,7 @@ const MORE_TABS = {
 };
 const TABS = { ...MAIN_TABS, ...MORE_TABS };
 // which bottom-bar page a link's #hash opens (old links keep working: #water → the map, #feed → เพื่อนบ้าน)
-const pageOf = (h) => (h === "pros" ? "pros" : h === "map" || h === "water" ? "map" : TABS[h] ? "community" : "home");
+const pageOf = (h) => (h === "pros" ? "pros" : h === "map" || h === "water" ? "map" : TABS[h] || h === "feed" ? "community" : "home");
 
 function PageTitle({ title, sub }) {
   return (
@@ -59,8 +65,8 @@ function PageTitle({ title, sub }) {
 export default function RepairApp() {
   const [tab, setTab] = useState(() => {
     const h = window.location.hash.slice(1);
-    const saved = load("repairTab3", "feed");
-    return TABS[h] ? h : TABS[saved] ? saved : "feed"; // a tab that no longer exists (e.g. "pros") falls back to the feed
+    const saved = load("repairTab3", "lost");
+    return h === "feed" ? "lost" : TABS[h] ? h : TABS[saved] ? saved : "lost"; // a tab that no longer exists (e.g. "feed", "pros") falls back to หาย·เจอ
   });
   const [lend, setLend] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -132,7 +138,7 @@ export default function RepairApp() {
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
-  const [forumGo, setForumGo] = useState({ n: 0 }); // feed / "ask" door → open a topic or the form
+  const [forumGo] = useState({ n: 0 });
   const [water, setWater] = useState([]);
   const [canal, setCanal] = useState(null);
   // highlight boxes (water watch, volunteer hand-out point): admins switch them on /admin, no redeploy
@@ -165,10 +171,6 @@ export default function RepairApp() {
     if (g.sheet) return setSheet(g.sheet);
     setSheet(null);
     showTab(g.tab);
-  };
-  const askForum = (openId = null) => {
-    setForumGo((f) => ({ n: f.n + 1, openId, compose: !openId }));
-    showTab("forum");
   };
   const goItem = (t, id) => {
     showTab(t);
@@ -353,7 +355,6 @@ export default function RepairApp() {
   const lostOpen = lost.filter((x) => x.status !== "reunited");
   const lostPets = lostOpen.filter((x) => x.kind === "lost" && ["dog", "cat", "pet"].includes(x.category) && Date.now() - new Date(x.created_at).getTime() < 7 * 864e5);
   const homePets = reunited.filter((x) => ["dog", "cat", "pet"].includes(x.category) && Date.now() - new Date(x.updated_at || x.created_at).getTime() < 864e5);
-  const lostHot = lostOpen.filter((x) => x.kind === "lost" && Date.now() - new Date(x.created_at).getTime() < 7 * 864e5);
   const needSig = needs.map((j) => j.id.slice(0, 6)).join(",");
 
   // what each page tab has to say (the bell lists it; ล้าง mutes it until it changes)
@@ -676,85 +677,119 @@ export default function RepairApp() {
 
           {page === "community" && (
             <>
-              <PageTitle title="เพื่อนบ้านช่วยกัน" sub="หาย·เจอ · ขอแรง · ยืม ให้ ขาย · ถามกัน" />
-              {/* 8 Oct: หาย·เจอ is the reason people keep the app after the flood, so it leads this page */}
-              <LostHero
-                items={lostOpen}
-                reunited={reunited}
-                onOpen={(id) => goItem("lost", id)}
-                onAll={() => pick("lost")}
-                onAdd={(kind) => setSheet({ type: "lostForm", kind })}
-                onPets={() => {
-                  goPage("home");
-                  setTimeout(() => flashTo(document.getElementById("myhome-pets")), 450);
-                }}
-              />
-              <section className="rounded-[20px] border border-[#DCE2DD] bg-white p-4">
-                <CommunityIntro
-                  showPros={false}
-                  services={services}
-                  onGroup={(g) => openPros(g)}
-                  onAll={() => openPros("")}
-                  onNeed={() => setSheet({ type: "intent", need: true })}
-                  onOffer={() => setSheet({ type: "intent", need: false })}
-                  onAsk={() => askForum()}
-                />
-                <nav ref={navRef} className="-mx-4 mt-5 scroll-mt-32 overflow-x-auto border-t border-[#E6EBE7] px-4 pt-4" aria-label="หมวด">
-                  <div className="flex w-max gap-2">
-                    {Object.entries(MAIN_TABS).map(([k, [, text]]) => (
+              <PageTitle title="เพื่อนบ้านช่วยกัน" sub="หาย·เจอ · ขอแรง ยืม ให้ ขาย · คุยกัน" />
+              <nav className="sticky top-[64px] z-[40] -mx-3 mb-3 bg-[#F2F4F1]/95 px-3 py-2 backdrop-blur sm:-mx-4 sm:px-4" aria-label="เพื่อนบ้าน">
+                <div className="grid grid-cols-3 gap-1 rounded-2xl border border-[#E3E7E2] bg-white p-1 shadow-sm">
+                  {GROUPS.map(([g, icon, name]) => {
+                    const on = groupOf(tab) === g;
+                    const n = g === "lost" ? lostOpen.length : g === "help" ? counts.jobs : 0;
+                    return (
                       <button
-                        key={k}
-                        onClick={() => pick(k)}
-                        aria-current={tab === k ? "page" : undefined}
-                        className={`min-h-[44px] whitespace-nowrap rounded-full px-4 text-[15px] ${tab === k ? "bg-[#15201A] font-bold text-white" : k === "lost" && lostHot.length ? "border-2 border-[#B42318] bg-[#FDE8E6] font-bold text-[#7A1A12]" : "border border-[#C9D1CB] bg-white"}`}
+                        key={g}
+                        onClick={() => pick(g === "lost" ? "lost" : g === "talk" ? "forum" : load("helpTab", "jobs"))}
+                        aria-current={on ? "page" : undefined}
+                        className={`relative flex min-h-[54px] flex-col items-center justify-center rounded-xl text-[15px] leading-tight transition-colors ${on ? "bg-[#15201A] font-bold text-white" : "text-[#33403A]"}`}
                       >
-                        {k === "lost" ? "🐾 " : ""}
-                        {text}
-                        {k === "lost" && lostOpen.length > 0 && <span className="ml-1.5 rounded-full bg-[#B42318] px-1.5 text-sm text-white">{lostOpen.length}</span>}
+                        <span className="text-lg" aria-hidden="true">
+                          {icon}
+                        </span>
+                        {name}
+                        {n > 0 && <span className={`absolute right-1.5 top-1 rounded-full px-1.5 text-xs font-bold text-white ${g === "lost" ? "bg-[#B42318]" : "bg-[#1E6B47]"}`}>{n}</span>}
                       </button>
-                    ))}
-                  </div>
-                </nav>
+                    );
+                  })}
+                </div>
+              </nav>
 
-                <div key={tab} className="anim-in mt-3">
-                  {tab === "feed" && (
-                    <CommunityFeed
-                      lost={lostOpen}
-                      lend={lend}
-                      jobs={jobs}
-                      services={services}
-                      topics={topics}
-                      onNeed={() => setSheet({ type: "intent", need: true })}
-                      onTab={showTab}
-                      onTopic={(id) => askForum(id)}
-                      onJoin={(job) => setSheet({ type: "join", job })}
+              <div key={groupOf(tab) || tab} ref={navRef} className="anim-in scroll-mt-36">
+                {tab === "lost" && (
+                  <>
+                    {/* 8 Oct: หาย·เจอ is the reason people keep the app after the flood, so it leads this page */}
+                    <LostHero
+                      items={lostOpen}
+                      reunited={reunited}
+                      onOpen={(id) => goItem("lost", id)}
+                      onAll={() => document.getElementById("lost-board")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      onAdd={(kind) => setSheet({ type: "lostForm", kind })}
+                      onPets={() => {
+                        goPage("home");
+                        setTimeout(() => flashTo(document.getElementById("myhome-pets")), 450);
+                      }}
                     />
-                  )}
-                  {tab === "forum" && <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />}
-                  {tab === "lend" && <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />}
-                  {tab === "jobs" && <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} onPaid={() => openPros("")} />}
-                  {tab === "lost" && <LostBoard items={lost} reunited={reunited} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />}
-                  {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
-                  {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
-                  {tab === "guide" && <AfterFloodGuide />}
-                </div>
-                <div className="mt-5 grid grid-cols-2 gap-2 border-t border-[#E6EBE7] pt-4" aria-label="เรื่องอื่นในหมู่บ้าน">
-                  {Object.entries(MORE_TABS).map(([k, [, text]]) => (
-                    <button
-                      key={k}
-                      onClick={() => showTab(k)}
-                      aria-current={tab === k ? "page" : undefined}
-                      className={`min-h-[60px] rounded-2xl px-3 py-2 text-left ${tab === k ? "bg-[#15201A] text-white" : "border border-[#DCE2DD] bg-white"}`}
-                    >
-                      <b className="block text-base leading-tight">{text}</b>
-                      <span className={`block text-sm ${tab === k ? "text-[#C5D1CA]" : "text-[#45504A]"}`}>
-                        {MORE_SUB[k]}
-                        {counts[k] > 0 ? ` · ${counts[k]}` : ""}
+                    <section id="lost-board" className="card scroll-mt-36 p-3">
+                      <LostBoard noAdd items={lost} reunited={reunited} setItems={setLost} admin={admin} onAdd={(kind) => setSheet({ type: "lostForm", kind })} />
+                    </section>
+                  </>
+                )}
+                {(tab === "jobs" || tab === "lend") && (
+                  <>
+                    <div className="grid grid-cols-2 gap-1 rounded-2xl bg-[#E6EBE7] p-1" role="tablist">
+                      {["jobs", "lend"].map((k) => (
+                        <button
+                          key={k}
+                          role="tab"
+                          aria-selected={tab === k}
+                          onClick={() => {
+                            save("helpTab", k);
+                            pick(k);
+                          }}
+                          className={`min-h-[46px] rounded-xl text-[15px] ${tab === k ? "bg-white font-bold shadow-sm" : "text-[#45504A]"}`}
+                        >
+                          {MAIN_TABS[k][0]} {MAIN_TABS[k][1]}
+                          {counts[k] > 0 ? ` · ${counts[k]}` : ""}
+                        </button>
+                      ))}
+                    </div>
+                    <section key={tab} className="card anim-in mt-2 p-3">
+                      {tab === "jobs" ? (
+                        <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} onPaid={() => openPros("")} />
+                      ) : (
+                        <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />
+                      )}
+                    </section>
+                  </>
+                )}
+                {tab === "forum" && (
+                  <section className="card p-3">
+                    <div className="mb-2 flex items-center gap-2.5">
+                      <span className="ic ic-sm ic-green" aria-hidden="true">
+                        💬
                       </span>
-                    </button>
-                  ))}
-                </div>
-              </section>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-lg font-bold leading-tight">กระดานคุยกัน</h3>
+                        <p className="text-sm text-[#45504A]">ถามเพื่อนบ้าน แนะนำ แลกเปลี่ยน เรื่องในหมู่บ้าน</p>
+                      </div>
+                    </div>
+                    <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />
+                  </section>
+                )}
+                {!groupOf(tab) && (
+                  <section className="card p-3">
+                    {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
+                    {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
+                    {tab === "guide" && <AfterFloodGuide />}
+                  </section>
+                )}
+              </div>
+
+              <div className="mt-5 grid grid-cols-3 gap-2" aria-label="เรื่องอื่นในหมู่บ้าน">
+                {Object.entries(MORE_TABS).map(([k, [icon, text]]) => (
+                  <button
+                    key={k}
+                    onClick={() => showTab(k)}
+                    aria-current={tab === k ? "page" : undefined}
+                    className={`min-h-[72px] rounded-2xl px-2 py-2 text-left ${tab === k ? "bg-[#15201A] text-white" : "card"}`}
+                  >
+                    <b className="block text-[15px] leading-tight">
+                      {icon} {text}
+                    </b>
+                    <span className={`block text-xs ${tab === k ? "text-[#C5D1CA]" : "text-[#45504A]"}`}>
+                      {MORE_SUB[k]}
+                      {counts[k] > 0 ? ` · ${counts[k]}` : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </>
           )}
 

@@ -39,7 +39,7 @@ export function LostPreview({ x, photo }) {
   );
 }
 
-export function LostBoard({ items, setItems, admin, onAdd, reunited = [] }) {
+export function LostBoard({ items, setItems, admin, onAdd, reunited = [], noAdd = false }) {
   const [kind, setKind] = useState("all");
   const [cat, setCat] = useState("all");
   const keys = load("lostKeys", {});
@@ -47,13 +47,15 @@ export function LostBoard({ items, setItems, admin, onAdd, reunited = [] }) {
   const upsert = (x) => setItems((prev) => (x.status === "reunited" ? prev.filter((y) => y.id !== x.id) : prev.map((y) => (y.id === x.id ? x : y))));
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        {Object.entries(LOST_KINDS).map(([k, v]) => (
-          <button key={k} onClick={() => onAdd(k)} className={`min-h-[56px] rounded-xl px-2 font-bold ${k === "lost" ? "bg-black text-white" : "border-2 border-black bg-white"}`}>
-            {v.emoji} {v.verb}
-          </button>
-        ))}
-      </div>
+      {!noAdd && (
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(LOST_KINDS).map(([k, v]) => (
+            <button key={k} onClick={() => onAdd(k)} className={`min-h-[56px] rounded-xl px-2 font-bold ${k === "lost" ? "bg-black text-white" : "border-2 border-black bg-white"}`}>
+              {v.emoji} {v.verb}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-1 rounded-xl bg-neutral-200 p-1">
         {[
           ["all", "ทั้งหมด"],
