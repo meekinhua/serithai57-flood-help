@@ -115,8 +115,47 @@ function Row({ icon, title, children, hi, onFold, id }) {
   );
 }
 
+// ---------- "ซอยไม่ถูก? แก้" — type the soi number, no map needed ----------
+function SoiEdit({ info, onSaved, onClose, setErr }) {
+  const [v, setV] = useState(info.soi || "");
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    setErr("");
+    setBusy(true);
+    try {
+      const r = await api("/myhome/soi", { method: "POST", body: JSON.stringify({ house: info.house, soi: v }) });
+      save("mySoi", r.soi || v);
+      onSaved(r);
+      onClose();
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy(false);
+  }
+  return (
+    <div className="anim-in my-2 flex items-center gap-2 rounded-2xl bg-[#FFF6DA] p-2.5">
+      <span className="shrink-0 text-[15px] font-bold">ซอย</span>
+      <input
+        autoFocus
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && go()}
+        inputMode="decimal"
+        placeholder="เช่น 14"
+        className="min-h-[48px] w-24 rounded-xl border-2 border-[#1E6B47] px-3 text-xl font-bold"
+      />
+      <button onClick={go} disabled={busy || !v.trim()} className="min-h-[48px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-40">
+        {busy ? "…" : "บันทึก"}
+      </button>
+      <button onClick={onClose} className="min-h-[48px] px-1 text-sm text-[#45504A] underline">
+        ปิด
+      </button>
+    </div>
+  );
+}
+
 // ---------- ⚡ this round of free electrical checks, confirmed from บ้านฉัน in one tap (the house is already known) ----------
-function ElectricRound({ info, setErr, onActive }) {
+function ElectricRound({ info, setErr, onActive, onEditSoi }) {
   const [s, setS] = useState(null);
   const [st, setSt] = useState(null);
   const [edit, setEdit] = useState(false);
@@ -229,7 +268,10 @@ function ElectricRound({ info, setErr, onActive }) {
         </button>
         {phoneOk && (
           <p className="text-sm text-[#45504A]">
-            ช่างจะโทร {f.phone} ก่อนเข้า · ซอย {info.soi || "?"} (จากบ้านเลขที่)
+            ช่างจะโทร {f.phone} ก่อนเข้า · ซอย {info.soi || "?"}{" "}
+            <button onClick={onEditSoi} className="font-bold text-[#1E6B47] underline">
+              ซอยไม่ถูก? แก้
+            </button>
           </p>
         )}
       </div>
@@ -824,7 +866,8 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const [info, setInfo] = useState(null);
   const [reloadN, setReloadN] = useState(0);
   const [handy, setHandy] = useState(null); // this house's อาสาข้างบ้าน profile
-  const [roundOn, setRoundOn] = useState(false); // a dated electrical round is open: it replaces the old follow-up row
+  const [roundOn, setRoundOn] = useState(false);
+  const [soiEdit, setSoiEdit] = useState(false); // the soi guessed from the house number can be fixed in one step // a dated electrical round is open: it replaces the old follow-up row
   const [handyOpen, setHandyOpen] = useState(false);
   useEffect(() => {
     if (!house) return;
@@ -1058,7 +1101,9 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
       )}
       {info && (
         <p className="text-[15px] text-[#33403A]">
-          {info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย"}
+          <button onClick={() => setSoiEdit((v) => !v)} className="font-bold underline decoration-dotted underline-offset-4" aria-label="แก้ซอย">
+            {info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย"} ✎
+          </button>
           {info.waste && (
             <>
               {" · 🚛 รถขยะ "}
@@ -1066,6 +1111,17 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
             </>
           )}
         </p>
+      )}
+      {info && soiEdit && (
+        <SoiEdit
+          info={info}
+          setErr={setErr}
+          onClose={() => setSoiEdit(false)}
+          onSaved={(r) => {
+            setInfo(r);
+            notify(`บันทึกแล้ว · บ้าน ${r.house} อยู่ ซ.${r.soi} (วันรถขยะและคิวช่างใช้ซอยนี้)`);
+          }}
+        />
       )}
       {err && (
         <p ref={errRef} role="alert" className="mt-2 rounded-xl bg-red-50 p-3 text-red-700">
@@ -1119,7 +1175,15 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               </div>
             </div>
           )}
-          <ElectricRound info={info} setErr={setErr} onActive={setRoundOn} />
+          <ElectricRound
+            info={info}
+            setErr={setErr}
+            onActive={setRoundOn}
+            onEditSoi={() => {
+              setSoiEdit(true);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          />
           <div className="mt-3">
             <AidRow info={info} onChanged={reload} setErr={setErr} />
           </div>
@@ -1158,6 +1222,11 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           ) : info.precision !== "house" ? (
             <div className="mb-3 rounded-2xl bg-[#FFF6DA] p-3">
               <p className="text-[15px]">{info.soi ? `ระบบเดาว่าอยู่ ซ.${info.soi} จากบ้านเลขที่` : "ระบบยังไม่รู้ว่าบ้านนี้อยู่ซอยไหน"} · บ้านแบ่งแปลงใหม่เลขที่มักไม่ตรงซอย</p>
+              {!soiEdit && (
+                <button onClick={() => setSoiEdit(true)} className="mt-2 min-h-[48px] w-full rounded-xl border-2 border-[#15201A] bg-white text-base font-bold">
+                  ✎ {info.soi ? `ไม่ใช่ ซ.${info.soi}? แก้ซอย` : "ใส่ซอยของบ้านฉัน"}
+                </button>
+              )}
               <button onClick={() => setPinning({ pos: null, soi: "" })} className="mt-2 min-h-[50px] w-full rounded-xl bg-[#15201A] text-base font-bold text-white">
                 {t("myhome.pin.button", "ปักหมุดบ้านฉัน (ใช้ GPS ได้)")}
               </button>

@@ -49,6 +49,11 @@ def to_segment(p, a, b):
     return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
 
 
+class SoiBody(BaseModel):
+    house: str = Field(..., max_length=20)
+    soi: str = Field(..., min_length=1, max_length=12)  # "14", "ซ.14", "แยก 2/2"
+
+
 class PinBody(BaseModel):
     house: str = Field(..., max_length=20)
     lat: float = Field(..., ge=13.7, le=13.9)
@@ -190,6 +195,19 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         lat, lng, bid = (roof[1], roof[2], roof[3]) if roof else (body.lat, body.lng, None)
         soi = re.sub(r"^(ซอย|ซ\.?|แยก)\s*", "", body.soi.strip()) or nearest_soi((lat, lng))
         await learn_address(h, soi=soi, lat=lat, lng=lng, source="resident", by="บ้านฉัน", building_id=bid)
+        return await myhome(h, request)
+
+    @router.post("/myhome/soi")
+    async def set_soi(body: SoiBody, request: Request):
+        """"ซอยไม่ถูก" → the owner types it; it wins over the guess from the house number."""
+        rate_limit(request, "myhome-pin", limit=20, window_s=600)
+        h = clean(body.house)
+        soi = re.sub(r"^(ซอย|ซ\.?|แยก)\s*", "", re.sub(r"\s", "", body.soi.strip()))
+        if not re.fullmatch(r"\d{1,3}(/\d{1,2})?", soi):
+            raise HTTPException(422, "ใส่เลขซอย เช่น 14 หรือ 2/2")
+        await learn_address(h, soi=soi, source="resident", by="บ้านฉัน (แก้ซอย)")
+        # the electricians' list follows the corrected soi
+        await db.survey_resp.update_many({"house": h}, {"$set": {"soi": soi}})
         return await myhome(h, request)
 
     @router.post("/myhome/electric")
