@@ -117,19 +117,19 @@ function Row({ icon, title, children, hi, onFold, id }) {
 }
 
 // ---------- a slide show card (ขอแรง, หาย·เจอ): one item at a time, folds to a line once every item has been shown ----------
-function Slides({ items, foldKey, icon, title, slide, onOpen, onAll, allLabel = "ดูทั้งหมด ›", tone = "amber" }) {
+function Slides({ items, foldKey, icon, title, slide, onOpen, onAll, allLabel = "ดูทั้งหมด ›", tone = "amber", startFolded = false }) {
   const key = items.map((x) => x.id.slice(0, 6)).join(",");
   const store = `slidesSeen:${foldKey}`;
-  const [folded, setFolded] = useState(() => load(store, "") === key); // this set was already shown in full
+  const [folded, setFolded] = useState(() => startFolded || load(store, "") === key); // folded by default, or this set was already shown in full
   const [manual, setManual] = useState(false); // opened by hand: stays open, no auto-fold
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
   const seen = useRef(new Set());
   useEffect(() => {
-    setFolded(load(store, "") === key);
+    setFolded(startFolded || load(store, "") === key);
     setI(0);
     seen.current = new Set();
-  }, [key, store]);
+  }, [key, store, startFolded]);
   const n = items.length;
   const x = items[Math.min(i, n - 1)];
   useEffect(() => {
@@ -1390,6 +1390,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <Slides
             items={[...needs].sort((x, y) => fits(y) - fits(x))}
             foldKey="needs"
+            startFolded
             icon="🙋"
             title={(n) => `เพื่อนบ้านขอแรงอยู่ ${n} เรื่อง`}
             onOpen={(id) => onNeeds(id)}
