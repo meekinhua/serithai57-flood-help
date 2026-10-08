@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, load, save } from "../api";
 import LocationPicker from "./LocationPicker";
 import Nearby from "./Nearby";
@@ -151,6 +152,76 @@ function SoiEdit({ info, onSaved, onClose, setErr }) {
         ปิด
       </button>
     </div>
+  );
+}
+
+// ---------- "บ้าน 4/305 อยู่ ซ.14 ใช่ไหม?" — asked once per house per phone; GPS recommended, never forced ----------
+function SoiAsk({ info, onSaved, onPin, onClose, setErr }) {
+  const [edit, setEdit] = useState(!info.soi);
+  const [v, setV] = useState(info.soi || "");
+  const [busy, setBusy] = useState(false);
+  async function save_(soi) {
+    setErr("");
+    setBusy(true);
+    try {
+      const r = await api("/myhome/soi", { method: "POST", body: JSON.stringify({ house: info.house, soi }) });
+      save("mySoi", r.soi || soi);
+      onSaved(r);
+      onClose(true);
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy(false);
+  }
+  // a portal: the page slides in (transform), which would trap a fixed overlay inside it
+  return createPortal(
+    <div className="anim-fade fixed inset-0 z-[950] flex items-end justify-center bg-black/40 sm:items-center" onClick={() => onClose(false)}>
+      <div className="anim-sheet w-full max-w-md rounded-t-3xl bg-white p-4 pb-6 shadow-xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="ยืนยันซอย">
+        <p className="text-sm font-bold text-[#7A4104]">ช่วยยืนยันหน่อย · ทำครั้งเดียว</p>
+        <h3 className="font-display mt-0.5 text-2xl font-bold leading-tight">{info.soi && !edit ? `บ้าน ${info.house} อยู่ ซ.${info.soi} ใช่ไหม?` : `บ้าน ${info.house} อยู่ซอยไหน?`}</h3>
+        <p className="mt-1 text-[15px] text-[#45504A]">ใช้กำหนดวันรถขยะ คิวช่าง และน้ำหน้าบ้านของคุณ · บ้านแบ่งแปลงใหม่เลขที่มักไม่ตรงซอย</p>
+        {!edit ? (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button onClick={() => save_(info.soi)} disabled={busy} className="min-h-[60px] rounded-2xl bg-[#1E6B47] text-lg font-bold text-white disabled:opacity-50">
+              ✅ ใช่ ซ.{info.soi}
+            </button>
+            <button onClick={() => setEdit(true)} className="min-h-[60px] rounded-2xl border-2 border-[#15201A] text-lg font-bold">
+              ✎ ไม่ใช่
+            </button>
+          </div>
+        ) : (
+          <div className="mt-3 flex items-center gap-2">
+            <span className="shrink-0 text-lg font-bold">ซอย</span>
+            <input
+              autoFocus
+              value={v}
+              onChange={(e) => setV(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && v.trim() && save_(v)}
+              inputMode="decimal"
+              placeholder="เช่น 14"
+              className="min-h-[56px] w-28 rounded-2xl border-2 border-[#1E6B47] px-3 text-2xl font-bold"
+            />
+            <button onClick={() => save_(v)} disabled={busy || !v.trim()} className="min-h-[56px] flex-1 rounded-2xl bg-[#1E6B47] text-lg font-bold text-white disabled:opacity-40">
+              บันทึก
+            </button>
+          </div>
+        )}
+        <button onClick={onPin} className="mt-3 flex min-h-[56px] w-full items-center gap-3 rounded-2xl bg-[#FFF6DA] px-3 text-left">
+          <span className="text-2xl" aria-hidden="true">
+            📍
+          </span>
+          <span className="min-w-0 flex-1">
+            <b className="block text-base leading-tight">ปักหมุดด้วย GPS · แนะนำ</b>
+            <span className="block text-sm text-[#45504A]">ตอนอยู่ที่บ้าน กดครั้งเดียว ระบบรู้ทั้งซอยและหลังบ้าน แม่นที่สุด</span>
+          </span>
+          <span aria-hidden="true">›</span>
+        </button>
+        <button onClick={() => onClose(false)} className="mt-2 min-h-[44px] w-full text-[15px] font-bold text-[#45504A] underline">
+          ไว้ทีหลัง
+        </button>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -867,7 +938,8 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const [reloadN, setReloadN] = useState(0);
   const [handy, setHandy] = useState(null); // this house's อาสาข้างบ้าน profile
   const [roundOn, setRoundOn] = useState(false);
-  const [soiEdit, setSoiEdit] = useState(false); // the soi guessed from the house number can be fixed in one step // a dated electrical round is open: it replaces the old follow-up row
+  const [soiEdit, setSoiEdit] = useState(false); // the soi guessed from the house number can be fixed in one step
+  const [soiAsked, setSoiAsked] = useState(() => load("soiAsked", [])); // houses this phone already asked about // a dated electrical round is open: it replaces the old follow-up row
   const [handyOpen, setHandyOpen] = useState(false);
   useEffect(() => {
     if (!house) return;
@@ -1112,6 +1184,28 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           )}
         </p>
       )}
+      {info && info.precision !== "house" && !soiAsked.includes(info.house) && !pinning && (
+        <SoiAsk
+          info={info}
+          setErr={setErr}
+          onSaved={(r) => {
+            setInfo(r);
+            notify(`บันทึกแล้ว · บ้าน ${r.house} อยู่ ซ.${r.soi}`);
+          }}
+          onClose={() => {
+            const next = [...soiAsked.slice(-30), info.house];
+            setSoiAsked(next);
+            save("soiAsked", next);
+          }}
+          onPin={() => {
+            const next = [...soiAsked.slice(-30), info.house];
+            setSoiAsked(next);
+            save("soiAsked", next);
+            setPinning({ pos: null, soi: info.soi || "" });
+            setTimeout(() => document.getElementById("myhome-pin")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+          }}
+        />
+      )}
       {info && soiEdit && (
         <SoiEdit
           info={info}
@@ -1190,7 +1284,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <PetsRow house={info.house} setErr={setErr} onLostPosted={onLostPosted} onOpenLost={onLost} />
 
           {pinning ? (
-            <Row title="ปักหมุดบ้านฉัน">
+            <Row id="myhome-pin" title="ปักหมุดบ้านฉัน">
               <p className="text-[15px]">กด "ใช้ตำแหน่งปัจจุบัน" ตอนอยู่ที่บ้าน หรือเลื่อนแผนที่ให้หมุดอยู่บนหลังคาบ้านคุณ</p>
               <LocationPicker
                 value={info.precision === "house" ? { lat: info.lat, lng: info.lng } : null}
