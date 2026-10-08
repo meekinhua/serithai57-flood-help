@@ -540,7 +540,7 @@ export default function RepairApp() {
         {peek && (
           <div
             key={peek.key}
-            className={`peek fixed inset-x-3 top-[64px] z-40 mx-auto max-w-md rounded-2xl border-2 bg-white p-2 shadow-xl ${peek.leaving ? "peek-out" : "peek-in"} ${peek.kind === "home" ? "border-[#1E6B47]" : "border-[#E0A100]"}`}
+            className={`peek fixed inset-x-3 top-[68px] z-40 mx-auto max-w-md rounded-2xl border-2 bg-white p-2 shadow-xl ${peek.leaving ? "peek-out" : "peek-in"} ${peek.kind === "home" ? "border-[#1E6B47]" : "border-[#E0A100]"}`}
             role="status"
           >
             <div className="flex items-center gap-2">
@@ -573,8 +573,8 @@ export default function RepairApp() {
             <span className="peek-timer absolute inset-x-3 bottom-0.5 h-0.5 origin-left rounded-full bg-[#E0A100]" aria-hidden="true" />
           </div>
         )}
-        {/* 8 Oct: the status row sits on top (water, weather, bell, share); the menu is at the bottom */}
-        <header className="sticky top-0 z-[900] bg-[#15201A] pt-[env(safe-area-inset-top)] text-white shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
+        {/* the status row at the bottom (water, weather, bell, share); the menu is on top */}
+        <header className="fixed inset-x-0 bottom-0 z-[900] bg-[#15201A] pb-[env(safe-area-inset-bottom)] text-white shadow-[0_-2px_8px_rgba(0,0,0,0.25)]">
           {!online && <p className="bg-red-700 px-3 py-1 text-center text-sm font-bold">⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่</p>}
           <div className="mx-auto flex max-w-5xl items-center gap-2 px-2 py-1.5 sm:px-4">
             <button onClick={() => goPage("home")} aria-label="เสรีไทย 57 · กลับบ้านฉัน" className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5">
@@ -615,13 +615,13 @@ export default function RepairApp() {
           )}
         </header>
 
-        <UrgentBar items={announcements} />
         <BottomNav
           page={page}
           badges={Object.fromEntries(Object.entries(notes).map(([k, b]) => [k, b && (ack[k] === b.sig ? "muted" : b.level)]))}
           onGo={(p) => (p === "pros" ? openPros("") : p === "community" ? showTab("lost") : goPage(p))}
           onHotline={() => setSheet({ type: "hotlines" })}
         />
+        <UrgentBar items={announcements} />
         <main key={page} className="anim-page mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
           {page === "home" ? (
             <>
@@ -678,7 +678,7 @@ export default function RepairApp() {
           {page === "community" && (
             <>
               <PageTitle title="เพื่อนบ้านช่วยกัน" sub="หาย·เจอ · ขอแรง ยืม ให้ ขาย · คุยกัน" />
-              <nav className="sticky top-[56px] z-[40] -mx-3 mb-3 bg-[#F2F4F1]/95 px-3 py-2 backdrop-blur sm:-mx-4 sm:px-4" aria-label="เพื่อนบ้าน">
+              <nav className="sticky top-[64px] z-[40] -mx-3 mb-3 bg-[#F2F4F1]/95 px-3 py-2 backdrop-blur sm:-mx-4 sm:px-4" aria-label="เพื่อนบ้าน">
                 <div className="grid grid-cols-3 gap-1 rounded-2xl border border-[#E3E7E2] bg-white p-1 shadow-sm">
                   {GROUPS.map(([g, icon, name]) => {
                     const on = groupOf(tab) === g;
