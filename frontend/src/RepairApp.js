@@ -66,8 +66,7 @@ function PageTitle({ title, sub }) {
 export default function RepairApp() {
   const [tab, setTab] = useState(() => {
     const h = window.location.hash.slice(1);
-    const saved = load("repairTab3", "lost");
-    return h === "feed" ? "lost" : TABS[h] ? h : TABS[saved] ? saved : "lost"; // a tab that no longer exists (e.g. "feed", "pros") falls back to หาย·เจอ
+    return TABS[h] ? h : "lost"; // 8 Oct: เพื่อนบ้าน always opens on หาย·เจอ unless a link names another tab
   });
   const [lend, setLend] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -620,7 +619,7 @@ export default function RepairApp() {
         <BottomNav
           page={page}
           badges={Object.fromEntries(Object.entries(notes).map(([k, b]) => [k, b && (ack[k] === b.sig ? "muted" : b.level)]))}
-          onGo={(p) => (p === "pros" ? openPros("") : goPage(p, p === "community" ? tab : undefined))}
+          onGo={(p) => (p === "pros" ? openPros("") : p === "community" ? showTab("lost") : goPage(p))}
           onHotline={() => setSheet({ type: "hotlines" })}
         />
         <main key={page} className="anim-page mx-auto max-w-5xl px-3 pb-28 pt-3 sm:px-4">
