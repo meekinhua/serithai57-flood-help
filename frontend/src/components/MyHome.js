@@ -234,6 +234,8 @@ function ElectricRound({ info, setErr, onActive, onEditSoi }) {
   const [f, setF] = useState(() => ({ teams: [], confirm: false, name: saved?.name || load("myName", ""), phone: saved?.phone || load("myReach", "") }));
   const [busy, setBusy] = useState(false);
   const [miss, setMiss] = useState("");
+  // the contact form stays open while typing (it used to vanish at the 9th digit); closed when both are already known
+  const [askContact, setAskContact] = useState(() => !(saved?.name || load("myName", "")) || (saved?.phone || load("myReach", "")).replace(/[^\d]/g, "").length < 9);
   useEffect(() => {
     api("/surveys")
       .then((l) => {
@@ -263,6 +265,8 @@ function ElectricRound({ info, setErr, onActive, onEditSoi }) {
       });
       save("myReach", f.phone);
       if (f.name) save("myName", f.name);
+      save(`myContact:${info.house}`, { ...(load(`myContact:${info.house}`, null) || {}), name: f.name.trim(), phone: f.phone.trim() });
+      setAskContact(false);
       setSt({ ...(st || {}), signed: true, round: s.round, teams: f.teams });
       setEdit(false);
       window.dispatchEvent(new Event(MYHOME_CHANGED));
@@ -311,14 +315,32 @@ function ElectricRound({ info, setErr, onActive, onEditSoi }) {
           );
         })}
         <p className="text-sm text-[#45504A]">เลือกทีมเดียวหรือทั้งสองทีมก็ได้</p>
-        {!phoneOk && (
-          <input
-            value={f.phone}
-            onChange={(e) => setF({ ...f, phone: e.target.value })}
-            inputMode="tel"
-            placeholder="เบอร์โทรให้ช่างโทรก่อนเข้า *"
-            className="min-h-[50px] w-full rounded-xl border border-[#A9B4AD] bg-white px-3 text-base"
-          />
+        {askContact ? (
+          <div className="space-y-2 rounded-2xl bg-[#F7F8F6] p-3">
+            <p className="text-[15px] font-bold">ผู้ติดต่อ (ช่างโทรหาก่อนเข้า)</p>
+            <input
+              value={f.name}
+              onChange={(e) => setF({ ...f, name: e.target.value })}
+              autoComplete="name"
+              placeholder="ชื่อผู้ติดต่อ เช่น ป้าน้อย *"
+              className="min-h-[50px] w-full rounded-xl border border-[#A9B4AD] bg-white px-3 text-base"
+            />
+            <input
+              value={f.phone}
+              onChange={(e) => setF({ ...f, phone: e.target.value })}
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="เบอร์โทร เช่น 081 234 5678 *"
+              className="min-h-[50px] w-full rounded-xl border border-[#A9B4AD] bg-white px-3 text-base"
+            />
+          </div>
+        ) : (
+          <p className="text-[15px]">
+            📞 ผู้ติดต่อ: <b>{f.name}</b> · {f.phone}{" "}
+            <button onClick={() => setAskContact(true)} className="font-bold text-[#1E6B47] underline">
+              แก้
+            </button>
+          </p>
         )}
         <label className={`flex min-h-[52px] items-center gap-3 rounded-xl border-2 p-3 ${f.confirm ? "border-[#1E6B47] bg-[#E4F0E9]" : "border-[#E0A100] bg-white"}`}>
           <input type="checkbox" checked={f.confirm} onChange={(e) => setF({ ...f, confirm: e.target.checked })} className="h-5 w-5 accent-[#1E6B47]" />
@@ -328,7 +350,15 @@ function ElectricRound({ info, setErr, onActive, onEditSoi }) {
         <button
           onClick={() => {
             // say what is missing instead of a button that silently does nothing
-            const m = !f.teams.length ? "☝️ เลือกทีมช่างก่อน (แตะกล่องทีมด้านบน)" : !phoneOk ? "☝️ ใส่เบอร์โทรให้ช่างโทรก่อนเข้า" : !f.confirm ? "☝️ ติ๊ก “อยู่บ้านรอเปิดประตู” ก่อน" : "";
+            const m = !f.teams.length
+              ? "☝️ เลือกทีมช่างก่อน (แตะกล่องทีมด้านบน)"
+              : !(f.name || "").trim()
+                ? "☝️ ใส่ชื่อผู้ติดต่อ"
+                : !phoneOk
+                  ? "☝️ ใส่เบอร์โทรให้ครบ (9–10 หลัก)"
+                  : !f.confirm
+                    ? "☝️ ติ๊ก “อยู่บ้านรอเปิดประตู” ก่อน"
+                    : "";
             setMiss(m);
             if (!m) send();
           }}
@@ -337,9 +367,9 @@ function ElectricRound({ info, setErr, onActive, onEditSoi }) {
         >
           {busy ? "กำลังส่ง…" : `✅ ยืนยันคิว บ้าน ${info.house}`}
         </button>
-        {phoneOk && (
+        {info && (
           <p className="text-sm text-[#45504A]">
-            ช่างจะโทร {f.phone} ก่อนเข้า · ซอย {info.soi || "?"}{" "}
+            ซอย {info.soi || "?"}{" "}
             <button onClick={onEditSoi} className="font-bold text-[#1E6B47] underline">
               ซอยไม่ถูก? แก้
             </button>

@@ -287,8 +287,17 @@ function SurveyBox({ s, onCount, look }) {
                   autoComplete="off"
                 />
                 <input required value={f.soi} onChange={(e) => set({ soi: e.target.value })} className={input} placeholder="ซอย/แยก *" aria-label="ซอย" />
-                <input value={f.name} onChange={(e) => set({ name: e.target.value })} className={input} placeholder="ชื่อ" aria-label="ชื่อ" maxLength={60} />
-                <input required value={f.phone} onChange={(e) => set({ phone: e.target.value })} className={input} placeholder="เบอร์โทร *" aria-label="เบอร์โทร" inputMode="tel" />
+                <input
+                  required
+                  value={f.name}
+                  onChange={(e) => set({ name: e.target.value })}
+                  className={input}
+                  placeholder="ชื่อผู้ติดต่อ *"
+                  aria-label="ชื่อผู้ติดต่อ"
+                  maxLength={60}
+                  autoComplete="name"
+                />
+                <input required value={f.phone} onChange={(e) => set({ phone: e.target.value })} className={input} placeholder="เบอร์โทร *" aria-label="เบอร์โทร" inputMode="tel" autoComplete="tel" />
               </div>
               {s.teams?.length > 0 && (
                 <fieldset className="space-y-2">
