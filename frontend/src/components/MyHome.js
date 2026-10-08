@@ -10,7 +10,7 @@ import PetsRow from "./Pets";
 import { notify } from "../notify";
 import { seenVisits } from "../visits";
 import { MediaStrip, MediaThumb } from "./MediaGallery";
-import { AidRow, CheckinCard, InstallCard, OutageRow, PlanRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
+import { AidRow, CheckinCard, InstallCard, OutageRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
 import { waterOf } from "../config";
 
 // บ้านฉัน (7 Oct 2026): a house number typed once (or taken from the electricians' sign-up on this phone) and
@@ -960,7 +960,6 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const [house, setHouse] = useState(() => takeFamilyParam() || load("myHouse", "") || fromSurvey);
   const [houses, setHouses] = useState(() => load("myHouses", []));
   const [outageOpen, setOutageOpen] = useState(false);
-  const [plusOpen, setPlusOpen] = useState([]); // settled extras opened again (plan / aid)
   const reload = () => setReloadN((n) => n + 1);
   const [typing, setTyping] = useState(!house);
   const [input, setInput] = useState(house || "");
@@ -1102,10 +1101,6 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           .map((q) => ({ key: q.id, icon: q.icon, label: q.short || (q.q.length > 22 ? q.q.slice(0, 20) + "…" : q.q), answer: q.no })),
         ...(elSettled && !opened.includes("electric") ? [{ key: "electric", icon: "⚡", label: "ตรวจไฟ", answer: el.status === "done" ? "ช่างตรวจแล้ว" : elWant[el.want] || "ตอบแล้ว" }] : []),
       ];
-  const plan = info?.plan;
-  const planDone = !!plan && !Object.values(plan).includes("todo");
-  const planSettled = planDone && !plusOpen.includes("plan");
-  if (info && planSettled) settled.push({ key: "plan", icon: "🔧", label: "แผนซ่อม", answer: Object.keys(plan).length ? `ครบ ${Object.keys(plan).length} อย่าง 🎉` : "ไม่ต้องซ่อม" });
   for (const a of info?.aid || [])
     if (a.mine === "received") settled.push({ key: `aid_${a.id}`, icon: "💰", label: a.title.length > 18 ? a.title.slice(0, 16) + "…" : a.title, answer: "ได้เงินแล้ว" });
   const isFolded = (k) => settled.some((x) => x.key === k);
@@ -1434,7 +1429,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <div id="myhome-outage">
             <OutageRow info={info} forced={outageOpen} onFold={() => setOutageOpen(false)} onChanged={reload} setErr={setErr} />
           </div>
-          {!planSettled && <PlanRow info={info} services={services} onPros={onPros} onSaved={setInfo} onFold={() => setPlusOpen((o) => o.filter((x) => x !== "plan"))} setErr={setErr} />}
+          {/* 8 Oct: แผนซ่อมของฉัน removed from บ้านฉัน (cluttered); ช่าง·ร้าน covers finding tradesmen */}
           <ReviewPrompt services={services} />
 
           <div ref={nearRef}>
@@ -1539,7 +1534,6 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <Settled
             items={settled}
             onOpen={(k) => {
-              if (k === "plan") setPlusOpen((o) => [...o, "plan"]);
               openIt(k);
               // a payout marked received is fixed in the 💰 box itself ("ยังไม่ได้รับ? แก้")
               if (k.startsWith("aid_")) window.dispatchEvent(new Event("aid:open"));
