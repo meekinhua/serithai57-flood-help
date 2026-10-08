@@ -197,6 +197,14 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         await learn_address(h, soi=soi, lat=lat, lng=lng, source="resident", by="บ้านฉัน", building_id=bid)
         return await myhome(h, request)
 
+    @router.get("/myhome/soi-at")
+    async def soi_at(lat: float, lng: float, request: Request):
+        """Which soi a dragged pin sits on (the pin page shows it live; the owner can still type another)."""
+        rate_limit(request, "soi-at", limit=300, window_s=600)
+        roof = nearest_roof((lat, lng))
+        p = (roof[1], roof[2]) if roof else (lat, lng)
+        return {"soi": nearest_soi(p)}
+
     @router.post("/myhome/soi")
     async def set_soi(body: SoiBody, request: Request):
         """"ซอยไม่ถูก" → the owner types it; it wins over the guess from the house number."""

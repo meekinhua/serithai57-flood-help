@@ -996,6 +996,18 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const openIt = (k) => setOpened((o) => (o.includes(k) ? o : [...o, k]));
   const foldIt = (k) => setOpened((o) => o.filter((x) => x !== k));
   const [pinning, setPinning] = useState(null); // {pos, soi, touched} while the map is open
+  // the soi follows the pin as it is dragged (unless the owner typed one)
+  const pinKey = pinning?.pos ? `${pinning.pos.lat},${pinning.pos.lng}` : "";
+  useEffect(() => {
+    if (!pinKey || pinning?.soiTyped || !pinning?.touched) return; // only once the owner moved the pin (drag / GPS)
+    const t = setTimeout(() => {
+      const [lat, lng] = pinKey.split(",");
+      api(`/myhome/soi-at?lat=${lat}&lng=${lng}`)
+        .then((r) => r.soi && setPinning((p) => (p && !p.soiTyped ? { ...p, soi: r.soi } : p)))
+        .catch(() => {});
+    }, 350);
+    return () => clearTimeout(t);
+  }, [pinKey, pinning?.touched]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!house) return;
@@ -1340,10 +1352,12 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
                     onTouched={() => setPinning((p) => ({ ...p, touched: true }))}
                   />
                   <label className="block">
-                    <span className="text-sm font-bold">อยู่ซอยไหน (ไม่ใส่ก็ได้ ระบบหาให้)</span>
+                    <span className="text-sm font-bold">
+                      {pinning.soiTyped ? "ซอย (คุณแก้เอง)" : pinning.soi ? `ซอยจากหมุด: ซ.${pinning.soi} · แก้ได้ถ้าไม่ตรง` : "ซอย (ลากหมุดแล้วระบบหาให้ · แก้ได้)"}
+                    </span>
                     <input
                       value={pinning.soi || ""}
-                      onChange={(e) => setPinning((p) => ({ ...p, soi: e.target.value }))}
+                      onChange={(e) => setPinning((p) => ({ ...p, soi: e.target.value, soiTyped: true }))}
                       placeholder="เช่น 34/6"
                       className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base"
                     />
