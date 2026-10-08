@@ -8,6 +8,7 @@ import { MYHOME_CHANGED, cleanHouse } from "./SurveyBox";
 import { PRO_GROUPS, goodOf, rememberCall } from "./Community";
 import PetsRow from "./Pets";
 import { notify } from "../notify";
+import PushCard from "./PushCard";
 import { mediaUrl } from "../media";
 import { MediaStrip, MediaThumb } from "./MediaGallery";
 import { AidRow, CheckinCard, InstallCard, OutageRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
@@ -1482,6 +1483,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <div className="mt-2">
             <AidRow info={info} onChanged={reload} setErr={setErr} />
           </div>
+          <PushCard house={info.house} />
           <PetsRow house={info.house} setErr={setErr} onLostPosted={onLostPosted} onOpenLost={onLost} />
 
           {

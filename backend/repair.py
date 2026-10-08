@@ -23,6 +23,8 @@ import hashlib
 import re
 import secrets
 import uuid
+
+import push
 from datetime import datetime, timezone
 from typing import Dict, List, Literal, Optional
 
@@ -484,6 +486,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             "edit_key_hash": _hash(key),
         }
         await db.jobs.insert_one(dict(doc))
+        push.fire(push.on_need, doc)
         return {**{k: v for k, v in doc.items() if k not in HIDDEN}, "edit_key": key}
 
     @router.get("/jobs/{job_id}/contact")
@@ -561,6 +564,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             "edit_key_hash": _hash(key),
         }
         await db.lost.insert_one(dict(doc))
+        push.fire(push.on_lost, doc)
         return {**{k: v for k, v in doc.items() if k not in HIDDEN}, "edit_key": key}
 
     @router.get("/lost/{item_id}/contact")
@@ -596,6 +600,8 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             projection=HIDDEN,
             return_document=True,
         )
+        if body.status == "reunited":
+            push.fire(push.on_reunited, doc)
         return doc
 
     @router.delete("/lost/{item_id}", status_code=204)

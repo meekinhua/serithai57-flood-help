@@ -181,6 +181,24 @@ export default function RepairApp() {
     };
     setTimeout(find, 200);
   };
+  // a notification tap lands on /#lost-<id> or /#jobs-<id>: open that item (sw.js posts {go} to an open tab)
+  useEffect(() => {
+    const open = (hash) => {
+      const m = (hash || "").match(/^#?(lost|jobs)-([\w-]{6,})$/);
+      if (!m) return;
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      goItem(m[1], m[2]);
+    };
+    open(window.location.hash);
+    const onHash = () => open(window.location.hash);
+    const onMsg = (e) => e.data?.go && open(new URL(e.data.go).hash);
+    window.addEventListener("hashchange", onHash);
+    navigator.serviceWorker?.addEventListener("message", onMsg);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      navigator.serviceWorker?.removeEventListener("message", onMsg);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const posted = (tab, text) => {
     showTab(tab);
     setSheet({ type: "posted", text });

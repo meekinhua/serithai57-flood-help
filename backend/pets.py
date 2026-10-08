@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
+import push
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
@@ -140,6 +141,7 @@ def build_router(db, rate_limit, clean, locate_house, claim_media, delete_media)
             "edit_key_hash": hashlib.sha256(key.encode()).hexdigest(),
         }
         await db.lost.insert_one(dict(doc))
+        push.fire(push.on_lost, doc)
         hidden = {"_id", "edit_key_hash", "phone", "pet_house"}
         return {**{k: v for k, v in doc.items() if k not in hidden}, "edit_key": key}
 
@@ -148,12 +150,14 @@ def build_router(db, rate_limit, clean, locate_house, claim_media, delete_media)
         """The owner, from บ้านฉัน on any phone of the house: back home 🎉 (closes the หาย·เจอ post)."""
         rate_limit(request, "pets", limit=30, window_s=600)
         h = clean(house)
-        r = await db.lost.update_one(
+        doc = await db.lost.find_one_and_update(
             {"pet_house": h, "pet_id": pid, "status": "open"},
             {"$set": {"status": "reunited", "updated_at": _now()}, "$push": {"history": {"by": "เจ้าของ", "text": "ได้คืนแล้ว 🎉", "at": _now()}}},
+            projection={"_id": 0, "id": 1, "title": 1, "category": 1},
         )
-        if not r.modified_count:
+        if not doc:
             raise HTTPException(404, "ไม่มีประกาศหายของน้องตัวนี้")
+        push.fire(push.on_reunited, doc)
         return {"ok": True}
 
     return router
