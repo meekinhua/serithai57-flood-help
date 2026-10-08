@@ -50,7 +50,7 @@ export function LostBoard({ items, setItems, admin, onAdd, reunited = [], noAdd 
       {!noAdd && (
         <div className="grid grid-cols-2 gap-2">
           {Object.entries(LOST_KINDS).map(([k, v]) => (
-            <button key={k} onClick={() => onAdd(k)} className={`min-h-[56px] rounded-xl px-2 font-bold ${k === "lost" ? "bg-black text-white" : "border-2 border-black bg-white"}`}>
+            <button key={k} onClick={() => onAdd(k)} className={`min-h-[56px] rounded-xl px-2 font-bold ${k === "lost" ? "bg-[#B42318] text-white" : "border-2 border-[#15201A] bg-white"}`}>
               {v.emoji} {v.verb}
             </button>
           ))}
@@ -167,11 +167,11 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
           📤 ส่งต่อในกลุ่ม LINE
         </button>
         {phone ? (
-          <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="flex min-h-[48px] items-center justify-center rounded-xl bg-black text-lg font-bold text-white">
+          <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="flex min-h-[48px] items-center justify-center rounded-xl bg-[#1E6B47] text-lg font-bold text-white">
             📞 {phone}
           </a>
         ) : (
-          <button onClick={() => run(async () => setPhone((await api(`/lost/${x.id}/contact`)).phone))} className="min-h-[48px] w-full rounded-xl bg-black font-bold text-white">
+          <button onClick={() => run(async () => setPhone((await api(`/lost/${x.id}/contact`)).phone))} className="min-h-[48px] w-full rounded-xl bg-[#1E6B47] font-bold text-white">
             {x.kind === "lost" ? "📞 ฉันเจอ · ติดต่อเจ้าของ" : "📞 ของฉันเอง · ติดต่อคนเจอ"}
           </button>
         )}
@@ -197,7 +197,7 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
                     setSeen(null);
                   })
                 }
-                className="min-h-[44px] rounded-lg bg-black font-bold text-white"
+                className="min-h-[44px] rounded-lg bg-[#1E6B47] font-bold text-white"
               >
                 ส่ง
               </button>
@@ -359,7 +359,7 @@ export function LostForm({ kind: initialKind = "lost", onDone }) {
       </div>
       <p className="text-sm text-neutral-500">เบอร์แสดงเมื่อมีคนกดติดต่อทีละรายการ · ได้คืนแล้วกด “ได้คืนแล้ว” จากเครื่องนี้</p>
       {err && <p className="rounded-lg bg-red-50 p-3 text-red-700">{err}</p>}
-      <button disabled={busy || attached.busy} className="min-h-[52px] w-full rounded-xl bg-black text-lg font-semibold text-white disabled:opacity-60">
+      <button disabled={busy || attached.busy} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60">
         {busy ? "กำลังส่ง…" : attached.busy ? "รอรูปอัปโหลด…" : lost ? "😢 ลงประกาศตามหา" : "🙌 ลงประกาศว่าเจอ"}
       </button>
     </form>

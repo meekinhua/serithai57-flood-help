@@ -58,7 +58,7 @@ export default function WasteBoard({ admin, onReportTrash }) {
         ) : (
           <p className="text-neutral-600">ยังไม่มีตาราง · ได้ข้อมูลแล้วจะขึ้นตรงนี้</p>
         )}
-        <button onClick={onReportTrash} className="mt-2 min-h-[44px] w-full rounded-lg bg-black px-3 font-semibold text-white">
+        <button onClick={onReportTrash} className="mt-2 min-h-[44px] w-full rounded-lg bg-[#1E6B47] px-3 font-semibold text-white">
           🗑️ กองขยะค้างนาน? แจ้งในปัญหาซอย
         </button>
       </section>
@@ -240,7 +240,7 @@ function WasteEditor({ value, onCancel, onSaved }) {
         <button onClick={onCancel} className="min-h-[52px] rounded-xl border-2 border-black bg-white font-semibold">
           ยกเลิก
         </button>
-        <button onClick={save} disabled={busy} className="min-h-[52px] rounded-xl bg-black font-bold text-white disabled:opacity-60">
+        <button onClick={save} disabled={busy} className="min-h-[52px] rounded-xl bg-[#1E6B47] font-bold text-white disabled:opacity-60">
           {busy ? "กำลังบันทึก…" : "💾 บันทึก"}
         </button>
       </div>

@@ -623,8 +623,7 @@ function Soon({ items, onSeen }) {
     onSeen && onSeen();
   };
   return (
-    <div className="mt-2 space-y-2" role="status">
-      <p className="text-sm font-bold text-[#45504A]">{t("myhome.soon.title", "เร็วๆ นี้ที่บ้านคุณ")}</p>
+    <div className="mt-2 space-y-2" role="status" aria-label={t("myhome.soon.title", "เร็วๆ นี้ที่บ้านคุณ")}>
       {shown.map((x) => (
         <div key={x.id} className="card flex items-center gap-3 p-3">
           <span className="ic ic-amber" aria-hidden="true">
@@ -1306,22 +1305,18 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
     );
 
   return (
-    <section className="mb-3 rounded-[20px] border border-[#DCE2DD] bg-white px-4 pt-4" style={frame}>
-      <div className="flex items-center gap-3">
-        <h2 className="font-display min-w-0 flex-1 text-xl font-bold">
-          {houses.find((x) => x.house === (info?.house || house))?.label || "บ้านฉัน"} {info?.house || house}
+    <section className={info && !typing ? "mb-3 px-1" : "mb-3 rounded-[20px] border border-[#DCE2DD] bg-white px-4 pt-4"} style={frame}>
+      <div className="flex items-end gap-3">
+        <h2 className="min-w-0 flex-1">
+          <span className="block text-[13px] font-bold tracking-wide text-[#5A665F]">{houses.find((x) => x.house === (info?.house || house))?.label || "บ้านฉัน"}</span>
+          <span className="font-display block text-[30px] font-bold leading-tight">{info?.house || house}</span>
         </h2>
-        {info?.precision === "house" && !pinning && (
-          <button onClick={() => setPinning({ pos: null, soi: info.soi || "" })} className="min-h-[44px] shrink-0 text-[15px] font-bold text-[#45504A] underline">
-            ย้ายหมุด
-          </button>
-        )}
         <button
           onClick={() => {
             setInput(house);
             setTyping(true);
           }}
-          className="min-h-[44px] shrink-0 text-[15px] font-bold text-[#45504A] underline"
+          className="min-h-[44px] shrink-0 text-[15px] font-bold text-[#1E6B47]"
         >
           เปลี่ยนบ้าน
         </button>
@@ -1345,24 +1340,19 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         </div>
       )}
       {info && (
-        <p className="text-[15px] text-[#33403A]">
-          <button onClick={() => setSoiEdit((v) => !v)} className="font-bold underline decoration-dotted underline-offset-4" aria-label="แก้ซอย">
-            {info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย"} ✎
-          </button>{" "}
-          <button
-            onClick={() => setPinning({ pos: null, soi: info.soi || "", gps: true })}
-            className="font-bold underline decoration-dotted underline-offset-4"
-            aria-label={info.precision === "house" ? "ย้ายหมุดบ้าน" : "ปักหมุดบ้านด้วย GPS"}
-          >
-            📍{info.precision === "house" ? "หมุดแล้ว" : "GPS"}
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[15px]">
+          <button onClick={() => setSoiEdit((v) => !v)} className="chip" aria-label="แก้ซอย">
+            {info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย"} <span className="text-[#1E6B47]">แก้</span>
+          </button>
+          <button onClick={() => setPinning({ pos: null, soi: info.soi || "", gps: true })} className="chip" aria-label={info.precision === "house" ? "ย้ายหมุดบ้าน" : "ปักหมุดบ้านด้วย GPS"}>
+            📍 {info.precision === "house" ? "หมุดแล้ว" : "ปักหมุด GPS"}
           </button>
           {info.waste && (
-            <>
-              {" · 🚛 รถขยะ "}
-              <WasteDays days={info.waste.days} />
-            </>
+            <span className="chip border-[#E4F0E9] bg-[#E4F0E9] text-[#154D33]">
+              🚛 <WasteDays days={info.waste.days} />
+            </span>
           )}
-        </p>
+        </div>
       )}
       {info && info.precision !== "house" && !soiAsked.includes(info.house) && !pinning && (
         <SoiAsk
@@ -1406,231 +1396,244 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         <p className="py-3 text-[15px] text-[#45504A]">กำลังโหลด…</p>
       ) : (
         <>
-          <CheckinCard info={info} onSaved={setInfo} onContact={() => setContact({ name: load("myName", ""), from: "news" })} setErr={setErr} />
-          <Soon items={info.soon} onSeen={() => setSeenN((n) => n + 1)} />
-          <Slides
-            items={lostNew}
-            allLabel={lost.length > lostNew.length ? `ดูทั้งหมด ${lost.length} เรื่อง ›` : "ดูทั้งหมด ›"}
-            foldKey="lost"
-            mini={(x) => (
-              <>
-                {x.media?.[0] ? (
-                  <img src={mediaUrl(x.media[0].id, "thumb")} alt="" className="h-12 w-12 shrink-0 rounded-xl bg-[#FDE8E6] object-cover" />
-                ) : (
-                  <span className="ic ic-red h-12 w-12" aria-hidden="true">
-                    {{ dog: "🐕", cat: "🐈", pet: "🐾", document: "📄", vehicle: "🛵" }[x.category] || "🎒"}
-                  </span>
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className={`rounded px-1 text-[11px] font-bold text-white ${x.kind === "found" ? "bg-[#1E6B47]" : "bg-[#B42318]"}`}>{x.kind === "found" ? "🙌 มีคนเจอ" : "😢 หาย"}</span>
-                  {x.soi ? <span className="ml-1 text-xs text-[#45504A]">ซ.{x.soi}</span> : null}
-                  <span className="block truncate text-[15px] font-bold leading-snug">{x.title}</span>
-                </span>
-              </>
-            )}
-            icon="🐾"
-            tone="red"
-            title={(n) => (lost.length > n ? `หาย · เจอ ล่าสุด ${n} เรื่อง` : `หาย · เจอ ${n} เรื่อง`)}
-            onOpen={(id) => onLost(id)}
-            onAll={() => onLost()}
-            slide={(x) => (
-              <span className="flex items-center gap-3">
-                {x.media?.[0] ? (
-                  <img src={mediaUrl(x.media[0].id, "thumb")} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
-                ) : (
-                  <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#F2F4F1] text-3xl" aria-hidden="true">
-                    {{ dog: "🐕", cat: "🐈", pet: "🐾", document: "📄", vehicle: "🛵" }[x.category] || "🎒"}
-                  </span>
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className={`rounded px-1.5 text-xs font-bold text-white ${x.kind === "found" ? "bg-[#1E6B47]" : "bg-[#B42318]"}`}>{x.kind === "found" ? "🙌 มีคนเจอ" : "😢 หาย"}</span>
-                  <span className="mt-0.5 line-clamp-2 block text-[16px] font-bold leading-snug">{x.title}</span>
-                  <span className="block text-sm text-[#45504A]">{[x.soi && `ซ.${x.soi}`, "เห็นไหม? แตะดูเบอร์ ›"].filter(Boolean).join(" · ")}</span>
-                </span>
-              </span>
-            )}
-          />
-          <Slides
-            items={[...needs].sort((x, y) => fits(y) - fits(x))}
-            foldKey="needs"
-            startFolded
-            tone="green"
-            icon="🙋"
-            title={(n) => `เพื่อนบ้านขอแรงอยู่ ${n} เรื่อง`}
-            onOpen={(id) => onNeeds(id)}
-            onAll={() => onNeeds()}
-            slide={(j) => (
-              <>
-                <span className="block text-sm text-[#45504A]">
-                  {j.name}
-                  {j.soi ? ` · ซ.${j.soi}` : ""}
-                  {fits(j) ? <b className="ml-1 rounded-full bg-[#1E6B47] px-2 text-xs text-white">🤝 ตรงกับที่คุณถนัด</b> : null}
-                </span>
-                <span className="line-clamp-2 block text-[16px] font-bold leading-snug">{j.detail}</span>
-                <span className="mt-0.5 block text-sm font-bold text-[#1E6B47]">ช่วยได้? ดูและติดต่อ ›</span>
-              </>
-            )}
-          />
-          <ElectricRound
-            info={info}
-            setErr={setErr}
-            onActive={setRoundOn}
-            onEditSoi={() => {
-              setSoiEdit(true);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-          />
-          <div className="mt-2">
-            <AidRow info={info} onChanged={reload} setErr={setErr} />
+          <div className="grp">
+            <p className="grp-label">วันนี้</p>
+            <div className="grp-body">
+              <CheckinCard info={info} onSaved={setInfo} onContact={() => setContact({ name: load("myName", ""), from: "news" })} setErr={setErr} />
+              <Soon items={info.soon} onSeen={() => setSeenN((n) => n + 1)} />
+              <ElectricRound
+                info={info}
+                setErr={setErr}
+                onActive={setRoundOn}
+                onEditSoi={() => {
+                  setSoiEdit(true);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
+            </div>
           </div>
-          <PushCard house={info.house} />
-          <PetsRow house={info.house} setErr={setErr} onLostPosted={onLostPosted} onOpenLost={onLost} />
+          <div className="grp">
+            <p className="grp-label">ในหมู่บ้านตอนนี้</p>
+            <div className="grp-body">
+              <Slides
+                items={lostNew}
+                allLabel={lost.length > lostNew.length ? `ดูทั้งหมด ${lost.length} เรื่อง ›` : "ดูทั้งหมด ›"}
+                foldKey="lost"
+                mini={(x) => (
+                  <>
+                    {x.media?.[0] ? (
+                      <img src={mediaUrl(x.media[0].id, "thumb")} alt="" className="h-12 w-12 shrink-0 rounded-xl bg-[#FDE8E6] object-cover" />
+                    ) : (
+                      <span className="ic ic-red h-12 w-12" aria-hidden="true">
+                        {{ dog: "🐕", cat: "🐈", pet: "🐾", document: "📄", vehicle: "🛵" }[x.category] || "🎒"}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className={`rounded px-1 text-[11px] font-bold text-white ${x.kind === "found" ? "bg-[#1E6B47]" : "bg-[#B42318]"}`}>{x.kind === "found" ? "🙌 มีคนเจอ" : "😢 หาย"}</span>
+                      {x.soi ? <span className="ml-1 text-xs text-[#45504A]">ซ.{x.soi}</span> : null}
+                      <span className="block truncate text-[15px] font-bold leading-snug">{x.title}</span>
+                    </span>
+                  </>
+                )}
+                icon="🐾"
+                tone="red"
+                title={(n) => (lost.length > n ? `หาย · เจอ ล่าสุด ${n} เรื่อง` : `หาย · เจอ ${n} เรื่อง`)}
+                onOpen={(id) => onLost(id)}
+                onAll={() => onLost()}
+                slide={(x) => (
+                  <span className="flex items-center gap-3">
+                    {x.media?.[0] ? (
+                      <img src={mediaUrl(x.media[0].id, "thumb")} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                    ) : (
+                      <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#F2F4F1] text-3xl" aria-hidden="true">
+                        {{ dog: "🐕", cat: "🐈", pet: "🐾", document: "📄", vehicle: "🛵" }[x.category] || "🎒"}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className={`rounded px-1.5 text-xs font-bold text-white ${x.kind === "found" ? "bg-[#1E6B47]" : "bg-[#B42318]"}`}>{x.kind === "found" ? "🙌 มีคนเจอ" : "😢 หาย"}</span>
+                      <span className="mt-0.5 line-clamp-2 block text-[16px] font-bold leading-snug">{x.title}</span>
+                      <span className="block text-sm text-[#45504A]">{[x.soi && `ซ.${x.soi}`, "เห็นไหม? แตะดูเบอร์ ›"].filter(Boolean).join(" · ")}</span>
+                    </span>
+                  </span>
+                )}
+              />
+              <Slides
+                items={[...needs].sort((x, y) => fits(y) - fits(x))}
+                foldKey="needs"
+                startFolded
+                tone="green"
+                icon="🙋"
+                title={(n) => `เพื่อนบ้านขอแรงอยู่ ${n} เรื่อง`}
+                onOpen={(id) => onNeeds(id)}
+                onAll={() => onNeeds()}
+                slide={(j) => (
+                  <>
+                    <span className="block text-sm text-[#45504A]">
+                      {j.name}
+                      {j.soi ? ` · ซ.${j.soi}` : ""}
+                      {fits(j) ? <b className="ml-1 rounded-full bg-[#1E6B47] px-2 text-xs text-white">🤝 ตรงกับที่คุณถนัด</b> : null}
+                    </span>
+                    <span className="line-clamp-2 block text-[16px] font-bold leading-snug">{j.detail}</span>
+                    <span className="mt-0.5 block text-sm font-bold text-[#1E6B47]">ช่วยได้? ดูและติดต่อ ›</span>
+                  </>
+                )}
+              />
+            </div>
+          </div>
+          <div className="grp">
+            <p className="grp-label">ของบ้านฉัน</p>
+            <div className="grp-body">
+              <div className="mt-2">
+                <AidRow info={info} onChanged={reload} setErr={setErr} />
+              </div>
+              <PushCard house={info.house} />
+              <div className="card stack mt-2 px-4">
+                <PetsRow house={info.house} setErr={setErr} onLostPosted={onLostPosted} onOpenLost={onLost} />
 
-          {
-            pinning
-              ? // full screen over everything: the map, GPS and "save" in one place — nothing to scroll for
-                createPortal(
-                  <div className="anim-fade fixed inset-0 z-[960] flex flex-col bg-white" role="dialog" aria-label="ปักหมุดบ้านฉัน">
-                    <div className="flex items-center gap-2 border-b border-[#E6EBE7] px-4 py-2">
-                      <b className="min-w-0 flex-1 text-lg">📍 ปักหมุดบ้าน {info.house}</b>
-                      <button onClick={() => setPinning(null)} aria-label="ปิด" className="min-h-[44px] min-w-[44px] text-2xl text-[#45504A]">
-                        ✕
+                {
+                  pinning
+                    ? // full screen over everything: the map, GPS and "save" in one place — nothing to scroll for
+                      createPortal(
+                        <div className="anim-fade fixed inset-0 z-[960] flex flex-col bg-white" role="dialog" aria-label="ปักหมุดบ้านฉัน">
+                          <div className="flex items-center gap-2 border-b border-[#E6EBE7] px-4 py-2">
+                            <b className="min-w-0 flex-1 text-lg">📍 ปักหมุดบ้าน {info.house}</b>
+                            <button onClick={() => setPinning(null)} aria-label="ปิด" className="min-h-[44px] min-w-[44px] text-2xl text-[#45504A]">
+                              ✕
+                            </button>
+                          </div>
+                          <div id="myhome-pin" className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+                            <p className="text-[15px]">กด "ใช้ตำแหน่งปัจจุบัน" ตอนอยู่ที่บ้าน หรือเลื่อนแผนที่ให้หมุดอยู่บนหลังคาบ้านคุณ</p>
+                            <LocationPicker
+                              big
+                              autoGps={!!pinning.gps}
+                              value={info.precision === "house" ? { lat: info.lat, lng: info.lng } : null}
+                              onChange={(pos) => setPinning((p) => ({ ...p, pos }))}
+                              onTouched={() => setPinning((p) => ({ ...p, touched: true }))}
+                            />
+                            <label className="block">
+                              <span className="text-sm font-bold">
+                                {pinning.soiTyped ? "ซอย (คุณแก้เอง)" : pinning.soi ? `ซอยจากหมุด: ซ.${pinning.soi} · แก้ได้ถ้าไม่ตรง` : "ซอย (ลากหมุดแล้วระบบหาให้ · แก้ได้)"}
+                              </span>
+                              <input
+                                value={pinning.soi || ""}
+                                onChange={(e) => setPinning((p) => ({ ...p, soi: e.target.value, soiTyped: true }))}
+                                placeholder="เช่น 34/6"
+                                className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base"
+                              />
+                            </label>
+                            <div className="flex gap-2">
+                              <button onClick={savePin} disabled={!pinning.pos} className="min-h-[52px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-50">
+                                บ้านฉันอยู่ตรงนี้
+                              </button>
+                              <button onClick={() => setPinning(null)} className="min-h-[52px] rounded-xl border border-[#C9D1CB] px-4 font-bold">
+                                ยกเลิก
+                              </button>
+                            </div>
+                          </div>
+                        </div>,
+                        document.body,
+                      )
+                    : null /* 8 Oct: the "ระบบเดาว่าอยู่ ซ.x" box is gone — the one-time "อยู่ ซ.x ใช่ไหม?" pop-up and "ซ.x ✎ · 📍GPS" at the top replace it */
+                }
+
+                {(info.questions || [])
+                  .filter((q) => !isFolded(q.id))
+                  .map((q) => (
+                    <QuestionRow
+                      key={q.id}
+                      onFold={() => foldIt(q.id)}
+                      q={q}
+                      info={info}
+                      services={services}
+                      onAnswered={(d) => {
+                        setInfo(d);
+                        // a fresh "no" folds right away; a "yes" stays open with its way out
+                        const a = (d.questions || []).find((x) => x.id === q.id)?.answer;
+                        if (a === "no") foldIt(q.id);
+                        else openIt(q.id);
+                      }}
+                      onPros={onPros}
+                      onIssue={onIssue}
+                      onAsk={() => {
+                        setNearForm({ kind: "ask", topic: "other", text: q.q, name: load("myName", ""), phone: load("myReach", ""), to_office: false });
+                        setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                      }}
+                      setErr={setErr}
+                    />
+                  ))}
+
+                {!roundOn && !isFolded("electric") && (
+                  <ElectricRow
+                    onFold={() => foldIt("electric")}
+                    onSent={(w) => (w === "free" ? foldIt("electric") : openIt("electric"))}
+                    info={info}
+                    services={services}
+                    onSaved={setInfo}
+                    onElectricians={onElectricians}
+                    onContact={() => setContact({ name: load("myName", ""), from: "electric" })}
+                    contactSlot={contact?.from === "electric" ? <ContactForm contact={contact} setContact={setContact} onSave={sendContact} /> : null}
+                    setErr={setErr}
+                  />
+                )}
+
+                <WaterRow
+                  info={info}
+                  water={water}
+                  sent={sent}
+                  onTap={tap}
+                  onAsk={
+                    nearForm
+                      ? null
+                      : () => {
+                          setNearForm({ kind: "ask", topic: "water", text: "", name: load("myName", ""), phone: load("myReach", ""), to_office: false });
+                          setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                        }
+                  }
+                />
+
+                <div id="myhome-outage">
+                  <OutageRow info={info} forced={outageOpen} onFold={() => setOutageOpen(false)} onChanged={reload} setErr={setErr} />
+                </div>
+                {/* 8 Oct: แผนซ่อมของฉัน removed from บ้านฉัน (cluttered); ช่าง·ร้าน covers finding tradesmen */}
+                <ReviewPrompt services={services} />
+
+                <div ref={nearRef}>
+                  <Nearby info={info} form={nearForm} setForm={setNearForm} setErr={setErr} handy={handy} onPros={onPros} />
+                </div>
+
+                {info.issues_open > 0 && (
+                  <Row icon="🛠️" title={t("myhome.office.open", "ในซอยมีเรื่องรอสำนักงานแก้")}>
+                    <div className="flex items-center gap-2">
+                      <p className="min-w-0 flex-1 text-[15px]">
+                        {info.soi ? `ซ.${info.soi} · ` : ""}
+                        {info.issues_open} เรื่อง
+                      </p>
+                      <button onClick={onIssues} className="min-h-[46px] shrink-0 rounded-xl border border-[#C9D1CB] bg-white px-4 text-[15px] font-bold">
+                        ดูรายการ
                       </button>
                     </div>
-                    <div id="myhome-pin" className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-                      <p className="text-[15px]">กด "ใช้ตำแหน่งปัจจุบัน" ตอนอยู่ที่บ้าน หรือเลื่อนแผนที่ให้หมุดอยู่บนหลังคาบ้านคุณ</p>
-                      <LocationPicker
-                        big
-                        autoGps={!!pinning.gps}
-                        value={info.precision === "house" ? { lat: info.lat, lng: info.lng } : null}
-                        onChange={(pos) => setPinning((p) => ({ ...p, pos }))}
-                        onTouched={() => setPinning((p) => ({ ...p, touched: true }))}
-                      />
-                      <label className="block">
-                        <span className="text-sm font-bold">
-                          {pinning.soiTyped ? "ซอย (คุณแก้เอง)" : pinning.soi ? `ซอยจากหมุด: ซ.${pinning.soi} · แก้ได้ถ้าไม่ตรง` : "ซอย (ลากหมุดแล้วระบบหาให้ · แก้ได้)"}
-                        </span>
-                        <input
-                          value={pinning.soi || ""}
-                          onChange={(e) => setPinning((p) => ({ ...p, soi: e.target.value, soiTyped: true }))}
-                          placeholder="เช่น 34/6"
-                          className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base"
-                        />
-                      </label>
-                      <div className="flex gap-2">
-                        <button onClick={savePin} disabled={!pinning.pos} className="min-h-[52px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-50">
-                          บ้านฉันอยู่ตรงนี้
-                        </button>
-                        <button onClick={() => setPinning(null)} className="min-h-[52px] rounded-xl border border-[#C9D1CB] px-4 font-bold">
-                          ยกเลิก
-                        </button>
-                      </div>
-                    </div>
-                  </div>,
-                  document.body,
-                )
-              : null /* 8 Oct: the "ระบบเดาว่าอยู่ ซ.x" box is gone — the one-time "อยู่ ซ.x ใช่ไหม?" pop-up and "ซ.x ✎ · 📍GPS" at the top replace it */
-          }
+                  </Row>
+                )}
 
-          {(info.questions || [])
-            .filter((q) => !isFolded(q.id))
-            .map((q) => (
-              <QuestionRow
-                key={q.id}
-                onFold={() => foldIt(q.id)}
-                q={q}
-                info={info}
-                services={services}
-                onAnswered={(d) => {
-                  setInfo(d);
-                  // a fresh "no" folds right away; a "yes" stays open with its way out
-                  const a = (d.questions || []).find((x) => x.id === q.id)?.answer;
-                  if (a === "no") foldIt(q.id);
-                  else openIt(q.id);
-                }}
-                onPros={onPros}
-                onIssue={onIssue}
-                onAsk={() => {
-                  setNearForm({ kind: "ask", topic: "other", text: q.q, name: load("myName", ""), phone: load("myReach", ""), to_office: false });
-                  setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-                }}
-                setErr={setErr}
-              />
-            ))}
-
-          {!roundOn && !isFolded("electric") && (
-            <ElectricRow
-              onFold={() => foldIt("electric")}
-              onSent={(w) => (w === "free" ? foldIt("electric") : openIt("electric"))}
-              info={info}
-              services={services}
-              onSaved={setInfo}
-              onElectricians={onElectricians}
-              onContact={() => setContact({ name: load("myName", ""), from: "electric" })}
-              contactSlot={contact?.from === "electric" ? <ContactForm contact={contact} setContact={setContact} onSave={sendContact} /> : null}
-              setErr={setErr}
-            />
-          )}
-
-          <WaterRow
-            info={info}
-            water={water}
-            sent={sent}
-            onTap={tap}
-            onAsk={
-              nearForm
-                ? null
-                : () => {
-                    setNearForm({ kind: "ask", topic: "water", text: "", name: load("myName", ""), phone: load("myReach", ""), to_office: false });
-                    setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-                  }
-            }
-          />
-
-          <div id="myhome-outage">
-            <OutageRow info={info} forced={outageOpen} onFold={() => setOutageOpen(false)} onChanged={reload} setErr={setErr} />
-          </div>
-          {/* 8 Oct: แผนซ่อมของฉัน removed from บ้านฉัน (cluttered); ช่าง·ร้าน covers finding tradesmen */}
-          <ReviewPrompt services={services} />
-
-          <div ref={nearRef}>
-            <Nearby info={info} form={nearForm} setForm={setNearForm} setErr={setErr} handy={handy} onPros={onPros} />
-          </div>
-
-          {info.issues_open > 0 && (
-            <Row icon="🛠️" title={t("myhome.office.open", "ในซอยมีเรื่องรอสำนักงานแก้")}>
-              <div className="flex items-center gap-2">
-                <p className="min-w-0 flex-1 text-[15px]">
-                  {info.soi ? `ซ.${info.soi} · ` : ""}
-                  {info.issues_open} เรื่อง
-                </p>
-                <button onClick={onIssues} className="min-h-[46px] shrink-0 rounded-xl border border-[#C9D1CB] bg-white px-4 text-[15px] font-bold">
-                  ดูรายการ
-                </button>
+                <div ref={contactRef} />
+                {contact && contact.from !== "electric" && (
+                  <Row icon="📨" title={t("myhome.contact.title", "ช่องทางติดต่อบ้านนี้")}>
+                    <ContactForm contact={contact} setContact={setContact} onSave={sendContact} />
+                  </Row>
+                )}
               </div>
-            </Row>
-          )}
-
-          <div ref={contactRef} />
-          {contact && contact.from !== "electric" && (
-            <Row icon="📨" title={t("myhome.contact.title", "ช่องทางติดต่อบ้านนี้")}>
-              <ContactForm contact={contact} setContact={setContact} onSave={sendContact} />
-            </Row>
-          )}
-
+            </div>
+          </div>
           {/* things you may want to do some day: one grid instead of a section each */}
-          <div className="border-t border-[#E6EBE7] py-3">
-            <p className="text-base font-bold text-[#15201A]">{t("myhome.tools.title", "ทำอะไรได้อีก")}</p>
-            <button
-              onClick={() => setHandyOpen((o) => !o)}
-              className={`mt-2 flex min-h-[64px] w-full items-center gap-3 rounded-2xl px-3 py-2 text-left ${handy?.on ? "border-2 border-[#1E6B47] bg-[#E4F0E9]" : "bg-[#15201A] text-white"}`}
-            >
+          <div className="pb-1">
+            <p className="grp-label">{t("myhome.tools.title", "ทำอะไรได้อีก")}</p>
+            <button onClick={() => setHandyOpen((o) => !o)} className={`card flex min-h-[64px] w-full items-center gap-3 px-3 py-2 text-left ${handy?.on ? "border-[#1E6B47] bg-[#E4F0E9]" : ""}`}>
               <span className="text-2xl" aria-hidden="true">
                 🤝
               </span>
               <span className="min-w-0 flex-1">
                 <b className="block text-base leading-tight">{handy?.on ? `คุณเป็นอาสาข้างบ้าน ✓` : t("myhome.handy.cta", "ทำเป็น ช่วยเพื่อนบ้านได้? เป็นอาสาข้างบ้าน")}</b>
-                <span className={`block text-sm ${handy?.on ? "text-[#33403A]" : "text-[#C5D1CA]"}`}>
+                <span className="block text-sm text-[#45504A]">
                   {handy?.on
                     ? `${SKILL_LIST.filter(([k]) => handy.skills.includes(k))
                         .map(([, , l]) => l)
@@ -1679,7 +1682,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
                     ]
                   : ["📨", t("myhome.tools.contact", "ฝากเบอร์ทีม"), t("myhome.tools.contact_sub", "รับข่าวด่วน นัดช่าง"), () => setContact({ name: load("myName", ""), from: "news" })],
               ].map(([icon, label, sub, go]) => (
-                <button key={label} onClick={go} className="flex min-h-[72px] flex-col items-start justify-center rounded-2xl border border-[#C9D1CB] bg-white px-3 py-2 text-left active:bg-[#F2F4F1]">
+                <button key={label} onClick={go} className="card flex min-h-[72px] flex-col items-start justify-center px-3 py-2 text-left active:bg-[#F2F4F1]">
                   <span className="whitespace-nowrap text-[15px] font-bold leading-tight">
                     <span aria-hidden="true">{icon} </span>
                     {label}

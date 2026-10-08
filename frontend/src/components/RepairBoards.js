@@ -71,7 +71,7 @@ function ContactButton({ path, text = "📞 ดูเบอร์ติดต่
     return (
       <div className="space-y-1">
         {c.phone ? (
-          <a href={telHref(c.phone)} className="flex min-h-[52px] items-center justify-center rounded-xl bg-black px-3 text-lg font-bold text-white">
+          <a href={telHref(c.phone)} className="flex min-h-[52px] items-center justify-center rounded-xl bg-[#1E6B47] px-3 text-lg font-bold text-white">
             📞 {c.phone}
           </a>
         ) : (
@@ -88,7 +88,7 @@ function ContactButton({ path, text = "📞 ดูเบอร์ติดต่
             .then(setC)
             .catch((e) => setErr(e.message))
         }
-        className="min-h-[48px] w-full rounded-xl bg-black px-3 font-bold text-white active:bg-neutral-800"
+        className="min-h-[48px] w-full rounded-xl bg-[#1E6B47] px-3 font-bold text-white active:bg-[#154D33]"
       >
         {text}
       </button>
@@ -297,12 +297,12 @@ function LendVisitor({ item: x, onChanged }) {
             <button type="button" onClick={() => setForm(null)} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">
               ยกเลิก
             </button>
-            <button className="min-h-[48px] rounded-xl bg-black font-bold text-white">ต่อคิว</button>
+            <button className="min-h-[48px] rounded-xl bg-[#1E6B47] font-bold text-white">ต่อคิว</button>
           </div>
         </form>
       ) : (
         !done && (
-          <button onClick={() => setForm({ name: c.name || "", phone: c.phone || "", note: "" })} className="min-h-[48px] w-full rounded-xl bg-black px-3 font-bold text-white">
+          <button onClick={() => setForm({ name: c.name || "", phone: c.phone || "", note: "" })} className="min-h-[48px] w-full rounded-xl bg-[#1E6B47] px-3 font-bold text-white">
             🙋 ขอยืม (ต่อคิว){x.queue_count ? ` · รออยู่ ${x.queue_count}` : ""}
           </button>
         )
@@ -349,7 +349,7 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
                   📞 {q.phone}
                 </a>
                 {q.note && <span className="w-full text-neutral-600">{q.note}</span>}
-                <button onClick={() => setLendTo({ lent_to: q.name, until: "" })} className="min-h-[40px] rounded-lg bg-black px-2 text-white">
+                <button onClick={() => setLendTo({ lent_to: q.name, until: "" })} className="min-h-[40px] rounded-lg bg-[#1E6B47] px-2 text-white">
                   ให้คนนี้ยืม
                 </button>
                 <button onClick={() => run(async () => setFull(await api(`/lend/${x.id}/queue/${q.id}/done`, { method: "POST", headers })))} className="min-h-[40px] px-2 underline">
@@ -372,7 +372,7 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
                     patch({ status: "lent", ...lendTo });
                     setLendTo(null);
                   }}
-                  className="min-h-[44px] rounded-lg bg-black font-bold text-white"
+                  className="min-h-[44px] rounded-lg bg-[#1E6B47] font-bold text-white"
                 >
                   บันทึก ให้ยืมแล้ว
                 </button>
@@ -381,11 +381,11 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
           ) : (
             <div className="grid grid-cols-2 gap-2">
               {x.status !== "lent" ? (
-                <button onClick={() => setLendTo({ lent_to: queue[0]?.name || "", until: "" })} className="min-h-[44px] rounded-lg bg-black font-semibold text-white">
+                <button onClick={() => setLendTo({ lent_to: queue[0]?.name || "", until: "" })} className="min-h-[44px] rounded-lg bg-[#1E6B47] font-semibold text-white">
                   📤 ให้ยืมไปแล้ว
                 </button>
               ) : (
-                <button onClick={() => patch({ status: "available" })} className="min-h-[44px] rounded-lg bg-black font-semibold text-white">
+                <button onClick={() => patch({ status: "available" })} className="min-h-[44px] rounded-lg bg-[#1E6B47] font-semibold text-white">
                   📥 ได้คืนแล้ว · ว่าง
                 </button>
               )}
@@ -397,7 +397,7 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
         </>
       )}
       {x.kind !== "lend" && x.status !== "closed" && (
-        <button onClick={() => patch({ status: "closed" })} className="min-h-[44px] w-full rounded-lg bg-black font-semibold text-white">
+        <button onClick={() => patch({ status: "closed" })} className="min-h-[44px] w-full rounded-lg bg-[#1E6B47] font-semibold text-white">
           {x.kind === "give" ? "✅ มีคนรับไปแล้ว · ปิด" : x.kind === "sell" ? "✅ ขายแล้ว · ปิด" : "✅ หาได้แล้ว · ปิด"}
         </button>
       )}
@@ -536,7 +536,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
       </div>
       <p className="text-sm text-neutral-500">เบอร์จะแสดงเมื่อมีคนกดดูทีละรายการ · คนขอยืมต่อคิวไว้ คุณเห็นชื่อและเบอร์เขา · จัดการ/ปิดรายการได้จากเครื่องนี้</p>
       {err && <p className="rounded-lg bg-red-50 p-3 text-red-700">{err}</p>}
-      <button disabled={busy || attached.busy} className="min-h-[52px] w-full rounded-xl bg-black text-lg font-semibold text-white disabled:opacity-60">
+      <button disabled={busy || attached.busy} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60">
         {busy ? "กำลังส่ง…" : attached.busy ? "รอรูปอัปโหลด…" : `${LEND_KINDS[form.kind].emoji} ลงรายการ`}
       </button>
     </form>
@@ -560,7 +560,7 @@ export function JobBoard({ jobs: all, setJobs, admin, onAdd, onPaid }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
-        <button onClick={() => onAdd("need")} className="min-h-[56px] rounded-xl bg-black px-2 font-bold text-white">
+        <button onClick={() => onAdd("need")} className="min-h-[56px] rounded-xl bg-[#1E6B47] px-2 font-bold text-white">
           🙋 ขอแรง / ขอติดรถ / ฝากซื้อ
         </button>
         <button onClick={() => onAdd("offer")} className="min-h-[56px] rounded-xl border-2 border-black bg-white px-2 font-bold">
@@ -691,7 +691,7 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
           {j.status !== "done" && !mine && (
             <div className="flex gap-2">
               <input aria-label="ชื่อของคุณ" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} className={input} placeholder="ชื่อเล่นของคุณ" />
-              <button onClick={join} disabled={joined} className="min-h-[44px] shrink-0 rounded-lg bg-black px-3 font-bold text-white disabled:opacity-50">
+              <button onClick={join} disabled={joined} className="min-h-[44px] shrink-0 rounded-xl border border-[#1E6B47] bg-white px-3 font-bold text-[#1E6B47] disabled:opacity-50">
                 {joined ? "✓ ลงชื่อแล้ว" : JOB_VERBS[j.type] ? JOB_VERBS[j.type][j.kind === "need" ? 0 : 1] : j.kind === "need" ? "🙋 ฉันจะไปช่วย" : "🏠 ขอให้มาช่วยบ้านฉัน"}
               </button>
             </div>
@@ -846,7 +846,7 @@ export function JobForm({ kind = "need", jobType = "", onDone }) {
       </div>
       <p className="text-sm text-neutral-500">เบอร์และบ้านเลขที่ แสดงเฉพาะคนที่กดดูทีละรายการ</p>
       {err && <p className="rounded-lg bg-red-50 p-3 text-red-700">{err}</p>}
-      <button disabled={busy} className="min-h-[52px] w-full rounded-xl bg-black text-lg font-semibold text-white disabled:opacity-60">
+      <button disabled={busy} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60">
         {busy ? "กำลังส่ง…" : need ? "🙋 ลงประกาศขอแรง" : "💪 ลงชื่ออาสา"}
       </button>
     </form>
@@ -901,7 +901,7 @@ export function IssueBoard({ issues, setIssues, admin, onAdd }) {
   };
   return (
     <div className="space-y-3">
-      <button onClick={onAdd} className="min-h-[56px] w-full rounded-xl bg-black px-2 text-lg font-bold text-white">
+      <button onClick={onAdd} className="min-h-[56px] w-full rounded-xl bg-[#1E6B47] px-2 text-lg font-bold text-white">
         📍 แจ้งปัญหาในซอย
       </button>
       {issues.length > 0 && <OfficeSummary issues={issues} />}
@@ -1021,7 +1021,7 @@ function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
             <button onClick={() => setNote(null)} className="min-h-[44px] rounded-lg border-2 border-black">
               ยกเลิก
             </button>
-            <button onClick={send} className="min-h-[44px] rounded-lg bg-black font-bold text-white">
+            <button onClick={send} className="min-h-[44px] rounded-lg bg-[#1E6B47] font-bold text-white">
               บันทึก
             </button>
           </div>
@@ -1142,7 +1142,7 @@ export function IssueForm({ onDone }) {
         <MediaPicker items={media} setItems={setMedia} max={2} allowVideo={false} />
       </div>
       {err && <p className="rounded-lg bg-red-50 p-3 text-red-700">{err}</p>}
-      <button disabled={busy || attached.busy} className="min-h-[52px] w-full rounded-xl bg-black text-lg font-semibold text-white disabled:opacity-60">
+      <button disabled={busy || attached.busy} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60">
         {busy ? "กำลังส่ง…" : attached.busy ? "รอรูปอัปโหลด…" : "📍 แจ้งปัญหา"}
       </button>
     </form>

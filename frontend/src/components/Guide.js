@@ -40,7 +40,7 @@ function SceneNeed() {
   return (
     <div className="relative mx-auto grid h-full max-w-sm grid-rows-[auto_1fr] gap-3">
       <div className="relative mx-auto">
-        <div className="g-press rounded-xl bg-black px-5 py-3 text-lg font-bold text-white shadow">🆘 ขอความช่วยเหลือ</div>
+        <div className="g-press rounded-xl bg-[#1E6B47] px-5 py-3 text-lg font-bold text-white shadow">🆘 ขอความช่วยเหลือ</div>
         <span className="g-tap absolute -bottom-3 right-2 text-3xl" aria-hidden="true">
           👆
         </span>
@@ -208,7 +208,7 @@ function SceneBoard() {
           🛻 รถยกสูงพี่ดำ <span className="rounded bg-emerald-100 px-1.5 text-xs text-emerald-800">🟢 ว่างรับงาน</span>
         </p>
         <p className="text-sm">💰 300 บาท/เที่ยว · ในหมู่บ้าน</p>
-        <div className="g-press mt-2 rounded-xl bg-black py-2 text-center font-bold text-white">📞 081-xxx-xxxx</div>
+        <div className="g-press mt-2 rounded-xl bg-[#1E6B47] py-2 text-center font-bold text-white">📞 081-xxx-xxxx</div>
         <span className="g-tap absolute bottom-0 right-6 text-3xl" aria-hidden="true">
           👆
         </span>
@@ -230,7 +230,7 @@ function SceneJoin({ cycle }) {
         <p className="mt-1 rounded-lg border border-neutral-300 px-2 py-2">
           <span className="g-typing inline-block overflow-hidden whitespace-nowrap align-bottom">ต้น (ทีมเรือ)</span>
         </p>
-        <div className="g-late-2 mt-2 rounded-lg bg-black py-2 text-center font-bold text-white">เริ่มทำงาน</div>
+        <div className="g-late-2 mt-2 rounded-lg bg-[#1E6B47] py-2 text-center font-bold text-white">เริ่มทำงาน</div>
       </div>
     </div>
   );
@@ -261,7 +261,7 @@ function SceneClaim({ playing }) {
       <p className="font-bold">
         {house} <span className="font-normal text-neutral-500">ซ.{soi} · 🍚 5 ที่</span>
       </p>
-      {state === "free" && <div className="mt-1 rounded-lg bg-black py-1.5 text-center font-bold text-white">🙋 รับงานนี้</div>}
+      {state === "free" && <div className="mt-1 rounded-lg bg-[#1E6B47] py-1.5 text-center font-bold text-white">🙋 รับงานนี้</div>}
       {state === "mine" && (
         <p key="m" className="anim-pop mt-1 font-semibold text-blue-700">
           👷 งานของคุณ
@@ -526,7 +526,7 @@ export default function Guide({ onClose, slides = USER_SLIDES, heading = "วิ
           >
             ‹
           </button>
-          <button onClick={() => go(index + 1)} className="min-h-[52px] rounded-xl bg-black text-lg font-bold text-white active:scale-[0.98]">
+          <button onClick={() => go(index + 1)} className="min-h-[52px] rounded-xl bg-[#1E6B47] text-lg font-bold text-white active:scale-[0.98]">
             {last ? "เริ่มใช้งาน 👍" : "ถัดไป ›"}
           </button>
         </div>

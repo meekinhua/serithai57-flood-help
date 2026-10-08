@@ -307,3 +307,10 @@ details[open] > :not(summary) { animation: row-in 0.25s ease-out backwards; }
 .ic-green { background: #E4F0E9; }
 .ic-amber { background: #FFF1C9; }
 .ic-gold { background: #FFE39A; }
+
+/* 8 Oct (Claude Design): บ้านฉัน is four groups on the grey ground; a group with nothing in it hides its label */
+.grp-label { margin: 20px 4px 2px; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: #5A665F; }
+.grp:not(:has(.grp-body > *)) { display: none; }
+.chip { display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid #D5DBD6; background: #fff; font-weight: 600; color: #15201A; }
+/* rows that were sections of the old big card keep their dividers inside one card; no line above the first */
+.stack > :first-child, .stack > :first-child > :first-child { border-top-width: 0; }

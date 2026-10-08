@@ -30,7 +30,7 @@ export function ServiceStrip({ services, paidNeeds, onOpen, onAdd }) {
             {paidNeeds > 0 && ` · มี ${paidNeeds} คนกำลังหาคนจ้าง`}
           </span>
         </h2>
-        <button onClick={onAdd} className="min-h-[44px] rounded-lg bg-black px-3 font-semibold text-white active:bg-neutral-800">
+        <button onClick={onAdd} className="min-h-[44px] rounded-lg bg-[#1E6B47] px-3 font-semibold text-white active:bg-[#154D33]">
           ➕ ลงชื่อรับงาน
         </button>
       </div>
@@ -135,7 +135,7 @@ function ServiceCard({ s, admin, onChanged, onDeleted, repair }) {
       {repair && <Reviews s={s} onChanged={onChanged} />}
 
       <div className="mt-2 grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
-        <a href={telHref(s.phone)} className="flex min-h-[52px] items-center justify-center rounded-xl bg-black px-3 text-lg font-bold text-white active:bg-neutral-800">
+        <a href={telHref(s.phone)} className="flex min-h-[52px] items-center justify-center rounded-xl bg-[#1E6B47] px-3 text-lg font-bold text-white active:bg-[#154D33]">
           📞 {s.phone}
         </a>
         {s.line_id && (
@@ -439,7 +439,7 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
         <p className="mb-1 font-medium">รูปร้าน / ผลงาน (ไม่บังคับ · ช่วยให้คนเลือกง่ายขึ้น)</p>
         <MediaPicker items={files} setItems={setFiles} max={3} />
       </div>
-      <button type="submit" disabled={busy} className="min-h-[52px] w-full rounded-xl bg-black text-lg font-semibold text-white disabled:opacity-60">
+      <button type="submit" disabled={busy} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60">
         {busy ? "กำลังส่ง…" : repair ? "ลงให้เพื่อนบ้านเห็น" : "📇 ลงชื่อในบอร์ดติดต่อ"}
       </button>
     </form>
@@ -509,7 +509,7 @@ function Reviews({ s, onChanged }) {
             <button type="button" onClick={() => setForm(null)} className="min-h-[44px] rounded-lg border-2 border-black">
               ยกเลิก
             </button>
-            <button className="min-h-[44px] rounded-lg bg-black font-bold text-white">ส่ง</button>
+            <button className="min-h-[44px] rounded-lg bg-[#1E6B47] font-bold text-white">ส่ง</button>
           </div>
         </form>
       )}

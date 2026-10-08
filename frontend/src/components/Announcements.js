@@ -92,7 +92,7 @@ export function UrgentBar({ items }) {
   if (!urgent.length) return null;
   const a = urgent[0];
   return (
-    <div role="alert" className="sticky top-[64px] z-[940] border-b-2 border-red-900 bg-red-600 text-white shadow-md">
+    <div role="alert" className="sticky top-[56px] z-[940] border-b-2 border-red-900 bg-red-600 text-white shadow-md">
       <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="mx-auto flex min-h-[44px] w-full max-w-5xl items-center gap-2 px-3 py-1.5 text-left">
         <span className="announce-flash shrink-0 text-xl" aria-hidden="true">
           🚨

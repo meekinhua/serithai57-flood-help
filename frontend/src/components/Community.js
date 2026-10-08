@@ -620,7 +620,7 @@ export function PostedSheetBody({ text, onClose }) {
   );
 }
 
-// ---------- the bottom bar: the four things people come back for ----------
+// ---------- the main menu (at the bottom since 8 Oct, Claude Design): the four things people come back for ----------
 // 7 Oct: badges = {home|pros|community|map: "important" | "general" | null}
 // important: a red "!" that pulses (act on it: a check-in, today's thing, the water) · general: a green dot (something new)
 export function BottomNav({ page, badges = {}, onGo, onHotline }) {
@@ -647,7 +647,7 @@ export function BottomNav({ page, badges = {}, onGo, onHotline }) {
     ],
   ];
   return (
-    <nav aria-label="เมนูหลัก" className="sticky top-0 z-[950] border-b border-[#DCE2DD] bg-white pt-[env(safe-area-inset-top)] shadow-sm">
+    <nav aria-label="เมนูหลัก" className="fixed inset-x-0 bottom-0 z-[950] border-t border-[#DCE2DD] bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_8px_rgba(21,32,26,0.08)]">
       <div className="mx-auto grid h-[64px] max-w-5xl grid-cols-5">
         {items.map(([key, label, icon]) => {
           const on = page === key;
@@ -658,7 +658,7 @@ export function BottomNav({ page, badges = {}, onGo, onHotline }) {
               aria-current={on ? "page" : undefined}
               className={`relative flex flex-col items-center justify-center gap-0.5 text-[14px] ${on ? "font-bold text-[#1E6B47]" : "text-[#45504A]"}`}
             >
-              {on && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-t bg-[#1E6B47]" aria-hidden="true" />}
+              {on && <span className="absolute inset-x-4 top-0 h-[3px] rounded-b bg-[#1E6B47]" aria-hidden="true" />}
               <span className="relative">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={on ? 2.4 : 2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   {icon}

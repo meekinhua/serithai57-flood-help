@@ -132,7 +132,7 @@ export default function Forum({ admin, openId = null, startCompose = false }) {
 
   return (
     <div className="space-y-3">
-      <button onClick={() => setCompose(true)} className="min-h-[56px] w-full rounded-xl bg-black text-lg font-bold text-white">
+      <button onClick={() => setCompose(true)} className="min-h-[56px] w-full rounded-xl bg-[#1E6B47] text-lg font-bold text-white">
         ✍️ ตั้งกระทู้ถาม / แชร์ความรู้
       </button>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 ค้นหา เช่น ปาร์เก้, ประกันรถ, ตู้เย็น" className={input} aria-label="ค้นหากระทู้" />
@@ -257,7 +257,7 @@ function TopicForm({ onCancel, onDone }) {
       </div>
       <IdentityFields me={me} set={setMe} idp="topic" />
       {err && <p className="rounded-lg bg-red-50 p-3 text-red-700">{err}</p>}
-      <button disabled={busy || attached.busy} className="min-h-[52px] w-full rounded-xl bg-black text-lg font-semibold text-white disabled:opacity-60">
+      <button disabled={busy || attached.busy} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60">
         {busy ? "กำลังส่ง…" : attached.busy ? "รอรูปอัปโหลด…" : "✍️ ตั้งกระทู้"}
       </button>
     </form>
@@ -443,7 +443,7 @@ function TopicView({ id, admin, onBack }) {
         <textarea id="reply-body" required rows={4} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} className={input} />
         <MediaPicker items={media} setItems={setMedia} max={2} allowVideo={false} />
         <IdentityFields me={me} set={setMe} idp="reply" />
-        <button disabled={busy || attached.busy || !text.trim()} className="min-h-[48px] w-full rounded-xl bg-black font-bold text-white disabled:opacity-60">
+        <button disabled={busy || attached.busy || !text.trim()} className="min-h-[48px] w-full rounded-xl bg-[#1E6B47] font-bold text-white disabled:opacity-60">
           {busy ? "กำลังส่ง…" : "💬 ส่งคำตอบ"}
         </button>
       </form>

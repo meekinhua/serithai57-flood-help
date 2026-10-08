@@ -35,7 +35,7 @@ function useContact() {
 
 function Submit({ busy, children }) {
   return (
-    <button type="submit" disabled={busy} className="min-h-[52px] w-full rounded-xl bg-black px-4 text-lg font-semibold text-white active:bg-neutral-800 disabled:opacity-60">
+    <button type="submit" disabled={busy} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] px-4 text-lg font-semibold text-white active:bg-[#154D33] disabled:opacity-60">
       {busy ? "กำลังส่ง…" : children}
     </button>
   );
