@@ -287,3 +287,11 @@ details[open] > :not(summary) { animation: row-in 0.25s ease-out backwards; }
 .peek-out { animation: peek-out 0.3s ease-in both; }
 .peek-in .peek-timer { animation: peek-timer 7s linear both; }
 @media (prefers-reduced-motion: reduce) { .peek-in, .peek-out, .peek-timer { animation: none !important; } }
+
+/* the folded หาย·เจอ line: each item slides in from the right */
+@keyframes slide-in-x {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+.slide-in-x { animation: slide-in-x 0.35s ease-out backwards; }
+@media (prefers-reduced-motion: reduce) { .slide-in-x { animation: none; } }

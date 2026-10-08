@@ -117,7 +117,7 @@ function Row({ icon, title, children, hi, onFold, id }) {
 }
 
 // ---------- a slide show card (ขอแรง, หาย·เจอ): one item at a time, folds to a line once every item has been shown ----------
-function Slides({ items, foldKey, icon, title, slide, onOpen, onAll, allLabel = "ดูทั้งหมด ›", tone = "amber", startFolded = false }) {
+function Slides({ items, foldKey, icon, title, slide, onOpen, onAll, allLabel = "ดูทั้งหมด ›", tone = "amber", startFolded = false, mini }) {
   const key = items.map((x) => x.id.slice(0, 6)).join(",");
   const store = `slidesSeen:${foldKey}`;
   const [folded, setFolded] = useState(() => startFolded || load(store, "") === key); // folded by default, or this set was already shown in full
@@ -144,6 +144,11 @@ function Slides({ items, foldKey, icon, title, slide, onOpen, onAll, allLabel = 
     }, 4500);
     return () => clearTimeout(t);
   }, [i, folded, paused, manual, n, key, store, x]);
+  useEffect(() => {
+    if (!folded || !mini || n < 2 || paused) return;
+    const t = setTimeout(() => setI((v) => (v + 1) % n), 3500);
+    return () => clearTimeout(t);
+  }, [folded, mini, n, i, paused]);
   if (!n) return null;
   const C =
     tone === "red"
@@ -154,6 +159,28 @@ function Slides({ items, foldKey, icon, title, slide, onOpen, onAll, allLabel = 
     setFolded(true);
     setManual(false);
   };
+  const open = () => {
+    setFolded(false);
+    setManual(true);
+    setI(0);
+  };
+  if (folded && mini)
+    return (
+      <div
+        className={`anim-shrink mt-2 flex min-h-[64px] w-full items-center gap-2 overflow-hidden rounded-2xl border p-1.5 pr-2 ${C.line}`}
+        onTouchStart={() => setPaused(true)}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
+        <button key={x.id} onClick={() => onOpen(x.id)} className="slide-in-x flex min-w-0 flex-1 items-center gap-2 text-left">
+          {mini(x)}
+        </button>
+        <button onClick={open} className={`min-h-[48px] shrink-0 pl-1 text-[15px] font-bold ${C.ink}`} aria-label={`${title(n)} · เปิดดู`}>
+          {n > 1 && <span className="block text-xs font-normal text-[#45504A]">{`${Math.min(i, n - 1) + 1}/${n}`}</span>}
+          ดู ▾
+        </button>
+      </div>
+    );
   if (folded)
     return (
       <button
@@ -1365,6 +1392,22 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           <Slides
             items={lost}
             foldKey="lost"
+            mini={(x) => (
+              <>
+                {x.media?.[0] ? (
+                  <img src={mediaUrl(x.media[0].id, "thumb")} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                ) : (
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-2xl" aria-hidden="true">
+                    {{ dog: "🐕", cat: "🐈", pet: "🐾", document: "📄", vehicle: "🛵" }[x.category] || "🎒"}
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className={`rounded px-1 text-[11px] font-bold text-white ${x.kind === "found" ? "bg-[#1E6B47]" : "bg-[#B42318]"}`}>{x.kind === "found" ? "🙌 มีคนเจอ" : "😢 หาย"}</span>
+                  {x.soi ? <span className="ml-1 text-xs text-[#45504A]">ซ.{x.soi}</span> : null}
+                  <span className="block truncate text-[15px] font-bold leading-snug">{x.title}</span>
+                </span>
+              </>
+            )}
             icon="🐾"
             tone="red"
             title={(n) => `หาย · เจอ ${n} เรื่อง`}
