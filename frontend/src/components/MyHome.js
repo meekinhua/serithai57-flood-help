@@ -1087,8 +1087,6 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const t = useT();
   const frame = look?.frame;
   const savedContact = info ? load(`myContact:${info.house}`, null) : null;
-  const [pinLaterAt, setPinLaterAt] = useState(0);
-  const pinLater = Date.now() - Math.max(pinLaterAt, info ? load(`pinLater:${info.house}`, 0) : 0) < 7 * 864e5;
   const startNear = (kind) => {
     setNearForm({ kind, topic: "", text: "", name: load("myName", ""), phone: kind === "ask" ? load("myReach", "") : "", to_office: true });
     setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -1332,74 +1330,51 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
           </div>
           <PetsRow house={info.house} setErr={setErr} onLostPosted={onLostPosted} onOpenLost={onLost} />
 
-          {pinning ? (
-            // full screen over everything: the map, GPS and "save" in one place — nothing to scroll for
-            createPortal(
-              <div className="anim-fade fixed inset-0 z-[960] flex flex-col bg-white" role="dialog" aria-label="ปักหมุดบ้านฉัน">
-                <div className="flex items-center gap-2 border-b border-[#E6EBE7] px-4 py-2">
-                  <b className="min-w-0 flex-1 text-lg">📍 ปักหมุดบ้าน {info.house}</b>
-                  <button onClick={() => setPinning(null)} aria-label="ปิด" className="min-h-[44px] min-w-[44px] text-2xl text-[#45504A]">
-                    ✕
-                  </button>
-                </div>
-                <div id="myhome-pin" className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-                  <p className="text-[15px]">กด "ใช้ตำแหน่งปัจจุบัน" ตอนอยู่ที่บ้าน หรือเลื่อนแผนที่ให้หมุดอยู่บนหลังคาบ้านคุณ</p>
-                  <LocationPicker
-                    big
-                    autoGps={!!pinning.gps}
-                    value={info.precision === "house" ? { lat: info.lat, lng: info.lng } : null}
-                    onChange={(pos) => setPinning((p) => ({ ...p, pos }))}
-                    onTouched={() => setPinning((p) => ({ ...p, touched: true }))}
-                  />
-                  <label className="block">
-                    <span className="text-sm font-bold">
-                      {pinning.soiTyped ? "ซอย (คุณแก้เอง)" : pinning.soi ? `ซอยจากหมุด: ซ.${pinning.soi} · แก้ได้ถ้าไม่ตรง` : "ซอย (ลากหมุดแล้วระบบหาให้ · แก้ได้)"}
-                    </span>
-                    <input
-                      value={pinning.soi || ""}
-                      onChange={(e) => setPinning((p) => ({ ...p, soi: e.target.value, soiTyped: true }))}
-                      placeholder="เช่น 34/6"
-                      className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base"
-                    />
-                  </label>
-                  <div className="flex gap-2">
-                    <button onClick={savePin} disabled={!pinning.pos} className="min-h-[52px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-50">
-                      บ้านฉันอยู่ตรงนี้
-                    </button>
-                    <button onClick={() => setPinning(null)} className="min-h-[52px] rounded-xl border border-[#C9D1CB] px-4 font-bold">
-                      ยกเลิก
-                    </button>
-                  </div>
-                </div>
-              </div>,
-              document.body,
-            )
-          ) : info.precision !== "house" && pinLater ? (
-            <button onClick={() => setPinning({ pos: null, soi: "" })} className="mt-1 min-h-[40px] text-[15px] font-bold text-[#7A4104] underline">
-              📍 ปักหมุดบ้าน ให้ระบบรู้ตำแหน่งแม่นขึ้น
-            </button>
-          ) : info.precision !== "house" ? (
-            <div className="mb-3 rounded-2xl bg-[#FFF6DA] p-3">
-              <p className="text-[15px]">{info.soi ? `ระบบเดาว่าอยู่ ซ.${info.soi} จากบ้านเลขที่` : "ระบบยังไม่รู้ว่าบ้านนี้อยู่ซอยไหน"} · บ้านแบ่งแปลงใหม่เลขที่มักไม่ตรงซอย</p>
-              {!soiEdit && (
-                <button onClick={() => setSoiEdit(true)} className="mt-2 min-h-[48px] w-full rounded-xl border-2 border-[#15201A] bg-white text-base font-bold">
-                  ✎ {info.soi ? `ไม่ใช่ ซ.${info.soi}? แก้ซอย` : "ใส่ซอยของบ้านฉัน"}
-                </button>
-              )}
-              <button onClick={() => setPinning({ pos: null, soi: "" })} className="mt-2 min-h-[50px] w-full rounded-xl bg-[#15201A] text-base font-bold text-white">
-                {t("myhome.pin.button", "ปักหมุดบ้านฉัน (ใช้ GPS ได้)")}
-              </button>
-              <button
-                onClick={() => {
-                  save(`pinLater:${info.house}`, Date.now());
-                  setPinLaterAt(Date.now());
-                }}
-                className="mt-1 min-h-[40px] w-full text-[15px] font-bold text-[#45504A] underline"
-              >
-                ไว้ทีหลัง
-              </button>
-            </div>
-          ) : null}
+          {
+            pinning
+              ? // full screen over everything: the map, GPS and "save" in one place — nothing to scroll for
+                createPortal(
+                  <div className="anim-fade fixed inset-0 z-[960] flex flex-col bg-white" role="dialog" aria-label="ปักหมุดบ้านฉัน">
+                    <div className="flex items-center gap-2 border-b border-[#E6EBE7] px-4 py-2">
+                      <b className="min-w-0 flex-1 text-lg">📍 ปักหมุดบ้าน {info.house}</b>
+                      <button onClick={() => setPinning(null)} aria-label="ปิด" className="min-h-[44px] min-w-[44px] text-2xl text-[#45504A]">
+                        ✕
+                      </button>
+                    </div>
+                    <div id="myhome-pin" className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+                      <p className="text-[15px]">กด "ใช้ตำแหน่งปัจจุบัน" ตอนอยู่ที่บ้าน หรือเลื่อนแผนที่ให้หมุดอยู่บนหลังคาบ้านคุณ</p>
+                      <LocationPicker
+                        big
+                        autoGps={!!pinning.gps}
+                        value={info.precision === "house" ? { lat: info.lat, lng: info.lng } : null}
+                        onChange={(pos) => setPinning((p) => ({ ...p, pos }))}
+                        onTouched={() => setPinning((p) => ({ ...p, touched: true }))}
+                      />
+                      <label className="block">
+                        <span className="text-sm font-bold">
+                          {pinning.soiTyped ? "ซอย (คุณแก้เอง)" : pinning.soi ? `ซอยจากหมุด: ซ.${pinning.soi} · แก้ได้ถ้าไม่ตรง` : "ซอย (ลากหมุดแล้วระบบหาให้ · แก้ได้)"}
+                        </span>
+                        <input
+                          value={pinning.soi || ""}
+                          onChange={(e) => setPinning((p) => ({ ...p, soi: e.target.value, soiTyped: true }))}
+                          placeholder="เช่น 34/6"
+                          className="min-h-[48px] w-full rounded-xl border border-[#A9B4AD] px-3 text-base"
+                        />
+                      </label>
+                      <div className="flex gap-2">
+                        <button onClick={savePin} disabled={!pinning.pos} className="min-h-[52px] flex-1 rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-50">
+                          บ้านฉันอยู่ตรงนี้
+                        </button>
+                        <button onClick={() => setPinning(null)} className="min-h-[52px] rounded-xl border border-[#C9D1CB] px-4 font-bold">
+                          ยกเลิก
+                        </button>
+                      </div>
+                    </div>
+                  </div>,
+                  document.body,
+                )
+              : null /* 8 Oct: the "ระบบเดาว่าอยู่ ซ.x" box is gone — the one-time "อยู่ ซ.x ใช่ไหม?" pop-up and "ซ.x ✎ · 📍GPS" at the top replace it */
+          }
 
           {(info.questions || [])
             .filter((q) => !isFolded(q.id))
