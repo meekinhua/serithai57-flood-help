@@ -8,7 +8,6 @@ import { MYHOME_CHANGED, cleanHouse } from "./SurveyBox";
 import { PRO_GROUPS, goodOf, rememberCall } from "./Community";
 import PetsRow from "./Pets";
 import { notify } from "../notify";
-import { seenVisits } from "../visits";
 import { MediaStrip, MediaThumb } from "./MediaGallery";
 import { AidRow, CheckinCard, InstallCard, OutageRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
 import { waterOf } from "../config";
@@ -112,6 +111,111 @@ function Row({ icon, title, children, hi, onFold, id }) {
         )}
       </div>
       <div className="mt-1 space-y-2">{children}</div>
+    </div>
+  );
+}
+
+// ---------- 🙋 ขอแรง as a slide show: one ask at a time, then it folds to a line once every ask has been shown ----------
+function NeedsSlides({ needs, fits, onOpen, onHide }) {
+  const key = needs.map((j) => j.id.slice(0, 6)).join(",");
+  const [folded, setFolded] = useState(() => load("needsSeenAll", "") === key); // this set was already shown in full
+  const [manual, setManual] = useState(false); // opened by hand: stays open, no auto-fold
+  const [i, setI] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const seen = useRef(new Set());
+  useEffect(() => {
+    setFolded(load("needsSeenAll", "") === key);
+    setI(0);
+    seen.current = new Set();
+  }, [key]);
+  const n = needs.length;
+  const j = needs[Math.min(i, n - 1)];
+  useEffect(() => {
+    if (folded || !j) return;
+    seen.current.add(j.id);
+    if (paused) return;
+    const t = setTimeout(() => {
+      if (!manual && seen.current.size >= n) {
+        // everything has been on screen once: step back to one line
+        save("needsSeenAll", key);
+        setFolded(true);
+      } else setI((x) => (x + 1) % n);
+    }, 4500);
+    return () => clearTimeout(t);
+  }, [i, folded, paused, manual, n, key, j]);
+  if (!n) return null;
+  if (folded)
+    return (
+      <button
+        onClick={() => {
+          setFolded(false);
+          setManual(true);
+          setI(0);
+        }}
+        className="anim-shrink mt-2 flex min-h-[48px] w-full items-center gap-2 rounded-2xl border border-[#E0C27A] bg-[#FFFBEF] px-3 text-left text-[15px]"
+      >
+        <span aria-hidden="true">🙋</span>
+        <span className="min-w-0 flex-1 truncate">
+          <b>เพื่อนบ้านขอแรง {n} เรื่อง</b> · {needs[0].detail.slice(0, 36)}
+        </span>
+        <span className="shrink-0 font-bold text-[#7A4104]">ดู ▾</span>
+      </button>
+    );
+  return (
+    <div
+      className="anim-in mt-2 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] p-3"
+      onTouchStart={() => setPaused(true)}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <div className="flex items-center gap-2">
+        <b className="min-w-0 flex-1 text-base leading-snug">🙋 เพื่อนบ้านขอแรงอยู่ {n} เรื่อง</b>
+        <button
+          onClick={() => {
+            save("needsSeenAll", key);
+            setFolded(true);
+            setManual(false);
+          }}
+          className="min-h-[40px] shrink-0 text-sm font-bold text-[#45504A] underline"
+        >
+          ย่อ ▴
+        </button>
+      </div>
+      {/* the slide: one ask, big enough to read; tap it to open that ask */}
+      <button key={j.id} onClick={() => onOpen(j.id)} className="anim-in mt-1.5 block min-h-[76px] w-full rounded-xl bg-white p-3 text-left shadow-sm">
+        <span className="block text-sm text-[#45504A]">
+          {j.name}
+          {j.soi ? ` · ซ.${j.soi}` : ""}
+          {fits(j) ? <b className="ml-1 rounded-full bg-[#1E6B47] px-2 text-xs text-white">🤝 ตรงกับที่คุณถนัด</b> : null}
+        </span>
+        <span className="line-clamp-2 block text-[16px] font-bold leading-snug">{j.detail}</span>
+        <span className="mt-0.5 block text-sm font-bold text-[#7A4104]">ช่วยได้? ดูและติดต่อ ›</span>
+      </button>
+      <div className="mt-2 flex items-center gap-2">
+        {n > 1 && (
+          <button onClick={() => setI((x) => (x - 1 + n) % n)} aria-label="เรื่องก่อนหน้า" className="min-h-[40px] min-w-[40px] rounded-full bg-white text-lg">
+            ‹
+          </button>
+        )}
+        <span className="flex flex-1 justify-center gap-1.5" aria-hidden="true">
+          {needs.map((x, k) => (
+            <span key={x.id} className={`h-2 rounded-full transition-all ${k === i ? "w-5 bg-[#7A4104]" : "w-2 bg-[#E0C27A]"}`} />
+          ))}
+        </span>
+        {n > 1 && (
+          <button onClick={() => setI((x) => (x + 1) % n)} aria-label="เรื่องถัดไป" className="min-h-[40px] min-w-[40px] rounded-full bg-white text-lg">
+            ›
+          </button>
+        )}
+      </div>
+      <div className="mt-1 flex items-center justify-between">
+        <button onClick={() => onOpen()} className="min-h-[40px] text-[15px] font-bold text-[#7A4104]">
+          ดูทั้งหมด ›
+        </button>
+        <button onClick={onHide} className="min-h-[40px] text-sm font-bold text-[#45504A] underline">
+          รับทราบแล้ว ซ่อน
+        </button>
+      </div>
     </div>
   );
 }
@@ -947,9 +1051,6 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   // a ขอแรง ask this house's อาสาข้างบ้าน profile can do (job type → skill)
   const JOB_SKILL = { clean: "strong", move: "strong", trash: "strong", fix: "fix", check: "elec", ride: "drive", errand: "errand" };
   const fits = (j) => (handy?.on && (handy.skills || []).includes(JOB_SKILL[j.type]) ? 1 : 0);
-  const needsKey = needs.map((j) => j.id.slice(0, 6)).join(",");
-  const needsVisits = useMemo(() => (needsKey ? seenVisits(`needs:${needsKey}`) : 0), [needsKey]);
-  const needsSmall = needsVisits > 3; // nobody tapped it in 3 visits: step back to one line
   const hideNeeds = () => {
     const ids = needs.map((j) => j.id);
     setNeedsHidden(ids);
@@ -1270,47 +1371,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
         <>
           <CheckinCard info={info} onSaved={setInfo} onContact={() => setContact({ name: load("myName", ""), from: "news" })} setErr={setErr} />
           <Soon items={info.soon} onSeen={() => setSeenN((n) => n + 1)} />
-          {needs.some((j) => !needsHidden.includes(j.id)) && needsSmall && (
-            <button
-              onClick={() => onNeeds()}
-              className="anim-shrink mt-2 flex min-h-[44px] w-full items-center gap-2 rounded-2xl border border-[#E0C27A] bg-[#FFFBEF] px-3 text-left text-[15px] opacity-90"
-            >
-              <span aria-hidden="true">🙋</span>
-              <span className="min-w-0 flex-1 truncate">
-                <b>เพื่อนบ้านขอแรง {needs.length} เรื่อง</b> · {needs[0].detail.slice(0, 40)}
-              </span>
-              <span className="text-[#45504A]">›</span>
-            </button>
-          )}
-          {needs.some((j) => !needsHidden.includes(j.id)) && !needsSmall && (
-            // the ขอแรง board, seen from home: who still needs hands (no one is pushed, the card just shows)
-            <div className="anim-in mt-2 flex items-start gap-3 rounded-2xl border-2 border-[#E0A100] bg-[#FFF8E1] p-3">
-              <span className="text-2xl" aria-hidden="true">
-                🙋
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="block w-full text-left">
-                  <b className="block text-base leading-snug">เพื่อนบ้านขอแรงอยู่ {needs.length} เรื่อง</b>
-                  {[...needs]
-                    .sort((x, y) => fits(y) - fits(x))
-                    .slice(0, 2)
-                    .map((j) => (
-                      <button key={j.id} onClick={() => onNeeds(j.id)} className="mt-0.5 block min-h-[36px] w-full text-left text-[15px] leading-snug text-[#33403A]">
-                        {j.name}
-                        {j.soi ? ` (ซ.${j.soi})` : ""}: {j.detail.length > 60 ? `${j.detail.slice(0, 60)}…` : j.detail}
-                        {fits(j) ? <b className="ml-1 rounded-full bg-[#1E6B47] px-2 text-sm text-white">🤝 ตรงกับที่คุณถนัด</b> : null} <span className="text-[#45504A]">›</span>
-                      </button>
-                    ))}
-                  <button onClick={() => onNeeds()} className="mt-1 block min-h-[40px] text-[15px] font-bold text-[#7A4104]">
-                    ดูทั้งหมด ›
-                  </button>
-                </div>
-                <button onClick={hideNeeds} className="mt-0.5 block min-h-[36px] text-sm font-bold text-[#45504A] underline">
-                  รับทราบแล้ว ซ่อน
-                </button>
-              </div>
-            </div>
-          )}
+          {needs.some((x) => !needsHidden.includes(x.id)) && <NeedsSlides needs={[...needs].sort((x, y) => fits(y) - fits(x))} fits={fits} onOpen={onNeeds} onHide={hideNeeds} />}
           <ElectricRound
             info={info}
             setErr={setErr}

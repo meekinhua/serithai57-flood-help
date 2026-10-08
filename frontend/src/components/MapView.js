@@ -340,6 +340,7 @@ export default function MapView({
       (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
         setHint("");
+        if (!mapRef.current?._mapPane) return; // the map was closed while the phone looked for the position
         mapRef.current.setView([lat, lng], 17);
         L.popup()
           .setLatLng([lat, lng])

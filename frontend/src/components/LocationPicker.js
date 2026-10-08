@@ -17,8 +17,12 @@ export default function LocationPicker({ value, onChange, onTouched = () => {}, 
     map.on("dragstart", () => onTouched()); // the user actually moved the pin
     emit();
     mapRef.current = map;
-    if (autoGps) setTimeout(useGps, 300); // opened from "📍 GPS": ask for the position straight away
-    return () => map.remove();
+    const t = autoGps ? setTimeout(useGps, 300) : null; // opened from "📍 GPS": ask for the position straight away
+    return () => {
+      clearTimeout(t);
+      mapRef.current = null; // a GPS answer arriving after this must not touch the removed map
+      map.remove();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -27,6 +31,7 @@ export default function LocationPicker({ value, onChange, onTouched = () => {}, 
     setGps("กำลังหาตำแหน่ง…");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (!mapRef.current?._mapPane) return; // the pin page was closed meanwhile
         mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 18);
         onTouched();
         setGps(`ได้ตำแหน่งแล้ว (แม่นยำ ~${Math.round(pos.coords.accuracy)} ม.) เลื่อนแผนที่ปรับได้`);
