@@ -16,7 +16,7 @@ import MyHome, { homeBadgeOf } from "./components/MyHome";
 import SurveyBoxes from "./components/SurveyBox";
 import { BottomNav, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PostedSheetBody, ProsList } from "./components/Community";
 import { CleanupPlan } from "./components/CleanupPage";
-import Forum from "./components/Forum";
+import Forum, { TopicForm } from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/WatchPanel";
 import { LostBoard, LostForm, LostHero, LostPreview, shareLost } from "./components/LostFound";
 import InstallApp from "./components/InstallApp";
@@ -1034,13 +1034,7 @@ export default function RepairApp() {
         {sheet?.type === "postPick" && (
           <Sheet title="✏️ ลงเรื่องอะไร?" onClose={() => setSheet(null)}>
             {(() => {
-              const write = (k) => {
-                forumGo.compose = true;
-                forumGo.openId = null;
-                forumGo.n += 1;
-                setSheet(null);
-                pick(k);
-              };
+              const write = () => setSheet({ type: "topicForm" }); // 9 Oct: a popup — the form below the hero was out of sight
               const groups = [
                 [
                   "lost",
@@ -1096,6 +1090,23 @@ export default function RepairApp() {
                 </div>
               ));
             })()}
+          </Sheet>
+        )}
+        {sheet?.type === "topicForm" && (
+          <Sheet title="✍️ ตั้งกระทู้ถาม / แชร์ความรู้" onClose={() => setSheet(null)}>
+            <TopicForm
+              onCancel={() => setSheet(null)}
+              onDone={(t) => {
+                setSheet(null);
+                forumGo.openId = t.id;
+                forumGo.compose = false;
+                forumGo.n += 1;
+                setForumTick((n) => n + 1);
+                pick("forum");
+                setToast("ตั้งกระทู้แล้ว · เพื่อนบ้านจะเข้ามาตอบ");
+                setTimeout(() => document.getElementById("forum-board")?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+              }}
+            />
           </Sheet>
         )}
         {sheet?.type === "lendForm" && (

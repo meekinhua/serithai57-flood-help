@@ -37,7 +37,10 @@ export function AuthorBadge({ a }) {
 
 // Who am I: house number (or outsider + name), remembered on this phone
 function useIdentity() {
-  const [me, setMe] = useState(() => load("forumMe", { house: "", name: load("contact", {}).name || "", outsider: false }));
+  const [me, setMe] = useState(() => {
+    const m = load("forumMe", { house: "", name: load("contact", {}).name || "", outsider: false });
+    return m.house || m.outsider ? m : { ...m, house: load("myHouse", "") || "" };
+  });
   const set = (patch) =>
     setMe((m) => {
       const next = { ...m, ...patch };
@@ -45,6 +48,18 @@ function useIdentity() {
       return next;
     });
   return [me, set];
+}
+
+// 9 Oct: "917" → "4/917" (the number pad has no "/"); Thai digits too
+export function whoAmI(me) {
+  const h = (me.house || "").replace(/[๐-๙]/g, (d) => "๐๑๒๓๔๕๖๗๘๙".indexOf(d)).replace(/\s/g, "");
+  return { ...me, house: me.outsider || !/^\d+[ก-ฮA-Za-z]?$/.test(h) ? h : `4/${h}` };
+}
+// the checks the phone's own form check would do, in Thai and on screen (some in-app browsers show nothing)
+function checkMe(me) {
+  const h = whoAmI(me).house;
+  if (me.outsider) return me.name.trim() ? "" : "คนนอกหมู่บ้าน ใส่ชื่อเล่นด้วย";
+  return /^4\/\d{1,5}/.test(h) ? "" : "ใส่บ้านเลขที่ เช่น 917 หรือ 4/917";
 }
 
 function IdentityFields({ me, set, idp }) {
@@ -73,14 +88,14 @@ function IdentityFields({ me, set, idp }) {
             <label className="mb-1 block text-sm font-medium" htmlFor={`${idp}-house`}>
               บ้านเลขที่ *
             </label>
-            <input id={`${idp}-house`} required inputMode="numeric" maxLength={20} value={me.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="4/917" />
+            <input id={`${idp}-house`} inputMode="numeric" maxLength={20} value={me.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="917 (ไม่ต้องพิมพ์ 4/)" />
           </div>
         )}
         <div className={me.outsider ? "col-span-2" : ""}>
           <label className="mb-1 block text-sm font-medium" htmlFor={`${idp}-name`}>
             ชื่อเล่น {me.outsider ? "*" : "(ไม่บังคับ)"}
           </label>
-          <input id={`${idp}-name`} required={me.outsider} maxLength={40} value={me.name} onChange={(e) => set({ name: e.target.value })} className={input} />
+          <input id={`${idp}-name`} maxLength={40} value={me.name} onChange={(e) => set({ name: e.target.value })} className={input} />
         </div>
       </div>
     </fieldset>
@@ -188,7 +203,7 @@ export default function Forum({ admin, openId = null, startCompose = false, noCo
   );
 }
 
-function TopicForm({ onCancel, onDone }) {
+export function TopicForm({ onCancel, onDone }) {
   const [me, setMe] = useIdentity();
   const [form, setForm] = useState({ category: "", title: "", body: "" });
   const [media, setMedia] = useState([]);
@@ -197,11 +212,14 @@ function TopicForm({ onCancel, onDone }) {
   const attached = mediaState(media);
   async function submit(e) {
     e.preventDefault();
-    if (!form.category) return setErr("เลือกหมวดก่อน");
+    if (!form.category) return setErr("☝️ เลือกหมวดก่อน");
+    if (form.title.trim().length < 4) return setErr("☝️ ใส่หัวข้อ / คำถาม (อย่างน้อย 4 ตัวอักษร)");
+    const bad = checkMe(me);
+    if (bad) return setErr(`☝️ ${bad}`);
     setBusy(true);
     setErr("");
     try {
-      const t = await api("/forum", { method: "POST", body: JSON.stringify({ ...form, author: me, media_ids: attached.ids }) });
+      const t = await api("/forum", { method: "POST", body: JSON.stringify({ ...form, author: whoAmI(me), media_ids: attached.ids }) });
       save("forumKeys", { ...load("forumKeys", {}), [t.id]: t.edit_key });
       onDone(t);
     } catch (e2) {
@@ -210,7 +228,7 @@ function TopicForm({ onCancel, onDone }) {
     }
   }
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-xl bg-white p-3">
+    <form noValidate onSubmit={submit} className="space-y-4 rounded-xl bg-white p-3">
       <button type="button" onClick={onCancel} className="min-h-[44px] font-semibold underline">
         ‹ กลับ
       </button>
@@ -235,7 +253,7 @@ function TopicForm({ onCancel, onDone }) {
         <label className={label} htmlFor="topic-title">
           หัวข้อ / คำถาม *
         </label>
-        <input id="topic-title" required minLength={4} maxLength={120} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={input} placeholder={EXAMPLES[0]} />
+        <input id="topic-title" maxLength={120} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={input} placeholder={EXAMPLES[0]} />
       </div>
       <div>
         <label className={label} htmlFor="topic-body">
@@ -308,9 +326,11 @@ function TopicView({ id, admin, onBack }) {
   };
   async function reply(e) {
     e.preventDefault();
+    const bad = !text.trim() ? "พิมพ์คำตอบก่อน" : checkMe(me);
+    if (bad) return setErr(`☝️ ${bad}`);
     setBusy(true);
     await run(async () => {
-      const r = await api(`/forum/${id}/replies`, { method: "POST", body: JSON.stringify({ body: text, author: me, media_ids: attached.ids }) });
+      const r = await api(`/forum/${id}/replies`, { method: "POST", body: JSON.stringify({ body: text, author: whoAmI(me), media_ids: attached.ids }) });
       save("forumReplyKeys", { ...load("forumReplyKeys", {}), [r.id]: r.edit_key });
       setText("");
       setMedia([]);
@@ -436,7 +456,7 @@ function TopicView({ id, admin, onBack }) {
         {!t.replies.length && <li className="rounded-xl bg-white p-3 text-neutral-500">ยังไม่มีคำตอบ ใครเคยเจอแบบนี้ ช่วยแชร์หน่อย</li>}
       </ul>
 
-      <form onSubmit={reply} className="space-y-2 rounded-xl border-2 border-black bg-white p-3">
+      <form noValidate onSubmit={reply} className="space-y-2 rounded-xl border-2 border-black bg-white p-3">
         <label className={label} htmlFor="reply-body">
           ตอบ / แชร์ประสบการณ์
         </label>

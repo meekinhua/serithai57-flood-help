@@ -62,6 +62,8 @@ class PinBody(BaseModel):
 
 def clean_author(a: Author) -> dict:
     house = re.sub(r"\s+", "", a.house)
+    if re.fullmatch(r"\d{1,5}[ก-ฮA-Za-z]?", house):
+        house = f"4/{house}"  # 9 Oct: the number pad has no "/": "917" is 4/917
     name = a.name.strip()
     if a.outsider:
         if not name:
