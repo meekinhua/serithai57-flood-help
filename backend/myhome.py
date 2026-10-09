@@ -98,6 +98,13 @@ class QuestionsBody(BaseModel):
     items: List[Question] = Field(default_factory=list, max_length=10)
 
 
+class SpeakerSoi(BaseModel):
+    soi: str = Field(..., min_length=1, max_length=10)
+    answer: Literal["yes", "no"] = "yes"
+    note: str = Field("", max_length=300)
+    src: str = Field("", max_length=60)  # "เพจ FB" / "กลุ่ม LINE"
+
+
 class AddrFix(BaseModel):
     house: str = Field(..., max_length=20)
     soi: Optional[str] = Field(None, max_length=10)
@@ -286,10 +293,16 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         """เสียงตามสาย on the map: one point per answering house (no house numbers). A pinned house is where it is;
         the others are spread along their soi (by house number), so a soi isn't one blob in its middle."""
         rate_limit(request, "speaker-map", limit=60, window_s=600)
-        rows = await db.myhome_answers.find({"qid": "speaker"}, {"_id": 0, "house": 1, "answer": 1}).to_list(5000)
+        rows = await db.myhome_answers.find({"qid": "speaker"}, {"_id": 0, "house": 1, "answer": 1, "soi": 1, "id": 1}).to_list(5000)
         out = []
         for r in rows:
-            loc = await locate_house(r["house"])
+            if not r.get("house"):
+                r["house"] = r.get("id") or "x"  # only for spreading it along the soi
+                loc = {"soi": r.get("soi"), "precision": "soi"} if r.get("soi") in sois else {"precision": "unknown"}
+                if loc["precision"] == "soi":
+                    loc["lat"], loc["lng"] = sois[r["soi"]]["center"]
+            else:
+                loc = await locate_house(r["house"])
             if loc.get("precision") == "unknown":
                 continue
             lat, lng, exact = loc["lat"], loc["lng"], loc.get("precision") == "house"
@@ -389,16 +402,26 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             await db.survey_resp.update_many({"house": h}, {"$set": {"soi": soi}})  # the electricians' list follows
         return await db.addresses.find_one({"house": h}, {"_id": 0})
 
+    @router.post("/admin/myhome/speaker", status_code=201)
+    async def speaker_add(body: SpeakerSoi, admin: dict = Depends(require_admin)):
+        """เสียงตามสาย heard about outside the app with only a soi ("แยก 79 ไม่เคยได้ยิน" in a comment): one point on that soi."""
+        soi = re.sub(r"^(ซอย|ซ\.?|แยก)\s*", "", re.sub(r"\s", "", body.soi))
+        if soi not in sois:
+            raise HTTPException(422, f"ไม่มี ซ.{soi} ในแผนที่")
+        doc = {"id": str(uuid.uuid4()), "house": "", "qid": "speaker", "soi": soi, "answer": body.answer, "note": body.note.strip(), "src": body.src.strip(), "at": now(), "by": admin.get("name", "")}
+        await db.myhome_answers.insert_one(dict(doc))
+        return doc
+
     @router.get("/admin/myhome/speaker")
     async def speaker_report(admin: dict = Depends(require_admin)):
         """เสียงตามสาย: which houses can't hear it, by soi (for คหบาล)."""
-        rows = await db.myhome_answers.find({"qid": "speaker"}, {"_id": 0, "house": 1, "soi": 1, "answer": 1, "at": 1, "note": 1}).to_list(5000)
+        rows = await db.myhome_answers.find({"qid": "speaker"}, {"_id": 0, "house": 1, "soi": 1, "answer": 1, "at": 1, "note": 1, "src": 1}).to_list(5000)
         by = {}
         for r in rows:
             k = r.get("soi") or "?"
             b = by.setdefault(k, {"soi": k, "no": [], "ok": 0})
             if r["answer"] == "yes":
-                b["no"].append({"house": r["house"], "at": r.get("at"), "note": r.get("note") or ""})
+                b["no"].append({"house": r.get("house") or f"(ไม่ระบุบ้าน · {r.get('src') or 'แจ้งนอกแอป'})", "at": r.get("at"), "note": r.get("note") or ""})
             else:
                 b["ok"] += 1
         return sorted(by.values(), key=lambda b: (-len(b["no"]), b["soi"]))
