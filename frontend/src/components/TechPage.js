@@ -63,15 +63,15 @@ function split(list) {
     both: list.filter((r) => t(r).includes("army") && t(r).includes("q")).length,
   };
 }
-function SignupReport({ all, seg, onSeg }) {
+function SignupReport({ all, list, teamLabel, seg, onSeg }) {
   const [open, setOpen] = useState(() => load("techReportOpen", true));
   const round = all.reduce((m, r) => (r.round && r.round > m ? r.round : m), "");
   const by = { new: [], re: [], pending: [], olddone: [] };
-  for (const r of all) by[segOf(r, round)].push(r);
-  const conf = [...by.new, ...by.re];
+  for (const r of list) by[segOf(r, round)].push(r); // this team's houses
+  const allConf = all.filter((r) => round && r.round === round);
   const today = new Date().toDateString();
-  const todayN = conf.filter((r) => r.confirmed_at && new Date(r.confirmed_at).toDateString() === today).length;
-  const tot = split(conf);
+  const todayN = allConf.filter((r) => r.confirmed_at && new Date(r.confirmed_at).toDateString() === today).length;
+  const tot = split(allConf);
   const armyAll = tot.army + tot.both;
   const qAll = tot.q + tot.both;
   const Row = ({ k, icon, label, list, tone }) => {
@@ -108,7 +108,7 @@ function SignupReport({ all, seg, onSeg }) {
       >
         <b className="min-w-0 flex-1 text-lg">📊 ยอดลงทะเบียน{round ? ` รอบ ${round.slice(8)}/${round.slice(5, 7)}` : ""}</b>
         <span className="text-sm text-neutral-600">
-          ยืนยันแล้ว {conf.length} หลัง{todayN ? ` · วันนี้ +${todayN}` : ""} {open ? "▴" : "▾"}
+          ยืนยันแล้ว {allConf.length} หลัง{todayN ? ` · วันนี้ +${todayN}` : ""} {open ? "▴" : "▾"}
         </span>
       </button>
       {open && (
@@ -123,6 +123,7 @@ function SignupReport({ all, seg, onSeg }) {
               <span className="text-xs">🔧 ทีม Q ช่าง (รวมขอทั้ง 2 ทีม)</span>
             </div>
           </div>
+          <p className="pt-1 text-sm font-bold text-neutral-700">{teamLabel} · แยกกลุ่ม</p>
           <Row k="new" icon="🆕" label="ลงใหม่ รอบนี้" list={by.new} tone="text-emerald-700" />
           <Row k="re" icon="🔁" label="ลงซ้ำ ยืนยันจากรอบก่อน" list={by.re} tone="text-emerald-700" />
           <Row k="pending" icon="⏳" label="รอบก่อน ยังค้าง · ยังไม่ยืนยันรอบนี้" list={by.pending} tone="text-amber-700" />
@@ -326,8 +327,34 @@ export default function TechPage() {
         <p className="p-4 text-center text-neutral-500">กำลังโหลด…</p>
       ) : (
         <>
+          {/* 9 Oct: one tab per team, so each team gets its own list (and its own job status) */}
+          <div className="sticky top-0 z-20 -mx-1 mb-3 bg-[#f5f3ee]/95 px-1 py-1.5 backdrop-blur">
+            <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white p-1 shadow-sm" role="tablist" aria-label="ทีมช่าง">
+              {TEAMS.map(([k, label]) => {
+                const n = (all || []).filter((r) => (r.teams || []).includes(k) || (k === "army" && !(r.teams || []).length)).length;
+                const on = team === k;
+                return (
+                  <button
+                    key={k}
+                    role="tab"
+                    aria-selected={on}
+                    onClick={() => {
+                      save("techTeam", k);
+                      setTeam(k);
+                    }}
+                    className={`min-h-[52px] rounded-xl px-1 text-[15px] font-bold leading-tight ${on ? "bg-black text-white" : "text-neutral-700"}`}
+                  >
+                    {label}
+                    <span className={`block text-xs font-normal ${on ? "text-neutral-300" : "text-neutral-500"}`}>{n} หลัง</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <SignupReport
             all={all}
+            list={rows}
+            teamLabel={(TEAMS.find(([k]) => k === team) || ["", ""])[1]}
             seg={seg}
             onSeg={(k) => {
               setSeg(k);
