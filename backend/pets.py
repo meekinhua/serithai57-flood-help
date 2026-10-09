@@ -111,10 +111,12 @@ def build_router(db, rate_limit, clean, locate_house, claim_media, delete_media)
             raise HTTPException(404, "ไม่พบสัตว์เลี้ยงตัวนี้")
         if await db.lost.find_one({"pet_house": h, "pet_id": pid, "status": "open"}):
             raise HTTPException(422, "ประกาศหายตัวนี้อยู่แล้ว")
-        soi = ""
+        soi, spot = "", {}
         try:
             loc = await locate_house(h)
             soi = str((loc or {}).get("soi") or "")
+            if (loc or {}).get("lat") is not None:
+                spot = {"lat": loc["lat"], "lng": loc["lng"], **({} if loc.get("precision") == "house" else {"approx": True})}
         except Exception:
             pass
         key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), _now()
@@ -126,6 +128,7 @@ def build_router(db, rate_limit, clean, locate_house, claim_media, delete_media)
             "title": title[:80],
             "detail": body.detail.strip() or pet.get("desc", ""),
             "soi": soi[:12],
+            **spot,
             "when_seen": body.when_seen.strip(),
             "name": body.name.strip(),
             "phone": body.phone.strip(),

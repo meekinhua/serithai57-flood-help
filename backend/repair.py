@@ -66,6 +66,26 @@ def _clean(d: dict) -> dict:
     return {k: v.strip() if isinstance(v, str) else v for k, v in d.items()}
 
 
+def soi_spot(soi: str, seed: str) -> dict:
+    """Only the soi known: a point at the soi's middle (a little apart from the others there), marked approx."""
+    import staff  # noqa: E402 (the soi centres)
+
+    s = re.sub(r"^(ซอย|ซ\.?)\s*", "", (soi or "").strip())
+    c = (staff.SOIS.get(s) or {}).get("center")
+    if not c:
+        return {}
+    h = int(hashlib.sha256(seed.encode()).hexdigest()[:4], 16)
+    return {"lat": round(c[0] + ((h % 21) - 10) * 0.000012, 6), "lng": round(c[1] + ((h // 21 % 21) - 10) * 0.000012, 6), "approx": True}
+
+
+def with_spot(docs: list) -> list:
+    """Older posts without a pin: give them their soi's spot on the way out (not stored)."""
+    for d in docs:
+        if d.get("lat") is None and d.get("soi"):
+            d.update(soi_spot(d["soi"], d.get("id", "")))
+    return docs
+
+
 class Contact(BaseModel):
     name: str = Field(..., min_length=1, max_length=60)
     phone: str = Field("", max_length=40)
@@ -110,6 +130,8 @@ class LostCreate(Contact):
     detail: str = Field("", max_length=400)
     soi: str = Field("", max_length=12)
     when_seen: str = Field("", max_length=60)  # "หายตั้งแต่ 29 ก.ย. ตอนน้ำขึ้น"
+    lat: Optional[float] = Field(None, ge=13.7, le=13.9)  # 9 Oct: where it was lost / seen (the pin)
+    lng: Optional[float] = Field(None, ge=100.6, le=100.8)
     media_ids: list[str] = Field(default_factory=list, max_length=3)
 
 
@@ -541,7 +563,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     @router.get("/lost")
     async def list_lost(include_closed: bool = False):
         q = {} if include_closed else {"status": "open"}
-        return await db.lost.find(q, HIDDEN).sort([("status", 1), ("updated_at", -1)]).to_list(1000)
+        return with_spot(await db.lost.find(q, HIDDEN).sort([("status", 1), ("updated_at", -1)]).to_list(1000))
 
     @router.post("/lost", status_code=201)
     async def create_lost(body: LostCreate, request: Request):
@@ -554,6 +576,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         doc = {
             "id": item_id,
             **_clean(body.model_dump(exclude={"media_ids"})),
+            **(soi_spot(body.soi, item_id) if body.lat is None else {}),
             "media": await claim_media(body.media_ids, f"lost:{item_id}", {"image"}),
             "has_phone": True,
             "sightings": [],
@@ -615,7 +638,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     @router.get("/issues")
     async def list_issues(include_fixed: bool = False):
         q = {} if include_fixed else {"status": {"$ne": "fixed"}}
-        return await db.issues.find(q, HIDDEN).sort([("status", 1), ("votes", -1), ("created_at", -1)]).to_list(1000)
+        return with_spot(await db.issues.find(q, HIDDEN).sort([("status", 1), ("votes", -1), ("created_at", -1)]).to_list(1000))
 
     @router.post("/issues", status_code=201)
     async def create_issue(body: IssueCreate, request: Request):
@@ -625,16 +648,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         if body.lat is None and not body.soi.strip():
             raise HTTPException(422, "บอกซอย หรือปักหมุดตำแหน่ง")
         issue_id, t = str(uuid.uuid4()), now()
-        where = {}
-        if body.lat is None:
-            # only the soi given: put it on the map at the soi's middle (shown as "approx"), a little apart from others
-            import staff  # noqa: E402 (the soi centres)
-
-            s = re.sub(r"^(ซอย|ซ\.?)\s*", "", body.soi.strip())
-            c = (staff.SOIS.get(s) or {}).get("center")
-            if c:
-                h = int(hashlib.sha256(issue_id.encode()).hexdigest()[:4], 16)
-                where = {"lat": round(c[0] + ((h % 21) - 10) * 0.000012, 6), "lng": round(c[1] + ((h // 21 % 21) - 10) * 0.000012, 6), "approx": True}
+        where = soi_spot(body.soi, issue_id) if body.lat is None else {}  # only the soi given: its middle, "approx"
         doc = {
             "id": issue_id,
             **_clean(body.model_dump(exclude={"media_ids"})),

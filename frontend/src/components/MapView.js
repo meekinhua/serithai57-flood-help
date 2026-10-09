@@ -91,6 +91,8 @@ export default function MapView({
   issues = [],
   flood = true,
   onIssue,
+  lost = [],
+  onLost,
 }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
@@ -262,6 +264,33 @@ export default function MapView({
         }`,
       ).addTo(layer);
     }
+    // 🐾 หาย·เจอ (9 Oct): red = still looking, green = found, waiting for the owner
+    for (const x of lost) {
+      if (x.lat == null) continue;
+      const pet = ["dog", "cat", "pet"].includes(x.category);
+      const found = x.kind === "found";
+      const icon = { dog: "🐕", cat: "🐈", pet: "🐾", document: "📄", vehicle: "🛵" }[x.category] || "🎒";
+      const thumb = x.media?.[0] ? `<img src="${mediaUrl(x.media[0].id, "thumb")}" alt="">` : `<span>${icon}</span>`;
+      // new ones stand out; older ones fade, and after 3 weeks they leave the map
+      const ageD = (Date.now() - new Date(x.created_at).getTime()) / 864e5;
+      if (ageD > 21) continue;
+      const fresh = ageD < 2;
+      const fade = fresh ? 1 : ageD < 7 ? 0.8 : ageD < 14 ? 0.55 : 0.32;
+      const size = fresh ? 56 : 44;
+      L.marker([x.lat, x.lng], {
+        zIndexOffset: (pet ? 1150 : 950) + (fresh ? 200 : 0),
+        opacity: fade,
+        icon: L.divIcon({
+          className: "",
+          iconSize: [size, size],
+          iconAnchor: [size / 2, size / 2],
+          html: `<div class="lost-pin ${found ? "found" : ""} ${fresh ? "fresh" : ""}" style="width:${size}px;height:${size}px">${thumb}</div>`,
+        }),
+      })
+        .on("click", () => onLost?.(x))
+        .bindTooltip(`${found ? "🙌 มีคนเจอ" : "😢 หาย"}: ${escapeHtml(x.title)}${x.soi ? ` · ซ.${escapeHtml(x.soi)}` : ""}${x.approx ? " (โดยประมาณ)" : ""}`, { direction: "top", offset: [0, -22] })
+        .addTo(layer);
+    }
     // leaks in the flood wall: on both views, they need hands now
     for (const lk of flood ? canal?.leaks || [] : []) {
       if (lk.lat == null) continue;
@@ -326,7 +355,7 @@ export default function MapView({
     }
     pinned.forEach((m) => m.addTo(layer));
     cluster.addLayers(grouped);
-  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak, hubs, events, issues, flood, onIssue]);
+  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak, hubs, events, issues, flood, onIssue, lost, onLost]);
 
   // Staff boats / trucks / people on duty: big, pulsing, always above residents' pins
   useEffect(() => {

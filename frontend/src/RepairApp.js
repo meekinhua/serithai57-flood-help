@@ -369,6 +369,9 @@ export default function RepairApp() {
   // 9 Oct: reports nobody on this phone has seen on the map yet → a dot on แผนที่หมู่บ้าน
   const openIssues = issues.filter((x) => x.status !== "fixed");
   const openIssue = useCallback((x) => setSheet({ type: "issue", issue: x }), []);
+  // หาย·เจอ on the map: still open, the last 3 weeks (MapView fades them with age)
+  const lostOnMap = useMemo(() => lostOpen.filter((x) => Date.now() - new Date(x.created_at).getTime() < 21 * 864e5), [lostOpen]);
+  const openLostFromMap = useCallback((x) => goItem("lost", x.id), []); // eslint-disable-line react-hooks/exhaustive-deps
   const newIssues = openIssues.filter((x) => new Date(x.created_at).getTime() > mapSeen);
   // what each page tab has to say (the bell lists it; ล้าง mutes it until it changes)
   const ws = waterStatus(water, canal);
@@ -853,6 +856,8 @@ export default function RepairApp() {
                   issues={openIssues}
                   flood={floodOn}
                   onIssue={openIssue}
+                  lost={lostOnMap}
+                  onLost={openLostFromMap}
                   tall
                 >
                   <button

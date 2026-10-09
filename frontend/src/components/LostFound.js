@@ -5,6 +5,7 @@ import { api, load, save } from "../api";
 import { LOST_CATEGORIES, LOST_KINDS, timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import MediaPicker, { mediaState } from "./MediaPicker";
+import LocationPicker from "./LocationPicker";
 import { input } from "./RepairBoards";
 
 // หาย · เจอ: dogs, cats, things and papers lost (or found) in the flood. Photos first — that is how people
@@ -244,16 +245,31 @@ export function LostForm({ kind: initialKind = "lost", onDone }) {
   const [media, setMedia] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [pinOpen, setPinOpen] = useState(false);
+  const [loc, setLoc] = useState(null);
+  const [pinned, setPinned] = useState(false);
+  const [soiTyped, setSoiTyped] = useState(false);
   const set = (p) => setForm((f) => ({ ...f, ...p }));
   const attached = mediaState(media);
   const lost = form.kind === "lost";
+  // 9 Oct: the soi follows the pin (unless typed)
+  const pinKey = pinned && loc ? `${loc.lat},${loc.lng}` : "";
+  useEffect(() => {
+    if (!pinKey || soiTyped) return;
+    const t = setTimeout(() => {
+      api(`/myhome/soi-at?lat=${loc.lat}&lng=${loc.lng}`)
+        .then((r) => r.soi && setForm((f) => ({ ...f, soi: r.soi })))
+        .catch(() => {});
+    }, 400);
+    return () => clearTimeout(t);
+  }, [pinKey, soiTyped]); // eslint-disable-line react-hooks/exhaustive-deps
   async function submit(e) {
     e.preventDefault();
     if (!form.category) return setErr("เลือกว่าเป็นอะไร");
     setBusy(true);
     setErr("");
     try {
-      const x = await api("/lost", { method: "POST", body: JSON.stringify({ ...form, media_ids: attached.ids }) });
+      const x = await api("/lost", { method: "POST", body: JSON.stringify({ ...form, ...(pinned && loc ? loc : {}), media_ids: attached.ids }) });
       save("lostKeys", { ...load("lostKeys", {}), [x.id]: x.edit_key });
       save("contact", { ...load("contact", {}), name: form.name, phone: form.phone });
       onDone(x);
@@ -327,12 +343,38 @@ export function LostForm({ kind: initialKind = "lost", onDone }) {
           placeholder={lost ? "จุดสังเกต นิสัย กลัวคนไหม มีรางวัลไหม" : "ตอนนี้อยู่ที่ไหน ฝากเลี้ยงไว้ที่ใคร"}
         />
       </div>
+      <div>
+        <p className={label}>{lost ? "หายตรงไหน" : "เจอตรงไหน"} · ปักหมุดแล้วขึ้นบนแผนที่หมู่บ้าน</p>
+        {!pinOpen ? (
+          <button type="button" onClick={() => setPinOpen(true)} className="min-h-[52px] w-full rounded-xl border-2 border-[#15201A] bg-white text-base font-bold">
+            🗺️ ปักหมุดบนแผนที่ (แนะนำ)
+          </button>
+        ) : (
+          <div className="anim-in">
+            <LocationPicker value={loc} onChange={setLoc} onTouched={() => setPinned(true)} />
+            <p className={`mt-1 text-sm font-bold ${pinned ? "text-[#1E6B47]" : "text-[#7A4104]"}`}>
+              {pinned ? `✓ หมุดอยู่ตรงนี้${form.soi ? ` · ซ.${form.soi}` : ""} · ลากแผนที่ปรับได้` : "ลากแผนที่ให้หมุด 📍 ชี้ตรงจุด"}
+            </p>
+          </div>
+        )}
+        {!pinOpen && <p className="mt-1 text-sm text-neutral-500">ไม่ปักก็ได้ · ใส่ซอยไว้ ระบบวางหมุดกลางซอยให้</p>}
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label className={label} htmlFor="lost-soi">
             {lost ? "หายแถวซอย" : "เจอแถวซอย"}
           </label>
-          <input id="lost-soi" maxLength={12} value={form.soi} onChange={(e) => set({ soi: e.target.value })} className={input} placeholder="เช่น 24" />
+          <input
+            id="lost-soi"
+            maxLength={12}
+            value={form.soi}
+            onChange={(e) => {
+              setSoiTyped(true);
+              set({ soi: e.target.value });
+            }}
+            className={input}
+            placeholder="เช่น 24"
+          />
         </div>
         <div>
           <label className={label} htmlFor="lost-when">

@@ -149,6 +149,8 @@ export function WaterView({
   tall = false,
   children,
   onIssue,
+  lost = [],
+  onLost,
 }) {
   return (
     <div className="space-y-3">
@@ -167,6 +169,8 @@ export function WaterView({
           issues={issues}
           flood={flood}
           onIssue={onIssue}
+          lost={lost}
+          onLost={onLost}
           onSelect={() => {}}
           onReportWater={onWater}
           canal={canal}
