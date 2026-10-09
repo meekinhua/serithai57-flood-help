@@ -19,14 +19,15 @@ const HINT = {
 // 9 Oct: people reported "can't hear the loudspeaker" as a map problem — it belongs to บ้านฉัน's question
 // (one answer per house → the เสียงตามสาย layer of the map). Words like these get pointed there.
 export const SPEAKER_RE = /เสียงตาม|ได้ยิน|ลำโพง|หอกระจาย/; // loose: "ไมไ่ด้ยิน" (a typo) came in too
-export const goSpeaker = () => window.dispatchEvent(new Event("speaker:go")); // RepairApp → บ้านฉัน, question open
+// RepairApp → บ้านฉัน, question open; what they typed in the report comes along as the house's note
+export const goSpeaker = (note = "") => window.dispatchEvent(new CustomEvent("speaker:go", { detail: typeof note === "string" ? note : "" }));
 
-export function SpeakerHint() {
+export function SpeakerHint({ note = "" }) {
   return (
     <div className="rounded-xl border-2 border-[#D9A21B] bg-[#FFF6DD] p-3">
       <p className="text-[15px] font-bold">📢 เรื่องเสียงตามสาย ไม่ต้องแจ้งเป็นจุดปัญหานะครับ</p>
       <p className="text-sm text-[#45504A]">ตอบในบ้านฉันว่าบ้านคุณ “ได้ยิน” หรือ “ไม่ได้ยิน” · ระบบรวมเป็นแผนที่จุดบอดเสียงให้คหบาลซ่อม</p>
-      <button type="button" onClick={goSpeaker} className="mt-2 min-h-[48px] w-full rounded-xl bg-[#15201A] text-base font-bold text-white">
+      <button type="button" onClick={() => goSpeaker(note)} className="mt-2 min-h-[48px] w-full rounded-xl bg-[#15201A] text-base font-bold text-white">
         ไปตอบในบ้านฉัน ›
       </button>
     </div>
@@ -111,7 +112,7 @@ export default function QuickReport({ type: type0 = "", onDone, onMore }) {
             <span aria-hidden="true">›</span>
           </button>
         ))}
-        <button onClick={goSpeaker} className="card flex min-h-[60px] w-full items-center gap-3 p-3 text-left active:bg-[#F2F4F1]">
+        <button onClick={() => goSpeaker()} className="card flex min-h-[60px] w-full items-center gap-3 p-3 text-left active:bg-[#F2F4F1]">
           <span className="ic ic-sm" aria-hidden="true">
             📢
           </span>
@@ -192,7 +193,7 @@ export default function QuickReport({ type: type0 = "", onDone, onMore }) {
           placeholder={HINT[type] || ""}
           className="w-full rounded-xl border border-[#A9B4AD] p-3 text-base"
         />
-        {SPEAKER_RE.test(detail) && <SpeakerHint />}
+        {SPEAKER_RE.test(detail) && <SpeakerHint note={detail} />}
       </div>
 
       {err && <p className="rounded-xl bg-[#FDE8E6] p-3 font-bold text-[#B42318]">{err}</p>}

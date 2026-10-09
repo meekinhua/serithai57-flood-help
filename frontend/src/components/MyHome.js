@@ -387,24 +387,45 @@ function openPush() {
 }
 
 // ---------- 📢 เสียงตามสาย: can this house hear the village loudspeaker? (9 Oct) ----------
-function SpeakerRow({ info, onSaved, setErr, open, onClose, onPin, hideNudge }) {
+const SPK_NOTES = ["ไม่เคยได้ยินเลย", "ได้ยินแต่ฟังไม่รู้เรื่อง", "เสียงเบามาก", "ลำโพงใกล้บ้านเสีย"];
+
+function SpeakerRow({ info, onSaved, setErr, open, onClose, onPin, hideNudge, draft = "" }) {
   // asked at the top until answered; after that the status chip by the house number opens it again ("open")
   const sp = info.speaker || {};
   const [busy, setBusy] = useState(false);
-  const [nudgeVisits] = useState(() => seenVisits("speaker:pin")); // the pin nudge shows on 3 visits, then the house panel has it
-  async function answer(a) {
+  const [noting, setNoting] = useState(false); // after "ไม่ได้ยิน": a line in their own words (optional)
+  const [note, setNote] = useState(draft || sp.note || "");
+  useEffect(() => {
+    if (draft) setNote(draft);
+  }, [draft]);
+  async function saveNote() {
     setErr("");
     setBusy(true);
     try {
-      onSaved(await api("/myhome/answer", { method: "POST", body: JSON.stringify({ house: info.house, qid: "speaker", answer: a }) }));
+      onSaved(await api("/myhome/answer", { method: "POST", body: JSON.stringify({ house: info.house, qid: "speaker", answer: "yes", note }) }));
+      setNoting(false);
       onClose();
-      notify(a === "yes" ? "แจ้งแล้ว · ทีมจะรวบรวมส่งคหบาลให้ซ่อมลำโพงซอยคุณ" : "บันทึกแล้ว · ขอบคุณครับ");
+      notify("บันทึกแล้ว · ทีมจะรวบรวมส่งคหบาลให้ซ่อมลำโพงซอยคุณ");
     } catch (e) {
       setErr(e.message);
     }
     setBusy(false);
   }
-  if (sp.answer && !open) {
+  const [nudgeVisits] = useState(() => seenVisits("speaker:pin")); // the pin nudge shows on 3 visits, then the house panel has it
+  async function answer(a) {
+    setErr("");
+    setBusy(true);
+    try {
+      onSaved(await api("/myhome/answer", { method: "POST", body: JSON.stringify({ house: info.house, qid: "speaker", answer: a, ...(a === "yes" && note.trim() ? { note } : {}) }) }));
+      if (a === "yes") return setNoting(true); // stays open: a line about it (optional)
+      onClose();
+      notify("บันทึกแล้ว · ขอบคุณครับ");
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy(false);
+  }
+  if (sp.answer && !open && !noting) {
     // can't hear and the house isn't pinned yet: one quiet nudge (the map needs the place)
     return sp.answer === "yes" && info.precision !== "house" && !hideNudge && nudgeVisits <= 3 ? (
       <button onClick={onPin} className="anim-in mt-2 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-[#FFF6DA] px-3 text-left text-sm">
@@ -441,8 +462,37 @@ function SpeakerRow({ info, onSaved, setErr, open, onClose, onPin, hideNudge }) 
           🔊 ได้ยินชัด
         </button>
       </div>
+      {sp.answer === "yes" && (noting || open) && (
+        <div className="anim-in mt-3 space-y-2">
+          <p className="text-[15px] font-bold">เล่าเพิ่มได้ (ไม่บังคับ) · ทีมส่งต่อให้คหบาล</p>
+          <div className="flex flex-wrap gap-1.5">
+            {SPK_NOTES.map((t) => (
+              <button key={t} onClick={() => setNote(note.includes(t) ? note : note.trim() ? `${note.trim()} · ${t}` : t)} className="chip min-h-[40px] border border-[#D5DBD6] bg-white px-3 text-sm">
+                {t}
+              </button>
+            ))}
+          </div>
+          <textarea
+            rows={2}
+            maxLength={300}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="เช่น ไม่ได้ยินมาตั้งแต่ก่อนโควิด · ลำโพงหน้าซอยไม่ดัง"
+            className="w-full rounded-xl border border-[#A9B4AD] p-3 text-base"
+          />
+          <button onClick={saveNote} disabled={busy} className="min-h-[48px] w-full rounded-xl bg-[#1E6B47] text-base font-bold text-white disabled:opacity-50">
+            บันทึก
+          </button>
+        </div>
+      )}
       {sp.answer && (
-        <button onClick={onClose} className="mt-1 min-h-[40px] text-sm text-[#45504A] underline">
+        <button
+          onClick={() => {
+            setNoting(false);
+            onClose();
+          }}
+          className="mt-1 min-h-[40px] text-sm text-[#45504A] underline"
+        >
           ปิด
         </button>
       )}
@@ -1195,9 +1245,14 @@ export default function MyHome({
   const [, setFloodPref] = useFloodTools();
   const [infoOpen, setInfoOpen] = useState(false); // the house panel (soi, pin, rubbish days, เสียงตามสาย)
   const [spkOpen, setSpkOpen] = useState(false); // เสียงตามสาย: the chip by the house number opens the question again
+  const [spkDraft, setSpkDraft] = useState(""); // words typed in a map report about the loudspeaker → the house's note
   useEffect(() => {
     // "ไม่ได้ยินเสียงตามสาย" from the report sheet / the map: open the question here and bring it into view
-    const show = () => findCard("myhome-speaker", () => setSpkOpen(true));
+    const show = (e) =>
+      findCard("myhome-speaker", () => {
+        setSpkDraft(e.detail || "");
+        setSpkOpen(true);
+      });
     window.addEventListener("speaker:open", show);
     return () => window.removeEventListener("speaker:open", show);
   }, []);
@@ -1540,7 +1595,11 @@ export default function MyHome({
             setErr={setErr}
             hideNudge={infoOpen}
             open={spkOpen}
-            onClose={() => setSpkOpen(false)}
+            draft={spkDraft}
+            onClose={() => {
+              setSpkOpen(false);
+              setSpkDraft("");
+            }}
             onPin={() => setPinning({ pos: null, soi: info.soi || "", gps: true })}
           />
           <div className="grp">

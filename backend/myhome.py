@@ -102,6 +102,7 @@ class AnswerBody(BaseModel):
     house: str = Field(..., max_length=20)
     qid: str = Field(..., max_length=30)
     answer: Literal["yes", "no"]
+    note: Optional[str] = Field(None, max_length=300)  # 9 Oct: เสียงตามสาย in their own words ("ไม่เคยได้ยินเลย ตั้งแต่ก่อนโควิด"); None = keep
 
 
 # "เร็วๆ นี้" on บ้านฉัน: what is about to happen to this house. The regular rubbish round comes by itself from the
@@ -243,9 +244,12 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         rate_limit(request, "myhome-answer", limit=40, window_s=600)
         h = clean(body.house)
         loc = await locate_house(h)
+        put = {"answer": body.answer, "soi": loc.get("soi") or "", "at": now()}
+        if body.note is not None:
+            put.update(note=body.note.strip(), note_at=now())
         await db.myhome_answers.update_one(
             {"house": h, "qid": body.qid},
-            {"$set": {"answer": body.answer, "soi": loc.get("soi") or "", "at": now()}, "$push": {"log": {"answer": body.answer, "at": now()}}},
+            {"$set": put, "$push": {"log": {"answer": body.answer, "at": now(), **({"note": put["note"]} if "note" in put else {})}}},
             upsert=True,
         )
         return await myhome(h, request)
@@ -293,13 +297,13 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
     @router.get("/admin/myhome/speaker")
     async def speaker_report(admin: dict = Depends(require_admin)):
         """เสียงตามสาย: which houses can't hear it, by soi (for คหบาล)."""
-        rows = await db.myhome_answers.find({"qid": "speaker"}, {"_id": 0, "house": 1, "soi": 1, "answer": 1, "at": 1}).to_list(5000)
+        rows = await db.myhome_answers.find({"qid": "speaker"}, {"_id": 0, "house": 1, "soi": 1, "answer": 1, "at": 1, "note": 1}).to_list(5000)
         by = {}
         for r in rows:
             k = r.get("soi") or "?"
             b = by.setdefault(k, {"soi": k, "no": [], "ok": 0})
             if r["answer"] == "yes":
-                b["no"].append({"house": r["house"], "at": r.get("at")})
+                b["no"].append({"house": r["house"], "at": r.get("at"), "note": r.get("note") or ""})
             else:
                 b["ok"] += 1
         return sorted(by.values(), key=lambda b: (-len(b["no"]), b["soi"]))
@@ -378,7 +382,8 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             "has_contact": bool(await db.households.find_one({"house": h}, {"_id": 1})),
             # 9 Oct: the village loudspeaker — "yes" = can't hear it (qid "speaker", always on, any time)
             "speaker": {
-                "answer": ((await db.myhome_answers.find_one({"house": h, "qid": "speaker"}, {"_id": 0, "answer": 1})) or {}).get("answer"),
+                "answer": None,
+                **((await db.myhome_answers.find_one({"house": h, "qid": "speaker"}, {"_id": 0, "answer": 1, "note": 1})) or {}),
                 "soi_no": await db.myhome_answers.count_documents({"qid": "speaker", "answer": "yes", "soi": soi, "house": {"$ne": h}}) if soi else 0,
                 "all_no": await db.myhome_answers.count_documents({"qid": "speaker", "answer": "yes"}),
             },

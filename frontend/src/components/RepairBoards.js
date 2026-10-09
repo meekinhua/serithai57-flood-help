@@ -1179,7 +1179,7 @@ export function IssueForm({ onDone }) {
           className={input}
           placeholder="เช่น ฟูก+ตู้พัง กองหน้าบ้าน 3 หลัง ปากซอย"
         />
-        {SPEAKER_RE.test(form.detail) && <SpeakerHint />}
+        {SPEAKER_RE.test(form.detail) && <SpeakerHint note={form.detail} />}
       </div>
       <div>
         <p className={label}>รูป (ไม่บังคับ)</p>

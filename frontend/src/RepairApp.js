@@ -386,10 +386,10 @@ export default function RepairApp() {
   const openIssue = useCallback((x) => setSheet({ type: "issue", issue: x }), []);
   useEffect(() => {
     // เสียงตามสาย is answered in บ้านฉัน (one answer per house), not reported as a map problem
-    const go = () => {
+    const go = (e) => {
       setSheet(null);
       goPage("home");
-      setTimeout(() => window.dispatchEvent(new Event("speaker:open")), 400);
+      setTimeout(() => window.dispatchEvent(new CustomEvent("speaker:open", { detail: e.detail || "" })), 400);
     };
     window.addEventListener("speaker:go", go);
     return () => window.removeEventListener("speaker:go", go);
