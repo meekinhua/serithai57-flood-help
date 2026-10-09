@@ -266,6 +266,20 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             q["answers"] = rows
         return items
 
+    @router.get("/admin/myhome/speaker")
+    async def speaker_report(admin: dict = Depends(require_admin)):
+        """เสียงตามสาย: which houses can't hear it, by soi (for คหบาล)."""
+        rows = await db.myhome_answers.find({"qid": "speaker"}, {"_id": 0, "house": 1, "soi": 1, "answer": 1, "at": 1}).to_list(5000)
+        by = {}
+        for r in rows:
+            k = r.get("soi") or "?"
+            b = by.setdefault(k, {"soi": k, "no": [], "ok": 0})
+            if r["answer"] == "yes":
+                b["no"].append({"house": r["house"], "at": r.get("at")})
+            else:
+                b["ok"] += 1
+        return sorted(by.values(), key=lambda b: (-len(b["no"]), b["soi"]))
+
     @router.put("/admin/myhome/reminders")
     async def set_reminders(body: RemindersBody, admin: dict = Depends(require_admin)):
         items = [r.model_dump(mode="json") for r in body.items]
@@ -338,6 +352,12 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             "questions": qs,
             "soon": coming,
             "has_contact": bool(await db.households.find_one({"house": h}, {"_id": 1})),
+            # 9 Oct: the village loudspeaker — "yes" = can't hear it (qid "speaker", always on, any time)
+            "speaker": {
+                "answer": ((await db.myhome_answers.find_one({"house": h, "qid": "speaker"}, {"_id": 0, "answer": 1})) or {}).get("answer"),
+                "soi_no": await db.myhome_answers.count_documents({"qid": "speaker", "answer": "yes", "soi": soi, "house": {"$ne": h}}) if soi else 0,
+                "all_no": await db.myhome_answers.count_documents({"qid": "speaker", "answer": "yes"}),
+            },
         }
 
     @router.post("/myhome/contact", status_code=201)

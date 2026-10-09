@@ -38,11 +38,11 @@ const mainSoi = (soi) => (String(soi || "").match(/\d+/) || [""])[0];
 const isUrgent = (r) => URGENT.test(`${(r.picks || []).join(" ")} ${r.note || ""}`) || (r.picks || []).includes("ไฟรั่ว / ไฟดูด");
 const time = (iso) => (iso ? new Date(iso).toLocaleString("th-TH", { weekday: "short", hour: "2-digit", minute: "2-digit" }) : "");
 
-// 10 Oct 2026: two teams the same day (military electricians + Q ช่าง). Each team sees the houses that asked for it,
+// 10 Oct 2026: two teams the same day (military electricians + Q-CHANG). Each team sees the houses that asked for it,
 // with its own status; the first team keeps the original `job`, the others `jobs.<team>`.
 const TEAMS = [
   ["army", "🪖 ทีมช่างทหาร"],
-  ["q", "🔧 ทีม Q ช่าง"],
+  ["q", "🔧 ทีม Q-CHANG"],
 ];
 
 // ---------- 📊 sign-up report (9 Oct): this round's confirmations, new vs re-confirmed, by team; older ones still waiting ----------
@@ -89,7 +89,7 @@ function SignupReport({ all, list, teamLabel, seg, onSeg }) {
           <b className="block text-[15px] leading-tight">{label}</b>
           {(k === "new" || k === "re") && (
             <span className="block text-xs text-neutral-600">
-              🪖 ทหาร {sp.army} · 🔧 Q {sp.q} · ทั้ง 2 ทีม {sp.both}
+              🪖 ทหาร {sp.army} · 🔧 Q-CHANG {sp.q} · ทั้ง 2 ทีม {sp.both}
             </span>
           )}
         </span>
@@ -120,7 +120,7 @@ function SignupReport({ all, list, teamLabel, seg, onSeg }) {
             </div>
             <div className="rounded-xl bg-[#E3EDF9] p-2">
               <b className="block text-2xl">{qAll}</b>
-              <span className="text-xs">🔧 ทีม Q ช่าง (รวมขอทั้ง 2 ทีม)</span>
+              <span className="text-xs">🔧 ทีม Q-CHANG (รวมขอทั้ง 2 ทีม)</span>
             </div>
           </div>
           <p className="pt-1 text-sm font-bold text-neutral-700">{teamLabel} · แยกกลุ่ม</p>

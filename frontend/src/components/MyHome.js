@@ -367,6 +367,63 @@ function SoiAsk({ info, onSaved, onPin, onClose, setErr }) {
   );
 }
 
+// ---------- 📢 เสียงตามสาย: can this house hear the village loudspeaker? (9 Oct) ----------
+function SpeakerRow({ info, onSaved, setErr }) {
+  const sp = info.speaker || {};
+  const [edit, setEdit] = useState(false);
+  const [busy, setBusy] = useState(false);
+  async function answer(a) {
+    setErr("");
+    setBusy(true);
+    try {
+      onSaved(await api("/myhome/answer", { method: "POST", body: JSON.stringify({ house: info.house, qid: "speaker", answer: a }) }));
+      setEdit(false);
+      notify(a === "yes" ? "แจ้งแล้ว · ทีมจะรวบรวมส่งคหบาลให้ซ่อมลำโพงซอยคุณ" : "บันทึกแล้ว · ขอบคุณครับ");
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy(false);
+  }
+  if (sp.answer && !edit)
+    return (
+      <div className="flex min-h-[48px] items-center gap-2 border-t border-[#E6EBE7] py-2 text-[15px]">
+        <span aria-hidden="true">{sp.answer === "yes" ? "🔇" : "🔊"}</span>
+        <span className="min-w-0 flex-1 leading-snug text-[#45504A]">
+          {sp.answer === "yes" ? (
+            <>
+              แจ้งแล้ว: <b className="text-[#15201A]">ไม่ได้ยินเสียงตามสาย</b>
+              {sp.soi_no > 0 ? ` · ใน ซ.${info.soi} อีก ${sp.soi_no} หลัง` : ""}
+            </>
+          ) : (
+            "ได้ยินเสียงตามสายชัด"
+          )}
+        </span>
+        <button onClick={() => setEdit(true)} className="min-h-[44px] shrink-0 text-sm font-bold text-[#1E6B47]">
+          เปลี่ยน
+        </button>
+      </div>
+    );
+  return (
+    <div className="border-t border-[#E6EBE7] py-3">
+      <p className="text-base font-bold">📢 เสียงตามสายของหมู่บ้าน ได้ยินที่บ้านไหม?</p>
+      <p className="text-sm text-[#45504A]">ช่วยให้รู้ว่าซอยไหนลำโพงเสีย · ทีมรวบรวมส่งคหบาล{sp.all_no ? ` · แจ้งแล้ว ${sp.all_no} หลัง` : ""}</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button onClick={() => answer("yes")} disabled={busy} className="min-h-[48px] rounded-xl border-2 border-[#B45F06] bg-white text-[15px] font-bold text-[#7A4104] disabled:opacity-50">
+          🔇 ไม่ได้ยิน / ไม่ชัด
+        </button>
+        <button onClick={() => answer("no")} disabled={busy} className="min-h-[48px] rounded-xl border-2 border-[#1E6B47] bg-white text-[15px] font-bold text-[#154D33] disabled:opacity-50">
+          🔊 ได้ยินชัด
+        </button>
+      </div>
+      {edit && (
+        <button onClick={() => setEdit(false)} className="mt-1 min-h-[40px] text-sm text-[#45504A] underline">
+          ยกเลิก
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ---------- ⚡ this round of free electrical checks, confirmed from บ้านฉัน in one tap (the house is already known) ----------
 function ElectricRound({ info, setErr, onActive, onEditSoi }) {
   const [s, setS] = useState(null);
@@ -1620,6 +1677,7 @@ export default function MyHome({
                 <div id="myhome-outage">
                   <OutageRow info={info} forced={outageOpen} onFold={() => setOutageOpen(false)} onChanged={reload} setErr={setErr} />
                 </div>
+                <SpeakerRow info={info} onSaved={setInfo} setErr={setErr} />
                 {/* 8 Oct: แผนซ่อมของฉัน removed from บ้านฉัน (cluttered); ช่าง·ร้าน covers finding tradesmen */}
                 <ReviewPrompt services={services} />
 
