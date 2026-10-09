@@ -368,71 +368,62 @@ function SoiAsk({ info, onSaved, onPin, onClose, setErr }) {
 }
 
 // ---------- 📢 เสียงตามสาย: can this house hear the village loudspeaker? (9 Oct) ----------
-function SpeakerRow({ info, onSaved, setErr, top = false, onPin }) {
+function SpeakerRow({ info, onSaved, setErr, open, onClose, onPin }) {
+  // asked at the top until answered; after that the status chip by the house number opens it again ("open")
   const sp = info.speaker || {};
-  const [edit, setEdit] = useState(false);
   const [busy, setBusy] = useState(false);
   async function answer(a) {
     setErr("");
     setBusy(true);
     try {
       onSaved(await api("/myhome/answer", { method: "POST", body: JSON.stringify({ house: info.house, qid: "speaker", answer: a }) }));
-      setEdit(false);
+      onClose();
       notify(a === "yes" ? "แจ้งแล้ว · ทีมจะรวบรวมส่งคหบาลให้ซ่อมลำโพงซอยคุณ" : "บันทึกแล้ว · ขอบคุณครับ");
     } catch (e) {
       setErr(e.message);
     }
     setBusy(false);
   }
-  if (top && (sp.answer || edit)) return null; // the top card only asks; the answer lives in ของบ้านฉัน
-  if (!top && !sp.answer && !edit) return null;
-  const pinMe =
-    info.precision !== "house" && onPin ? (
-      <button onClick={onPin} className="mt-1 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-[#FFF6DA] px-3 text-left text-sm">
+  if (sp.answer && !open) {
+    // can't hear and the house isn't pinned yet: one quiet nudge (the map needs the place)
+    return sp.answer === "yes" && info.precision !== "house" ? (
+      <button onClick={onPin} className="anim-in mt-2 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-[#FFF6DA] px-3 text-left text-sm">
         <span aria-hidden="true">📍</span>
         <span className="min-w-0 flex-1">
-          <b>ปักหมุดบ้านด้วย GPS</b> · แผนที่จะรู้ว่าจุดไหนไม่ได้ยินแม่นขึ้น
+          <b>ปักหมุดบ้านด้วย GPS</b> · แผนที่จะรู้ว่าจุดไหนไม่ได้ยินเสียงตามสายแม่นขึ้น
         </span>
         <span aria-hidden="true">›</span>
       </button>
     ) : null;
-  if (sp.answer && !edit)
-    return (
-      <div className="border-t border-[#E6EBE7] py-2">
-        {sp.answer === "yes" && pinMe}
-        <div className="flex min-h-[48px] items-center gap-2 text-[15px]">
-          <span aria-hidden="true">{sp.answer === "yes" ? "🔇" : "🔊"}</span>
-          <span className="min-w-0 flex-1 leading-snug text-[#45504A]">
-            {sp.answer === "yes" ? (
-              <>
-                แจ้งแล้ว: <b className="text-[#15201A]">ไม่ได้ยินเสียงตามสาย</b>
-                {sp.soi_no > 0 ? ` · ใน ซ.${info.soi} อีก ${sp.soi_no} หลัง` : ""}
-              </>
-            ) : (
-              "ได้ยินเสียงตามสายชัด"
-            )}
-          </span>
-          <button onClick={() => setEdit(true)} className="min-h-[44px] shrink-0 text-sm font-bold text-[#1E6B47]">
-            เปลี่ยน
-          </button>
-        </div>
-      </div>
-    );
+  }
   return (
-    <div className={top ? "card anim-in mt-3 p-3" : "border-t border-[#E6EBE7] py-3"}>
+    <div className="card anim-in mt-3 p-3">
       <p className="text-base font-bold">📢 เสียงตามสายของหมู่บ้าน ได้ยินที่บ้านไหม?</p>
-      <p className="text-sm text-[#45504A]">ช่วยให้รู้ว่าซอยไหนลำโพงเสีย · ทีมรวบรวมส่งคหบาล{sp.all_no ? ` · แจ้งแล้ว ${sp.all_no} หลัง` : ""}</p>
+      <p className="text-sm text-[#45504A]">
+        ช่วยให้รู้ว่าซอยไหนลำโพงเสีย · ทีมรวบรวมส่งคหบาล{sp.all_no ? ` · แจ้งไม่ได้ยินแล้ว ${sp.all_no} หลัง` : ""}
+        {sp.answer === "yes" && sp.soi_no > 0 ? ` · ใน ซ.${info.soi} อีก ${sp.soi_no} หลัง` : ""}
+      </p>
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <button onClick={() => answer("yes")} disabled={busy} className="min-h-[48px] rounded-xl border-2 border-[#B45F06] bg-white text-[15px] font-bold text-[#7A4104] disabled:opacity-50">
+        <button
+          onClick={() => answer("yes")}
+          disabled={busy}
+          aria-pressed={sp.answer === "yes"}
+          className={`min-h-[48px] rounded-xl border-2 border-[#B45F06] text-[15px] font-bold disabled:opacity-50 ${sp.answer === "yes" ? "bg-[#B45F06] text-white" : "bg-white text-[#7A4104]"}`}
+        >
           🔇 ไม่ได้ยิน / ไม่ชัด
         </button>
-        <button onClick={() => answer("no")} disabled={busy} className="min-h-[48px] rounded-xl border-2 border-[#1E6B47] bg-white text-[15px] font-bold text-[#154D33] disabled:opacity-50">
+        <button
+          onClick={() => answer("no")}
+          disabled={busy}
+          aria-pressed={sp.answer === "no"}
+          className={`min-h-[48px] rounded-xl border-2 border-[#1E6B47] text-[15px] font-bold disabled:opacity-50 ${sp.answer === "no" ? "bg-[#1E6B47] text-white" : "bg-white text-[#154D33]"}`}
+        >
           🔊 ได้ยินชัด
         </button>
       </div>
-      {edit && (
-        <button onClick={() => setEdit(false)} className="mt-1 min-h-[40px] text-sm text-[#45504A] underline">
-          ยกเลิก
+      {sp.answer && (
+        <button onClick={onClose} className="mt-1 min-h-[40px] text-sm text-[#45504A] underline">
+          ปิด
         </button>
       )}
     </div>
@@ -1182,6 +1173,7 @@ export default function MyHome({
   const reload = () => setReloadN((n) => n + 1);
   const [typing, setTyping] = useState(!house);
   const [, setFloodPref] = useFloodTools();
+  const [spkOpen, setSpkOpen] = useState(false); // เสียงตามสาย: the chip by the house number opens the question again
   const [input, setInput] = useState(house || "");
   const [info, setInfo] = useState(null);
   const [reloadN, setReloadN] = useState(0);
@@ -1445,6 +1437,16 @@ export default function MyHome({
               🚛 เก็บขยะ <WasteDays days={info.waste.days} />
             </span>
           )}
+          {info.speaker?.answer && (
+            <button
+              onClick={() => setSpkOpen((v) => !v)}
+              aria-expanded={spkOpen}
+              className={`chip ${info.speaker.answer === "yes" ? "border-[#E9B48A] bg-[#FDF1E7] text-[#7A4104]" : "border-[#E4F0E9] bg-[#E4F0E9] text-[#154D33]"}`}
+              aria-label="สถานะเสียงตามสาย · แตะเพื่อแก้"
+            >
+              {info.speaker.answer === "yes" ? "🔇 ไม่ได้ยินเสียงตามสาย" : "📢 ได้ยินเสียงตามสาย"} <span className="text-[#1E6B47]">แก้</span>
+            </button>
+          )}
         </div>
       )}
       {info && info.precision !== "house" && !soiAsked.includes(info.house) && !pinning && (
@@ -1489,7 +1491,7 @@ export default function MyHome({
         <p className="py-3 text-[15px] text-[#45504A]">กำลังโหลด…</p>
       ) : (
         <>
-          <SpeakerRow top info={info} onSaved={setInfo} setErr={setErr} />
+          <SpeakerRow info={info} onSaved={setInfo} setErr={setErr} open={spkOpen} onClose={() => setSpkOpen(false)} onPin={() => setPinning({ pos: null, soi: info.soi || "", gps: true })} />
           <div className="grp">
             <p className="grp-label">วันนี้</p>
             <div className="grp-body">
@@ -1693,7 +1695,6 @@ export default function MyHome({
                 <div id="myhome-outage">
                   <OutageRow info={info} forced={outageOpen} onFold={() => setOutageOpen(false)} onChanged={reload} setErr={setErr} />
                 </div>
-                <SpeakerRow info={info} onSaved={setInfo} setErr={setErr} onPin={() => setPinning({ pos: null, soi: info.soi || "", gps: true })} />
                 {/* 8 Oct: แผนซ่อมของฉัน removed from บ้านฉัน (cluttered); ช่าง·ร้าน covers finding tradesmen */}
                 <ReviewPrompt services={services} />
 
