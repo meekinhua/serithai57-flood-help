@@ -1428,7 +1428,7 @@ export default function MyHome({
         </div>
       )}
       {info && (
-        <div className={`mt-1.5 rounded-2xl border border-[#D7E6DC] bg-[#EEF5F0] p-1.5 ${infoOpen ? "pb-2" : ""}`}>
+        <div className={`mt-1.5 rounded-2xl border-2 border-[#1E6B47] bg-[#EEF5F0] p-1.5 ${infoOpen ? "pb-2" : ""}`}>
           {/* 9 Oct: one quiet summary line; tap it for the house panel where everything is edited */}
           <button onClick={() => setInfoOpen((v) => !v)} aria-expanded={infoOpen} className="flex min-h-[44px] w-full items-center gap-1.5 rounded-xl pl-1.5 text-left text-[15px] text-[#33403A]">
             <span className="min-w-0 flex-1 truncate">
