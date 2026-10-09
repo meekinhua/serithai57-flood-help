@@ -1,9 +1,10 @@
 // 📍 แจ้งจุดปัญหา in 3 taps (9 Oct 2026): what (garbage pile / broken drain cover / danger spot) → photo → where
 // (GPS where you stand, or just the soi) → send. The full form (9 kinds, map pin) stays one link away.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, load, save } from "../api";
 import { ISSUE_TYPES } from "../config";
 import MediaPicker, { mediaState } from "./MediaPicker";
+import LocationPicker from "./LocationPicker";
 
 export const QUICK = [
   ["trash", "กองขยะตกค้าง", "ฟูก ตู้ ถุงดำ กองริมถนน"],
@@ -20,9 +21,13 @@ const IN_VILLAGE = (p) => p.lat > 13.7 && p.lat < 13.9 && p.lng > 100.6 && p.lng
 export default function QuickReport({ type: type0 = "", onDone, onMore }) {
   const [type, setType] = useState(type0);
   const [media, setMedia] = useState([]);
-  const [pos, setPos] = useState(null); // {lat, lng}
+  const [loc, setLoc] = useState(null); // where the map's pin points
+  const [touched, setTouched] = useState(false); // GPS answered or the pin was dragged: the pin counts
+  const pos = touched ? loc : null;
   const [gps, setGps] = useState(""); // "" | "busy" | message
+  const [map, setMap] = useState(0); // >0: the drag-the-pin map is open (the number re-centres it after GPS)
   const [soi, setSoi] = useState(load("mySoi", ""));
+  const [soiTyped, setSoiTyped] = useState(false);
   const [detail, setDetail] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -35,16 +40,27 @@ export default function QuickReport({ type: type0 = "", onDone, onMore }) {
       (p) => {
         const at = { lat: +p.coords.latitude.toFixed(6), lng: +p.coords.longitude.toFixed(6) };
         if (!IN_VILLAGE(at)) return setGps("ตำแหน่งอยู่นอกหมู่บ้าน · ใส่ซอยแทน");
-        setPos(at);
+        setLoc(at);
+        setTouched(true);
         setGps("");
-        api(`/myhome/soi-at?lat=${at.lat}&lng=${at.lng}`)
-          .then((r) => r.soi && setSoi(r.soi))
-          .catch(() => {});
+        setMap((n) => n + 1); // show it on the map: drag to fine-tune
       },
       () => setGps("เปิด GPS ไม่ได้ · ใส่ซอยแทนก็ได้"),
       { enableHighAccuracy: true, timeout: 12000 },
     );
   }
+
+  // the soi follows the pin (unless typed by hand)
+  const key = pos ? `${pos.lat},${pos.lng}` : "";
+  useEffect(() => {
+    if (!key || soiTyped) return;
+    const t = setTimeout(() => {
+      api(`/myhome/soi-at?lat=${pos.lat}&lng=${pos.lng}`)
+        .then((r) => r.soi && setSoi(r.soi))
+        .catch(() => {});
+    }, 400);
+    return () => clearTimeout(t);
+  }, [key, soiTyped]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function send() {
     if (!pos && !soi.trim()) return setErr("☝️ กด “ใช้ตำแหน่งที่ยืนอยู่” หรือใส่ซอย");
@@ -102,16 +118,36 @@ export default function QuickReport({ type: type0 = "", onDone, onMore }) {
 
       <div>
         <p className="mb-1 font-bold">2. ตรงไหน</p>
-        <button
-          onClick={here}
-          className={`flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl text-base font-bold ${pos ? "border-2 border-[#1E6B47] bg-[#E4F0E9] text-[#154D33]" : "bg-[#15201A] text-white"}`}
-        >
-          {gps === "busy" ? "กำลังหาตำแหน่ง…" : pos ? `✓ ได้ตำแหน่งแล้ว${soi ? ` · ซ.${soi}` : ""}` : "📍 ใช้ตำแหน่งที่ยืนอยู่"}
-        </button>
+        {!map ? (
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={here} className="min-h-[56px] rounded-xl bg-[#15201A] px-2 text-[15px] font-bold text-white">
+              {gps === "busy" ? "กำลังหาตำแหน่ง…" : "📍 ใช้ตำแหน่งที่ยืนอยู่"}
+            </button>
+            <button onClick={() => setMap(1)} className="min-h-[56px] rounded-xl border-2 border-[#15201A] bg-white px-2 text-[15px] font-bold">
+              🗺️ ปักหมุดบนแผนที่
+            </button>
+          </div>
+        ) : (
+          <div className="anim-in">
+            <LocationPicker key={map} value={loc} onChange={setLoc} onTouched={() => setTouched(true)} />
+            <p className={`mt-1 text-sm font-bold ${pos ? "text-[#1E6B47]" : "text-[#7A4104]"}`}>
+              {pos ? `✓ หมุดอยู่ตรงนี้${soi ? ` · ซ.${soi}` : ""} · ลากแผนที่ปรับได้` : "ลากแผนที่ให้หมุด 📍 ชี้ตรงจุดที่เห็น"}
+            </p>
+          </div>
+        )}
         {gps && gps !== "busy" && <p className="mt-1 text-sm font-bold text-[#7A4104]">{gps}</p>}
         <label className="mt-2 flex items-center gap-2">
           <span className="shrink-0 text-[15px]">หรือซอย</span>
-          <input value={soi} onChange={(e) => setSoi(e.target.value)} inputMode="decimal" placeholder="เช่น 16" className="min-h-[48px] w-28 rounded-xl border border-[#A9B4AD] px-3 text-lg" />
+          <input
+            value={soi}
+            onChange={(e) => {
+              setSoi(e.target.value);
+              setSoiTyped(true);
+            }}
+            inputMode="decimal"
+            placeholder="เช่น 16"
+            className="min-h-[48px] w-28 rounded-xl border border-[#A9B4AD] px-3 text-lg"
+          />
         </label>
       </div>
 
