@@ -195,7 +195,9 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         p = (body.lat, body.lng)
         roof = nearest_roof(p)
         lat, lng, bid = (roof[1], roof[2], roof[3]) if roof else (body.lat, body.lng, None)
-        soi = re.sub(r"^(ซอย|ซ\.?|แยก)\s*", "", body.soi.strip()) or nearest_soi((lat, lng))
+        soi = re.sub(r"^(ซอย|ซ\.?|แยก)\s*", "", re.sub(r"\s", "", body.soi.strip()))
+        if not re.fullmatch(r"\d{1,3}(/\d{1,2})?", soi):
+            soi = nearest_soi((lat, lng))  # 9 Oct: "4/229 ซอย 10" came in as a soi — a typed soi must look like 14 or 2/2
         await learn_address(h, soi=soi, lat=lat, lng=lng, source="resident", by="บ้านฉัน", building_id=bid)
         return await myhome(h, request)
 
