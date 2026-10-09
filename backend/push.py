@@ -4,7 +4,10 @@ A phone opts in from บ้านฉัน; its subscription is kept with the ho
   lost   หาย·เจอ: a pet lost / found / back home → the whole village; things → the same soi       (default on)
   waste  "พรุ่งนี้รถขยะเข้าซอยคุณ" the evening before (18:00)                                      (default on)
   news   ประกาศจากทีม (admin broadcast, tools/site.py push)                                        (default on)
-  help   เพื่อนบ้านในซอยขอแรง                                                                     (default off)
+  help   เพื่อนบ้านในซอย: ขอแรง · ยืม/ให้/ขาย                                                     (option)
+  map    แผนที่หมู่บ้าน: จุดปัญหาใหม่ในซอยคุณ (ขยะ ฝาท่อ จุดอันตราย …)                           (option)
+  shop   ช่าง·ร้านใหม่ในหมู่บ้าน (at most one every 3 hours)                                         (option)
+  forum  กระทู้ใหม่ในกระดานคุยกัน (at most one every 3 hours)                                      (option)
 
   GET    /api/push/key                       → {key} (VAPID public key, generated once and kept in settings)
   POST   /api/push/subscribe                 {sub, house?, topics}
@@ -37,7 +40,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 BKK = timezone(timedelta(hours=7))
-TOPICS = {"lost", "waste", "news", "help"}
+TOPICS = {"lost", "waste", "news", "help", "map", "shop", "forum"}
 DEFAULT_TOPICS = ["lost", "waste", "news"]
 PETS = {"dog", "cat", "pet"}
 SUBJECT = "https://serithai57.com"
@@ -188,6 +191,54 @@ async def on_reunited(doc: dict):
     if doc.get("category") not in PETS:
         return
     await send({"topics": "lost"}, "🎉 กลับบ้านแล้ว", f"{doc.get('title', '')} · ขอบคุณทุกคนที่ช่วยกันดู", f"/#lost-{doc['id']}", tag=f"lost-{doc['id']}")
+
+
+ISSUE_WORDS = {
+    "trash": "🗑️ กองขยะตกค้าง",
+    "cover": "🕳️ ฝาท่อแตก",
+    "danger": "⚠️ จุดอันตราย",
+    "drain": "🌀 ท่อตัน",
+    "light": "💡 ไฟถนนดับ",
+    "road": "🚧 ถนนพัง",
+    "tree": "🌳 ต้นไม้ล้ม",
+    "wire": "⚠️ สายไฟห้อย",
+    "water": "🚰 น้ำประปา",
+    "smell": "🦟 น้ำขัง",
+}
+_quiet: dict = {}  # topic → when it last went to the whole village (anyone can post a shop / a topic: never a stream)
+
+
+def _quiet_ok(topic: str, hours: float = 3) -> bool:
+    if time.time() - _quiet.get(topic, 0) < hours * 3600:
+        return False
+    _quiet[topic] = time.time()
+    return True
+
+
+async def on_issue(doc: dict):
+    if not doc.get("soi"):
+        return
+    head = ISSUE_WORDS.get(doc.get("type"), "📍 จุดปัญหา")
+    await send({"topics": "map", "soi": doc["soi"]}, f"{head} · ซ.{doc['soi']}", (doc.get("detail") or "มีคนแจ้งจุดปัญหาใหม่ในซอยคุณ") + " · แตะดูบนแผนที่", f"/#issue-{doc['id']}", tag=f"issue-{doc['id']}")
+
+
+async def on_lend(doc: dict):
+    if not doc.get("soi"):
+        return
+    word = {"want": "อยากยืม", "give": "แจกให้", "sell": "ขาย"}.get(doc.get("kind"), "ให้ยืม")
+    await send({"topics": "help", "soi": doc["soi"]}, f"🧰 เพื่อนบ้าน ซ.{doc['soi']} {word}", doc.get("title") or doc.get("name") or "", f"/#lend-{doc['id']}", tag=f"lend-{doc['id']}")
+
+
+async def on_shop(doc: dict):
+    if not _quiet_ok("shop"):
+        return
+    await send({"topics": "shop"}, "🔧 ช่าง·ร้านใหม่ในหมู่บ้าน", doc.get("name", ""), f"/#shop-{doc['id']}", tag="shop")
+
+
+async def on_forum(doc: dict):
+    if not _quiet_ok("forum"):
+        return
+    await send({"topics": "forum"}, "💬 กระทู้ใหม่ในกระดานคุยกัน", doc.get("title", ""), f"/#forum-{doc['id']}", tag="forum")
 
 
 async def on_need(doc: dict):

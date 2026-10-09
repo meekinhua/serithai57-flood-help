@@ -495,6 +495,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             "edit_key_hash": _hash(key),
         }
         await db.lend_items.insert_one(dict(doc))
+        push.fire(push.on_lend, doc)
         return {**public_lend(doc), "edit_key": key}
 
     @router.get("/lend/{item_id}/contact")
@@ -736,6 +737,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             "updated_at": t,
         }
         await db.issues.insert_one(dict(doc))
+        push.fire(push.on_issue, doc)
         return {k: v for k, v in doc.items() if k not in HIDDEN}
 
     @router.post("/issues/{issue_id}/plusone")

@@ -12,6 +12,8 @@ import re
 import secrets
 import uuid
 from datetime import datetime, timezone
+
+import push
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -123,6 +125,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             "edit_key_hash": _hash(key),
         }
         await db.forum_topics.insert_one(dict(doc))
+        push.fire(push.on_forum, doc)
         doc.pop("edit_key_hash")
         return {**doc, "edit_key": key}
 

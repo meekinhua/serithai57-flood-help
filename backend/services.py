@@ -9,6 +9,8 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime, timezone
+
+import push
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -104,6 +106,7 @@ def build_router(db, rate_limit, require_admin, audit, client_ip, claim_media=No
             "edit_key_hash": _hash(edit_key),
         }
         await db.services.insert_one(dict(doc))
+        push.fire(push.on_shop, doc)
         for k in ("edit_key_hash", "reporters"):
             doc.pop(k)
         return {**doc, "edit_key": edit_key}

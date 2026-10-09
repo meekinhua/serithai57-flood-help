@@ -7,25 +7,28 @@ import { TOPICS, defaultTopics, disablePush, enablePush, pushStatus, testPush, u
 function Topics({ topics, setTopics }) {
   return (
     <div className="space-y-1.5">
-      {TOPICS.map(([k, icon, name, sub]) => {
+      {TOPICS.map(([k, icon, name, sub, main], i) => {
         const on = topics.includes(k);
+        const head = i === 0 ? "เรื่องหลัก (แนะนำ)" : !main && TOPICS[i - 1][4] ? "เลือกเพิ่มได้" : "";
         return (
-          <button
-            key={k}
-            onClick={() => setTopics(on ? topics.filter((x) => x !== k) : [...topics, k])}
-            aria-pressed={on}
-            className={`flex min-h-[52px] w-full items-center gap-2.5 rounded-xl border px-3 text-left ${on ? "border-[#1E6B47] bg-[#E4F0E9]" : "border-[#D5DBD6] bg-white"}`}
-          >
-            <span className="text-lg" aria-hidden="true">
-              {on ? "☑" : "☐"}
-            </span>
-            <span className="min-w-0 flex-1 leading-snug">
-              <b className="block text-[15px]">
-                {icon} {name}
-              </b>
-              <span className="block text-sm text-[#45504A]">{sub}</span>
-            </span>
-          </button>
+          <div key={k}>
+            {head && <p className="px-1 pb-1 pt-1.5 text-sm font-bold text-[#45504A]">{head}</p>}
+            <button
+              onClick={() => setTopics(on ? topics.filter((x) => x !== k) : [...topics, k])}
+              aria-pressed={on}
+              className={`flex min-h-[52px] w-full items-center gap-2.5 rounded-xl border px-3 text-left ${on ? "border-[#1E6B47] bg-[#E4F0E9]" : "border-[#D5DBD6] bg-white"}`}
+            >
+              <span className="text-lg" aria-hidden="true">
+                {on ? "☑" : "☐"}
+              </span>
+              <span className="min-w-0 flex-1 leading-snug">
+                <b className="block text-[15px]">
+                  {icon} {name}
+                </b>
+                <span className="block text-sm text-[#45504A]">{sub}</span>
+              </span>
+            </button>
+          </div>
         );
       })}
     </div>

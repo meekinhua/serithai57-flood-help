@@ -5,6 +5,7 @@ import Sheet from "./components/Sheet";
 import Announcements, { UrgentBar } from "./components/Announcements";
 import { WeatherAlerts, WeatherChip, WindyMap } from "./components/Weather";
 import { mediaUrl } from "./media";
+import { clearBadge } from "./push";
 import { flashTo } from "./notify";
 import { MediaStrip } from "./components/MediaGallery";
 import { ServiceBoard, ServiceForm } from "./components/ServiceBoard";
@@ -192,20 +193,34 @@ export default function RepairApp() {
     };
     setTimeout(find, 200);
   };
-  // a notification tap lands on /#lost-<id> or /#jobs-<id>: open that item (sw.js posts {go} to an open tab)
+  // a notification tap lands on /#lost-<id>, #jobs-, #lend-, #issue-, #shop-, #forum-: open that item (sw.js posts {go} to an open tab)
+  const [issueGo, setIssueGo] = useState("");
   useEffect(() => {
     const open = (hash) => {
-      const m = (hash || "").match(/^#?(lost|jobs)-([\w-]{6,})$/);
+      const m = (hash || "").match(/^#?(lost|jobs|lend|issue|shop|forum)-([\w-]{6,})$/);
       if (!m) return;
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      if (m[1] === "issue") {
+        goPage("map");
+        return setIssueGo(m[2]); // opened once the map's reports are loaded
+      }
+      if (m[1] === "shop") return openPros("");
+      if (m[1] === "forum") {
+        forumGo.openId = m[2];
+        forumGo.n += 1;
+      }
       goItem(m[1], m[2]);
     };
     open(window.location.hash);
+    clearBadge();
+    const onVis = () => document.visibilityState === "visible" && clearBadge();
+    document.addEventListener("visibilitychange", onVis);
     const onHash = () => open(window.location.hash);
     const onMsg = (e) => e.data?.go && open(new URL(e.data.go).hash);
     window.addEventListener("hashchange", onHash);
     navigator.serviceWorker?.addEventListener("message", onMsg);
     return () => {
+      document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("hashchange", onHash);
       navigator.serviceWorker?.removeEventListener("message", onMsg);
     };
@@ -369,6 +384,12 @@ export default function RepairApp() {
   // 9 Oct: reports nobody on this phone has seen on the map yet → a dot on แผนที่หมู่บ้าน
   const openIssues = issues.filter((x) => x.status !== "fixed");
   const openIssue = useCallback((x) => setSheet({ type: "issue", issue: x }), []);
+  useEffect(() => {
+    const x = issueGo && issues.find((i) => i.id === issueGo);
+    if (!x) return;
+    setIssueGo("");
+    openIssue(x);
+  }, [issueGo, issues, openIssue]);
   // 📢 เสียงตามสาย layer: off by default (one switch on the map), loaded when switched on
   const [speakerOn, setSpeakerOn] = useState(() => load("speakerLayer", false));
   const [speakerPts, setSpeakerPts] = useState(null);

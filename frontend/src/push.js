@@ -1,11 +1,15 @@
 // Web Push for บ้านฉัน (backend push.py): the phone's own notifications, tied to the house number.
 import { api, load, save } from "./api";
 
+// [key, icon, name, what it sends, on by default] · the first ones (on by default) are the main ones, the rest are options
 export const TOPICS = [
   ["lost", "🐾", "หาย·เจอ", "สัตว์เลี้ยงหาย/เจอ ทั้งหมู่บ้าน · ของหายในซอยคุณ", true],
-  ["waste", "🚛", "รถขยะ", "เตือน 6 โมงเย็น ก่อนวันรถเข้าซอยคุณ", true],
   ["news", "📣", "ประกาศจากทีม", "เรื่องสำคัญเท่านั้น เช่น ตรวจไฟ เยียวยา น้ำมา", true],
-  ["help", "🙋", "เพื่อนบ้านในซอยขอแรง", "มีคนในซอยคุณขอให้ช่วย", false],
+  ["waste", "🚛", "รถขยะ", "เตือน 6 โมงเย็น ก่อนวันรถเข้าซอยคุณ", true],
+  ["map", "📍", "แผนที่หมู่บ้าน", "มีคนแจ้งจุดปัญหาใหม่ในซอยคุณ (ขยะ ฝาท่อ จุดอันตราย)", false],
+  ["help", "🤝", "เพื่อนบ้านในซอย", "ขอแรง · ยืม · แจก · ขาย ในซอยคุณ", false],
+  ["shop", "🔧", "ช่าง·ร้านใหม่", "มีช่างหรือร้านใหม่ในหมู่บ้าน · เตือนไม่เกิน 3 ชม.ละครั้ง", false],
+  ["forum", "💬", "กระดานคุยกัน", "มีกระทู้ใหม่ · เตือนไม่เกิน 3 ชม.ละครั้ง", false],
 ];
 export const defaultTopics = () => load("pushTopics", null) || TOPICS.filter((t) => t[4]).map((t) => t[0]);
 
@@ -16,6 +20,16 @@ export const standalone = () => window.matchMedia?.("(display-mode: standalone)"
 function keyBytes(b64) {
   const s = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
+}
+
+// the number on the app icon / taskbar = notifications still waiting in the phone's tray (sw.js sets it);
+// opening the app means they've been seen: clear the tray and the number
+export async function clearBadge() {
+  try {
+    navigator.clearAppBadge?.();
+    const reg = pushSupported() && (await navigator.serviceWorker.getRegistration("/"));
+    if (reg) (await reg.getNotifications()).forEach((n) => n.close());
+  } catch (_) {}
 }
 
 export async function currentSub() {
