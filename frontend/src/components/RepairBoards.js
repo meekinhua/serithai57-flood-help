@@ -1074,11 +1074,23 @@ export function IssueForm({ onDone }) {
   const [form, setForm] = useState({ type: "", detail: "", soi: load("mySoi", ""), name: savedContact().name || "" });
   const [loc, setLoc] = useState(null);
   const [pinned, setPinned] = useState(false);
+  const [soiTyped, setSoiTyped] = useState(false);
   const [media, setMedia] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const set = (p) => setForm((f) => ({ ...f, ...p }));
   const attached = mediaState(media);
+  // 9 Oct: the soi / แยก follows the pin once it was moved (unless typed by hand)
+  const pinKey = pinned && loc ? `${loc.lat},${loc.lng}` : "";
+  useEffect(() => {
+    if (!pinKey || soiTyped) return;
+    const t = setTimeout(() => {
+      api(`/myhome/soi-at?lat=${loc.lat}&lng=${loc.lng}`)
+        .then((r) => r.soi && setForm((f) => ({ ...f, soi: r.soi })))
+        .catch(() => {});
+    }, 400);
+    return () => clearTimeout(t);
+  }, [pinKey, soiTyped]); // eslint-disable-line react-hooks/exhaustive-deps
   async function submit(e) {
     e.preventDefault();
     if (!form.type) return setErr("เลือกประเภทปัญหา");
@@ -1117,10 +1129,19 @@ export function IssueForm({ onDone }) {
       <div>
         <p className={label}>ตรงไหน (เลื่อนแผนที่ให้หมุดอยู่ตรงจุด)</p>
         <LocationPicker value={loc} onChange={setLoc} onTouched={() => setPinned(true)} />
-        {!pinned && <p className="mt-1 text-sm text-neutral-500">ยังไม่ได้ปักหมุด · ใส่แค่ซอยก็ได้</p>}
+        <p className={`mt-1 text-sm ${pinned ? "font-bold text-[#1E6B47]" : "text-neutral-500"}`}>
+          {pinned ? `✓ ปักหมุดแล้ว${form.soi ? ` · ซ.${form.soi}` : ""} · ซอยเปลี่ยนตามหมุด (แก้เองได้)` : "ยังไม่ได้ปักหมุด · ใส่แค่ซอยก็ได้"}
+        </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <SoiField id="issue-soi" value={form.soi} onChange={(soi) => set({ soi })} />
+        <SoiField
+          id="issue-soi"
+          value={form.soi}
+          onChange={(soi) => {
+            setSoiTyped(true);
+            set({ soi });
+          }}
+        />
         <NameField id="issue-name" labelText="ชื่อ (ไม่บังคับ)" value={form.name} onChange={(name) => set({ name })} />
       </div>
       <div>
