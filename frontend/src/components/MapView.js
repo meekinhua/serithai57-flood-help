@@ -4,6 +4,7 @@ import "leaflet.markercluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import { KINDS, VILLAGE_BOUNDARY, VILLAGE_CENTER, VILLAGE_ZOOM, categoryOf, timeAgo, waterOf } from "../config";
 import { ISSUE_TYPES } from "../config";
+import { renderSpeaker } from "../speakerField";
 import { mediaUrl } from "../media";
 import { drawStaff } from "./staffMarkers";
 import { WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
@@ -93,6 +94,7 @@ export default function MapView({
   onIssue,
   lost = [],
   onLost,
+  speaker = null,
 }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
@@ -361,6 +363,20 @@ export default function MapView({
   useEffect(() => {
     if (tripsRef.current) drawStaff(tripsRef.current, trips, "trips");
   }, [trips]);
+
+  // 📢 เสียงตามสาย wash (9 Oct): only while the layer is switched on
+  const speakerRef = useRef(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (speakerRef.current) {
+      map.removeLayer(speakerRef.current);
+      speakerRef.current = null;
+    }
+    const canvas = speaker ? renderSpeaker(speaker) : null;
+    if (!canvas) return;
+    speakerRef.current = L.imageOverlay(canvas.toDataURL(), fieldBounds(), { pane: "waterField", interactive: false, className: "water-field" }).addTo(map);
+  }, [speaker]);
 
   // Interpolated water surface. Rebuilt only when the set of reports changes (not on every 20 s poll).
   const fieldKey = useRef("");

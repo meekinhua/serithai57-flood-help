@@ -368,7 +368,7 @@ function SoiAsk({ info, onSaved, onPin, onClose, setErr }) {
 }
 
 // ---------- 📢 เสียงตามสาย: can this house hear the village loudspeaker? (9 Oct) ----------
-function SpeakerRow({ info, onSaved, setErr }) {
+function SpeakerRow({ info, onSaved, setErr, top = false, onPin }) {
   const sp = info.speaker || {};
   const [edit, setEdit] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -384,27 +384,42 @@ function SpeakerRow({ info, onSaved, setErr }) {
     }
     setBusy(false);
   }
+  if (top && (sp.answer || edit)) return null; // the top card only asks; the answer lives in ของบ้านฉัน
+  if (!top && !sp.answer && !edit) return null;
+  const pinMe =
+    info.precision !== "house" && onPin ? (
+      <button onClick={onPin} className="mt-1 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-[#FFF6DA] px-3 text-left text-sm">
+        <span aria-hidden="true">📍</span>
+        <span className="min-w-0 flex-1">
+          <b>ปักหมุดบ้านด้วย GPS</b> · แผนที่จะรู้ว่าจุดไหนไม่ได้ยินแม่นขึ้น
+        </span>
+        <span aria-hidden="true">›</span>
+      </button>
+    ) : null;
   if (sp.answer && !edit)
     return (
-      <div className="flex min-h-[48px] items-center gap-2 border-t border-[#E6EBE7] py-2 text-[15px]">
-        <span aria-hidden="true">{sp.answer === "yes" ? "🔇" : "🔊"}</span>
-        <span className="min-w-0 flex-1 leading-snug text-[#45504A]">
-          {sp.answer === "yes" ? (
-            <>
-              แจ้งแล้ว: <b className="text-[#15201A]">ไม่ได้ยินเสียงตามสาย</b>
-              {sp.soi_no > 0 ? ` · ใน ซ.${info.soi} อีก ${sp.soi_no} หลัง` : ""}
-            </>
-          ) : (
-            "ได้ยินเสียงตามสายชัด"
-          )}
-        </span>
-        <button onClick={() => setEdit(true)} className="min-h-[44px] shrink-0 text-sm font-bold text-[#1E6B47]">
-          เปลี่ยน
-        </button>
+      <div className="border-t border-[#E6EBE7] py-2">
+        {sp.answer === "yes" && pinMe}
+        <div className="flex min-h-[48px] items-center gap-2 text-[15px]">
+          <span aria-hidden="true">{sp.answer === "yes" ? "🔇" : "🔊"}</span>
+          <span className="min-w-0 flex-1 leading-snug text-[#45504A]">
+            {sp.answer === "yes" ? (
+              <>
+                แจ้งแล้ว: <b className="text-[#15201A]">ไม่ได้ยินเสียงตามสาย</b>
+                {sp.soi_no > 0 ? ` · ใน ซ.${info.soi} อีก ${sp.soi_no} หลัง` : ""}
+              </>
+            ) : (
+              "ได้ยินเสียงตามสายชัด"
+            )}
+          </span>
+          <button onClick={() => setEdit(true)} className="min-h-[44px] shrink-0 text-sm font-bold text-[#1E6B47]">
+            เปลี่ยน
+          </button>
+        </div>
       </div>
     );
   return (
-    <div className="border-t border-[#E6EBE7] py-3">
+    <div className={top ? "card anim-in mt-3 p-3" : "border-t border-[#E6EBE7] py-3"}>
       <p className="text-base font-bold">📢 เสียงตามสายของหมู่บ้าน ได้ยินที่บ้านไหม?</p>
       <p className="text-sm text-[#45504A]">ช่วยให้รู้ว่าซอยไหนลำโพงเสีย · ทีมรวบรวมส่งคหบาล{sp.all_no ? ` · แจ้งแล้ว ${sp.all_no} หลัง` : ""}</p>
       <div className="mt-2 grid grid-cols-2 gap-2">
@@ -1474,6 +1489,7 @@ export default function MyHome({
         <p className="py-3 text-[15px] text-[#45504A]">กำลังโหลด…</p>
       ) : (
         <>
+          <SpeakerRow top info={info} onSaved={setInfo} setErr={setErr} />
           <div className="grp">
             <p className="grp-label">วันนี้</p>
             <div className="grp-body">
@@ -1677,7 +1693,7 @@ export default function MyHome({
                 <div id="myhome-outage">
                   <OutageRow info={info} forced={outageOpen} onFold={() => setOutageOpen(false)} onChanged={reload} setErr={setErr} />
                 </div>
-                <SpeakerRow info={info} onSaved={setInfo} setErr={setErr} />
+                <SpeakerRow info={info} onSaved={setInfo} setErr={setErr} onPin={() => setPinning({ pos: null, soi: info.soi || "", gps: true })} />
                 {/* 8 Oct: แผนซ่อมของฉัน removed from บ้านฉัน (cluttered); ช่าง·ร้าน covers finding tradesmen */}
                 <ReviewPrompt services={services} />
 

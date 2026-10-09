@@ -369,6 +369,15 @@ export default function RepairApp() {
   // 9 Oct: reports nobody on this phone has seen on the map yet → a dot on แผนที่หมู่บ้าน
   const openIssues = issues.filter((x) => x.status !== "fixed");
   const openIssue = useCallback((x) => setSheet({ type: "issue", issue: x }), []);
+  // 📢 เสียงตามสาย layer: off by default (one switch on the map), loaded when switched on
+  const [speakerOn, setSpeakerOn] = useState(() => load("speakerLayer", false));
+  const [speakerPts, setSpeakerPts] = useState(null);
+  useEffect(() => {
+    if (!speakerOn || page !== "map") return;
+    api("/speaker/map")
+      .then(setSpeakerPts)
+      .catch(() => {});
+  }, [speakerOn, page]);
   // หาย·เจอ on the map: still open, the last 3 weeks (MapView fades them with age)
   const lostOnMap = useMemo(() => lostOpen.filter((x) => Date.now() - new Date(x.created_at).getTime() < 21 * 864e5), [lostOpen]);
   const openLostFromMap = useCallback((x) => goItem("lost", x.id), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -858,8 +867,26 @@ export default function RepairApp() {
                   onIssue={openIssue}
                   lost={lostOnMap}
                   onLost={openLostFromMap}
+                  speaker={speakerOn ? speakerPts : null}
                   tall
                 >
+                  <div className="absolute right-3 top-[60px] z-[650] flex flex-col items-end gap-1">
+                    <button
+                      onClick={() => {
+                        setSpeakerOn(!speakerOn);
+                        save("speakerLayer", !speakerOn);
+                      }}
+                      aria-pressed={speakerOn}
+                      className={`flex min-h-[44px] items-center gap-1 rounded-full border px-3 text-[15px] font-bold shadow ${speakerOn ? "border-[#15201A] bg-[#15201A] text-white" : "border-[#D5DBD6] bg-white/95"}`}
+                    >
+                      📢 เสียงตามสาย {speakerOn ? "✓" : ""}
+                    </button>
+                    {speakerOn && (
+                      <span className="rounded-lg bg-white/95 px-2 py-1 text-xs shadow">
+                        <span className="text-[#B42318]">■</span> ไม่ได้ยิน · <span className="text-[#1E6B47]">■</span> ได้ยินชัด · {speakerPts ? `${speakerPts.length} บ้านตอบ` : "…"}
+                      </span>
+                    )}
+                  </div>
                   <button
                     onClick={() => setSheet({ type: "issueHistory" })}
                     className="absolute right-3 top-3 z-[650] flex min-h-[44px] items-center gap-1 rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-[15px] font-bold shadow"

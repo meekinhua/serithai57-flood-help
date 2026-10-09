@@ -6,6 +6,7 @@ flood left behind: the electricians' sign-ups (survey_resp), the address book, t
 People who want news by LINE / e-mail / IG leave a contact (optional, team-only) — an outlet for later.
 Identity is checked in person when it matters (a volunteer walks over), not by the site.
 """
+import hashlib
 import math
 import re
 import uuid
@@ -265,6 +266,29 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
             rows = await db.myhome_answers.find({"qid": q["id"]}, {"_id": 0, "log": 0}).sort([("soi", 1), ("house", 1)]).to_list(3000)
             q["answers"] = rows
         return items
+
+    @router.get("/speaker/map")
+    async def speaker_map(request: Request):
+        """เสียงตามสาย on the map: one point per answering house (no house numbers). A pinned house is where it is;
+        the others are spread along their soi (by house number), so a soi isn't one blob in its middle."""
+        rate_limit(request, "speaker-map", limit=60, window_s=600)
+        rows = await db.myhome_answers.find({"qid": "speaker"}, {"_id": 0, "house": 1, "answer": 1}).to_list(5000)
+        out = []
+        for r in rows:
+            loc = await locate_house(r["house"])
+            if loc.get("precision") == "unknown":
+                continue
+            lat, lng, exact = loc["lat"], loc["lng"], loc.get("precision") == "house"
+            if not exact and loc.get("soi") in sois:
+                line = [p for seg in sois[loc["soi"]].get("lines") or [] for p in seg]
+                if len(line) >= 2:
+                    t = int(hashlib.sha256(r["house"].encode()).hexdigest()[:6], 16) / 0xFFFFFF * (len(line) - 1)
+                    k = min(int(t), len(line) - 2)
+                    f = t - k
+                    lat = line[k][0] + (line[k + 1][0] - line[k][0]) * f
+                    lng = line[k][1] + (line[k + 1][1] - line[k][1]) * f
+            out.append({"lat": round(lat, 5), "lng": round(lng, 5), "heard": r["answer"] == "no", "exact": exact})
+        return out
 
     @router.get("/admin/myhome/speaker")
     async def speaker_report(admin: dict = Depends(require_admin)):
