@@ -88,7 +88,7 @@ function IdentityFields({ me, set, idp }) {
 }
 
 // openId / startCompose: the community feed and its "ask" door land straight on a topic or the form
-export default function Forum({ admin, openId = null, startCompose = false }) {
+export default function Forum({ admin, openId = null, startCompose = false, noCompose = false }) {
   const [topics, setTopics] = useState(null);
   const [cat, setCat] = useState("all");
   const [q, setQ] = useState("");
@@ -132,7 +132,7 @@ export default function Forum({ admin, openId = null, startCompose = false }) {
 
   return (
     <div className="space-y-3">
-      <button onClick={() => setCompose(true)} className="min-h-[56px] w-full rounded-xl bg-[#1E6B47] text-lg font-bold text-white">
+      <button onClick={() => setCompose(true)} className={noCompose ? "hidden" : "min-h-[56px] w-full rounded-xl bg-[#1E6B47] text-lg font-bold text-white"}>
         ✍️ ตั้งกระทู้ถาม / แชร์ความรู้
       </button>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 ค้นหา เช่น ปาร์เก้, ประกันรถ, ตู้เย็น" className={input} aria-label="ค้นหากระทู้" />

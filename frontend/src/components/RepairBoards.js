@@ -153,7 +153,7 @@ function SoiField({ value, onChange, id }) {
 // =====================================================================
 // 🧰 ยืม · ให้ยืม · ให้ฟรี · ตามหา
 // =====================================================================
-export function LendBoard({ items, setItems, admin, onAdd }) {
+export function LendBoard({ items, setItems, admin, onAdd, noAdd = false }) {
   const [kind, setKind] = useState("all");
   const [cat, setCat] = useState("all");
   const [q, setQ] = useState("");
@@ -167,7 +167,7 @@ export function LendBoard({ items, setItems, admin, onAdd }) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className={noAdd ? "hidden" : "grid grid-cols-2 gap-2 sm:grid-cols-4"}>
         {Object.entries(LEND_KINDS).map(([k, v]) => (
           <button key={k} onClick={() => onAdd(k)} className="min-h-[56px] rounded-xl border-2 border-black bg-white px-1 text-sm font-bold leading-tight active:bg-neutral-100">
             {v.emoji} {v.verb}
@@ -549,7 +549,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
 // 🙋 ขอแรง / อาสาไปช่วย
 // =====================================================================
 const FREE_TYPES = Object.fromEntries(Object.entries(JOB_TYPES).filter(([k]) => k !== "hire"));
-export function JobBoard({ jobs: all, setJobs, admin, onAdd, onPaid }) {
+export function JobBoard({ jobs: all, setJobs, admin, onAdd, onPaid, noAdd = false }) {
   const [kind, setKind] = useState("need");
   const [type, setType] = useState("all");
   const [keys, , dropKey] = useKeys("jobKeys");
@@ -561,7 +561,7 @@ export function JobBoard({ jobs: all, setJobs, admin, onAdd, onPaid }) {
   const offers = jobs.filter((j) => j.kind === "offer").length;
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
+      <div className={noAdd ? "hidden" : "grid grid-cols-2 gap-2"}>
         <button onClick={() => onAdd("need")} className="min-h-[56px] rounded-xl bg-[#1E6B47] px-2 font-bold text-white">
           🙋 ขอแรง / ขอติดรถ / ฝากซื้อ
         </button>

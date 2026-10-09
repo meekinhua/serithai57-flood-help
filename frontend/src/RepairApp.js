@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API, api, load, save, viewerId } from "./api";
-import { HOTLINE_GROUPS, ISSUE_TYPES, VILLAGE_NAME, timeAgo } from "./config";
+import { HOTLINE_GROUPS, ISSUE_TYPES, LEND_KINDS, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
 import Announcements, { UrgentBar } from "./components/Announcements";
 import { WeatherAlerts, WeatherChip, WindyMap } from "./components/Weather";
@@ -207,6 +207,7 @@ export default function RepairApp() {
       if (m[1] === "shop") return openPros("");
       if (m[1] === "forum") {
         forumGo.openId = m[2];
+        forumGo.compose = false;
         forumGo.n += 1;
       }
       goItem(m[1], m[2]);
@@ -650,6 +651,15 @@ export default function RepairApp() {
             <span className="peek-timer absolute inset-x-3 bottom-0.5 h-0.5 origin-left rounded-full bg-[#E0A100]" aria-hidden="true" />
           </div>
         )}
+        {/* 9 Oct: เพื่อนบ้าน is read first — the "write" buttons left the top of every tab for one floating button */}
+        {page === "community" && !sheet && (
+          <button
+            onClick={() => setSheet({ type: "postPick" })}
+            className={`fixed ${admin ? "bottom-[calc(112px+env(safe-area-inset-bottom))]" : "bottom-[calc(68px+env(safe-area-inset-bottom))]"} right-4 z-[800] flex min-h-[52px] items-center gap-1.5 rounded-full bg-[#1E6B47] px-5 text-base font-bold text-white shadow-[0_4px_14px_rgba(0,0,0,0.3)] active:bg-[#154D33]`}
+          >
+            ✏️ ลงประกาศ
+          </button>
+        )}
         {/* the status row at the bottom (water, weather, bell, share); the menu is on top */}
         <header className="fixed inset-x-0 bottom-0 z-[900] bg-[#15201A] pb-[env(safe-area-inset-bottom)] text-white shadow-[0_-2px_8px_rgba(0,0,0,0.25)]">
           {!online && <p className="bg-red-700 px-3 py-1 text-center text-sm font-bold">⚠️ เชื่อมต่อไม่ได้ กำลังลองใหม่</p>}
@@ -783,6 +793,7 @@ export default function RepairApp() {
                   <>
                     {/* 8 Oct: หาย·เจอ is the reason people keep the app after the flood, so it leads this page */}
                     <LostHero
+                      noAdd
                       items={lostOpen}
                       reunited={reunited}
                       onOpen={(id) => goItem("lost", id)}
@@ -819,9 +830,9 @@ export default function RepairApp() {
                     </div>
                     <section key={tab} className="card anim-in mt-2 p-3">
                       {tab === "jobs" ? (
-                        <JobBoard jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} onPaid={() => openPros("")} />
+                        <JobBoard noAdd jobs={jobs} setJobs={setJobs} admin={admin} onAdd={(kind) => setSheet({ type: "jobForm", kind })} onPaid={() => openPros("")} />
                       ) : (
-                        <LendBoard items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />
+                        <LendBoard noAdd items={lend} setItems={setLend} admin={admin} onAdd={(kind) => setSheet({ type: "lendForm", kind })} />
                       )}
                     </section>
                   </>
@@ -837,7 +848,7 @@ export default function RepairApp() {
                         <p className="text-sm text-[#45504A]">ถามเพื่อนบ้าน แนะนำ แลกเปลี่ยน เรื่องในหมู่บ้าน</p>
                       </div>
                     </div>
-                    <Forum key={forumGo.n} admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />
+                    <Forum key={forumGo.n} noCompose admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />
                   </section>
                 )}
                 {!groupOf(tab) && (
@@ -1013,6 +1024,73 @@ export default function RepairApp() {
               )}
               <p className="text-sm text-[#45504A]">ล้างแล้วจะเหลือจุดจางๆ บนปุ่มจนกว่าเรื่องนั้นจะจบ ไม่ต้องรีบ ช่วยได้เมื่อสะดวก · ถ้ามีเรื่องใหม่ จะเตือนอีกครั้ง</p>
             </div>
+          </Sheet>
+        )}
+        {sheet?.type === "postPick" && (
+          <Sheet title="✏️ ลงเรื่องอะไร?" onClose={() => setSheet(null)}>
+            {(() => {
+              const write = (k) => {
+                forumGo.compose = true;
+                forumGo.openId = null;
+                forumGo.n += 1;
+                setSheet(null);
+                pick(k);
+              };
+              const groups = [
+                [
+                  "lost",
+                  "🐾 หาย · เจอ",
+                  [
+                    ["😢", "ของ / สัตว์หาย", "ทั้งหมู่บ้านเห็นรูปทันที", () => setSheet({ type: "lostForm", kind: "lost" })],
+                    ["🙌", "เจอของ / สัตว์ หาเจ้าของ", "", () => setSheet({ type: "lostForm", kind: "found" })],
+                    ...(load("petsHave", false)
+                      ? []
+                      : [
+                          [
+                            "🐶",
+                            "ลงรูปสัตว์เลี้ยงไว้ก่อน",
+                            "ถ้าหาย กดปุ่มเดียว",
+                            () => {
+                              setSheet(null);
+                              goPage("home");
+                              setTimeout(() => flashTo(document.getElementById("myhome-pets")), 450);
+                            },
+                          ],
+                        ]),
+                  ],
+                ],
+                [
+                  "help",
+                  "🤝 ช่วยกัน",
+                  [
+                    ["🙋", "ขอแรง / ขอติดรถ / ฝากซื้อ", "", () => setSheet({ type: "jobForm", kind: "need" })],
+                    ["💪", "ฉันช่วยได้ / มีรถออกไป", "", () => setSheet({ type: "jobForm", kind: "offer" })],
+                    ...Object.entries(LEND_KINDS).map(([k, v]) => [v.emoji, v.verb, "", () => setSheet({ type: "lendForm", kind: k })]),
+                  ],
+                ],
+                ["talk", "💬 คุยกัน", [["✍️", "ตั้งกระทู้ถาม / แชร์ความรู้", "", () => write("forum")]]],
+              ];
+              const here = groupOf(tab);
+              return [...groups.filter((g) => g[0] === here), ...groups.filter((g) => g[0] !== here)].map(([g, title, opts]) => (
+                <div key={g} className="mb-3">
+                  <p className="mb-1 px-1 text-sm font-bold text-[#45504A]">{title}</p>
+                  <div className="space-y-1.5">
+                    {opts.map(([icon, text, sub, go]) => (
+                      <button key={text} onClick={go} className="card flex min-h-[56px] w-full items-center gap-3 p-3 text-left active:bg-[#F2F4F1]">
+                        <span className="text-2xl" aria-hidden="true">
+                          {icon}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <b className="block text-[16px] leading-tight">{text}</b>
+                          {sub && <span className="block text-sm text-[#45504A]">{sub}</span>}
+                        </span>
+                        <span aria-hidden="true">›</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ));
+            })()}
           </Sheet>
         )}
         {sheet?.type === "lendForm" && (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { notify } from "../notify";
 import { seenVisits } from "../visits";
 import { api, load, save } from "../api";
@@ -548,7 +548,69 @@ export function PetAlert({ items, reunited = [], onOpen }) {
 
 // ---------- the หาย·เจอ hero at the top of เพื่อนบ้านช่วยกัน: photos first, the happy endings counted, one tap to post ----------
 const ICON = { dog: "🐕", cat: "🐈", pet: "🐾", document: "📄", vehicle: "🛵" };
-export function LostHero({ items, reunited = [], onOpen, onAll, onAdd, onPets }) {
+// 9 Oct: the หาย·เจอ hero is a big slideshow — full-width photo, big title, slides by itself, swipe to browse
+function HeroSlides({ tiles, onOpen }) {
+  const box = useRef(null);
+  const [i, setI] = useState(0);
+  const hold = useRef(0); // a finger on it: no auto-slide for a while
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (Date.now() - hold.current < 8000 || !box.current || document.hidden) return;
+      const n = (Math.round(box.current.scrollLeft / box.current.clientWidth) + 1) % tiles.length;
+      box.current.scrollTo({ left: n * box.current.clientWidth, behavior: "smooth" });
+    }, 4500);
+    return () => clearInterval(t);
+  }, [tiles.length]);
+  const onScroll = () => box.current && setI(Math.round(box.current.scrollLeft / box.current.clientWidth));
+  const go = (n) => {
+    hold.current = Date.now();
+    box.current?.scrollTo({ left: n * box.current.clientWidth, behavior: "smooth" });
+  };
+  return (
+    <div className="-mx-3 mt-3">
+      <div
+        ref={box}
+        onScroll={onScroll}
+        onPointerDown={() => (hold.current = Date.now())}
+        onTouchStart={() => (hold.current = Date.now())}
+        className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {tiles.map(({ x, home }) => (
+          <button key={x.id} onClick={() => onOpen(x.id)} className="w-full shrink-0 snap-center px-3 text-left" aria-label={x.title}>
+            <span className={`relative block aspect-[4/3] overflow-hidden rounded-2xl ${home ? "bg-[#E4F0E9]" : x.kind === "found" ? "bg-[#E4F0E9]" : "bg-[#FDE8E6]"}`}>
+              {x.media?.[0] ? (
+                <img src={mediaUrl(x.media[0].id)} alt="" loading="lazy" className="h-full w-full object-cover" />
+              ) : (
+                <span className="flex h-full items-center justify-center text-[96px]" aria-hidden="true">
+                  {ICON[x.category] || "🎒"}
+                </span>
+              )}
+              <span className={`absolute left-3 top-3 rounded-lg px-2.5 py-1 text-[15px] font-bold text-white shadow ${home || x.kind === "found" ? "bg-[#1E6B47]" : "bg-[#B42318]"}`}>
+                {home ? "🎉 กลับบ้านแล้ว" : x.kind === "found" ? "🙌 มีคนเจอ หาเจ้าของ" : "😢 ตามหาอยู่"}
+              </span>
+              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/45 to-transparent px-3 pb-3 pt-10 text-white">
+                <span className="line-clamp-2 block text-xl font-bold leading-snug">{x.title}</span>
+                <span className="block text-[15px] opacity-90">
+                  {[x.soi && `ซ.${x.soi}`, timeAgo(home ? x.updated_at || x.created_at : x.created_at)].filter(Boolean).join(" · ")}
+                  {!home && " · แตะดู เห็นไหม?"}
+                </span>
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+      {tiles.length > 1 && (
+        <div className="mt-2 flex justify-center gap-1.5" aria-hidden="true">
+          {tiles.map((t, n) => (
+            <button key={t.x.id} tabIndex={-1} onClick={() => go(n)} className={`h-2 rounded-full transition-all ${n === i ? "w-6 bg-[#15201A]" : "w-2 bg-[#C5CCC7]"}`} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function LostHero({ items, reunited = [], onOpen, onAll, onAdd, onPets, noAdd = false }) {
   const strip = [...items].sort((x, y) => String(y.created_at).localeCompare(String(x.created_at))).slice(0, 8);
   const happy = [...reunited].sort((x, y) => String(y.updated_at || y.created_at).localeCompare(String(x.updated_at || x.created_at))).slice(0, 3);
   const nLost = items.filter((x) => x.kind === "lost").length;
@@ -572,31 +634,8 @@ export function LostHero({ items, reunited = [], onOpen, onAll, onAdd, onPets })
           ดูทั้งหมด ›
         </button>
       </div>
-      {tiles.length > 0 && (
-        <div className="-mx-3 mt-3 overflow-x-auto px-3 pb-1">
-          <div className="flex w-max snap-x gap-2.5">
-            {tiles.map(({ x, home }) => (
-              <button key={x.id} onClick={() => onOpen(x.id)} className="w-[132px] shrink-0 snap-start text-left">
-                <span className={`relative block h-[112px] overflow-hidden rounded-xl ${home ? "bg-[#E4F0E9]" : "bg-[#FDE8E6]"}`}>
-                  {x.media?.[0] ? (
-                    <img src={mediaUrl(x.media[0].id, "thumb")} alt="" loading="lazy" className={`h-full w-full object-cover ${home ? "opacity-90" : ""}`} />
-                  ) : (
-                    <span className="flex h-full items-center justify-center text-5xl" aria-hidden="true">
-                      {ICON[x.category] || "🎒"}
-                    </span>
-                  )}
-                  <span className={`absolute left-1.5 top-1.5 rounded-md px-1.5 text-xs font-bold text-white ${home ? "bg-[#1E6B47]" : x.kind === "found" ? "bg-[#1E6B47]" : "bg-[#B42318]"}`}>
-                    {home ? "🎉 กลับบ้านแล้ว" : x.kind === "found" ? "🙌 มีคนเจอ" : "😢 หาย"}
-                  </span>
-                </span>
-                <span className="mt-1 line-clamp-2 block text-[15px] font-bold leading-snug">{x.title}</span>
-                <span className="block truncate text-xs text-[#45504A]">{[x.soi && `ซ.${x.soi}`, timeAgo(home ? x.updated_at || x.created_at : x.created_at)].filter(Boolean).join(" · ")}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      {tiles.length > 0 && <HeroSlides tiles={tiles} onOpen={onOpen} />}
+      <div className={noAdd ? "hidden" : "mt-3 grid grid-cols-2 gap-2"}>
         <button onClick={() => onAdd("lost")} className="min-h-[52px] rounded-xl bg-[#B42318] px-2 text-[15px] font-bold text-white">
           😢 ของ/สัตว์หาย
         </button>
@@ -604,7 +643,7 @@ export function LostHero({ items, reunited = [], onOpen, onAll, onAdd, onPets })
           🙌 เจอ หาเจ้าของ
         </button>
       </div>
-      {onPets && !load("petsHave", false) && (
+      {onPets && !noAdd && !load("petsHave", false) && (
         <button onClick={onPets} className="mt-2 flex min-h-[52px] w-full items-center gap-2.5 rounded-xl bg-[#F7F8F6] px-3 text-left">
           <span className="text-2xl" aria-hidden="true">
             🐶
