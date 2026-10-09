@@ -18,7 +18,7 @@ const HINT = {
 };
 // 9 Oct: people reported "can't hear the loudspeaker" as a map problem — it belongs to บ้านฉัน's question
 // (one answer per house → the เสียงตามสาย layer of the map). Words like these get pointed there.
-export const SPEAKER_RE = /เสียงตามสาย|ไม่ได้ยิน|ได้ยินไม่ชัด|ลำโพง|หอกระจายข่าว/;
+export const SPEAKER_RE = /เสียงตาม|ได้ยิน|ลำโพง|หอกระจาย/; // loose: "ไมไ่ด้ยิน" (a typo) came in too
 export const goSpeaker = () => window.dispatchEvent(new Event("speaker:go")); // RepairApp → บ้านฉัน, question open
 
 export function SpeakerHint() {
