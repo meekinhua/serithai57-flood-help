@@ -447,7 +447,13 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
                 {groupOf(s.category)?.label || SERVICE_CATEGORIES[s.category]?.[1] || "อื่นๆ"}
                 {isLocal(s) && <span className="ml-1.5 rounded-full bg-[#E4F0E9] px-2 py-0.5 text-[#154D33]">🏠 ร้านเพื่อนบ้าน</span>}
               </p>
-              <b className="block break-words text-lg leading-snug">{s.name}</b>
+              <b className="block break-words text-lg leading-snug">
+                {s.name}
+                {/* 9 Oct: added in the last 5 days → a "ใหม่" tag right behind the name */}
+                {Date.now() - new Date(s.created_at || 0).getTime() < 5 * 864e5 && (
+                  <span className="ml-1.5 inline-block -translate-y-0.5 rounded-full bg-[#B42318] px-2 py-0.5 align-middle text-xs font-bold text-white">ใหม่</span>
+                )}
+              </b>
               <MediaStrip media={s.media || []} />
               {s.detail && <p className="whitespace-pre-line break-words text-[15px] leading-relaxed text-[#33403A]">{s.detail}</p>}
               {(s.price || s.area) && <p className="text-sm text-[#45504A]">{[s.price, s.area].filter(Boolean).join(" · ")}</p>}
