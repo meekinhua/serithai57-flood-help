@@ -7,6 +7,7 @@ import { createBaseMap } from "./MapView";
 import LocationPicker from "./LocationPicker";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinFix from "./PinFix";
+import { SPEAKER_RE, SpeakerHint } from "./QuickReport";
 
 // After the flood: lend & borrow, ask for hands, soi problems, and the after-flood checklist.
 // Same rules as the flood board: no accounts, an edit key in this browser, phones shown one item at a time.
@@ -1115,6 +1116,7 @@ export function IssueForm({ onDone }) {
     e.preventDefault();
     if (!form.type) return setErr("เลือกประเภทปัญหา");
     if (!pinned && !form.soi.trim()) return setErr("บอกซอย หรือเลื่อนแผนที่ปักหมุดตรงจุด");
+    if (SPEAKER_RE.test(form.detail)) return setErr("📢 เรื่องเสียงตามสาย กด “ไปตอบในบ้านฉัน” ในกล่องสีเหลืองแทนนะครับ");
     setBusy(true);
     setErr("");
     try {
@@ -1177,6 +1179,7 @@ export function IssueForm({ onDone }) {
           className={input}
           placeholder="เช่น ฟูก+ตู้พัง กองหน้าบ้าน 3 หลัง ปากซอย"
         />
+        {SPEAKER_RE.test(form.detail) && <SpeakerHint />}
       </div>
       <div>
         <p className={label}>รูป (ไม่บังคับ)</p>

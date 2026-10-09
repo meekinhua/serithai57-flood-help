@@ -385,6 +385,16 @@ export default function RepairApp() {
   const openIssues = issues.filter((x) => x.status !== "fixed");
   const openIssue = useCallback((x) => setSheet({ type: "issue", issue: x }), []);
   useEffect(() => {
+    // เสียงตามสาย is answered in บ้านฉัน (one answer per house), not reported as a map problem
+    const go = () => {
+      setSheet(null);
+      goPage("home");
+      setTimeout(() => window.dispatchEvent(new Event("speaker:open")), 400);
+    };
+    window.addEventListener("speaker:go", go);
+    return () => window.removeEventListener("speaker:go", go);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
     const x = issueGo && issues.find((i) => i.id === issueGo);
     if (!x) return;
     setIssueGo("");
@@ -906,6 +916,11 @@ export default function RepairApp() {
                       <span className="rounded-lg bg-white/95 px-2 py-1 text-xs shadow">
                         <span className="text-[#B42318]">■</span> ไม่ได้ยิน · <span className="text-[#1E6B47]">■</span> ได้ยินชัด · {speakerPts ? `${speakerPts.length} บ้านตอบ` : "…"}
                       </span>
+                    )}
+                    {speakerOn && (
+                      <button onClick={() => window.dispatchEvent(new Event("speaker:go"))} className="min-h-[40px] rounded-full bg-[#15201A] px-3 text-sm font-bold text-white shadow">
+                        บ้านฉันได้ยินไหม? ตอบ ›
+                      </button>
                     )}
                   </div>
                   <button

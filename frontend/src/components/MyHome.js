@@ -417,7 +417,7 @@ function SpeakerRow({ info, onSaved, setErr, open, onClose, onPin, hideNudge }) 
     ) : null;
   }
   return (
-    <div className="card anim-in mt-3 p-3">
+    <div id="myhome-speaker" className="card anim-in mt-3 p-3">
       <p className="text-base font-bold">📢 เสียงตามสายของหมู่บ้าน ได้ยินที่บ้านไหม?</p>
       <p className="text-sm text-[#45504A]">
         ช่วยให้รู้ว่าซอยไหนลำโพงเสีย · ทีมรวบรวมส่งคหบาล{sp.all_no ? ` · แจ้งไม่ได้ยินแล้ว ${sp.all_no} หลัง` : ""}
@@ -1195,6 +1195,12 @@ export default function MyHome({
   const [, setFloodPref] = useFloodTools();
   const [infoOpen, setInfoOpen] = useState(false); // the house panel (soi, pin, rubbish days, เสียงตามสาย)
   const [spkOpen, setSpkOpen] = useState(false); // เสียงตามสาย: the chip by the house number opens the question again
+  useEffect(() => {
+    // "ไม่ได้ยินเสียงตามสาย" from the report sheet / the map: open the question here and bring it into view
+    const show = () => findCard("myhome-speaker", () => setSpkOpen(true));
+    window.addEventListener("speaker:open", show);
+    return () => window.removeEventListener("speaker:open", show);
+  }, []);
   const [input, setInput] = useState(house || "");
   const [info, setInfo] = useState(null);
   const [reloadN, setReloadN] = useState(0);

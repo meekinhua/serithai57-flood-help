@@ -16,6 +16,23 @@ const HINT = {
   cover: "เช่น ฝาท่อแตก หน้าบ้านเลขที่… ตรงทางเข้าซอย",
   danger: "เช่น รถเสียจอดหัวยื่นกลางถนน กลางคืนมองไม่เห็น",
 };
+// 9 Oct: people reported "can't hear the loudspeaker" as a map problem — it belongs to บ้านฉัน's question
+// (one answer per house → the เสียงตามสาย layer of the map). Words like these get pointed there.
+export const SPEAKER_RE = /เสียงตามสาย|ไม่ได้ยิน|ได้ยินไม่ชัด|ลำโพง|หอกระจายข่าว/;
+export const goSpeaker = () => window.dispatchEvent(new Event("speaker:go")); // RepairApp → บ้านฉัน, question open
+
+export function SpeakerHint() {
+  return (
+    <div className="rounded-xl border-2 border-[#D9A21B] bg-[#FFF6DD] p-3">
+      <p className="text-[15px] font-bold">📢 เรื่องเสียงตามสาย ไม่ต้องแจ้งเป็นจุดปัญหานะครับ</p>
+      <p className="text-sm text-[#45504A]">ตอบในบ้านฉันว่าบ้านคุณ “ได้ยิน” หรือ “ไม่ได้ยิน” · ระบบรวมเป็นแผนที่จุดบอดเสียงให้คหบาลซ่อม</p>
+      <button type="button" onClick={goSpeaker} className="mt-2 min-h-[48px] w-full rounded-xl bg-[#15201A] text-base font-bold text-white">
+        ไปตอบในบ้านฉัน ›
+      </button>
+    </div>
+  );
+}
+
 const IN_VILLAGE = (p) => p.lat > 13.7 && p.lat < 13.9 && p.lng > 100.6 && p.lng < 100.8;
 
 export default function QuickReport({ type: type0 = "", onDone, onMore }) {
@@ -64,6 +81,7 @@ export default function QuickReport({ type: type0 = "", onDone, onMore }) {
 
   async function send() {
     if (!pos && !soi.trim()) return setErr("☝️ กด “ใช้ตำแหน่งที่ยืนอยู่” หรือใส่ซอย");
+    if (SPEAKER_RE.test(detail)) return setErr("📢 เรื่องเสียงตามสาย กด “ไปตอบในบ้านฉัน” ด้านบนแทนนะครับ");
     setBusy(true);
     setErr("");
     try {
@@ -93,6 +111,16 @@ export default function QuickReport({ type: type0 = "", onDone, onMore }) {
             <span aria-hidden="true">›</span>
           </button>
         ))}
+        <button onClick={goSpeaker} className="card flex min-h-[60px] w-full items-center gap-3 p-3 text-left active:bg-[#F2F4F1]">
+          <span className="ic ic-sm" aria-hidden="true">
+            📢
+          </span>
+          <span className="min-w-0 flex-1">
+            <b className="block text-[16px] leading-tight">ไม่ได้ยินเสียงตามสาย</b>
+            <span className="block text-sm text-[#45504A]">ไม่ต้องปักหมุด · ตอบในบ้านฉันทีเดียว</span>
+          </span>
+          <span aria-hidden="true">›</span>
+        </button>
         {onMore && (
           <button onClick={onMore} className="min-h-[44px] w-full text-[15px] font-bold text-[#1E6B47]">
             เรื่องอื่น (ไฟถนน ต้นไม้ล้ม ท่อตัน น้ำประปา) ›
@@ -164,6 +192,7 @@ export default function QuickReport({ type: type0 = "", onDone, onMore }) {
           placeholder={HINT[type] || ""}
           className="w-full rounded-xl border border-[#A9B4AD] p-3 text-base"
         />
+        {SPEAKER_RE.test(detail) && <SpeakerHint />}
       </div>
 
       {err && <p className="rounded-xl bg-[#FDE8E6] p-3 font-bold text-[#B42318]">{err}</p>}
