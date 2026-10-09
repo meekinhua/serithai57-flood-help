@@ -745,6 +745,38 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             raise HTTPException(404, "ไม่พบรายการ")
         return doc
 
+    class WhereBody(BaseModel):
+        lat: Optional[float] = Field(None, ge=13.7, le=13.9)
+        lng: Optional[float] = Field(None, ge=100.6, le=100.8)
+        soi: str = Field("", max_length=12)
+        clear: bool = False  # drop the pin, show it at the soi's middle
+
+    async def move_pin(coll, item_id: str, body: WhereBody, admin: dict, what: str):
+        if not body.clear and (body.lat is None or body.lng is None):
+            raise HTTPException(422, "ลากหมุดก่อน")
+        if not body.clear and not in_village(body.lat, body.lng):
+            raise HTTPException(422, "หมุดอยู่นอกหมู่บ้าน")
+        upd = {"soi": body.soi.strip()[:12], "updated_at": now()}
+        upd.update({"lat": None, "lng": None, "approx": False} if body.clear else {"lat": body.lat, "lng": body.lng, "approx": False})
+        doc = await coll.find_one_and_update(
+            {"id": item_id},
+            {"$set": upd, "$push": {"history": log(admin.get("name", "ผู้ดูแล"), "ย้ายหมุด (ผู้ดูแล)" if not body.clear else "ใช้ตำแหน่งกลางซอย (ผู้ดูแล)")}},
+            projection=HIDDEN,
+            return_document=True,
+        )
+        if not doc:
+            raise HTTPException(404, "ไม่พบรายการ")
+        await audit(admin, f"move_pin_{what}", item_id, f"{body.lat},{body.lng} soi={body.soi}")
+        return with_spot([doc])[0]
+
+    @router.post("/admin/issues/{item_id}/where")
+    async def admin_move_issue(item_id: str, body: WhereBody, admin: dict = Depends(require_admin)):
+        return await move_pin(db.issues, item_id, body, admin, "issue")
+
+    @router.post("/admin/lost/{item_id}/where")
+    async def admin_move_lost(item_id: str, body: WhereBody, admin: dict = Depends(require_admin)):
+        return await move_pin(db.lost, item_id, body, admin, "lost")
+
     @router.delete("/admin/issues/{issue_id}", status_code=204)
     async def admin_delete_issue(issue_id: str, admin: dict = Depends(require_admin)):
         doc = await db.issues.find_one_and_delete({"id": issue_id})

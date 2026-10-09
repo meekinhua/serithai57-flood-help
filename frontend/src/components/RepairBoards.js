@@ -6,6 +6,7 @@ import { mediaUrl } from "../media";
 import { createBaseMap } from "./MapView";
 import LocationPicker from "./LocationPicker";
 import MediaPicker, { mediaState } from "./MediaPicker";
+import PinFix from "./PinFix";
 
 // After the flood: lend & borrow, ask for hands, soi problems, and the after-flood checklist.
 // Same rules as the flood board: no accounts, an edit key in this browser, phones shown one item at a time.
@@ -968,6 +969,7 @@ export function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
   const st = ISSUE_STATUS[x.status];
   const [voted, setVoted] = useState(() => load("issueVotes", []).includes(x.id));
   const [note, setNote] = useState(null); // status form: {status, note}
+  const [moving, setMoving] = useState(false);
   const [err, setErr] = useState("");
   const run = async (fn) => {
     setErr("");
@@ -1051,6 +1053,11 @@ export function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
             </button>
           )}
           {admin && (
+            <button onClick={() => setMoving((v) => !v)} className="min-h-[40px] px-2 font-bold underline">
+              📍 ย้ายหมุด
+            </button>
+          )}
+          {admin && (
             <button
               onClick={() =>
                 window.confirm("ลบรายการนี้ (ผู้ดูแล)?") &&
@@ -1065,6 +1072,17 @@ export function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
             </button>
           )}
         </div>
+      )}
+      {moving && (
+        <PinFix
+          kind="issues"
+          item={x}
+          onClose={() => setMoving(false)}
+          onSaved={(d) => {
+            onChanged(d);
+            setMoving(false);
+          }}
+        />
       )}
       <History items={x.history} />
       {err && <p className="mt-1 text-sm text-red-700">{err}</p>}

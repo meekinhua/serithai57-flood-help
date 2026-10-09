@@ -6,6 +6,7 @@ import { LOST_CATEGORIES, LOST_KINDS, timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import LocationPicker from "./LocationPicker";
+import PinFix from "./PinFix";
 import { input } from "./RepairBoards";
 
 // หาย · เจอ: dogs, cats, things and papers lost (or found) in the flood. Photos first — that is how people
@@ -104,6 +105,7 @@ export function LostBoard({ items, setItems, admin, onAdd, reunited = [], noAdd 
 }
 
 function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
+  const [moving, setMoving] = useState(false);
   const [emoji, catText] = LOST_CATEGORIES[x.category] || ["📦", x.category];
   const k = LOST_KINDS[x.kind];
   const [phone, setPhone] = useState(null);
@@ -210,6 +212,22 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
               👀 ฉันเห็นแถวนี้
             </button>
           )
+        )}
+        {admin && (
+          <button onClick={() => setMoving((v) => !v)} className="min-h-[40px] text-sm font-bold underline">
+            🛡️ 📍 ย้ายหมุด
+          </button>
+        )}
+        {admin && moving && (
+          <PinFix
+            kind="lost"
+            item={x}
+            onClose={() => setMoving(false)}
+            onSaved={(d) => {
+              onChanged(d);
+              setMoving(false);
+            }}
+          />
         )}
         {(mine || admin) && (
           <div className="flex flex-wrap gap-2 text-sm">
