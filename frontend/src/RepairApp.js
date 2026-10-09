@@ -19,7 +19,7 @@ import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/WatchPanel";
 import { LostBoard, LostForm, LostHero, LostPreview, shareLost } from "./components/LostFound";
 import InstallApp from "./components/InstallApp";
-import QuickReport, { QUICK } from "./components/QuickReport";
+import QuickReport from "./components/QuickReport";
 import FloodTuck, { useFloodTools } from "./components/FloodTuck";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
@@ -827,27 +827,12 @@ export default function RepairApp() {
 
           {page === "map" && (
             <>
-              <PageTitle title="แผนที่หมู่บ้าน" sub={floodOn ? `จุดปัญหา ${openIssues.length} จุด · ${waterSub(water)}` : `จุดปัญหาที่ยังไม่แก้ ${openIssues.length} จุด`} />
-              {/* 9 Oct: report a garbage pile / broken drain cover / danger spot in three taps */}
-              <section className="card mb-3 p-3">
-                <b className="block text-base">เห็นอะไรไม่เรียบร้อย? แจ้งตรงนี้</b>
-                <div className="mt-2 grid grid-cols-3 gap-2">
-                  {QUICK.map(([k, name]) => (
-                    <button
-                      key={k}
-                      onClick={() => setSheet({ type: "quickReport", kind: k })}
-                      className={`flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-center text-[14px] font-bold leading-tight ${k === "trash" ? "bg-[#FFF1C9] text-[#7A4104]" : "bg-[#FDE8E6] text-[#7A1A12]"}`}
-                    >
-                      <span className="text-2xl" aria-hidden="true">
-                        {ISSUE_TYPES[k][0]}
-                      </span>
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              </section>
-              {!ws.alarm && <FloodTuck on={floodPref} setOn={setFloodPref} className="mb-3" />}
-              <section className="rounded-[20px] border border-[#DCE2DD] bg-white p-3">
+              {/* 9 Oct: the map gets the screen; one line of title, the report button floats on the map */}
+              <div className="mb-2 flex items-baseline gap-2 px-1">
+                <h2 className="font-display min-w-0 flex-1 text-xl font-bold">แผนที่หมู่บ้าน</h2>
+                <span className="shrink-0 text-sm text-[#45504A]">{floodOn ? waterSub(water) : `จุดปัญหา ${openIssues.length} จุด`}</span>
+              </div>
+              <section className="-mx-3 sm:mx-0">
                 <WaterView
                   trips={trips}
                   focus={focus}
@@ -865,8 +850,17 @@ export default function RepairApp() {
                   onPumps={() => setSheet({ type: "pumps" })}
                   issues={openIssues}
                   flood={floodOn}
-                />
+                  tall
+                >
+                  <button
+                    onClick={() => setSheet({ type: "quickReport" })}
+                    className="absolute bottom-24 right-3 z-[650] flex min-h-[52px] items-center gap-1.5 rounded-full bg-[#1E6B47] px-4 text-base font-bold text-white shadow-lg active:bg-[#154D33]"
+                  >
+                    📍 แจ้งจุดปัญหา
+                  </button>
+                </WaterView>
               </section>
+              {!ws.alarm && <FloodTuck on={floodPref} setOn={setFloodPref} className="mb-2" />}
             </>
           )}
         </main>
