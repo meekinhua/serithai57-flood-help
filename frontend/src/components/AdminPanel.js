@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { API, api } from "../api";
 import { ANNOUNCEMENT_LEVELS, timeAgo } from "../config";
+import AddressAdmin from "./AddressAdmin";
 import Announcements from "./Announcements";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import { MediaThumb } from "./MediaGallery";
@@ -508,6 +509,7 @@ function StaffAdmin() {
 
 const TABS = [
   ["announcements", "📢 ประกาศ"],
+  ["address", "🏠 ที่อยู่"],
   ["staff", "👷 เจ้าหน้าที่"],
   ["admins", "🛡️ ผู้ดูแล"],
   ["audit", "📜 ประวัติ"],
@@ -525,7 +527,7 @@ export default function AdminPanel({ admin, onPublicChange }) {
         </a>{" "}
         (ปุ่มผู้ดูแลจะแสดงในหน้ารายละเอียดของแต่ละรายการ)
       </p>
-      <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 sm:grid-cols-5" role="tablist">
+      <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 sm:grid-cols-6" role="tablist">
         {TABS.map(([key, text]) => (
           <button
             key={key}
@@ -539,6 +541,7 @@ export default function AdminPanel({ admin, onPublicChange }) {
         ))}
       </div>
       {tab === "announcements" && <AnnouncementsAdmin admin={admin} onPublicChange={onPublicChange} />}
+      {tab === "address" && <AddressAdmin />}
       {tab === "staff" && <StaffAdmin />}
       {tab === "admins" && <AdminsAdmin admin={admin} />}
       {tab === "audit" && <AuditAdmin />}

@@ -98,6 +98,14 @@ class QuestionsBody(BaseModel):
     items: List[Question] = Field(default_factory=list, max_length=10)
 
 
+class AddrFix(BaseModel):
+    house: str = Field(..., max_length=20)
+    soi: Optional[str] = Field(None, max_length=10)
+    lat: Optional[float] = Field(None, ge=13.7, le=13.9)
+    lng: Optional[float] = Field(None, ge=100.6, le=100.8)
+    ok: bool = False  # looked at it: right as it is
+
+
 class AnswerBody(BaseModel):
     house: str = Field(..., max_length=20)
     qid: str = Field(..., max_length=30)
@@ -295,6 +303,91 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
                     lng = line[k][1] + (line[k + 1][1] - line[k][1]) * f
             out.append({"lat": round(lat, 5), "lng": round(lng, 5), "heard": r["answer"] == "no", "exact": exact})
         return out
+
+    # ---------- 🏠 9 Oct: the admin checks the address book (house → soi / pin) that residents filled in ----------
+    SOI_RE = re.compile(r"\d{1,3}(/\d{1,2})?")
+
+    def main_soi(x):
+        return (x or "").split("/")[0]
+
+    def soi_dist(p):
+        best = (1e9, None)
+        for name, sv in sois.items():
+            for line in sv.get("lines") or []:
+                for a_, b_ in zip(line, line[1:]):
+                    d = to_segment(p, a_, b_)
+                    if d < best[0]:
+                        best = (d, name)
+        return best
+
+    def hnum(h):
+        m = re.match(r"4/(\d+)", h or "")
+        return int(m.group(1)) if m else None
+
+    @router.get("/admin/addresses/review")
+    async def addr_review(admin: dict = Depends(require_admin)):
+        from repair import _in_outline
+
+        docs = await db.addresses.find({}, {"_id": 0}).to_list(5000)
+        signed = {r["house"]: str(r["soi"]) async for r in db.survey_resp.find({"soi": {"$nin": [None, ""]}}, {"_id": 0, "house": 1, "soi": 1})}
+        pairs = sorted((hnum(d["house"]), d["soi"]) for d in docs if d.get("soi") and hnum(d["house"]) is not None)
+        out = []
+        for d in docs:
+            h, soi, flags = d["house"], d.get("soi"), []
+            pin = (d["lat"], d["lng"]) if d.get("lat") is not None else None
+            pin_soi = None
+            if soi and soi not in sois:
+                flags.append(["amber", f"ซ.{soi} ยังไม่มีเส้นในแผนที่"] if SOI_RE.fullmatch(soi) else ["red", f"ซอยพิมพ์ผิดรูป “{soi}”"])
+            if pin:
+                if not _in_outline(*pin):
+                    flags.append(["red", "หมุดอยู่นอกหมู่บ้าน"])
+                dist, pin_soi = soi_dist(pin)
+                if dist > SOI_M:
+                    flags.append(["amber", f"หมุดห่างถนนซอย {int(dist)} ม."])
+                    pin_soi = None
+                elif soi and pin_soi != soi:
+                    same = main_soi(pin_soi) == main_soi(soi) or soi not in sois
+                    flags.append(["amber" if same else "red", f"หมุดอยู่บน ซ.{pin_soi} แต่บันทึกเป็น ซ.{soi}"])
+                twins = [o["house"] for o in docs if o["house"] != h and o.get("lat") is not None and (metres(pin, (o["lat"], o["lng"])) < 2 or (d.get("building_id") and o.get("building_id") == d.get("building_id")))]
+                if twins:
+                    flags.append(["red", "หมุดซ้ำกับ " + ", ".join(twins)])
+            near_soi = None
+            n = hnum(h)
+            if soi and n is not None:
+                nb = sorted((abs(m - n), m, x) for m, x in pairs if m != n and abs(m - n) <= 20)[:6]
+                if len(nb) >= 3 and all(main_soi(x) != main_soi(soi) for _, _, x in nb):
+                    top = max({main_soi(x) for _, _, x in nb}, key=lambda t: sum(main_soi(x) == t for _, _, x in nb))
+                    if sum(main_soi(x) == top for _, _, x in nb) >= 3:
+                        near_soi = top
+                        flags.append(["amber", f"เลขบ้านข้างเคียงอยู่ ซ.{top} (" + ", ".join(f"4/{m}" for _, m, x in nb if main_soi(x) == top) + ")"])
+            sv = signed.get(h)
+            if sv and soi and main_soi(sv) != main_soi(soi):
+                flags.append(["amber", f"ลงทะเบียนตรวจไฟบอก ซ.{sv}"])
+            if d.get("reviewed_at") and d.get("reviewed_at") >= (d.get("updated_at") or d["reviewed_at"]):
+                flags = []  # an admin looked after the last change
+            out.append({
+                "house": h, "soi": soi, "lat": d.get("lat"), "lng": d.get("lng"), "source": d.get("source"), "by": d.get("updated_by", ""),
+                "at": d.get("updated_at"), "reviewed": bool(d.get("reviewed_at")), "flags": flags,
+                "hints": {k: v for k, v in {"pin": pin_soi, "signup": sv, "numbers": near_soi}.items() if v and v != soi},
+            })
+        out.sort(key=lambda r: (0 if any(f[0] == "red" for f in r["flags"]) else 1 if r["flags"] else 2, hnum(r["house"]) or 0))
+        return {"items": out, "sois": sorted(sois, key=lambda x: [int(t) for t in re.findall(r"\d+", x)])}
+
+    @router.post("/admin/addresses/review")
+    async def addr_fix(body: AddrFix, admin: dict = Depends(require_admin)):
+        h = clean(body.house)
+        cur = await db.addresses.find_one({"house": h}, {"_id": 0}) or {}
+        soi = body.soi.strip() if body.soi is not None else cur.get("soi")
+        if soi and not SOI_RE.fullmatch(soi):
+            raise HTTPException(422, "ซอยต้องเป็นแบบ 14 หรือ 2/2")
+        lat, lng = (body.lat, body.lng) if body.lat is not None and body.lng is not None else (cur.get("lat"), cur.get("lng"))
+        by = f"แอดมิน {admin.get('name', '')}".strip()
+        await learn_address(h, soi=soi, lat=lat, lng=lng, source="staff", by=by)
+        t = now()
+        await db.addresses.update_one({"house": h}, {"$set": {"reviewed_at": t, "reviewed_by": by, "updated_at": t}})
+        if soi and soi != cur.get("soi"):
+            await db.survey_resp.update_many({"house": h}, {"$set": {"soi": soi}})  # the electricians' list follows
+        return await db.addresses.find_one({"house": h}, {"_id": 0})
 
     @router.get("/admin/myhome/speaker")
     async def speaker_report(admin: dict = Depends(require_admin)):
