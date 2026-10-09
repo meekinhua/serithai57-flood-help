@@ -20,6 +20,7 @@ import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/Watc
 import { LostBoard, LostForm, LostHero, LostPreview, shareLost } from "./components/LostFound";
 import InstallApp from "./components/InstallApp";
 import QuickReport, { QUICK } from "./components/QuickReport";
+import FloodTuck, { useFloodTools } from "./components/FloodTuck";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, HireList, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
@@ -369,6 +370,9 @@ export default function RepairApp() {
   const newIssues = openIssues.filter((x) => new Date(x.created_at).getTime() > mapSeen);
   // what each page tab has to say (the bell lists it; ล้าง mutes it until it changes)
   const ws = waterStatus(water, canal);
+  // 9 Oct: the water is gone, the flood tools are tucked away (one switch per phone); they come back by themselves if the water rises
+  const [floodPref, setFloodPref] = useFloodTools();
+  const floodOn = floodPref || !!ws.alarm;
   const notes = {
     home: homeBadge,
     pros: newestPro > prosSeen ? { level: "general", reasons: ["🔧 มีร้าน / ช่างใหม่ในหมู่บ้าน"], sig: `p${newestPro}` } : null,
@@ -465,6 +469,8 @@ export default function RepairApp() {
         onBadge={onHomeBadge}
         needs={needs}
         lost={lostOpen}
+        flood={floodOn}
+        floodAlarm={!!ws.alarm}
         onNeeds={(id) => goItem("jobs", id)}
         onAskHelp={() => setSheet({ type: "jobForm", kind: "need" })}
         onLost={(id) => goItem("lost", id)}
@@ -606,7 +612,7 @@ export default function RepairApp() {
             <button onClick={() => goPage("home")} aria-label="เสรีไทย 57 · กลับบ้านฉัน" className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5">
               <img src={`${process.env.PUBLIC_URL}/logo-mark.png`} alt="" className="h-full w-full object-contain" />
             </button>
-            <WaterPill water={water} canal={canal} onOpen={openWater} />
+            {floodOn && <WaterPill water={water} canal={canal} onOpen={openWater} />}
             <WeatherChip weather={weather} onOpen={() => setSheet({ type: "weather" })} viewers={online ? viewers : 0} />
             {Object.values(notes).some(Boolean) && (
               <button
@@ -821,7 +827,7 @@ export default function RepairApp() {
 
           {page === "map" && (
             <>
-              <PageTitle title="แผนที่หมู่บ้าน" sub={`จุดปัญหา ${openIssues.length} จุด · ${waterSub(water)}`} />
+              <PageTitle title="แผนที่หมู่บ้าน" sub={floodOn ? `จุดปัญหา ${openIssues.length} จุด · ${waterSub(water)}` : `จุดปัญหาที่ยังไม่แก้ ${openIssues.length} จุด`} />
               {/* 9 Oct: report a garbage pile / broken drain cover / danger spot in three taps */}
               <section className="card mb-3 p-3">
                 <b className="block text-base">เห็นอะไรไม่เรียบร้อย? แจ้งตรงนี้</b>
@@ -840,6 +846,7 @@ export default function RepairApp() {
                   ))}
                 </div>
               </section>
+              {!ws.alarm && <FloodTuck on={floodPref} setOn={setFloodPref} className="mb-3" />}
               <section className="rounded-[20px] border border-[#DCE2DD] bg-white p-3">
                 <WaterView
                   trips={trips}
@@ -857,6 +864,7 @@ export default function RepairApp() {
                   onPump={(pump) => setSheet({ type: "pump", pump })}
                   onPumps={() => setSheet({ type: "pumps" })}
                   issues={openIssues}
+                  flood={floodOn}
                 />
               </section>
             </>

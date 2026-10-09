@@ -89,6 +89,7 @@ export default function MapView({
   hubs = [],
   events = [],
   issues = [],
+  flood = true,
 }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
@@ -106,8 +107,8 @@ export default function MapView({
     setModeState(m);
     mapRef.current?.closePopup();
   };
-  const waterMode = mode === "water";
-  const fieldOn = waterMode || showField;
+  const waterMode = flood && mode === "water";
+  const fieldOn = flood && (waterMode || showField);
   const [hint, setHint] = useState("");
   const toggle = (k) =>
     setLayers((l) => {
@@ -258,7 +259,7 @@ export default function MapView({
         .addTo(layer);
     }
     // leaks in the flood wall: on both views, they need hands now
-    for (const lk of canal?.leaks || []) {
+    for (const lk of flood ? canal?.leaks || [] : []) {
       if (lk.lat == null) continue;
       const st = LEAK_STATUS[lk.status] || LEAK_STATUS.open;
       L.marker([lk.lat, lk.lng], {
@@ -321,7 +322,7 @@ export default function MapView({
     }
     pinned.forEach((m) => m.addTo(layer));
     cluster.addLayers(grouped);
-  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak, hubs, events, issues]);
+  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak, hubs, events, issues, flood]);
 
   // Staff boats / trucks / people on duty: big, pulsing, always above residents' pins
   useEffect(() => {
@@ -386,7 +387,7 @@ export default function MapView({
     <div className="relative h-full w-full">
       <div ref={elRef} className="h-full w-full" />
       {/* one big switch: what am I looking at */}
-      <div className="pointer-events-none absolute inset-x-0 top-2 z-[600] flex justify-center px-12">
+      <div className={`pointer-events-none absolute inset-x-0 top-2 z-[600] justify-center px-12 ${flood ? "flex" : "hidden"}`}>
         <div className="pointer-events-auto flex w-full max-w-xs rounded-full border-2 border-black bg-white/95 p-0.5 shadow-lg" role="tablist" aria-label="ดูบนแผนที่">
           <button type="button" role="tab" aria-selected={!waterMode} onClick={() => setMode("need")} className={tabCls(!waterMode)}>
             🆘 คำขอช่วย
@@ -450,12 +451,12 @@ export default function MapView({
         </div>
       ) : (
         <div className="pointer-events-none absolute bottom-6 left-2 z-[500] flex max-w-[85%] flex-wrap gap-1">
-          {onLeaks && (
+          {flood && onLeaks && (
             <button type="button" onClick={onLeaks} className="pointer-events-auto min-h-[36px] rounded-full bg-red-700 px-2.5 text-xs font-bold text-white shadow">
               🕳️ รูรั่ว{openLeaks ? ` ${openLeaks}` : ""}
             </button>
           )}
-          {water.length > 0 && (
+          {flood && water.length > 0 && (
             <button
               type="button"
               onClick={() => {

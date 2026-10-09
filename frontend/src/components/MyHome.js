@@ -9,6 +9,7 @@ import { PRO_GROUPS, goodOf, rememberCall } from "./Community";
 import PetsRow from "./Pets";
 import { notify } from "../notify";
 import PushCard from "./PushCard";
+import FloodTuck, { useFloodTools } from "./FloodTuck";
 import { mediaUrl } from "../media";
 import { MediaStrip, MediaThumb } from "./MediaGallery";
 import { AidRow, CheckinCard, OutageRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
@@ -1081,7 +1082,24 @@ function HandyRow({ house, handy, onSaved, onClose, setErr }) {
   );
 }
 
-export default function MyHome({ water, services, look, onIssue, onIssues, onElectricians, onPros, onBadge, needs = [], lost = [], onNeeds, onAskHelp, onLost, onLostPosted }) {
+export default function MyHome({
+  water,
+  services,
+  look,
+  onIssue,
+  onIssues,
+  onElectricians,
+  onPros,
+  onBadge,
+  needs = [],
+  lost = [],
+  flood = true,
+  floodAlarm = false,
+  onNeeds,
+  onAskHelp,
+  onLost,
+  onLostPosted,
+}) {
   // a ขอแรง ask this house's อาสาข้างบ้าน profile can do (job type → skill)
   const JOB_SKILL = { clean: "strong", move: "strong", trash: "strong", fix: "fix", check: "elec", ride: "drive", errand: "errand" };
   const fits = (j) => (handy?.on && (handy.skills || []).includes(JOB_SKILL[j.type]) ? 1 : 0);
@@ -1091,6 +1109,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
   const [outageOpen, setOutageOpen] = useState(false);
   const reload = () => setReloadN((n) => n + 1);
   const [typing, setTyping] = useState(!house);
+  const [, setFloodPref] = useFloodTools();
   const [input, setInput] = useState(house || "");
   const [info, setInfo] = useState(null);
   const [reloadN, setReloadN] = useState(0);
@@ -1579,20 +1598,24 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
                   />
                 )}
 
-                <WaterRow
-                  info={info}
-                  water={water}
-                  sent={sent}
-                  onTap={tap}
-                  onAsk={
-                    nearForm
-                      ? null
-                      : () => {
-                          setNearForm({ kind: "ask", topic: "water", text: "", name: load("myName", ""), phone: load("myReach", ""), to_office: false });
-                          setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-                        }
-                  }
-                />
+                {!flood && <FloodTuck on={false} setOn={setFloodPref} />}
+                {flood && !floodAlarm && <FloodTuck on setOn={setFloodPref} className="mt-1" />}
+                {flood && (
+                  <WaterRow
+                    info={info}
+                    water={water}
+                    sent={sent}
+                    onTap={tap}
+                    onAsk={
+                      nearForm
+                        ? null
+                        : () => {
+                            setNearForm({ kind: "ask", topic: "water", text: "", name: load("myName", ""), phone: load("myReach", ""), to_office: false });
+                            setTimeout(() => nearRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                          }
+                    }
+                  />
+                )}
 
                 <div id="myhome-outage">
                   <OutageRow info={info} forced={outageOpen} onFold={() => setOutageOpen(false)} onChanged={reload} setErr={setErr} />

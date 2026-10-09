@@ -129,7 +129,7 @@ export function WaterPill({ water, canal, onOpen }) {
 }
 
 // 💧 tab: the map in water mode (street dots, canals, pumps, leaks) and the latest reports.
-export function WaterView({ water, canal, onWater, onCanal, onLeaks, onLeak, onPump, onPumps, admin, trips = [], focus, onFocusTrip, hubs = [], events = [], issues = [] }) {
+export function WaterView({ water, canal, onWater, onCanal, onLeaks, onLeak, onPump, onPumps, admin, trips = [], focus, onFocusTrip, hubs = [], events = [], issues = [], flood = true }) {
   return (
     <div className="space-y-3">
       {trips.length > 0 && <TripsStrip trips={trips} onFocus={onFocusTrip} />}
@@ -142,6 +142,7 @@ export function WaterView({ water, canal, onWater, onCanal, onLeaks, onLeak, onP
           hubs={hubs}
           events={events}
           issues={issues}
+          flood={flood}
           onSelect={() => {}}
           onReportWater={onWater}
           canal={canal}
@@ -153,7 +154,7 @@ export function WaterView({ water, canal, onWater, onCanal, onLeaks, onLeak, onP
           onLeaks={onLeaks}
         />
       </div>
-      <section className="rounded-xl bg-white p-3">
+      <section className={`rounded-xl bg-white p-3 ${flood ? "" : "hidden"}`}>
         <h3 className="mb-2 font-bold">💧 รายงานล่าสุด</h3>
         <ul className="space-y-1 text-sm">
           {water.slice(0, 15).map((w) => {
