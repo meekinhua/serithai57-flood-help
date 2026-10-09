@@ -20,6 +20,7 @@ import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/Watc
 import { LostBoard, LostForm, LostHero, LostPreview, shareLost } from "./components/LostFound";
 import InstallApp from "./components/InstallApp";
 import QuickReport from "./components/QuickReport";
+import IssueHistory from "./components/IssueHistory";
 import FloodTuck, { useFloodTools } from "./components/FloodTuck";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
@@ -855,6 +856,12 @@ export default function RepairApp() {
                   tall
                 >
                   <button
+                    onClick={() => setSheet({ type: "issueHistory" })}
+                    className="absolute right-3 top-3 z-[650] flex min-h-[44px] items-center gap-1 rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-[15px] font-bold shadow"
+                  >
+                    🕘 ประวัติ
+                  </button>
+                  <button
                     onClick={() => setSheet({ type: "quickReport" })}
                     className="absolute bottom-24 right-3 z-[650] flex min-h-[52px] items-center gap-1.5 rounded-full bg-[#1E6B47] px-4 text-base font-bold text-white shadow-lg active:bg-[#154D33]"
                   >
@@ -1067,16 +1074,22 @@ export default function RepairApp() {
             />
           </Sheet>
         )}
+        {sheet?.type === "issueHistory" && (
+          <Sheet title="🕘 จุดปัญหาย้อนหลัง" onClose={() => setSheet(null)}>
+            <IssueHistory onOpen={(x) => setSheet({ type: "issue", issue: x, from: "history" })} />
+          </Sheet>
+        )}
         {sheet?.type === "issue" && (
-          <Sheet title="📍 จุดปัญหา" onClose={() => setSheet(null)}>
+          <Sheet title="📍 จุดปัญหา" onClose={() => setSheet(sheet.from === "history" ? { type: "issueHistory" } : null)}>
             <ul>
               <IssueCard
                 issue={issues.find((y) => y.id === sheet.issue.id) || sheet.issue}
                 admin={admin}
                 onChanged={(x) => {
-                  setIssues((p) => p.map((y) => (y.id === x.id ? x : y)));
+                  setIssues((p) => (p.some((y) => y.id === x.id) ? p.map((y) => (y.id === x.id ? x : y)) : x.status !== "fixed" ? [x, ...p] : p));
+                  setSheet((sh) => (sh?.type === "issue" ? { ...sh, issue: x } : sh));
                   if (x.status === "fixed") {
-                    setSheet(null);
+                    setSheet(sheet.from === "history" ? { type: "issueHistory" } : null);
                     setToast("ขอบคุณครับ · เอาหมุดออกจากแผนที่แล้ว");
                   }
                 }}
