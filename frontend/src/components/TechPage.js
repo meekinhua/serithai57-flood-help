@@ -45,6 +45,95 @@ const TEAMS = [
   ["q", "🔧 ทีม Q ช่าง"],
 ];
 
+// ---------- 📊 sign-up report (9 Oct): this round's confirmations, new vs re-confirmed, by team; older ones still waiting ----------
+const DONE_ST = ["done", "absent", "fine"];
+export function segOf(r, round) {
+  if (round && r.round === round) {
+    const fresh = r.created_at && r.confirmed_at && new Date(r.confirmed_at) - new Date(r.created_at) < 5 * 60e3; // first sign-up was this confirmation
+    return fresh ? "new" : "re";
+  }
+  const st = r.job?.status || "todo";
+  return DONE_ST.includes(st) || ["fine", "hired"].includes(r.followup?.want) ? "olddone" : "pending";
+}
+function split(list) {
+  const t = (r) => r.teams || [];
+  return {
+    army: list.filter((r) => t(r).includes("army") && !t(r).includes("q")).length,
+    q: list.filter((r) => t(r).includes("q") && !t(r).includes("army")).length,
+    both: list.filter((r) => t(r).includes("army") && t(r).includes("q")).length,
+  };
+}
+function SignupReport({ all, seg, onSeg }) {
+  const [open, setOpen] = useState(() => load("techReportOpen", true));
+  const round = all.reduce((m, r) => (r.round && r.round > m ? r.round : m), "");
+  const by = { new: [], re: [], pending: [], olddone: [] };
+  for (const r of all) by[segOf(r, round)].push(r);
+  const conf = [...by.new, ...by.re];
+  const today = new Date().toDateString();
+  const todayN = conf.filter((r) => r.confirmed_at && new Date(r.confirmed_at).toDateString() === today).length;
+  const tot = split(conf);
+  const armyAll = tot.army + tot.both;
+  const qAll = tot.q + tot.both;
+  const Row = ({ k, icon, label, list, tone }) => {
+    const sp = split(list);
+    return (
+      <button
+        onClick={() => onSeg(seg === k ? "" : k)}
+        aria-pressed={seg === k}
+        className={`flex w-full items-center gap-2 rounded-xl border-2 p-2 text-left ${seg === k ? "border-black bg-amber-50" : "border-transparent bg-neutral-50"}`}
+      >
+        <span className="text-xl" aria-hidden="true">
+          {icon}
+        </span>
+        <span className="min-w-0 flex-1">
+          <b className="block text-[15px] leading-tight">{label}</b>
+          {(k === "new" || k === "re") && (
+            <span className="block text-xs text-neutral-600">
+              🪖 ทหาร {sp.army} · 🔧 Q {sp.q} · ทั้ง 2 ทีม {sp.both}
+            </span>
+          )}
+        </span>
+        <b className={`shrink-0 text-2xl ${tone}`}>{list.length}</b>
+      </button>
+    );
+  };
+  return (
+    <section className="mb-3 rounded-2xl bg-white p-3 shadow-sm">
+      <button
+        onClick={() => {
+          setOpen(!open);
+          save("techReportOpen", !open);
+        }}
+        className="flex w-full items-baseline gap-2 text-left"
+      >
+        <b className="min-w-0 flex-1 text-lg">📊 ยอดลงทะเบียน{round ? ` รอบ ${round.slice(8)}/${round.slice(5, 7)}` : ""}</b>
+        <span className="text-sm text-neutral-600">
+          ยืนยันแล้ว {conf.length} หลัง{todayN ? ` · วันนี้ +${todayN}` : ""} {open ? "▴" : "▾"}
+        </span>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          <div className="grid grid-cols-2 gap-1.5 text-center">
+            <div className="rounded-xl bg-[#E4F0E9] p-2">
+              <b className="block text-2xl">{armyAll}</b>
+              <span className="text-xs">🪖 ทีมทหาร (รวมขอทั้ง 2 ทีม)</span>
+            </div>
+            <div className="rounded-xl bg-[#E3EDF9] p-2">
+              <b className="block text-2xl">{qAll}</b>
+              <span className="text-xs">🔧 ทีม Q ช่าง (รวมขอทั้ง 2 ทีม)</span>
+            </div>
+          </div>
+          <Row k="new" icon="🆕" label="ลงใหม่ รอบนี้" list={by.new} tone="text-emerald-700" />
+          <Row k="re" icon="🔁" label="ลงซ้ำ ยืนยันจากรอบก่อน" list={by.re} tone="text-emerald-700" />
+          <Row k="pending" icon="⏳" label="รอบก่อน ยังค้าง · ยังไม่ยืนยันรอบนี้" list={by.pending} tone="text-amber-700" />
+          <Row k="olddone" icon="✅" label="รอบก่อน เสร็จแล้ว / ไม่ต้องแล้ว" list={by.olddone} tone="text-neutral-500" />
+          <p className="text-xs text-neutral-500">แตะแถวเพื่อดูรายชื่อบ้านกลุ่มนั้นด้านล่าง · แตะอีกครั้งเพื่อเลิกกรอง</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function TechPage() {
   const [key] = useState(techKey);
   const [team, setTeam] = useState(() => load("techTeam", ""));
@@ -67,6 +156,7 @@ export default function TechPage() {
   const [show, setShow] = useState(() => load("techShow", "open")); // open | mine | done | all
   const [zone, setZone] = useState(() => load("techZone", ""));
   const [soi, setSoi] = useState("");
+  const [seg, setSeg] = useState(""); // a report row picked: only those houses below
   const [busy, setBusy] = useState("");
 
   useEffect(() => {
@@ -126,8 +216,12 @@ export default function TechPage() {
     if (show === "done") list = list.filter((r) => ["done", "absent"].includes(statusOf(r)));
     if (zone) list = list.filter((r) => zoneOf(r) === zone);
     if (soi) list = list.filter((r) => mainSoi(r.soi) === soi);
+    if (seg) {
+      const round = (all || []).reduce((m, r) => (r.round && r.round > m ? r.round : m), "");
+      list = list.filter((r) => segOf(r, round) === seg);
+    }
     return list;
-  }, [rows, show, zone, soi, me, zones]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rows, show, zone, soi, me, zones, seg, all]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // group by zone → soi so a technician walks one soi at a time
   const groups = useMemo(() => {
@@ -232,6 +326,17 @@ export default function TechPage() {
         <p className="p-4 text-center text-neutral-500">กำลังโหลด…</p>
       ) : (
         <>
+          <SignupReport
+            all={all}
+            seg={seg}
+            onSeg={(k) => {
+              setSeg(k);
+              if (k) {
+                setShow("all"); // the picked group, whatever their job status
+                save("techShow", "all");
+              }
+            }}
+          />
           <section className="mb-3 rounded-2xl bg-white p-3 shadow-sm">
             <div className="flex items-baseline justify-between">
               <b className="text-lg">
@@ -295,6 +400,11 @@ export default function TechPage() {
               {soi && (
                 <button onClick={() => setSoi("")} className="min-h-[36px] rounded-full bg-amber-200 px-3 text-sm font-bold">
                   ซอย {soi} ✕
+                </button>
+              )}
+              {seg && (
+                <button onClick={() => setSeg("")} className="min-h-[36px] rounded-full bg-amber-200 px-3 text-sm font-bold">
+                  {{ new: "ลงใหม่", re: "ลงซ้ำ", pending: "รอบก่อนยังค้าง", olddone: "รอบก่อนเสร็จแล้ว" }[seg]} ✕
                 </button>
               )}
             </div>
