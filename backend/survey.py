@@ -233,7 +233,18 @@ def build_router(db, rate_limit, require_admin, audit, client_ip) -> APIRouter:
                 {"$setOnInsert": {"id": str(uuid.uuid4()), "house": house, "name": doc["name"], "phone": phone, "line_id": "", "email": "", "ig": "", "news": True, "created_at": now(), "updated_at": now()}},
                 upsert=True,
             )
-        res = await db.survey_resp.update_one({"survey": key, "house": house}, {"$set": doc, "$setOnInsert": {"id": str(uuid.uuid4()), "created_at": now()}}, upsert=True)
+        # 9 Oct: confirming a NEW round starts the work over: last round's "done" / "not home" no longer count
+        reset = {}
+        if s.get("round"):
+            prev = await db.survey_resp.find_one({"survey": key, "house": house}, {"_id": 0, "round": 1, "job": 1, "jobs": 1})
+            if prev and prev.get("round") != s["round"]:
+                old = [k for k, j in [("", prev.get("job") or {}), *((t, j or {}) for t, j in (prev.get("jobs") or {}).items())] if j.get("status", "todo") != "todo"]
+                if old:
+                    t = now()
+                    doc["job"] = {"status": "todo", "note": "", "tech": "", "at": t}
+                    doc["jobs"] = {}
+                    reset = {"$push": {"job_log": {"$each": [{"status": "todo", "by": "ระบบ", "at": t, "note": f"ยืนยันคิวรอบใหม่ {s.get('round_label') or s['round']} · เริ่มนับใหม่", "team": ""}], "$slice": -30}}}
+        res = await db.survey_resp.update_one({"survey": key, "house": house}, {"$set": doc, "$setOnInsert": {"id": str(uuid.uuid4()), "created_at": now()}, **reset}, upsert=True)
         count = await db.survey_resp.count_documents({"survey": key})
         return {"ok": True, "updated": res.matched_count > 0, "count": count}
 
