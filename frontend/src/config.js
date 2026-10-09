@@ -3,7 +3,7 @@
 export const VILLAGE_NAME = "บ้านสหกรณ์เคหะสถาน 4 (เสรีไทย 57)";
 export const VILLAGE_CENTER = [13.7958, 100.67];
 export const VILLAGE_ZOOM = 16;
-// 9 Oct: the block between the park and คลองระหัส (ชุมชนโต๊ะบาง, outside the village, it only uses our exit) is cut out
+// 9 Oct: cut out ชุมชนโต๊ะบาง (between the park and คลองระหัส; it only uses our exit) and the strip under the park (นวธานี) — the line runs along the ลำราง road
 export const VILLAGE_BOUNDARY = [
   [13.8045107, 100.6649608],
   [13.8021235, 100.6650218],
@@ -24,7 +24,7 @@ export const VILLAGE_BOUNDARY = [
   [13.7944681, 100.6736678],
   [13.794661, 100.673675],
   [13.794385, 100.672623],
-  [13.7947239, 100.6724959],
+  [13.794, 100.671282],
   [13.7942871, 100.6711636],
   [13.7965257, 100.6702901],
   [13.7982259, 100.6698609],
