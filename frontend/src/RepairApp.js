@@ -21,6 +21,7 @@ import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/Watc
 import { LostBoard, LostForm, LostHero, LostPreview, shareLost } from "./components/LostFound";
 import InstallApp from "./components/InstallApp";
 import QuickReport from "./components/QuickReport";
+import { HelpHero, TalkHero } from "./components/HeroSlides";
 import IssueHistory from "./components/IssueHistory";
 import FloodTuck, { useFloodTools } from "./components/FloodTuck";
 import { WaterForm } from "./components/Forms";
@@ -149,6 +150,7 @@ export default function RepairApp() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
   const [forumGo] = useState({ n: 0 });
+  const [, setForumTick] = useState(0); // forumGo is mutated in place: this re-renders after it changed
   const [water, setWater] = useState([]);
   const [canal, setCanal] = useState(null);
   // highlight boxes (water watch, volunteer hand-out point): admins switch them on /admin, no redeploy
@@ -811,6 +813,7 @@ export default function RepairApp() {
                 )}
                 {(tab === "jobs" || tab === "lend") && (
                   <>
+                    <HelpHero jobs={jobs} lend={lend} onOpen={(t, id) => goItem(t, id)} />
                     <div className="grid grid-cols-2 gap-1 rounded-2xl bg-[#E6EBE7] p-1" role="tablist">
                       {["jobs", "lend"].map((k) => (
                         <button
@@ -838,18 +841,20 @@ export default function RepairApp() {
                   </>
                 )}
                 {tab === "forum" && (
-                  <section className="card p-3">
-                    <div className="mb-2 flex items-center gap-2.5">
-                      <span className="ic ic-sm ic-green" aria-hidden="true">
-                        💬
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-lg font-bold leading-tight">กระดานคุยกัน</h3>
-                        <p className="text-sm text-[#45504A]">ถามเพื่อนบ้าน แนะนำ แลกเปลี่ยน เรื่องในหมู่บ้าน</p>
-                      </div>
-                    </div>
-                    <Forum key={forumGo.n} noCompose admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />
-                  </section>
+                  <>
+                    <TalkHero
+                      onOpen={(id) => {
+                        forumGo.openId = id;
+                        forumGo.compose = false;
+                        forumGo.n += 1;
+                        setForumTick((t) => t + 1);
+                        setTimeout(() => document.getElementById("forum-board")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+                      }}
+                    />
+                    <section id="forum-board" className="card scroll-mt-36 p-3">
+                      <Forum key={forumGo.n} noCompose admin={admin} openId={forumGo.openId || null} startCompose={!!forumGo.compose} />
+                    </section>
+                  </>
                 )}
                 {!groupOf(tab) && (
                   <section className="card p-3">
