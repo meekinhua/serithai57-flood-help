@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API, api, load, save, viewerId } from "./api";
-import { HOTLINE_GROUPS, VILLAGE_NAME, timeAgo } from "./config";
+import { HOTLINE_GROUPS, ISSUE_TYPES, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
 import Announcements, { UrgentBar } from "./components/Announcements";
 import { WeatherAlerts, WeatherChip, WindyMap } from "./components/Weather";
@@ -19,6 +19,7 @@ import Forum from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/WatchPanel";
 import { LostBoard, LostForm, LostHero, LostPreview, shareLost } from "./components/LostFound";
 import InstallApp from "./components/InstallApp";
+import QuickReport, { QUICK } from "./components/QuickReport";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, HireList, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
@@ -71,6 +72,12 @@ export default function RepairApp() {
   const [lend, setLend] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [issues, setIssues] = useState([]);
+  const [mapSeen, setMapSeen] = useState(() => {
+    const v = load("mapSeen", 0);
+    if (v) return v;
+    save("mapSeen", Date.now() - 864e5); // first visit: only the last day's reports count as new
+    return Date.now() - 864e5;
+  });
   const [lost, setLost] = useState([]);
   const [reunited, setReunited] = useState([]);
   // the peek: a new lost pet / a pet back home slides in at the top, stays ~7 s, slides away; once per phone.
@@ -357,6 +364,9 @@ export default function RepairApp() {
   const homePets = reunited.filter((x) => ["dog", "cat", "pet"].includes(x.category) && Date.now() - new Date(x.updated_at || x.created_at).getTime() < 864e5);
   const needSig = needs.map((j) => j.id.slice(0, 6)).join(",");
 
+  // 9 Oct: reports nobody on this phone has seen on the map yet → a dot on แผนที่หมู่บ้าน
+  const openIssues = issues.filter((x) => x.status !== "fixed");
+  const newIssues = openIssues.filter((x) => new Date(x.created_at).getTime() > mapSeen);
   // what each page tab has to say (the bell lists it; ล้าง mutes it until it changes)
   const ws = waterStatus(water, canal);
   const notes = {
@@ -376,8 +386,24 @@ export default function RepairApp() {
               needs.length || lostPets.length || homePets.length ? `n${needSig}|p${lostPets.map((x) => x.id.slice(0, 6)).join(",")}|h${homePets.map((x) => x.id.slice(0, 6)).join(",")}` : `c${newest}`,
           }
         : null,
-    map: ws.alarm ? { level: "important", reasons: [`💧 ระดับน้ำ: ${ws.text}${ws.sub ? ` · ${ws.sub}` : ""}`], sig: `m${ws.text}` } : null,
+    map:
+      ws.alarm || newIssues.length
+        ? {
+            level: ws.alarm || newIssues.some((x) => x.type === "cover" || x.type === "danger") ? "important" : "general",
+            reasons: [
+              ...(ws.alarm ? [`💧 ระดับน้ำ: ${ws.text}${ws.sub ? ` · ${ws.sub}` : ""}`] : []),
+              ...newIssues.slice(0, 4).map((x) => `${(ISSUE_TYPES[x.type] || ["📍"])[0]} แจ้งใหม่: ${(ISSUE_TYPES[x.type] || ["", "จุดปัญหา"])[1]}${x.soi ? ` ซ.${x.soi}` : ""}`),
+            ],
+            sig: `m${ws.alarm ? ws.text : ""}|${newIssues.map((x) => x.id.slice(0, 6)).join(",")}`,
+          }
+        : null,
   };
+  useEffect(() => {
+    if (page !== "map" || !issues.length) return;
+    const t = Date.now();
+    setMapSeen(t);
+    save("mapSeen", t);
+  }, [page, issues.length]);
   const live = Object.entries(notes).filter(([k, b]) => b && ack[k] !== b.sig);
   // having looked at the community page counts as seen: the dot stays faint until every ask is taken
   const communitySig = notes.community?.sig;
@@ -432,7 +458,7 @@ export default function RepairApp() {
         water={water}
         services={services}
         look={home.layout?.myhome ? lookOf(home.layout, "myhome") : null}
-        onIssue={() => setSheet({ type: "issueForm" })}
+        onIssue={() => setSheet({ type: "quickReport" })}
         onIssues={() => showTab("issues")}
         onElectricians={() => openPros("electric")}
         onPros={(g) => openPros(g)}
@@ -765,7 +791,7 @@ export default function RepairApp() {
                 )}
                 {!groupOf(tab) && (
                   <section className="card p-3">
-                    {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "issueForm" })} />}
+                    {tab === "issues" && <IssueBoard issues={issues} setIssues={setIssues} admin={admin} onAdd={() => setSheet({ type: "quickReport" })} />}
                     {tab === "waste" && <WasteBoard admin={admin} onReportTrash={() => setSheet({ type: "issueForm" })} />}
                     {tab === "guide" && <AfterFloodGuide />}
                   </section>
@@ -795,7 +821,25 @@ export default function RepairApp() {
 
           {page === "map" && (
             <>
-              <PageTitle title="ระดับน้ำ · แผนที่หมู่บ้าน" sub={waterSub(water)} />
+              <PageTitle title="แผนที่หมู่บ้าน" sub={`จุดปัญหา ${openIssues.length} จุด · ${waterSub(water)}`} />
+              {/* 9 Oct: report a garbage pile / broken drain cover / danger spot in three taps */}
+              <section className="card mb-3 p-3">
+                <b className="block text-base">เห็นอะไรไม่เรียบร้อย? แจ้งตรงนี้</b>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {QUICK.map(([k, name]) => (
+                    <button
+                      key={k}
+                      onClick={() => setSheet({ type: "quickReport", kind: k })}
+                      className={`flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-center text-[14px] font-bold leading-tight ${k === "trash" ? "bg-[#FFF1C9] text-[#7A4104]" : "bg-[#FDE8E6] text-[#7A1A12]"}`}
+                    >
+                      <span className="text-2xl" aria-hidden="true">
+                        {ISSUE_TYPES[k][0]}
+                      </span>
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </section>
               <section className="rounded-[20px] border border-[#DCE2DD] bg-white p-3">
                 <WaterView
                   trips={trips}
@@ -812,6 +856,7 @@ export default function RepairApp() {
                   onLeak={(leak) => setSheet({ type: "leak", leak })}
                   onPump={(pump) => setSheet({ type: "pump", pump })}
                   onPumps={() => setSheet({ type: "pumps" })}
+                  issues={openIssues}
                 />
               </section>
             </>
@@ -825,7 +870,7 @@ export default function RepairApp() {
                 ["home", "🏠 บ้านฉัน"],
                 ["pros", "🔧 ช่าง · ร้าน"],
                 ["community", "👥 เพื่อนบ้าน"],
-                ["map", "🗺️ แผนที่น้ำ"],
+                ["map", "🗺️ แผนที่หมู่บ้าน"],
               ]
                 .filter(([k]) => notes[k])
                 .map(([k, name]) => {
@@ -1014,6 +1059,21 @@ export default function RepairApp() {
                 setCanal((c) => ({ ...(c || { reports: [], pumps: [] }), leaks: [l, ...((c && c.leaks) || [])] }));
                 setSheet(null);
                 setToast("แจ้งรูรั่วแล้ว");
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "quickReport" && (
+          <Sheet title="📍 แจ้งจุดปัญหาในหมู่บ้าน" onClose={() => setSheet(null)}>
+            <QuickReport
+              type={sheet.kind || ""}
+              onMore={() => setSheet({ type: "issueForm" })}
+              onDone={(x) => {
+                setIssues((p) => [x, ...p]);
+                setSheet(null);
+                goPage("map");
+                if (x.lat != null) setFocus({ lat: x.lat, lng: x.lng, t: Date.now() });
+                setToast("แจ้งแล้ว · ขึ้นบนแผนที่หมู่บ้านแล้ว ขอบคุณครับ");
               }}
             />
           </Sheet>

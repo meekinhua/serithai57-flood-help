@@ -83,7 +83,7 @@ export default function WatchPanel({ water, canal, onWater, onCanal, onLeak, onL
           🕳️ เจอรูรั่ว
         </button>
         <button onClick={onMap} className="min-h-[48px] rounded-xl border-2 border-black bg-white px-2 font-bold">
-          🗺️ แผนที่น้ำ
+          🗺️ แผนที่หมู่บ้าน
         </button>
       </div>
       <p className="mt-2 text-xs text-neutral-600">น้ำไม่ท่วมก็แจ้ง “ไม่ท่วม” ได้ ช่วยให้รู้ว่าซอยไหนปลอดภัย · ถ้าน้ำเข้าหมู่บ้าน ผู้ดูแลจะเปิดระบบน้ำท่วมกลับมาทันที · ฉุกเฉินโทร 1669 / 199</p>
@@ -116,7 +116,7 @@ export function WaterPill({ water, canal, onOpen }) {
   return (
     <button
       onClick={onOpen}
-      aria-label={`ระดับน้ำตอนนี้: ${st.text} · ${st.sub} · แตะเพื่อดูแผนที่น้ำ`}
+      aria-label={`ระดับน้ำตอนนี้: ${st.text} · ${st.sub} · แตะเพื่อดูแผนที่หมู่บ้าน`}
       className={`flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-lg px-2 text-left leading-tight ${st.alarm ? "bg-red-600" : "bg-white/10"} active:bg-white/20`}
     >
       <span className={`inline-block h-3.5 w-3.5 shrink-0 rounded-full ring-2 ring-white ${st.alarm ? "animate-pulse" : ""}`} style={{ background: st.color }} aria-hidden="true" />
@@ -129,7 +129,7 @@ export function WaterPill({ water, canal, onOpen }) {
 }
 
 // 💧 tab: the map in water mode (street dots, canals, pumps, leaks) and the latest reports.
-export function WaterView({ water, canal, onWater, onCanal, onLeaks, onLeak, onPump, onPumps, admin, trips = [], focus, onFocusTrip, hubs = [], events = [] }) {
+export function WaterView({ water, canal, onWater, onCanal, onLeaks, onLeak, onPump, onPumps, admin, trips = [], focus, onFocusTrip, hubs = [], events = [], issues = [] }) {
   return (
     <div className="space-y-3">
       {trips.length > 0 && <TripsStrip trips={trips} onFocus={onFocusTrip} />}
@@ -141,6 +141,7 @@ export function WaterView({ water, canal, onWater, onCanal, onLeaks, onLeak, onP
           focus={focus}
           hubs={hubs}
           events={events}
+          issues={issues}
           onSelect={() => {}}
           onReportWater={onWater}
           canal={canal}

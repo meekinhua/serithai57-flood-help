@@ -1271,9 +1271,10 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
               const h = cleanHouse(input.trim());
               if (!/^\d{1,3}\/\d{1,5}/.test(h)) return setErr("ใส่บ้านเลขที่ เช่น 4/917 หรือพิมพ์แค่ 917");
               setErr("");
+              setTyping(false);
+              if (h === house) return setReloadN((n) => n + 1); // same house again: keep what's on screen, just refresh
               setInfo(null);
               setHouse(h);
-              setTyping(false);
             }}
           >
             <label className="min-w-0 flex-1">
@@ -1664,7 +1665,7 @@ export default function MyHome({ water, services, look, onIssue, onIssues, onEle
                 ["👀", t("myhome.tools.ask", "ฝากดูบ้าน"), t("myhome.tools.ask_sub2", "น้ำหน้าบ้าน รับของ ดูประตู"), () => startNear("ask")],
                 ["🐾", t("myhome.tools.lost", "หาย · เจอ"), t("myhome.tools.lost_sub", "หมาแมวหาย เจอของ ลงรูปไว้"), onLost],
                 ["⚠️", t("myhome.tools.alert", "เตือนเพื่อนบ้าน"), t("myhome.tools.alert_sub2", "ฝาท่อแตก กิ่งไม้ สายไฟ"), () => startNear("alert")],
-                ["🛠️", t("myhome.tools.office", "แจ้งสำนักงาน"), t("myhome.tools.office_sub", "ไฟถนน ขยะ ถ่ายรูปได้"), onIssue],
+                ["📍", t("myhome.tools.report", "แจ้งจุดปัญหา"), t("myhome.tools.report_sub", "ขยะค้าง ฝาท่อแตก จุดอันตราย"), onIssue],
                 [
                   "⚡",
                   t("myhome.tools.outage", "ไฟดับ น้ำไม่ไหล"),

@@ -1,0 +1,139 @@
+// 📍 แจ้งจุดปัญหา in 3 taps (9 Oct 2026): what (garbage pile / broken drain cover / danger spot) → photo → where
+// (GPS where you stand, or just the soi) → send. The full form (9 kinds, map pin) stays one link away.
+import { useState } from "react";
+import { api, load, save } from "../api";
+import { ISSUE_TYPES } from "../config";
+import MediaPicker, { mediaState } from "./MediaPicker";
+
+export const QUICK = [
+  ["trash", "กองขยะตกค้าง", "ฟูก ตู้ ถุงดำ กองริมถนน"],
+  ["cover", "ฝาท่อแตก", "ฝาแตก ฝาเปิด ตกลงไปได้"],
+  ["danger", "จุดอันตราย", "สายไฟห้อย รถจอดขวาง ของมีคม"],
+];
+const HINT = {
+  trash: "เช่น ฟูก+ตู้พัง กองปากซอย ล้นถนน",
+  cover: "เช่น ฝาท่อแตก หน้าบ้านเลขที่… ตรงทางเข้าซอย",
+  danger: "เช่น รถเสียจอดหัวยื่นกลางถนน กลางคืนมองไม่เห็น",
+};
+const IN_VILLAGE = (p) => p.lat > 13.7 && p.lat < 13.9 && p.lng > 100.6 && p.lng < 100.8;
+
+export default function QuickReport({ type: type0 = "", onDone, onMore }) {
+  const [type, setType] = useState(type0);
+  const [media, setMedia] = useState([]);
+  const [pos, setPos] = useState(null); // {lat, lng}
+  const [gps, setGps] = useState(""); // "" | "busy" | message
+  const [soi, setSoi] = useState(load("mySoi", ""));
+  const [detail, setDetail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const attached = mediaState(media);
+
+  function here() {
+    if (!navigator.geolocation) return setGps("มือถือนี้ใช้ GPS ไม่ได้ · ใส่ซอยแทน");
+    setGps("busy");
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        const at = { lat: +p.coords.latitude.toFixed(6), lng: +p.coords.longitude.toFixed(6) };
+        if (!IN_VILLAGE(at)) return setGps("ตำแหน่งอยู่นอกหมู่บ้าน · ใส่ซอยแทน");
+        setPos(at);
+        setGps("");
+        api(`/myhome/soi-at?lat=${at.lat}&lng=${at.lng}`)
+          .then((r) => r.soi && setSoi(r.soi))
+          .catch(() => {});
+      },
+      () => setGps("เปิด GPS ไม่ได้ · ใส่ซอยแทนก็ได้"),
+      { enableHighAccuracy: true, timeout: 12000 },
+    );
+  }
+
+  async function send() {
+    if (!pos && !soi.trim()) return setErr("☝️ กด “ใช้ตำแหน่งที่ยืนอยู่” หรือใส่ซอย");
+    setBusy(true);
+    setErr("");
+    try {
+      const x = await api("/issues", { method: "POST", body: JSON.stringify({ type, detail, soi, ...(pos || {}), name: load("myName", ""), media_ids: attached.ids }) });
+      save("issueVotes", [...load("issueVotes", []), x.id]);
+      if (soi) save("mySoi", load("mySoi", "") || soi);
+      onDone(x);
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
+  }
+
+  if (!type)
+    return (
+      <div className="space-y-2">
+        <p className="text-[15px] text-[#45504A]">เลือกเรื่อง แล้วถ่ายรูป ส่งได้ใน 3 ขั้น · ขึ้นบนแผนที่หมู่บ้านให้ทุกคนเห็น</p>
+        {QUICK.map(([k, name, sub]) => (
+          <button key={k} onClick={() => setType(k)} className="card flex min-h-[72px] w-full items-center gap-3 p-3 text-left active:bg-[#F2F4F1]">
+            <span className={`ic ${k === "trash" ? "ic-amber" : "ic-red"}`} aria-hidden="true">
+              {ISSUE_TYPES[k][0]}
+            </span>
+            <span className="min-w-0 flex-1">
+              <b className="block text-[17px] leading-tight">{name}</b>
+              <span className="block text-sm text-[#45504A]">{sub}</span>
+            </span>
+            <span aria-hidden="true">›</span>
+          </button>
+        ))}
+        {onMore && (
+          <button onClick={onMore} className="min-h-[44px] w-full text-[15px] font-bold text-[#1E6B47]">
+            เรื่องอื่น (ไฟถนน ต้นไม้ล้ม ท่อตัน น้ำประปา) ›
+          </button>
+        )}
+      </div>
+    );
+
+  const [, name] = QUICK.find((q) => q[0] === type) || [type, ISSUE_TYPES[type]?.[1] || ""];
+  return (
+    <div className="space-y-4">
+      <button onClick={() => setType("")} className="flex min-h-[44px] items-center gap-2 text-[15px] font-bold">
+        <span className="text-2xl" aria-hidden="true">
+          {ISSUE_TYPES[type]?.[0]}
+        </span>
+        {name} <span className="font-normal text-[#1E6B47] underline">เปลี่ยน</span>
+      </button>
+
+      <div>
+        <p className="mb-1 font-bold">1. ถ่ายรูป (แนะนำ)</p>
+        <MediaPicker items={media} setItems={setMedia} max={2} allowVideo={false} />
+      </div>
+
+      <div>
+        <p className="mb-1 font-bold">2. ตรงไหน</p>
+        <button
+          onClick={here}
+          className={`flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl text-base font-bold ${pos ? "border-2 border-[#1E6B47] bg-[#E4F0E9] text-[#154D33]" : "bg-[#15201A] text-white"}`}
+        >
+          {gps === "busy" ? "กำลังหาตำแหน่ง…" : pos ? `✓ ได้ตำแหน่งแล้ว${soi ? ` · ซ.${soi}` : ""}` : "📍 ใช้ตำแหน่งที่ยืนอยู่"}
+        </button>
+        {gps && gps !== "busy" && <p className="mt-1 text-sm font-bold text-[#7A4104]">{gps}</p>}
+        <label className="mt-2 flex items-center gap-2">
+          <span className="shrink-0 text-[15px]">หรือซอย</span>
+          <input value={soi} onChange={(e) => setSoi(e.target.value)} inputMode="decimal" placeholder="เช่น 16" className="min-h-[48px] w-28 rounded-xl border border-[#A9B4AD] px-3 text-lg" />
+        </label>
+      </div>
+
+      <div>
+        <label className="mb-1 block font-bold" htmlFor="qr-detail">
+          3. บอกเพิ่ม (ไม่บังคับ)
+        </label>
+        <textarea
+          id="qr-detail"
+          rows={2}
+          maxLength={300}
+          value={detail}
+          onChange={(e) => setDetail(e.target.value)}
+          placeholder={HINT[type] || ""}
+          className="w-full rounded-xl border border-[#A9B4AD] p-3 text-base"
+        />
+      </div>
+
+      {err && <p className="rounded-xl bg-[#FDE8E6] p-3 font-bold text-[#B42318]">{err}</p>}
+      <button onClick={send} disabled={busy || attached.busy} className="min-h-[56px] w-full rounded-xl bg-[#1E6B47] text-lg font-bold text-white disabled:opacity-60">
+        {busy ? "กำลังส่ง…" : attached.busy ? "รอรูปอัปโหลด…" : "ส่งเลย · ขึ้นแผนที่หมู่บ้าน"}
+      </button>
+    </div>
+  );
+}

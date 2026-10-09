@@ -40,7 +40,7 @@ LendStatus = Literal["available", "lent", "closed"]  # ว่าง · มีค
 JobKind = Literal["need", "offer"]  # ขอแรง · อาสาพร้อมไปช่วย
 JOB_TYPES = ["clean", "move", "trash", "fix", "check", "elderly", "ride", "errand", "hire", "other"]
 JobStatus = Literal["open", "scheduled", "done"]
-ISSUE_TYPES = ["trash", "drain", "light", "road", "tree", "wire", "water", "smell", "other"]
+ISSUE_TYPES = ["trash", "cover", "danger", "drain", "light", "road", "tree", "wire", "water", "smell", "other"]  # cover/danger: 9 Oct quick report
 IssueStatus = Literal["open", "reported", "fixed"]
 SiteMode = Literal["repair", "flood"]
 LostKind = Literal["lost", "found"]
@@ -625,9 +625,20 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         if body.lat is None and not body.soi.strip():
             raise HTTPException(422, "บอกซอย หรือปักหมุดตำแหน่ง")
         issue_id, t = str(uuid.uuid4()), now()
+        where = {}
+        if body.lat is None:
+            # only the soi given: put it on the map at the soi's middle (shown as "approx"), a little apart from others
+            import staff  # noqa: E402 (the soi centres)
+
+            s = re.sub(r"^(ซอย|ซ\.?)\s*", "", body.soi.strip())
+            c = (staff.SOIS.get(s) or {}).get("center")
+            if c:
+                h = int(hashlib.sha256(issue_id.encode()).hexdigest()[:4], 16)
+                where = {"lat": round(c[0] + ((h % 21) - 10) * 0.000012, 6), "lng": round(c[1] + ((h // 21 % 21) - 10) * 0.000012, 6), "approx": True}
         doc = {
             "id": issue_id,
             **_clean(body.model_dump(exclude={"media_ids"})),
+            **where,
             "media": await claim_media(body.media_ids, f"issue:{issue_id}", {"image"}),
             "status": "open",
             "votes": 1,

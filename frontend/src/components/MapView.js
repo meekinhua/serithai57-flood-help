@@ -3,6 +3,7 @@ import L from "../leafletGlobal";
 import "leaflet.markercluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import { KINDS, VILLAGE_BOUNDARY, VILLAGE_CENTER, VILLAGE_ZOOM, categoryOf, timeAgo, waterOf } from "../config";
+import { ISSUE_TYPES } from "../config";
 import { mediaUrl } from "../media";
 import { drawStaff } from "./staffMarkers";
 import { WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
@@ -87,6 +88,7 @@ export default function MapView({
   onLeaks,
   hubs = [],
   events = [],
+  issues = [],
 }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
@@ -237,6 +239,24 @@ export default function MapView({
         .bindPopup(pop)
         .addTo(layer);
     }
+    // 📍 reports from neighbours: garbage piles, broken drain covers, danger spots (9 Oct)
+    for (const x of issues) {
+      if (x.lat == null || x.status === "fixed") continue;
+      const [emoji, text] = ISSUE_TYPES[x.type] || ["📍", "จุดปัญหา"];
+      const hot = x.type === "cover" || x.type === "danger";
+      L.marker([x.lat, x.lng], {
+        zIndexOffset: hot ? 1100 : 900,
+        icon: L.divIcon({ className: "", iconSize: [36, 36], iconAnchor: [18, 18], html: `<div class="leak-pin" style="--c:${hot ? "#B42318" : "#B45F06"}">${emoji}</div>` }),
+      })
+        .bindPopup(
+          `<b>${emoji} ${escapeHtml(text)}</b>${x.soi ? ` · ซ.${escapeHtml(x.soi)}` : ""}${x.approx ? " <small>(ตำแหน่งโดยประมาณ)</small>" : ""}${x.detail ? `<br>${escapeHtml(x.detail)}` : ""}<br><small>${x.status === "reported" ? "แจ้งเขตแล้ว · " : ""}${timeAgo(x.created_at)}${x.votes > 1 ? ` · ยืนยัน ${x.votes} คน` : ""}</small>${
+            x.media?.[0]
+              ? `<br><a href="${mediaUrl(x.media[0].id)}" target="_blank" rel="noreferrer"><img src="${mediaUrl(x.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
+              : ""
+          }`,
+        )
+        .addTo(layer);
+    }
     // leaks in the flood wall: on both views, they need hands now
     for (const lk of canal?.leaks || []) {
       if (lk.lat == null) continue;
@@ -301,7 +321,7 @@ export default function MapView({
     }
     pinned.forEach((m) => m.addTo(layer));
     cluster.addLayers(grouped);
-  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak, hubs, events]);
+  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak, hubs, events, issues]);
 
   // Staff boats / trucks / people on duty: big, pulsing, always above residents' pins
   useEffect(() => {
