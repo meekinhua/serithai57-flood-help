@@ -20,6 +20,7 @@ import hashlib
 import json
 import re
 import secrets
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -109,6 +110,16 @@ class HandoffBody(BaseModel):
 class InviteCreate(BaseModel):
     expires_hours: int = Field(72, ge=1, le=24 * 30)
     importer: bool = False  # account for the central LINE import (tools/push_line.py), not for people
+
+
+class SoiRange(BaseModel):
+    lo: int = Field(..., ge=1, le=9999)
+    hi: int = Field(..., ge=1, le=9999)
+    soi: str = Field(..., max_length=10)
+
+
+class SoiRanges(BaseModel):
+    ranges: list[SoiRange] = Field(default_factory=list, max_length=600)
 
 
 class AddressSet(BaseModel):
@@ -301,12 +312,67 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         best = min(near, key=lambda p: abs(p[0] - num))
         return best[1] if abs(best[0] - num) <= 60 else None
 
+    _ranges = {"at": 0.0, "items": []}
+
+    async def confirmed_ranges() -> list:
+        if time.time() - _ranges["at"] > 60:
+            doc = await db.settings.find_one({"id": "soi_ranges"}, {"_id": 0, "ranges": 1})
+            _ranges.update(at=time.time(), items=(doc or {}).get("ranges") or [])
+        return _ranges["items"]
+
+    async def number_runs() -> dict:
+        """House numbers run along the sois in chunks (one side of a block, then the next soi's side):
+        the known houses in number order, cut wherever the soi changes. Between two chunks = not known yet."""
+        known = {}
+        async for r in db.survey_resp.find({"soi": {"$nin": [None, ""]}}, {"house": 1, "soi": 1}):
+            n = house_num(r.get("house") or "")
+            if n and re.fullmatch(r"\d{1,3}(/\d{1,2})?", str(r["soi"])):
+                known[n] = {"soi": str(r["soi"]), "w": 2, "pin": None}
+        async for a in db.addresses.find({"soi": {"$nin": [None, ""]}}, {"_id": 0, "house": 1, "soi": 1, "source": 1, "lat": 1, "lng": 1, "reviewed_at": 1}):
+            n = house_num(a["house"])
+            if not n or not re.fullmatch(r"\d{1,3}(/\d{1,2})?", a["soi"]):
+                continue
+            w = 5 if a.get("reviewed_at") else SOURCE_RANK.get(a.get("source"), 1) + (1 if a.get("lat") is not None else 0)
+            if n not in known or w >= known[n]["w"]:
+                known[n] = {"soi": a["soi"], "w": w, "pin": [a["lat"], a["lng"]] if a.get("lat") is not None else None}
+        main = lambda x: x.split("/")[0]  # noqa: E731
+        ns = sorted(n for n in known if n < 3000)
+        odd = set()  # one house against both neighbours that agree with each other: probably a typo
+        for i in range(1, len(ns) - 1):
+            a_, n, b_ = ns[i - 1], ns[i], ns[i + 1]
+            if b_ - a_ <= 30 and known[n]["w"] < 5 and main(known[a_]["soi"]) == main(known[b_]["soi"]) != main(known[n]["soi"]):
+                odd.add(n)
+        runs = []
+        for n in ns:
+            if n in odd:
+                continue
+            k = main(known[n]["soi"])
+            if runs and runs[-1]["soi"] == k:
+                runs[-1]["nums"].append(n)
+            else:
+                runs.append({"soi": k, "nums": [n]})
+        for r in runs:
+            r.update(lo=r["nums"][0], hi=r["nums"][-1], n=len(r["nums"]), pins=[[m] + known[m]["pin"] for m in r["nums"] if known[m]["pin"]][:3])
+        gaps = [{"lo": a_["hi"] + 1, "hi": b_["lo"] - 1, "below": a_["soi"], "above": b_["soi"],
+                 "pins": ([[a_["hi"]] + known[a_["hi"]]["pin"]] if known[a_["hi"]]["pin"] else []) + ([[b_["lo"]] + known[b_["lo"]]["pin"]] if known[b_["lo"]]["pin"] else [])}
+                for a_, b_ in zip(runs, runs[1:]) if b_["lo"] - a_["hi"] > 1]
+        return {"runs": [{k: v for k, v in r.items() if k != "nums"} | {"nums": r["nums"][:40]} for r in runs], "gaps": gaps,
+                "odd": [{"n": n, "soi": known[n]["soi"]} for n in sorted(odd)], "confirmed": await confirmed_ranges()}
+
     async def locate(house: Optional[str], soi_hint: Optional[str] = None, pairs=None) -> dict:
         addr = await db.addresses.find_one({"house": house}, {"_id": 0}) if house else None
         if addr and addr.get("lat") is not None:
             return {"lat": addr["lat"], "lng": addr["lng"], "soi": addr.get("soi") or soi_hint, "precision": "house", "source": addr["source"]}
         soi = soi_hint or (addr or {}).get("soi")
         precision = "soi"
+        if not soi and house:
+            # 9 Oct: number ranges the admin confirmed ("4/198–209 = ซ.10") come before guessing from the nearest number
+            n = house_num(house)
+            for r in await confirmed_ranges():
+                if r["lo"] <= n <= r["hi"]:
+                    soi = r["soi"]
+                    precision = "estimated_soi"
+                    break
         if not soi and house:
             pairs = pairs if pairs is not None else await known_sois()
             soi = estimate_soi(house_num(house), pairs)
@@ -331,6 +397,24 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         if building_id is not None:
             changes["building_id"] = building_id
         await db.addresses.update_one({"house": house}, {"$set": changes}, upsert=True)
+
+    @router.get("/admin/addresses/ranges")
+    async def get_ranges(admin: dict = Depends(require_admin)):
+        return await number_runs()
+
+    @router.put("/admin/addresses/ranges")
+    async def set_ranges(body: SoiRanges, admin: dict = Depends(require_admin)):
+        items = sorted(({"lo": min(r.lo, r.hi), "hi": max(r.lo, r.hi), "soi": r.soi.strip()} for r in body.ranges), key=lambda r: r["lo"])
+        for a_, b_ in zip(items, items[1:]):
+            if b_["lo"] <= a_["hi"]:
+                raise HTTPException(422, f"ช่วงซ้อนกัน: 4/{a_['lo']}–{a_['hi']} กับ 4/{b_['lo']}–{b_['hi']}")
+        for r in items:
+            if r["soi"] not in SOIS and not re.fullmatch(r"\d{1,3}(/\d{1,2})?", r["soi"]):
+                raise HTTPException(422, f"ซอยไม่ถูกต้อง: {r['soi']}")
+        await db.settings.update_one({"id": "soi_ranges"}, {"$set": {"id": "soi_ranges", "ranges": items, "by": admin.get("name", ""), "at": now()}}, upsert=True)
+        _ranges["at"] = 0
+        await audit(admin, "set_soi_ranges", f"{len(items)} ช่วง")
+        return await number_runs()
 
     @router.get("/sois")
     async def sois():

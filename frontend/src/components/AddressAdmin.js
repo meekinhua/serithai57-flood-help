@@ -14,7 +14,7 @@ const HINT = { pin: "ตามหมุด", signup: "ตามที่ลง�
 // Google Maps shows a building's number when you tap it (sometimes wrong): the admin looks there by hand
 const gmaps = (p) => `https://www.google.com/maps/@${p.lat},${p.lng},20z`;
 
-export default function AddressAdmin() {
+function HouseReview({ goHouse }) {
   const [data, setData] = useState(null);
   const [msg, setMsg] = useState("");
   const [filter, setFilter] = useState("bad");
@@ -28,6 +28,12 @@ export default function AddressAdmin() {
   const layer = useRef(null);
   const drag = useRef(null);
 
+  useEffect(() => {
+    if (goHouse && data) {
+      setQ(goHouse.replace(/^4\//, ""));
+      pick(goHouse);
+    }
+  }, [goHouse, !!data]); // eslint-disable-line react-hooks/exhaustive-deps
   const load = () =>
     api("/admin/addresses/review")
       .then(setData)
@@ -243,6 +249,200 @@ export default function AddressAdmin() {
           </ul>
         </div>
       </div>
+    </section>
+  );
+}
+
+// ---------- 📏 house numbers run in chunks along the sois: confirm a range once instead of every house ----------
+export default function AddressAdmin() {
+  const [mode, setMode] = useState("ranges");
+  const [goHouse, setGoHouse] = useState("");
+  return (
+    <div>
+      <div className="mb-2 grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1">
+        {[
+          ["ranges", "📏 ช่วงเลขบ้าน (ทีละช่วง)"],
+          ["houses", "🏠 รายหลัง"],
+        ].map(([k, t]) => (
+          <button key={k} onClick={() => setMode(k)} className={`min-h-[44px] rounded-lg font-semibold ${mode === k ? "bg-white shadow" : "text-neutral-600"}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+      {mode === "ranges" ? (
+        <RangeView
+          onHouse={(h) => {
+            setGoHouse(h);
+            setMode("houses");
+          }}
+        />
+      ) : (
+        <HouseReview goHouse={goHouse} />
+      )}
+    </div>
+  );
+}
+
+function RangeView({ onHouse }) {
+  const [d, setD] = useState(null);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [split, setSplit] = useState({}); // gap lo → the number where the upper soi starts
+  useEffect(() => {
+    api("/admin/addresses/ranges")
+      .then(setD)
+      .catch((e) => setMsg(e.message));
+  }, []);
+  if (!d) return <p className={msg ? "text-red-700" : "text-neutral-500"}>{msg || "กำลังโหลด…"}</p>;
+  const conf = d.confirmed || [];
+  const covered = (lo, hi) => conf.some((r) => r.lo <= lo && hi <= r.hi);
+  async function put(next, note) {
+    setBusy(true);
+    setMsg("");
+    try {
+      setD(await api("/admin/addresses/ranges", { method: "PUT", body: JSON.stringify({ ranges: next }) }));
+      setMsg(`✅ ${note}`);
+    } catch (e) {
+      setMsg(e.message);
+    }
+    setBusy(false);
+  }
+  // adding a range swallows / trims the confirmed ones it overlaps
+  const add = (lo, hi, soi) => {
+    const rest = [];
+    for (const r of conf) {
+      if (r.hi < lo || r.lo > hi) rest.push(r);
+      else if (r.soi === soi) {
+        lo = Math.min(lo, r.lo);
+        hi = Math.max(hi, r.hi);
+      } else {
+        if (r.lo < lo) rest.push({ ...r, hi: lo - 1 });
+        if (r.hi > hi) rest.push({ ...r, lo: hi + 1 });
+      }
+    }
+    put([...rest, { lo, hi, soi }], `4/${lo}–${hi} = ซ.${soi}`);
+  };
+  const rows = [...d.runs.map((r) => ({ ...r, kind: "run" })), ...d.gaps.map((g) => ({ ...g, kind: "gap" }))].sort((a, b) => a.lo - b.lo);
+  const gapNums = d.gaps.reduce((t, g) => t + (covered(g.lo, g.hi) ? 0 : g.hi - g.lo + 1), 0);
+  const gm = (p) => `https://www.google.com/maps/@${p[1]},${p[2]},20z`;
+  return (
+    <section className="rounded-2xl border bg-white p-3">
+      <h2 className="text-lg font-bold">📏 ช่วงเลขบ้าน → ซอย</h2>
+      <p className="text-sm text-neutral-600">
+        เลขบ้านเรียงเป็นช่วงตามซอย (ฝั่งหนึ่งของบล็อก แล้วไปอีกซอย) · ยืนยันทีละช่วง บ้านที่ยังไม่มีข้อมูลในช่วงนั้นจะได้ซอยตามช่วงเลย · ช่วงที่รู้ {d.runs.length} · เลขที่ยังไม่รู้ระหว่างช่วง{" "}
+        {gapNums} เลข · ยืนยันแล้ว {conf.length} ช่วง
+      </p>
+      {msg && <p className={`mt-1 ${msg.startsWith("✅") ? "text-green-800" : "text-red-700"}`}>{msg}</p>}
+      <ul className="mt-2 divide-y rounded-xl border">
+        {rows.map((r) =>
+          r.kind === "run" ? (
+            <li key={`r${r.lo}`} className={`flex flex-wrap items-center gap-2 p-2 ${covered(r.lo, r.hi) ? "bg-green-50" : ""}`}>
+              <b className="w-14">ซ.{r.soi}</b>
+              <span className="flex-1">
+                4/{r.lo}
+                {r.hi !== r.lo && `–${r.hi}`} · รู้ {r.n} หลัง
+                {r.n === 1 && <span className="ml-1 rounded bg-amber-100 px-1 text-xs text-amber-900">หลังเดียว อาจผิด</span>}
+                <span className="block text-xs text-neutral-500">
+                  {r.nums.slice(0, 12).map((n) => (
+                    <button key={n} onClick={() => onHouse(`4/${n}`)} className="mr-1 underline">
+                      {n}
+                    </button>
+                  ))}
+                </span>
+              </span>
+              {covered(r.lo, r.hi) ? (
+                <span className="text-sm font-semibold text-green-800">✓ ยืนยันแล้ว</span>
+              ) : (
+                <button disabled={busy} onClick={() => add(r.lo, r.hi, r.soi)} className="min-h-[40px] rounded-lg border-2 border-green-700 px-3 text-sm font-semibold text-green-800">
+                  ✓ ช่วงนี้ถูก
+                </button>
+              )}
+            </li>
+          ) : covered(r.lo, r.hi) ? null : (
+            <li key={`g${r.lo}`} className="bg-amber-50 p-2 text-sm">
+              <span>
+                ❓{" "}
+                <b>
+                  4/{r.lo}
+                  {r.hi !== r.lo && `–${r.hi}`}
+                </b>{" "}
+                ({r.hi - r.lo + 1} เลข) อยู่ระหว่าง ซ.{r.below} กับ ซ.{r.above}
+                {r.pins.map((p) => (
+                  <a key={p[0]} href={gm(p)} target="_blank" rel="noreferrer" className="ml-2 text-blue-800 underline">
+                    🔎 ใกล้ 4/{p[0]}
+                  </a>
+                ))}
+              </span>
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                <button disabled={busy} onClick={() => add(r.lo, r.hi, r.below)} className="min-h-[36px] rounded-lg border px-2">
+                  ทั้งหมด ซ.{r.below}
+                </button>
+                <button disabled={busy} onClick={() => add(r.lo, r.hi, r.above)} className="min-h-[36px] rounded-lg border px-2">
+                  ทั้งหมด ซ.{r.above}
+                </button>
+                {r.below !== r.above && (
+                  <>
+                    <span>หรือ ซ.{r.above} เริ่มที่เลข</span>
+                    <input
+                      value={split[r.lo] || ""}
+                      onChange={(e) => setSplit({ ...split, [r.lo]: e.target.value.replace(/\D/g, "") })}
+                      inputMode="numeric"
+                      className="min-h-[36px] w-20 rounded-lg border px-2"
+                    />
+                    <button
+                      disabled={busy || !(+split[r.lo] >= r.lo && +split[r.lo] <= r.hi + 1)}
+                      onClick={() => {
+                        const k = +split[r.lo];
+                        const next = conf.filter((x) => x.hi < r.lo || x.lo > r.hi);
+                        if (k > r.lo) next.push({ lo: r.lo, hi: k - 1, soi: r.below });
+                        if (k <= r.hi) next.push({ lo: k, hi: r.hi, soi: r.above });
+                        put(next, `แบ่งที่ 4/${k}`);
+                      }}
+                      className="min-h-[36px] rounded-lg bg-black px-2 text-white disabled:opacity-40"
+                    >
+                      แบ่ง
+                    </button>
+                  </>
+                )}
+              </div>
+            </li>
+          ),
+        )}
+      </ul>
+      {d.odd.length > 0 && (
+        <p className="mt-2 text-sm">
+          ⚠️ เลขที่ไม่เข้ากับเลขข้างเคียง (อาจพิมพ์ผิด):{" "}
+          {d.odd.map((o) => (
+            <button key={o.n} onClick={() => onHouse(`4/${o.n}`)} className="mr-2 underline">
+              4/{o.n} (ซ.{o.soi})
+            </button>
+          ))}
+        </p>
+      )}
+      {conf.length > 0 && (
+        <details className="mt-2 text-sm">
+          <summary className="cursor-pointer font-semibold">ช่วงที่ยืนยันแล้ว {conf.length} ช่วง</summary>
+          {conf.map((r) => (
+            <div key={r.lo} className="flex items-center gap-2 py-1">
+              <span className="flex-1">
+                4/{r.lo}–{r.hi} = ซ.{r.soi}
+              </span>
+              <button
+                disabled={busy}
+                onClick={() =>
+                  put(
+                    conf.filter((x) => x !== r),
+                    `ลบ 4/${r.lo}–${r.hi}`,
+                  )
+                }
+                className="underline"
+              >
+                ลบ
+              </button>
+            </div>
+          ))}
+        </details>
+      )}
     </section>
   );
 }
