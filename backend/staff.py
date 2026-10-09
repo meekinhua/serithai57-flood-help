@@ -281,6 +281,13 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
     # ---------- address book / locating a house ----------
     async def known_sois() -> list[tuple[int, str]]:
         pairs = [(house_num(a["house"]), a["soi"]) async for a in db.addresses.find({"soi": {"$ne": None}}, {"house": 1, "soi": 1})]
+        # 9 Oct: the electric sign-ups say their soi too (owners typed it): nearest-number guesses went from 62% to 69% right
+        have = {p[0] for p in pairs}
+        async for r in db.survey_resp.find({"soi": {"$nin": [None, ""]}}, {"house": 1, "soi": 1}):
+            n = house_num(r.get("house") or "")
+            if n and n not in have and re.fullmatch(r"\d{1,3}(/\d{1,2})?", str(r["soi"])):
+                pairs.append((n, str(r["soi"])))
+                have.add(n)
         for h, s in SOI_DATA.get("known_houses", {}).items():
             pairs.append((house_num(h), s))
         return sorted(pairs)

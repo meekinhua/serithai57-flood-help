@@ -10,7 +10,9 @@ import { createBaseMap } from "./MapView";
 const SRC = { staff: "ทีมยืนยัน", resident: "เจ้าของบ้านใส่เอง", text: "เดาจากแชท LINE" };
 const COLOR = { red: "#B42318", amber: "#D9A21B", ok: "#1E6B47", done: "#5B6CFF" };
 const sevOf = (r) => (r.flags.some((f) => f[0] === "red") ? "red" : r.flags.length ? "amber" : r.reviewed ? "done" : "ok");
-const HINT = { pin: "ตามหมุด", signup: "ตามที่ลงทะเบียนตรวจไฟ", numbers: "ตามเลขบ้านข้างเคียง" };
+const HINT = { pin: "ตามหมุด", signup: "ตามที่ลงทะเบียนตรวจไฟ", numbers: "ตามเลขบ้านข้างเคียง", guess: "ระบบเดาจากเลขข้างเคียง" };
+// Google Maps shows a building's number when you tap it (sometimes wrong): the admin looks there by hand
+const gmaps = (p) => `https://www.google.com/maps/@${p.lat},${p.lng},20z`;
 
 export default function AddressAdmin() {
   const [data, setData] = useState(null);
@@ -53,7 +55,11 @@ export default function AddressAdmin() {
     const k = q.trim().replace(/^4\//, "");
     return data.items.filter((r) => (k ? r.house.replace(/^4\//, "").startsWith(k) : filter === "all" || (filter === "bad" ? r.flags.length : filter === "nopin" ? r.lat == null : r.reviewed)));
   }, [data, filter, q]);
-  const cur = data?.items.find((r) => r.house === sel) || null;
+  const [guess, setGuess] = useState(null); // a house not in the book yet: the system's guess {soi, lat, lng}
+  const cur =
+    data?.items.find((r) => r.house === sel) || (sel ? { house: sel, soi: "", lat: null, lng: null, flags: [], hints: guess?.soi ? { guess: guess.soi } : {}, source: "", by: "", isNew: true } : null);
+  const qNum = q.trim().replace(/^4\//, "");
+  const canAdd = /^\d{1,4}$/.test(qNum) && data && !data.items.some((r) => r.house === `4/${qNum}`);
 
   // markers
   useEffect(() => {
@@ -87,6 +93,14 @@ export default function AddressAdmin() {
 
   function pick(h) {
     const r = data.items.find((x) => x.house === h);
+    setGuess(null);
+    if (!r)
+      api(`/myhome?house=${encodeURIComponent(h)}`)
+        .then((x) => {
+          setGuess({ soi: x.soi, lat: x.lat, lng: x.lng });
+          if (x.lat) map.current?.setView([x.lat, x.lng], 18);
+        })
+        .catch(() => {});
     setSel(h);
     setSoi(r?.soi || "");
     setMoving(null);
@@ -143,6 +157,7 @@ export default function AddressAdmin() {
                 </button>
               </div>
               <p className="text-sm text-neutral-600">
+                {cur.isNew ? "ยังไม่มีในสมุด · " : ""}
                 {SRC[cur.source] || cur.source} {cur.by && `(${cur.by})`} {cur.at && `· ${timeAgo(cur.at)}`} · {cur.lat != null ? "มีหมุด" : "ยังไม่มีหมุด"}
               </p>
               {cur.flags.map(([s, t]) => (
@@ -184,6 +199,15 @@ export default function AddressAdmin() {
                     📍 {cur.lat != null ? "ย้ายหมุด" : "ปักหมุดบ้านนี้"}
                   </button>
                 )}
+                <a
+                  href={gmaps(moving || (cur.lat != null ? cur : guess?.lat ? guess : { lat: map.current?.getCenter().lat.toFixed(6), lng: map.current?.getCenter().lng.toFixed(6) }))}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 block font-semibold text-blue-800 underline"
+                >
+                  🔎 ดูใน Google Maps ตรงนี้
+                </a>
+                <span className="block text-xs text-neutral-600">แตะอาคารใน Google จะขึ้นเลขที่บ้าน · Google ผิดได้ เทียบกับเลขข้างเคียงด้วย</span>
               </div>
 
               <div className="mt-2 grid grid-cols-2 gap-1">
@@ -201,6 +225,11 @@ export default function AddressAdmin() {
             </div>
           )}
           {msg && <p className={msg.startsWith("✅") ? "text-green-800" : "text-red-700"}>{msg}</p>}
+          {canAdd && (
+            <button onClick={() => pick(`4/${qNum}`)} className="min-h-[44px] rounded-xl border-2 border-dashed border-black font-semibold">
+              ➕ 4/{qNum} ยังไม่มีในสมุด · เพิ่ม/ปักหมุด
+            </button>
+          )}
           <p className="text-sm text-neutral-600">{items.length} หลัง · แตะเพื่อดู/แก้</p>
           <ul className="flex-1 overflow-auto rounded-xl border">
             {items.map((r) => (
