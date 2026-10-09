@@ -1428,19 +1428,21 @@ export default function MyHome({
         </div>
       )}
       {info && (
-        <>
+        <div className={`mt-1.5 rounded-2xl border border-[#D7E6DC] bg-[#EEF5F0] p-1.5 ${infoOpen ? "pb-2" : ""}`}>
           {/* 9 Oct: one quiet summary line; tap it for the house panel where everything is edited */}
-          <button onClick={() => setInfoOpen((v) => !v)} aria-expanded={infoOpen} className="mt-1 flex min-h-[44px] w-full items-center gap-1.5 rounded-xl text-left text-[15px] text-[#33403A]">
+          <button onClick={() => setInfoOpen((v) => !v)} aria-expanded={infoOpen} className="flex min-h-[44px] w-full items-center gap-1.5 rounded-xl pl-1.5 text-left text-[15px] text-[#33403A]">
             <span className="min-w-0 flex-1 truncate">
               {info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย"}
               {info.waste && <span> · 🚛 {info.waste.days}</span>}
               {info.speaker?.answer && <span> · {info.speaker.answer === "yes" ? "🔇 ไม่ได้ยินเสียงตามสาย" : "📢 ได้ยิน"}</span>}
               {info.precision !== "house" && <span className="text-[#7A4104]"> · ยังไม่ปักหมุด</span>}
             </span>
-            <span className="shrink-0 text-sm font-bold text-[#1E6B47]">{infoOpen ? "ย่อ ▴" : "ข้อมูลบ้าน ▾"}</span>
+            <span className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-bold ${infoOpen ? "bg-[#1E6B47] text-white" : "border border-[#1E6B47] bg-white text-[#1E6B47]"}`}>
+              {infoOpen ? "ย่อ ▴" : "ข้อมูลบ้าน ▾"}
+            </span>
           </button>
           {infoOpen && (
-            <div className="card anim-in mt-1 divide-y divide-[#EEF1EE] px-3">
+            <div className="anim-in mt-1 divide-y divide-[#EEF1EE] rounded-xl bg-white px-3 shadow-sm">
               {[
                 ["ซอย", info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย", "แก้", () => setSoiEdit((v) => !v)],
                 [
@@ -1464,7 +1466,7 @@ export default function MyHome({
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
       {info && info.precision !== "house" && !soiAsked.includes(info.house) && !pinning && (
         <SoiAsk
