@@ -158,6 +158,11 @@ export default function TechPage() {
   const [zone, setZone] = useState(() => load("techZone", ""));
   const [soi, setSoi] = useState("");
   const [seg, setSeg] = useState(""); // a report row picked: only those houses below
+  const [pool, setPool] = useState(() => load("techPool", "round")); // round | old
+  const round = useMemo(() => (all || []).reduce((m, r) => (r.round && r.round > m ? r.round : m), ""), [all]);
+  const roundLabel = round ? `${+round.slice(8)} ต.ค.` : "รอบนี้";
+  const inPool = (r, p) => (p === "round" ? !!round && r.round === round : !round || r.round !== round);
+  const poolRows = useMemo(() => (rows ? rows.filter((r) => inPool(r, pool)) : null), [rows, pool, round]); // eslint-disable-line react-hooks/exhaustive-deps
   const [busy, setBusy] = useState("");
 
   useEffect(() => {
@@ -198,7 +203,7 @@ export default function TechPage() {
   const counts = useMemo(() => {
     const c = { all: 0, todo: 0, claimed: 0, done: 0, absent: 0, again: 0 };
     const byTech = {};
-    for (const r of rows || []) {
+    for (const r of poolRows || []) {
       c.all++;
       c[statusOf(r)]++;
       if (r.job?.tech && r.job.status !== "todo") {
@@ -208,21 +213,18 @@ export default function TechPage() {
       }
     }
     return { c, byTech };
-  }, [rows]);
+  }, [poolRows]);
 
   const shown = useMemo(() => {
-    let list = rows || [];
+    let list = poolRows || [];
     if (show === "open") list = list.filter((r) => ["todo", "claimed", "again"].includes(statusOf(r)));
     if (show === "mine") list = list.filter((r) => r.job?.tech === me && statusOf(r) !== "todo");
     if (show === "done") list = list.filter((r) => ["done", "absent"].includes(statusOf(r)));
     if (zone) list = list.filter((r) => zoneOf(r) === zone);
     if (soi) list = list.filter((r) => mainSoi(r.soi) === soi);
-    if (seg) {
-      const round = (all || []).reduce((m, r) => (r.round && r.round > m ? r.round : m), "");
-      list = list.filter((r) => segOf(r, round) === seg);
-    }
+    if (seg) list = list.filter((r) => segOf(r, round) === seg);
     return list;
-  }, [rows, show, zone, soi, me, zones, seg, all]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [poolRows, show, zone, soi, me, zones, seg, round]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // group by zone → soi so a technician walks one soi at a time
   const groups = useMemo(() => {
@@ -351,19 +353,33 @@ export default function TechPage() {
               })}
             </div>
           </div>
-          <SignupReport
-            all={all}
-            list={rows}
-            teamLabel={(TEAMS.find(([k]) => k === team) || ["", ""])[1]}
-            seg={seg}
-            onSeg={(k) => {
-              setSeg(k);
-              if (k) {
-                setShow("all"); // the picked group, whatever their job status
-                save("techShow", "all");
-              }
-            }}
-          />
+          <div className="mb-3 grid grid-cols-2 gap-1.5" role="tablist" aria-label="รายการบ้าน">
+            {[
+              ["round", "✅ ยืนยันคิว " + roundLabel, "งานหลักของวันนี้"],
+              ["old", "⏳ ค้างเก่า ไม่ได้ยืนยัน", "ว่างแล้วค่อยมาดู"],
+            ].map(([k, label, sub]) => {
+              const n = (rows || []).filter((r) => inPool(r, k) && !["done", "absent"].includes(statusOf(r))).length;
+              const on = pool === k;
+              return (
+                <button
+                  key={k}
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => {
+                    setPool(k);
+                    save("techPool", k);
+                    setSeg("");
+                  }}
+                  className={`min-h-[60px] rounded-2xl border-2 px-2 text-left leading-tight ${on ? (k === "round" ? "border-emerald-700 bg-emerald-700 text-white" : "border-amber-600 bg-amber-500 text-white") : "border-neutral-200 bg-white"}`}
+                >
+                  <b className="block text-[15px]">{label}</b>
+                  <span className={`block text-xs ${on ? "text-white/85" : "text-neutral-500"}`}>
+                    ยังต้องไป {n} หลัง · {sub}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
           <section className="mb-3 rounded-2xl bg-white p-3 shadow-sm">
             <div className="flex items-baseline justify-between">
               <b className="text-lg">
@@ -393,7 +409,7 @@ export default function TechPage() {
 
           <ZonePicker
             zones={zones}
-            rows={rows}
+            rows={poolRows}
             zone={zone}
             onZone={(z) => {
               setZone(z);
@@ -401,7 +417,7 @@ export default function TechPage() {
               save("techZone", z);
             }}
           />
-          <TechMap zones={zones} rows={rows} zone={zone} soi={soi} me={me} onSoi={(s) => setSoi((cur) => (cur === s ? "" : s))} />
+          <TechMap zones={zones} rows={poolRows} zone={zone} soi={soi} me={me} onSoi={(s) => setSoi((cur) => (cur === s ? "" : s))} />
 
           <div className="my-3 space-y-2">
             <div className="grid grid-cols-4 gap-1 rounded-xl bg-white p-1 text-sm">
@@ -453,6 +469,23 @@ export default function TechPage() {
               </section>
             );
           })}
+          <SignupReport
+            all={all}
+            list={rows}
+            teamLabel={(TEAMS.find(([k]) => k === team) || ["", ""])[1]}
+            seg={seg}
+            onSeg={(k) => {
+              setSeg(k);
+              if (k) {
+                setShow("all"); // the picked group, whatever their job status
+                save("techShow", "all");
+                const p = k === "new" || k === "re" ? "round" : "old";
+                setPool(p);
+                save("techPool", p);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
+          />
           <p className="py-4 text-center text-xs text-neutral-500">อัปเดตเองทุก 30 วินาที · เบอร์โทรในหน้านี้ใช้ติดต่อเจ้าของบ้านเท่านั้น</p>
         </>
       )}
