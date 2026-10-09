@@ -8,6 +8,7 @@ import { MYHOME_CHANGED, cleanHouse } from "./SurveyBox";
 import { PRO_GROUPS, goodOf, rememberCall } from "./Community";
 import PetsRow from "./Pets";
 import { notify } from "../notify";
+import { seenVisits } from "../visits";
 import PushCard from "./PushCard";
 import FloodTuck, { useFloodTools } from "./FloodTuck";
 import { mediaUrl } from "../media";
@@ -368,10 +369,11 @@ function SoiAsk({ info, onSaved, onPin, onClose, setErr }) {
 }
 
 // ---------- 📢 เสียงตามสาย: can this house hear the village loudspeaker? (9 Oct) ----------
-function SpeakerRow({ info, onSaved, setErr, open, onClose, onPin }) {
+function SpeakerRow({ info, onSaved, setErr, open, onClose, onPin, hideNudge }) {
   // asked at the top until answered; after that the status chip by the house number opens it again ("open")
   const sp = info.speaker || {};
   const [busy, setBusy] = useState(false);
+  const [nudgeVisits] = useState(() => seenVisits("speaker:pin")); // the pin nudge shows on 3 visits, then the house panel has it
   async function answer(a) {
     setErr("");
     setBusy(true);
@@ -386,7 +388,7 @@ function SpeakerRow({ info, onSaved, setErr, open, onClose, onPin }) {
   }
   if (sp.answer && !open) {
     // can't hear and the house isn't pinned yet: one quiet nudge (the map needs the place)
-    return sp.answer === "yes" && info.precision !== "house" ? (
+    return sp.answer === "yes" && info.precision !== "house" && !hideNudge && nudgeVisits <= 3 ? (
       <button onClick={onPin} className="anim-in mt-2 flex min-h-[44px] w-full items-center gap-2 rounded-xl bg-[#FFF6DA] px-3 text-left text-sm">
         <span aria-hidden="true">📍</span>
         <span className="min-w-0 flex-1">
@@ -1173,6 +1175,7 @@ export default function MyHome({
   const reload = () => setReloadN((n) => n + 1);
   const [typing, setTyping] = useState(!house);
   const [, setFloodPref] = useFloodTools();
+  const [infoOpen, setInfoOpen] = useState(false); // the house panel (soi, pin, rubbish days, เสียงตามสาย)
   const [spkOpen, setSpkOpen] = useState(false); // เสียงตามสาย: the chip by the house number opens the question again
   const [input, setInput] = useState(house || "");
   const [info, setInfo] = useState(null);
@@ -1425,29 +1428,43 @@ export default function MyHome({
         </div>
       )}
       {info && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[15px]">
-          <button onClick={() => setSoiEdit((v) => !v)} className="chip" aria-label="แก้ซอย">
-            {info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย"} <span className="text-[#1E6B47]">แก้</span>
-          </button>
-          <button onClick={() => setPinning({ pos: null, soi: info.soi || "", gps: true })} className="chip" aria-label={info.precision === "house" ? "ย้ายหมุดบ้าน" : "ปักหมุดบ้านด้วย GPS"}>
-            📍 {info.precision === "house" ? "หมุดแล้ว" : "ปักหมุด GPS"}
-          </button>
-          {info.waste && (
-            <span className="chip border-[#E4F0E9] bg-[#E4F0E9] text-[#154D33]">
-              🚛 เก็บขยะ <WasteDays days={info.waste.days} />
+        <>
+          {/* 9 Oct: one quiet summary line; tap it for the house panel where everything is edited */}
+          <button onClick={() => setInfoOpen((v) => !v)} aria-expanded={infoOpen} className="mt-1 flex min-h-[44px] w-full items-center gap-1.5 rounded-xl text-left text-[15px] text-[#33403A]">
+            <span className="min-w-0 flex-1 truncate">
+              {info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย"}
+              {info.waste && <span> · 🚛 {info.waste.days}</span>}
+              {info.speaker?.answer && <span> · {info.speaker.answer === "yes" ? "🔇 ไม่ได้ยินเสียงตามสาย" : "📢 ได้ยิน"}</span>}
+              {info.precision !== "house" && <span className="text-[#7A4104]"> · ยังไม่ปักหมุด</span>}
             </span>
+            <span className="shrink-0 text-sm font-bold text-[#1E6B47]">{infoOpen ? "ย่อ ▴" : "ข้อมูลบ้าน ▾"}</span>
+          </button>
+          {infoOpen && (
+            <div className="card anim-in mt-1 divide-y divide-[#EEF1EE] px-3">
+              {[
+                ["ซอย", info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย", "แก้", () => setSoiEdit((v) => !v)],
+                [
+                  "ตำแหน่งบ้าน",
+                  info.precision === "house" ? "📍 ปักหมุดแล้ว" : "ยังไม่ปักหมุด · ใช้กลางซอย",
+                  info.precision === "house" ? "ย้าย" : "ปักหมุด GPS",
+                  () => setPinning({ pos: null, soi: info.soi || "", gps: true }),
+                ],
+                ["เก็บขยะ", info.waste ? <WasteDays key="w" days={info.waste.days} /> : "ยังไม่รู้ (ใส่ซอยก่อน)", null, null],
+                ["เสียงตามสาย", info.speaker?.answer ? (info.speaker.answer === "yes" ? "🔇 ไม่ได้ยิน / ไม่ชัด" : "📢 ได้ยินชัด") : "ยังไม่ได้ตอบ", "แก้", () => setSpkOpen(true)],
+              ].map(([label, value, act, go]) => (
+                <div key={label} className="flex min-h-[52px] items-center gap-2 py-1.5">
+                  <span className="w-24 shrink-0 text-sm text-[#5A665F]">{label}</span>
+                  <span className="min-w-0 flex-1 text-[15px] font-bold leading-snug">{value}</span>
+                  {act && (
+                    <button onClick={go} className="min-h-[40px] shrink-0 rounded-lg border border-[#D5DBD6] px-3 text-sm font-bold text-[#1E6B47]">
+                      {act}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
-          {info.speaker?.answer && (
-            <button
-              onClick={() => setSpkOpen((v) => !v)}
-              aria-expanded={spkOpen}
-              className={`chip ${info.speaker.answer === "yes" ? "border-[#E9B48A] bg-[#FDF1E7] text-[#7A4104]" : "border-[#E4F0E9] bg-[#E4F0E9] text-[#154D33]"}`}
-              aria-label="สถานะเสียงตามสาย · แตะเพื่อแก้"
-            >
-              {info.speaker.answer === "yes" ? "🔇 ไม่ได้ยินเสียงตามสาย" : "📢 ได้ยินเสียงตามสาย"} <span className="text-[#1E6B47]">แก้</span>
-            </button>
-          )}
-        </div>
+        </>
       )}
       {info && info.precision !== "house" && !soiAsked.includes(info.house) && !pinning && (
         <SoiAsk
@@ -1491,7 +1508,15 @@ export default function MyHome({
         <p className="py-3 text-[15px] text-[#45504A]">กำลังโหลด…</p>
       ) : (
         <>
-          <SpeakerRow info={info} onSaved={setInfo} setErr={setErr} open={spkOpen} onClose={() => setSpkOpen(false)} onPin={() => setPinning({ pos: null, soi: info.soi || "", gps: true })} />
+          <SpeakerRow
+            info={info}
+            onSaved={setInfo}
+            setErr={setErr}
+            hideNudge={infoOpen}
+            open={spkOpen}
+            onClose={() => setSpkOpen(false)}
+            onPin={() => setPinning({ pos: null, soi: info.soi || "", gps: true })}
+          />
           <div className="grp">
             <p className="grp-label">วันนี้</p>
             <div className="grp-body">
