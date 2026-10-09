@@ -102,11 +102,27 @@ def _in_outline(lat, lng) -> bool:
     return c
 
 
-def in_village(lat, lng, within_m: float = 40) -> bool:
-    """A pin counts when it is inside the village outline, or right next to one of its sois (a house on the edge)."""
+def _seg_m(lat, lng, a1, b1, a2, b2) -> float:
+    """Metres from a point to the segment (a1,b1)-(a2,b2) (lat,lng pairs), flat-earth (fine at this scale)."""
+    kx = 111_320 * math.cos(math.radians(lat))
+    ax, ay, bx, by, px, py = b1 * kx, a1 * 111_320, b2 * kx, a2 * 111_320, lng * kx, lat * 111_320
+    dx, dy = bx - ax, by - ay
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy or 1)))
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+
+# 9 Oct: หาย·เจอ also counts the neighbours just outside (ชุมชนโต๊ะบาง, นวธานี…): pets and things cross the line
+NEAR_M = 300
+
+
+def in_village(lat, lng, within_m: float = 40, near_m: float = 0) -> bool:
+    """A pin counts when it is inside the village outline, or right next to one of its sois (a house on the edge).
+    near_m > 0: also anywhere within that many metres of the outline (the neighbouring communities)."""
     import staff  # noqa: E402
 
     if _in_outline(lat, lng):
+        return True
+    if near_m and any(_seg_m(lat, lng, *a, *b) <= near_m for a, b in zip(VILLAGE_BOUNDARY, VILLAGE_BOUNDARY[-1:] + VILLAGE_BOUNDARY[:-1])):
         return True
 
     kx = 111_320 * math.cos(math.radians(lat))
@@ -124,18 +140,18 @@ def in_village(lat, lng, within_m: float = 40) -> bool:
     return False
 
 
-def place(d: dict, seed: str) -> dict:
+def place(d: dict, seed: str, near_m: float = 0) -> dict:
     """Where a post goes on the map: its own pin if that is in the village, else its soi (approx), else nowhere."""
-    if d.get("lat") is not None and in_village(d["lat"], d["lng"]):
+    if d.get("lat") is not None and in_village(d["lat"], d["lng"], near_m=near_m):
         return {}
     spot = soi_spot(d.get("soi", ""), seed)
     return spot or ({"lat": None, "lng": None} if d.get("lat") is not None else {})
 
 
-def with_spot(docs: list) -> list:
+def with_spot(docs: list, near_m: float = 0) -> list:
     """On the way out (not stored): no pin → the soi's spot; a pin outside the village → its soi instead."""
     for d in docs:
-        d.update(place(d, d.get("id", "")))
+        d.update(place(d, d.get("id", ""), near_m))
     return docs
 
 
@@ -616,7 +632,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     @router.get("/lost")
     async def list_lost(include_closed: bool = False):
         q = {} if include_closed else {"status": "open"}
-        return with_spot(await db.lost.find(q, HIDDEN).sort([("status", 1), ("updated_at", -1)]).to_list(1000))
+        return with_spot(await db.lost.find(q, HIDDEN).sort([("status", 1), ("updated_at", -1)]).to_list(1000), NEAR_M)
 
     @router.post("/lost", status_code=201)
     async def create_lost(body: LostCreate, request: Request):
@@ -626,7 +642,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         if len(body.phone.strip()) < 3:
             raise HTTPException(422, "ใส่เบอร์โทรให้คนที่เจอติดต่อได้")
         key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
-        spot = place(body.model_dump(), item_id)
+        spot = place(body.model_dump(), item_id, NEAR_M)
         if body.lat is not None and spot.get("lat", 0) is None:
             raise HTTPException(422, "หมุดอยู่นอกหมู่บ้าน · ลากหมุดกลับเข้ามาตรงจุด หรือใส่ซอยแทน")
         doc = {
@@ -754,7 +770,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     async def move_pin(coll, item_id: str, body: WhereBody, admin: dict, what: str):
         if not body.clear and (body.lat is None or body.lng is None):
             raise HTTPException(422, "ลากหมุดก่อน")
-        if not body.clear and not in_village(body.lat, body.lng):
+        if not body.clear and not in_village(body.lat, body.lng, near_m=NEAR_M if what == "lost" else 0):
             raise HTTPException(422, "หมุดอยู่นอกหมู่บ้าน")
         upd = {"soi": body.soi.strip()[:12], "updated_at": now()}
         upd.update({"lat": None, "lng": None, "approx": False} if body.clear else {"lat": body.lat, "lng": body.lng, "approx": False})
@@ -767,7 +783,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         if not doc:
             raise HTTPException(404, "ไม่พบรายการ")
         await audit(admin, f"move_pin_{what}", item_id, f"{body.lat},{body.lng} soi={body.soi}")
-        return with_spot([doc])[0]
+        return with_spot([doc], NEAR_M if what == "lost" else 0)[0]
 
     @router.post("/admin/issues/{item_id}/where")
     async def admin_move_issue(item_id: str, body: WhereBody, admin: dict = Depends(require_admin)):
