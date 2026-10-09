@@ -90,6 +90,7 @@ export default function MapView({
   events = [],
   issues = [],
   flood = true,
+  onIssue,
 }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
@@ -245,18 +246,21 @@ export default function MapView({
       if (x.lat == null || x.status === "fixed") continue;
       const [emoji, text] = ISSUE_TYPES[x.type] || ["📍", "จุดปัญหา"];
       const hot = x.type === "cover" || x.type === "danger";
-      L.marker([x.lat, x.lng], {
+      const mk = L.marker([x.lat, x.lng], {
         zIndexOffset: hot ? 1100 : 900,
         icon: L.divIcon({ className: "", iconSize: [36, 36], iconAnchor: [18, 18], html: `<div class="leak-pin" style="--c:${hot ? "#B42318" : "#B45F06"}">${emoji}</div>` }),
-      })
-        .bindPopup(
-          `<b>${emoji} ${escapeHtml(text)}</b>${x.soi ? ` · ซ.${escapeHtml(x.soi)}` : ""}${x.approx ? " <small>(ตำแหน่งโดยประมาณ)</small>" : ""}${x.detail ? `<br>${escapeHtml(x.detail)}` : ""}<br><small>${x.status === "reported" ? "แจ้งเขตแล้ว · " : ""}${timeAgo(x.created_at)}${x.votes > 1 ? ` · ยืนยัน ${x.votes} คน` : ""}</small>${
-            x.media?.[0]
-              ? `<br><a href="${mediaUrl(x.media[0].id)}" target="_blank" rel="noreferrer"><img src="${mediaUrl(x.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
-              : ""
-          }`,
-        )
-        .addTo(layer);
+      });
+      if (onIssue) {
+        mk.on("click", () => onIssue(x)).addTo(layer);
+        continue;
+      }
+      mk.bindPopup(
+        `<b>${emoji} ${escapeHtml(text)}</b>${x.soi ? ` · ซ.${escapeHtml(x.soi)}` : ""}${x.approx ? " <small>(ตำแหน่งโดยประมาณ)</small>" : ""}${x.detail ? `<br>${escapeHtml(x.detail)}` : ""}<br><small>${x.status === "reported" ? "แจ้งเขตแล้ว · " : ""}${timeAgo(x.created_at)}${x.votes > 1 ? ` · ยืนยัน ${x.votes} คน` : ""}</small>${
+          x.media?.[0]
+            ? `<br><a href="${mediaUrl(x.media[0].id)}" target="_blank" rel="noreferrer"><img src="${mediaUrl(x.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
+            : ""
+        }`,
+      ).addTo(layer);
     }
     // leaks in the flood wall: on both views, they need hands now
     for (const lk of flood ? canal?.leaks || [] : []) {
@@ -322,7 +326,7 @@ export default function MapView({
     }
     pinned.forEach((m) => m.addTo(layer));
     cluster.addLayers(grouped);
-  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak, hubs, events, issues, flood]);
+  }, [posts, water, onSelect, layers, filter, waterMode, drops, canal, onPump, onLeak, hubs, events, issues, flood, onIssue]);
 
   // Staff boats / trucks / people on duty: big, pulsing, always above residents' pins
   useEffect(() => {

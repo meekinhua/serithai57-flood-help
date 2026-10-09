@@ -961,7 +961,9 @@ function IssueMap({ issues }) {
   return <div ref={el} className="isolate h-64 overflow-hidden rounded-xl border border-neutral-300 sm:h-80" aria-label="แผนที่ปัญหาในซอย" />;
 }
 
-function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
+// 9 Oct: what "done" means for each kind (anyone who sees it fixed can say so; "ยังไม่หาย" puts it back)
+const DONE_WORD = { trash: "✅ เก็บแล้ว", cover: "✅ ซ่อมแล้ว", danger: "✅ เคลียร์แล้ว" };
+export function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
   const [emoji, text] = ISSUE_TYPES[x.type] || ["📍", x.type];
   const st = ISSUE_STATUS[x.status];
   const [voted, setVoted] = useState(() => load("issueVotes", []).includes(x.id));
@@ -1015,7 +1017,7 @@ function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
             value={note.note}
             onChange={(e) => setNote({ ...note, note: e.target.value })}
             className={input}
-            placeholder={note.status === "reported" ? "แจ้งที่ไหน เลขเรื่อง เช่น Traffy #2026-XXXX" : "หมายเหตุ เช่น รถเขตมาเก็บแล้ว"}
+            placeholder={note.status === "reported" ? "แจ้งที่ไหน เลขเรื่อง เช่น Traffy #2026-XXXX" : note.status === "fixed" ? "ไม่บังคับ เช่น รถเขตมาเก็บแล้ว เช้านี้" : "หมายเหตุ"}
           />
           <div className="grid grid-cols-2 gap-2">
             <button onClick={() => setNote(null)} className="min-h-[44px] rounded-lg border-2 border-black">
@@ -1039,8 +1041,8 @@ function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
             </button>
           )}
           {x.status !== "fixed" && (
-            <button onClick={() => setNote({ status: "fixed", note: "" })} className="min-h-[40px] rounded-lg border border-black px-2">
-              ✅ แก้แล้ว
+            <button onClick={() => setNote({ status: "fixed", note: "" })} className="min-h-[44px] rounded-lg bg-[#1E6B47] px-3 font-bold text-white">
+              {DONE_WORD[x.type] || "✅ แก้แล้ว"}
             </button>
           )}
           {x.status === "fixed" && (

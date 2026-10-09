@@ -23,7 +23,7 @@ import QuickReport from "./components/QuickReport";
 import FloodTuck, { useFloodTools } from "./components/FloodTuck";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
-import { AfterFloodGuide, HireList, IssueBoard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
+import { AfterFloodGuide, HireList, IssueBoard, IssueCard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
 
 // ซ่อมบ้าน mode (2 Oct 2026): the water is gone. Lend & borrow, ask for hands, tradesmen with neighbours'
 // reviews, soi problems for the district, and an after-flood checklist. The flood board is at /flood (read-only).
@@ -367,6 +367,7 @@ export default function RepairApp() {
 
   // 9 Oct: reports nobody on this phone has seen on the map yet → a dot on แผนที่หมู่บ้าน
   const openIssues = issues.filter((x) => x.status !== "fixed");
+  const openIssue = useCallback((x) => setSheet({ type: "issue", issue: x }), []);
   const newIssues = openIssues.filter((x) => new Date(x.created_at).getTime() > mapSeen);
   // what each page tab has to say (the bell lists it; ล้าง mutes it until it changes)
   const ws = waterStatus(water, canal);
@@ -850,6 +851,7 @@ export default function RepairApp() {
                   onPumps={() => setSheet({ type: "pumps" })}
                   issues={openIssues}
                   flood={floodOn}
+                  onIssue={openIssue}
                   tall
                 >
                   <button
@@ -1063,6 +1065,28 @@ export default function RepairApp() {
                 setToast("แจ้งรูรั่วแล้ว");
               }}
             />
+          </Sheet>
+        )}
+        {sheet?.type === "issue" && (
+          <Sheet title="📍 จุดปัญหา" onClose={() => setSheet(null)}>
+            <ul>
+              <IssueCard
+                issue={issues.find((y) => y.id === sheet.issue.id) || sheet.issue}
+                admin={admin}
+                onChanged={(x) => {
+                  setIssues((p) => p.map((y) => (y.id === x.id ? x : y)));
+                  if (x.status === "fixed") {
+                    setSheet(null);
+                    setToast("ขอบคุณครับ · เอาหมุดออกจากแผนที่แล้ว");
+                  }
+                }}
+                onDeleted={(id) => {
+                  setIssues((p) => p.filter((y) => y.id !== id));
+                  setSheet(null);
+                }}
+              />
+            </ul>
+            <p className="mt-2 text-sm text-[#45504A]">ใครเห็นว่าเคลียร์แล้วกดบอกได้ · ถ้ายังไม่หาย กด “ยังไม่หาย” ในหน้าปัญหาซอยได้</p>
           </Sheet>
         )}
         {sheet?.type === "quickReport" && (
