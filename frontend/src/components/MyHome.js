@@ -1442,7 +1442,7 @@ export default function MyHome({
           </button>
           {info.waste && (
             <span className="chip border-[#E4F0E9] bg-[#E4F0E9] text-[#154D33]">
-              🚛 <WasteDays days={info.waste.days} />
+              🚛 เก็บขยะ <WasteDays days={info.waste.days} />
             </span>
           )}
         </div>
