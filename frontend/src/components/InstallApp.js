@@ -97,7 +97,12 @@ function howTo(env, canPrompt) {
 }
 
 export default function InstallApp({ inSheet = false, why: whyProp = "" }) {
-  const [env] = useState(detectInApp);
+  const [env] = useState(() => {
+    const e = detectInApp();
+    // iPadOS asks for the desktop site and says "Macintosh": a Mac with a touch screen is an iPad
+    if (e.os === "other" && /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) return { ...e, os: "ios" };
+    return e;
+  });
   const [, force] = useState(0);
   const [open, setOpen] = useState(inSheet || Date.now() - load("installLater", 0) > 7 * 864e5);
   const [steps, setSteps] = useState(inSheet);
@@ -143,7 +148,7 @@ export default function InstallApp({ inSheet = false, why: whyProp = "" }) {
 
   if (!open)
     return (
-      <button onClick={() => setOpen(true)} className="card mt-2 flex min-h-[56px] w-full items-center gap-2.5 p-2 pr-3 text-left text-[15px]">
+      <button id={inSheet ? undefined : "myhome-install"} onClick={() => setOpen(true)} className="card mt-2 flex min-h-[56px] w-full items-center gap-2.5 p-2 pr-3 text-left text-[15px]">
         <span className="ic ic-sm ic-green" aria-hidden="true">
           📲
         </span>
@@ -155,7 +160,7 @@ export default function InstallApp({ inSheet = false, why: whyProp = "" }) {
     );
 
   return (
-    <div className={inSheet ? "rounded-2xl border border-[#E3E7E2] p-3" : "card anim-in mt-2 p-3"}>
+    <div id={inSheet ? undefined : "myhome-install"} className={inSheet ? "rounded-2xl border border-[#E3E7E2] p-3" : "card anim-in mt-2 p-3"}>
       <div className="flex items-start gap-2.5">
         <span className="ic ic-green" aria-hidden="true">
           📲

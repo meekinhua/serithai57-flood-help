@@ -40,6 +40,12 @@ export default function PushCard({ house }) {
   const [later, setLater] = useState(() => Date.now() - load("pushLater", 0) < 7 * 864e5);
   useEffect(() => {
     pushStatus().then(setSt);
+    const show = () => {
+      setLater(false);
+      setOpen(true);
+    };
+    window.addEventListener("push:open", show);
+    return () => window.removeEventListener("push:open", show);
   }, []);
   // the phone moved to another house: the notifications follow
   useEffect(() => {
@@ -82,7 +88,7 @@ export default function PushCard({ house }) {
 
   if (st === "on")
     return (
-      <div className="card mt-2 p-2 pr-3">
+      <div id="myhome-push" className="card mt-2 p-2 pr-3">
         <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex min-h-[44px] w-full items-center gap-2.5 text-left">
           <span className="ic ic-sm ic-green" aria-hidden="true">
             🔔
@@ -128,7 +134,18 @@ export default function PushCard({ house }) {
       </div>
     );
 
-  if (later) return null;
+  if (later && st !== "denied")
+    return (
+      <button id="myhome-push" onClick={() => setLater(false)} className="card mt-2 flex min-h-[52px] w-full items-center gap-2.5 p-2 pr-3 text-left text-[15px]">
+        <span className="ic ic-sm ic-green" aria-hidden="true">
+          🔔
+        </span>
+        <span className="min-w-0 flex-1 truncate">
+          <b>แจ้งเตือนเข้ามือถือ</b> · ปิดอยู่
+        </span>
+        <span className="shrink-0 font-bold text-[#1E6B47]">เปิด ▾</span>
+      </button>
+    );
   const rest = () => {
     save("pushLater", Date.now());
     setLater(true);
@@ -160,7 +177,7 @@ export default function PushCard({ house }) {
 
   if (st === "denied")
     return (
-      <div className="card mt-2 flex items-center gap-2.5 p-2 pr-3 text-sm">
+      <div id="myhome-push" className="card mt-2 flex items-center gap-2.5 p-2 pr-3 text-sm">
         <span className="ic ic-sm bg-[#F2F4F1]" aria-hidden="true">
           🔕
         </span>
@@ -172,7 +189,7 @@ export default function PushCard({ house }) {
     );
 
   return (
-    <div className="card mt-2 p-3">
+    <div id="myhome-push" className="card mt-2 p-3">
       <div className="flex items-center gap-2.5">
         <span className="ic ic-green" aria-hidden="true">
           🔔

@@ -7,14 +7,15 @@ import { useT } from "./Texts";
 import { MYHOME_CHANGED, cleanHouse } from "./SurveyBox";
 import { PRO_GROUPS, goodOf, rememberCall } from "./Community";
 import PetsRow from "./Pets";
-import { notify } from "../notify";
+import { flashTo, notify } from "../notify";
 import { seenVisits } from "../visits";
 import PushCard from "./PushCard";
 import FloodTuck, { useFloodTools } from "./FloodTuck";
 import { mediaUrl } from "../media";
 import { MediaStrip, MediaThumb } from "./MediaGallery";
 import { AidRow, CheckinCard, OutageRow, ReviewPrompt, shareFamily, takeFamilyParam } from "./HomePlus";
-import InstallApp from "./InstallApp";
+import InstallApp, { isStandalone, nudgeInstall } from "./InstallApp";
+import { isIOS, pushSupported } from "../push";
 import { waterOf } from "../config";
 
 // บ้านฉัน (7 Oct 2026): a house number typed once (or taken from the electricians' sign-up on this phone) and
@@ -366,6 +367,23 @@ function SoiAsk({ info, onSaved, onPin, onClose, setErr }) {
     </div>,
     document.body,
   );
+}
+
+// a phone (not a computer): where installing / phone notifications make sense
+const isPhone = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+// open a card in บ้านฉัน (it may be folded) and bring it into view
+function findCard(id, open) {
+  open();
+  setTimeout(() => {
+    const el = document.getElementById(id);
+    if (el) flashTo(el);
+  }, 120);
+}
+function openPush() {
+  // iPhone in Safari (not the installed icon): notifications need the icon first → the install card says so
+  if (isIOS() && !isStandalone()) return findCard("myhome-install", () => nudgeInstall("iPhone รับแจ้งเตือนได้ต่อเมื่อเปิดจากไอคอนที่ติดตั้งแล้ว · ติดตั้งก่อนนะ"));
+  if (!pushSupported()) return notify("มือถือ/เบราว์เซอร์นี้รับแจ้งเตือนไม่ได้ · ลองเปิดใน Chrome หรือ Safari");
+  findCard("myhome-push", () => window.dispatchEvent(new Event("push:open")));
 }
 
 // ---------- 📢 เสียงตามสาย: can this house hear the village loudspeaker? (9 Oct) ----------
@@ -1801,6 +1819,8 @@ export default function MyHome({
                   },
                 ],
                 ["👨‍👩‍👧", t("myhome.tools.family", "ส่งให้ลูกหลาน"), t("myhome.tools.family_sub", "ดูบ้านนี้จากที่ไหนก็ได้"), () => shareFamily(info.house)],
+                ...(isStandalone() || !isPhone() ? [] : [["📲", "ติดตั้งแอปไว้หน้าจอ", "Android · iPhone · ทำครั้งเดียว", () => findCard("myhome-install", () => nudgeInstall(""))]]),
+                ...(isPhone() ? [["🔔", "แจ้งเตือนเข้ามือถือ", "รถขยะ ของหาย ประกาศ · เปิด/ตั้งค่า", openPush]] : []),
                 info.has_contact
                   ? [
                       "📨",
