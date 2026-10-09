@@ -20,6 +20,7 @@ Site mode: settings {id: "site_mode", mode: "repair"|"flood"}. In repair mode th
 answer 423 for everyone but admins; an admin can switch back to flood mode if the water returns.
 """
 import hashlib
+import math
 import re
 import secrets
 import uuid
@@ -66,23 +67,75 @@ def _clean(d: dict) -> dict:
     return {k: v.strip() if isinstance(v, str) else v for k, v in d.items()}
 
 
-def soi_spot(soi: str, seed: str) -> dict:
-    """Only the soi known: a point at the soi's middle (a little apart from the others there), marked approx."""
+def _soi_key(soi: str):
+    """ "ซ.48/2" → the soi we have on the map: "48/2" if known, else the main soi "48"."""
     import staff  # noqa: E402 (the soi centres)
 
     s = re.sub(r"^(ซอย|ซ\.?)\s*", "", (soi or "").strip())
-    c = (staff.SOIS.get(s) or {}).get("center")
+    if s in staff.SOIS:
+        return s
+    m = re.match(r"\d+", s)
+    return m.group() if m and m.group() in staff.SOIS else None
+
+
+def soi_spot(soi: str, seed: str) -> dict:
+    """Only the soi known: a point at the soi's middle (a little apart from the others there), marked approx."""
+    import staff  # noqa: E402
+
+    k = _soi_key(soi)
+    c = (staff.SOIS.get(k) or {}).get("center") if k else None
     if not c:
         return {}
     h = int(hashlib.sha256(seed.encode()).hexdigest()[:4], 16)
     return {"lat": round(c[0] + ((h % 21) - 10) * 0.000012, 6), "lng": round(c[1] + ((h // 21 % 21) - 10) * 0.000012, 6), "approx": True}
 
 
+# the village outline (same points as VILLAGE_BOUNDARY in frontend/src/config.js)
+VILLAGE_BOUNDARY = [(13.8045107, 100.6649608), (13.8021235, 100.6650218), (13.8023053, 100.6658692), (13.7992588, 100.6662844), (13.7980021, 100.6666275), (13.7960034, 100.6674634), (13.79303, 100.6689847), (13.7928924, 100.6689603), (13.7927455, 100.6687709), (13.7924425, 100.6687764), (13.786371, 100.6723076), (13.7877058, 100.6731558), (13.7889926, 100.6750347), (13.7903221, 100.6744911), (13.7912586, 100.674232), (13.7929105, 100.6740703), (13.7944681, 100.6736678), (13.7965121, 100.6733347), (13.7974813, 100.6728487), (13.7973137, 100.6721926), (13.7966997, 100.6724127), (13.7967906, 100.6726849), (13.79637, 100.6728205), (13.7961255, 100.6721555), (13.7947239, 100.6724959), (13.7942871, 100.6711636), (13.7965257, 100.6702901), (13.7982259, 100.6698609), (13.7985382, 100.6705193), (13.7999105, 100.6698604), (13.8008781, 100.6696271), (13.8007251, 100.6692087), (13.8030013, 100.668275), (13.8029673, 100.6680454), (13.8052466, 100.6676938), (13.8045107, 100.6649608)]
+
+
+def _in_outline(lat, lng) -> bool:
+    c = False
+    for (y1, x1), (y2, x2) in zip(VILLAGE_BOUNDARY, VILLAGE_BOUNDARY[-1:] + VILLAGE_BOUNDARY[:-1]):
+        if (y1 > lat) != (y2 > lat) and lng < (x2 - x1) * (lat - y1) / (y2 - y1) + x1:
+            c = not c
+    return c
+
+
+def in_village(lat, lng, within_m: float = 40) -> bool:
+    """A pin counts when it is inside the village outline, or right next to one of its sois (a house on the edge)."""
+    import staff  # noqa: E402
+
+    if _in_outline(lat, lng):
+        return True
+
+    kx = 111_320 * math.cos(math.radians(lat))
+    best = 1e9
+    for v in staff.SOIS.values():
+        for line in v.get("lines") or []:
+            for (a1, b1), (a2, b2) in zip(line, line[1:]):
+                # point-to-segment distance in metres
+                ax, ay, bx, by, px, py = b1 * kx, a1 * 111_320, b2 * kx, a2 * 111_320, lng * kx, lat * 111_320
+                dx, dy = bx - ax, by - ay
+                t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy or 1)))
+                best = min(best, math.hypot(px - (ax + t * dx), py - (ay + t * dy)))
+                if best <= within_m:
+                    return True
+    return False
+
+
+def place(d: dict, seed: str) -> dict:
+    """Where a post goes on the map: its own pin if that is in the village, else its soi (approx), else nowhere."""
+    if d.get("lat") is not None and in_village(d["lat"], d["lng"]):
+        return {}
+    spot = soi_spot(d.get("soi", ""), seed)
+    return spot or ({"lat": None, "lng": None} if d.get("lat") is not None else {})
+
+
 def with_spot(docs: list) -> list:
-    """Older posts without a pin: give them their soi's spot on the way out (not stored)."""
+    """On the way out (not stored): no pin → the soi's spot; a pin outside the village → its soi instead."""
     for d in docs:
-        if d.get("lat") is None and d.get("soi"):
-            d.update(soi_spot(d["soi"], d.get("id", "")))
+        d.update(place(d, d.get("id", "")))
     return docs
 
 
@@ -573,10 +626,13 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         if len(body.phone.strip()) < 3:
             raise HTTPException(422, "ใส่เบอร์โทรให้คนที่เจอติดต่อได้")
         key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
+        spot = place(body.model_dump(), item_id)
+        if body.lat is not None and spot.get("lat", 0) is None:
+            raise HTTPException(422, "หมุดอยู่นอกหมู่บ้าน · ลากหมุดกลับเข้ามาตรงจุด หรือใส่ซอยแทน")
         doc = {
             "id": item_id,
             **_clean(body.model_dump(exclude={"media_ids"})),
-            **(soi_spot(body.soi, item_id) if body.lat is None else {}),
+            **spot,
             "media": await claim_media(body.media_ids, f"lost:{item_id}", {"image"}),
             "has_phone": True,
             "sightings": [],
@@ -648,7 +704,9 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         if body.lat is None and not body.soi.strip():
             raise HTTPException(422, "บอกซอย หรือปักหมุดตำแหน่ง")
         issue_id, t = str(uuid.uuid4()), now()
-        where = soi_spot(body.soi, issue_id) if body.lat is None else {}  # only the soi given: its middle, "approx"
+        where = place(body.model_dump(), issue_id)  # no pin / a pin outside the village → its soi, "approx"
+        if body.lat is not None and where.get("lat", 0) is None:
+            raise HTTPException(422, "หมุดอยู่นอกหมู่บ้าน · ลากหมุดกลับเข้ามาตรงจุด หรือใส่ซอยแทน")
         doc = {
             "id": issue_id,
             **_clean(body.model_dump(exclude={"media_ids"})),
