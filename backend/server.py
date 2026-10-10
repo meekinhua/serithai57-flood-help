@@ -10,6 +10,7 @@ moderate posts, pin important ones, and publish announcements.
 import asyncio
 import hashlib
 import hmac
+import json
 import os
 import secrets
 import time
@@ -681,6 +682,22 @@ app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=Tr
 @app.on_event("startup")
 async def startup():
     staff.apply_soi_extra(((await db.settings.find_one({"id": "soi_extra"}, {"_id": 0, "sois": 1})) or {}).get("sois") or {})
+
+    # 10 Oct: the site runs several workers; a soi drawn / deleted on one must reach the others → re-read every 20 s
+    async def soi_extra_sync():
+        last = None
+        while True:
+            await asyncio.sleep(20)
+            try:
+                extra = ((await db.settings.find_one({"id": "soi_extra"}, {"_id": 0, "sois": 1})) or {}).get("sois") or {}
+                key = json.dumps(extra, sort_keys=True)
+                if key != last:
+                    staff.apply_soi_extra(extra)
+                    last = key
+            except Exception:
+                pass
+
+    asyncio.create_task(soi_extra_sync())
     await db.posts.create_index("id", unique=True)
     await db.posts.create_index([("status", 1), ("created_at", -1)])
     await db.water.create_index("created_at")
