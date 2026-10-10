@@ -1261,6 +1261,13 @@ export default function MyHome({
   const [reloadN, setReloadN] = useState(0);
   const [handy, setHandy] = useState(null); // this house's อาสาข้างบ้าน profile
   const [roundOn, setRoundOn] = useState(false);
+  // 10 Oct: the electric check is over when the team switches the sign-up off (site.py survey off electric) → no electric rows at all
+  const [elOn, setElOn] = useState(false);
+  useEffect(() => {
+    api("/surveys")
+      .then((l) => setElOn(l.some((x) => x.key === "electric")))
+      .catch(() => {});
+  }, []);
   // หาย·เจอ in บ้านฉัน: only the newest few (2 weeks at most); the rest live on the หาย·เจอ page
   const lostNew = useMemo(
     () =>
@@ -1402,7 +1409,7 @@ export default function MyHome({
         ...(info.questions || [])
           .filter((q) => q.answer === "no" && !opened.includes(q.id))
           .map((q) => ({ key: q.id, icon: q.icon, label: q.short || (q.q.length > 22 ? q.q.slice(0, 20) + "…" : q.q), answer: q.no })),
-        ...(elSettled && !opened.includes("electric") ? [{ key: "electric", icon: "⚡", label: "ตรวจไฟ", answer: el.status === "done" ? "ช่างตรวจแล้ว" : elWant[el.want] || "ตอบแล้ว" }] : []),
+        ...(elOn && elSettled && !opened.includes("electric") ? [{ key: "electric", icon: "⚡", label: "ตรวจไฟ", answer: el.status === "done" ? "ช่างตรวจแล้ว" : elWant[el.want] || "ตอบแล้ว" }] : []),
       ];
   for (const a of info?.aid || [])
     if (a.mine === "received") settled.push({ key: `aid_${a.id}`, icon: "💰", label: a.title.length > 18 ? a.title.slice(0, 16) + "…" : a.title, answer: "ได้เงินแล้ว" });
@@ -1769,7 +1776,7 @@ export default function MyHome({
                     />
                   ))}
 
-                {!roundOn && !isFolded("electric") && (
+                {elOn && !roundOn && !isFolded("electric") && (
                   <ElectricRow
                     onFold={() => foldIt("electric")}
                     onSent={(w) => (w === "free" ? foldIt("electric") : openIt("electric"))}
