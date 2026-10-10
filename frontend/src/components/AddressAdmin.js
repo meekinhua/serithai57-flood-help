@@ -8,7 +8,7 @@ import { timeAgo } from "../config";
 import { createBaseMap } from "./MapView";
 import SoiDraw from "./SoiDraw";
 
-const SRC = { staff: "ทีมยืนยัน", resident: "เจ้าของบ้านใส่เอง", text: "เดาจากแชท LINE" };
+const SRC = { staff: "ทีมยืนยัน", resident: "เจ้าของบ้านใส่เอง", neighbor: "เพื่อนบ้านใส่ให้", text: "เดาจากแชท LINE" };
 const COLOR = { red: "#B42318", amber: "#D9A21B", ok: "#1E6B47", done: "#5B6CFF" };
 const sevOf = (r) => (r.flags.some((f) => f[0] === "red") ? "red" : r.flags.length ? "amber" : r.reviewed ? "done" : "ok");
 const HINT = { pin: "ตามหมุด", signup: "ตามที่ลงทะเบียนตรวจไฟ", numbers: "ตามเลขบ้านข้างเคียง", guess: "ระบบเดาจากเลขข้างเคียง" };

@@ -10,6 +10,7 @@ import PetsRow from "./Pets";
 import { flashTo, notify } from "../notify";
 import { seenVisits } from "../visits";
 import PushCard from "./PushCard";
+import NeighborFill from "./NeighborFill";
 import FloodTuck, { useFloodTools } from "./FloodTuck";
 import { mediaUrl } from "../media";
 import { MediaStrip, MediaThumb } from "./MediaGallery";
@@ -1554,6 +1555,7 @@ export default function MyHome({
           )}
         </div>
       )}
+      {info && !pinning && <NeighborFill info={info} onPin={() => setPinning({ pos: null, soi: info.soi || "", gps: true })} />}
       {info && info.precision !== "house" && !soiAsked.includes(info.house) && !pinning && (
         <SoiAsk
           info={info}

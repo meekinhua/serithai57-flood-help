@@ -98,6 +98,19 @@ class QuestionsBody(BaseModel):
     items: List[Question] = Field(default_factory=list, max_length=10)
 
 
+class NeighborPin(BaseModel):
+    by: str = Field(..., max_length=20)  # the member's own house (must be pinned)
+    house: str = Field(..., max_length=20)  # the house next door
+    lat: float = Field(..., ge=13.7, le=13.9)
+    lng: float = Field(..., ge=100.6, le=100.8)
+
+
+class NeighborVote(BaseModel):
+    by: str = Field(..., max_length=20)
+    house: str = Field(..., max_length=20)
+    ok: bool
+
+
 class SpeakerSoi(BaseModel):
     soi: str = Field(..., min_length=1, max_length=10)
     answer: Literal["yes", "no"] = "yes"
@@ -344,6 +357,13 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         docs = await db.addresses.find({}, {"_id": 0}).to_list(5000)
         signed = {r["house"]: str(r["soi"]) async for r in db.survey_resp.find({"soi": {"$nin": [None, ""]}}, {"_id": 0, "house": 1, "soi": 1})}
         pairs = sorted((hnum(d["house"]), d["soi"]) for d in docs if d.get("soi") and hnum(d["house"]) is not None)
+        pins = {d["house"]: (d["lat"], d["lng"]) for d in docs if d.get("lat") is not None}
+        nos, far_adds = {}, {}
+        async for c in db.addr_claims.find({}, {"_id": 0, "house": 1, "kind": 1, "lat": 1, "lng": 1}):
+            if c["kind"] == "no":
+                nos[c["house"]] = nos.get(c["house"], 0) + 1
+            elif c["kind"] == "add" and c["house"] in pins and metres(pins[c["house"]], (c["lat"], c["lng"])) > 15:
+                far_adds[c["house"]] = far_adds.get(c["house"], 0) + 1
         out = []
         for d in docs:
             h, soi, flags = d["house"], d.get("soi"), []
@@ -373,6 +393,11 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
                     if sum(main_soi(x) == top for _, _, x in nb) >= 3:
                         near_soi = top
                         flags.append(["amber", f"เลขบ้านข้างเคียงอยู่ ซ.{top} (" + ", ".join(f"4/{m}" for _, m, x in nb if main_soi(x) == top) + ")"])
+            no = nos.get(h, 0)
+            if no:
+                flags.append(["red" if no >= 2 else "amber", f"เพื่อนบ้าน {no} คนบอกว่าหมุดนี้ไม่ใช่ {h}"])
+            if far_adds.get(h):
+                flags.append(["amber", f"เพื่อนบ้านปักหมุด {h} ไว้อีกที่ ({far_adds[h]} ครั้ง)"])
             sv = signed.get(h)
             if sv and soi and main_soi(sv) != main_soi(soi):
                 flags.append(["amber", f"ลงทะเบียนตรวจไฟบอก ซ.{sv}"])
@@ -401,6 +426,69 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         if soi and soi != cur.get("soi"):
             await db.survey_resp.update_many({"house": h}, {"$set": {"soi": soi}})  # the electricians' list follows
         return await db.addresses.find_one({"house": h}, {"_id": 0})
+
+    # ---------- 🗺️ 10 Oct: members fill in the houses around their own (number + pin), and check each other's ----------
+    NEAR_R = 150  # metres around the member's own pinned house
+
+    async def own_pin(by: str):
+        h = clean(by)
+        a = await db.addresses.find_one({"house": h}, {"_id": 0, "lat": 1, "lng": 1})
+        if not a or a.get("lat") is None:
+            raise HTTPException(409, "ปักหมุดบ้านคุณก่อน แล้วค่อยช่วยใส่บ้านข้างๆ")
+        return h, (a["lat"], a["lng"])
+
+    @router.get("/myhome/neighbors")
+    async def neighbors(house: str, request: Request):
+        rate_limit(request, "neighbors", limit=60, window_s=600)
+        h, me = await own_pin(house)
+        near = []
+        async for a in db.addresses.find({"lat": {"$ne": None}}, {"_id": 0, "house": 1, "lat": 1, "lng": 1, "source": 1, "reviewed_at": 1}):
+            if a["house"] != h and metres(me, (a["lat"], a["lng"])) <= NEAR_R:
+                near.append(a)
+        votes = {}
+        async for c in db.addr_claims.find({"house": {"$in": [a["house"] for a in near]}, "kind": {"$in": ["ok", "no"]}}, {"_id": 0, "house": 1, "kind": 1, "by": 1}):
+            v = votes.setdefault(c["house"], {"ok": 0, "no": 0, "mine": None})
+            v[c["kind"]] += 1
+            if c["by"] == h:
+                v["mine"] = c["kind"]
+        src = lambda a: "team" if a.get("reviewed_at") or a.get("source") == "staff" else "owner" if a.get("source") == "resident" else "neighbor"  # noqa: E731
+        known = [{"house": a["house"], "lat": a["lat"], "lng": a["lng"], "src": src(a), **votes.get(a["house"], {"ok": 0, "no": 0, "mine": None})} for a in near]
+        roofs = [[lat, lng] for lat, lng, _ in buildings if metres(me, (lat, lng)) <= NEAR_R and not any(metres((lat, lng), (k["lat"], k["lng"])) < 6 for k in known + [{"lat": me[0], "lng": me[1]}])]
+        mine = await db.addr_claims.count_documents({"by": h, "kind": "add"})
+        return {"me": list(me), "radius": NEAR_R, "known": known, "roofs": roofs, "mine": mine}
+
+    @router.post("/myhome/neighbors")
+    async def neighbor_pin(body: NeighborPin, request: Request):
+        rate_limit(request, "neighbor-pin", limit=40, window_s=600)
+        by, me = await own_pin(body.by)
+        h = clean(body.house if "/" in body.house else f"4/{body.house.strip()}")
+        if h == by:
+            raise HTTPException(422, "นี่คือบ้านคุณเอง · ย้ายหมุดบ้านคุณได้ที่ ข้อมูลบ้าน")
+        p = (body.lat, body.lng)
+        if metres(me, p) > NEAR_R + 30:
+            raise HTTPException(422, "ใส่ได้เฉพาะบ้านรอบๆ บ้านคุณ (ไม่เกิน 150 ม.)")
+        roof = nearest_roof(p)
+        if roof and roof[0] <= 6:
+            p = (roof[1], roof[2])
+        cur = await db.addresses.find_one({"house": h}, {"_id": 0}) or {}
+        await db.addr_claims.insert_one({"house": h, "by": by, "kind": "add", "lat": p[0], "lng": p[1], "at": now()})
+        strong = cur.get("lat") is not None and cur.get("source") in ("resident", "staff")
+        if strong:
+            far = metres(p, (cur["lat"], cur["lng"])) > 15
+            return {"ok": True, "kept": True, "note": "เจ้าของบ้านปักหมุดไว้เองแล้ว" + (" · ตำแหน่งที่คุณใส่ต่างออกไป ทีมจะตรวจให้" if far else " · ตรงกัน ขอบคุณครับ")}
+        await learn_address(h, soi=nearest_soi(p), lat=p[0], lng=p[1], source="neighbor", by=f"เพื่อนบ้าน {by}")
+        return {"ok": True, "kept": False, "note": f"ใส่ {h} แล้ว ขอบคุณครับ"}
+
+    @router.post("/myhome/neighbors/vote")
+    async def neighbor_vote(body: NeighborVote, request: Request):
+        rate_limit(request, "neighbor-vote", limit=80, window_s=600)
+        by, me = await own_pin(body.by)
+        h = clean(body.house)
+        a = await db.addresses.find_one({"house": h}, {"_id": 0, "lat": 1, "lng": 1})
+        if not a or a.get("lat") is None or metres(me, (a["lat"], a["lng"])) > NEAR_R + 30:
+            raise HTTPException(422, "ยืนยันได้เฉพาะบ้านรอบๆ บ้านคุณ")
+        await db.addr_claims.update_one({"house": h, "by": by, "kind": {"$in": ["ok", "no"]}}, {"$set": {"kind": "ok" if body.ok else "no", "at": now()}}, upsert=True)
+        return {"ok": True}
 
     @router.post("/admin/myhome/speaker", status_code=201)
     async def speaker_add(body: SpeakerSoi, admin: dict = Depends(require_admin)):

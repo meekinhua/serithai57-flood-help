@@ -67,7 +67,7 @@ RECEIVED_RE = re.compile(
     r"|เคลียร์แล้ว|ไม่ต้องแล้ว|✅|☑️|✔️?)"
 )
 NOT_RECEIVED_RE = re.compile(r"ยังไม่ได้|ไม่ได้รับ|ยังไม่มี|ยังไม่ถึง|ยังรอ|รออยู่")
-SOURCE_RANK = {"staff": 3, "resident": 2, "text": 1}
+SOURCE_RANK = {"staff": 3, "resident": 2, "neighbor": 1.5, "text": 1}  # neighbor: a member pinned the house next door (10 Oct)
 RECENT_DONE = timedelta(hours=24)
 # Messages that are selling/pre-ordering things. Their "1. 4/688 ..." sign-up lists look exactly like
 # help lists, so without this the buyers of waterproof suits became "requests" for staff.
