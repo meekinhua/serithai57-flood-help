@@ -31,6 +31,23 @@ from pydantic import BaseModel, Field
 
 SOI_DATA = json.loads((Path(__file__).parent / "data" / "sois.json").read_text(encoding="utf-8"))
 SOIS: dict = SOI_DATA["sois"]
+# 9 Oct: sub-sois missing from the map (48/1, 34/2 …) are drawn by the admin (settings "soi_extra") and merged into SOIS
+# in place — every module holds this same dict, so the whole site (map, soi from a pin, house guesses) sees them.
+BASE_SOIS: dict = json.loads(json.dumps(SOIS))
+
+
+def apply_soi_extra(extra: dict):
+    SOIS.clear()
+    SOIS.update(json.loads(json.dumps(BASE_SOIS)))
+    for name, e in (extra or {}).items():
+        lines = [ln for ln in e.get("lines") or [] if len(ln) >= 2]
+        if not lines:
+            continue
+        mid = lines[0][len(lines[0]) // 2]
+        if name in SOIS:
+            SOIS[name] = {**SOIS[name], "lines": (SOIS[name].get("lines") or []) + lines, "drawn": True}
+        else:
+            SOIS[name] = {"center": [mid[0], mid[1]], "lines": lines, "drawn": True}
 # Relief zones A, B, C… and truck drop points on the main road (data/make_zones.py)
 ZONES = json.loads((Path(__file__).parent / "data" / "zones.json").read_text(encoding="utf-8"))
 # 1,5xx building centres inside the village (OSM has footprints but no house numbers): staff tap one
@@ -110,6 +127,10 @@ class HandoffBody(BaseModel):
 class InviteCreate(BaseModel):
     expires_hours: int = Field(72, ge=1, le=24 * 30)
     importer: bool = False  # account for the central LINE import (tools/push_line.py), not for people
+
+
+class SoiLines(BaseModel):
+    lines: list[list[list[float]]] = Field(..., min_length=1, max_length=6)
 
 
 class SoiRange(BaseModel):
@@ -415,6 +436,37 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         _ranges["at"] = 0
         await audit(admin, "set_soi_ranges", f"{len(items)} ช่วง")
         return await number_runs()
+
+    @router.get("/admin/sois/drawn")
+    async def drawn_sois(admin: dict = Depends(require_admin)):
+        doc = await db.settings.find_one({"id": "soi_extra"}, {"_id": 0}) or {}
+        return {"sois": doc.get("sois") or {}}
+
+    @router.put("/admin/sois/drawn/{name:path}")
+    async def draw_soi(name: str, body: SoiLines, admin: dict = Depends(require_admin)):
+        name = re.sub(r"^(ซอย|ซ\.?|แยก)\s*", "", re.sub(r"\s", "", name))
+        if not re.fullmatch(r"\d{1,3}(/\d{1,2})?", name):
+            raise HTTPException(422, "ชื่อซอยต้องเป็นแบบ 48 หรือ 48/1")
+        for ln in body.lines:
+            if len(ln) < 2 or len(ln) > 200 or any(len(p) != 2 or not (13.7 < p[0] < 13.9 and 100.6 < p[1] < 100.8) for p in ln):
+                raise HTTPException(422, "เส้นต้องมีอย่างน้อย 2 จุด และอยู่ในหมู่บ้าน")
+        doc = await db.settings.find_one({"id": "soi_extra"}, {"_id": 0}) or {}
+        extra = doc.get("sois") or {}
+        extra[name] = {"lines": [[[round(p[0], 6), round(p[1], 6)] for p in ln] for ln in body.lines], "by": admin.get("name", ""), "at": now().isoformat()}
+        await db.settings.update_one({"id": "soi_extra"}, {"$set": {"id": "soi_extra", "sois": extra}}, upsert=True)
+        apply_soi_extra(extra)
+        await audit(admin, "draw_soi", name, f"{sum(len(x) for x in body.lines)} จุด")
+        return {"sois": extra}
+
+    @router.delete("/admin/sois/drawn/{name:path}")
+    async def undraw_soi(name: str, admin: dict = Depends(require_admin)):
+        doc = await db.settings.find_one({"id": "soi_extra"}, {"_id": 0}) or {}
+        extra = doc.get("sois") or {}
+        extra.pop(name, None)
+        await db.settings.update_one({"id": "soi_extra"}, {"$set": {"id": "soi_extra", "sois": extra}}, upsert=True)
+        apply_soi_extra(extra)
+        await audit(admin, "undraw_soi", name, "")
+        return {"sois": extra}
 
     @router.get("/sois")
     async def sois():

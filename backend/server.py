@@ -680,6 +680,7 @@ app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=Tr
 
 @app.on_event("startup")
 async def startup():
+    staff.apply_soi_extra(((await db.settings.find_one({"id": "soi_extra"}, {"_id": 0, "sois": 1})) or {}).get("sois") or {})
     await db.posts.create_index("id", unique=True)
     await db.posts.create_index([("status", 1), ("created_at", -1)])
     await db.water.create_index("created_at")

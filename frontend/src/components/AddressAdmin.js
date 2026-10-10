@@ -6,6 +6,7 @@ import L from "leaflet";
 import { api } from "../api";
 import { timeAgo } from "../config";
 import { createBaseMap } from "./MapView";
+import SoiDraw from "./SoiDraw";
 
 const SRC = { staff: "ทีมยืนยัน", resident: "เจ้าของบ้านใส่เอง", text: "เดาจากแชท LINE" };
 const COLOR = { red: "#B42318", amber: "#D9A21B", ok: "#1E6B47", done: "#5B6CFF" };
@@ -453,17 +454,20 @@ export default function AddressAdmin() {
   const [goHouse, setGoHouse] = useState("");
   return (
     <div>
-      <div className="mb-2 grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1">
+      <div className="mb-2 grid grid-cols-3 gap-1 rounded-xl bg-neutral-200 p-1">
         {[
           ["ranges", "📏 ช่วงเลขบ้าน (ทีละช่วง)"],
           ["houses", "🏠 รายหลัง"],
+          ["draw", "✏️ เส้นซอย"],
         ].map(([k, t]) => (
           <button key={k} onClick={() => setMode(k)} className={`min-h-[44px] rounded-lg font-semibold ${mode === k ? "bg-white shadow" : "text-neutral-600"}`}>
             {t}
           </button>
         ))}
       </div>
-      {mode === "ranges" ? (
+      {mode === "draw" ? (
+        <SoiDraw />
+      ) : mode === "ranges" ? (
         <RangeView
           onHouse={(h) => {
             setGoHouse(h);
