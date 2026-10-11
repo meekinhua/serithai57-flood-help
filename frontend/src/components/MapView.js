@@ -5,6 +5,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import { KINDS, VILLAGE_BOUNDARY, VILLAGE_CENTER, VILLAGE_ZOOM, categoryOf, timeAgo, waterOf } from "../config";
 import { ISSUE_TYPES } from "../config";
 import { renderSpeaker } from "../speakerField";
+import { drawPlace } from "./placeDraw";
 import { mediaUrl } from "../media";
 import { drawStaff } from "./staffMarkers";
 import { WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
@@ -95,6 +96,7 @@ export default function MapView({
   lost = [],
   onLost,
   speaker = null,
+  places = [],
 }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
@@ -363,6 +365,35 @@ export default function MapView({
   useEffect(() => {
     if (tripsRef.current) drawStaff(tripsRef.current, trips, "trips");
   }, [trips]);
+
+  // 🗺️ places (11 Oct): shops, areas, routes the admin drew; timed ones only while on (or "soon")
+  const placesRef = useRef(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!placesRef.current || !map.hasLayer(placesRef.current)) placesRef.current = L.layerGroup().addTo(map); // the map can be rebuilt (StrictMode, remount)
+    const g = placesRef.current;
+    g.clearLayers();
+    for (const p of places) {
+      if (p.show === "schedule" && p.state === "off") continue;
+      const soon = p.state === "soon";
+      const badge =
+        p.state === "on" && p.times
+          ? `<span style="color:#1E6B47;font-weight:700">● กำลังมีตอนนี้${p.when ? ` · ${p.when}` : ""}</span>`
+          : soon
+            ? `<span style="color:#B45F06;font-weight:700">⏰ อีก ${p.starts_in} นาที · ${p.when}</span>`
+            : p.times
+              ? `<span style="color:#5A665F">ครั้งต่อไป ${p.when}</span>`
+              : "";
+      const esc = (t) => String(t || "").replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c]);
+      const html = `<div style="min-width:180px;max-width:260px"><b style="font-size:15px">${p.emoji} ${esc(p.name)}</b>${badge ? `<div style="margin-top:2px">${badge}</div>` : ""}${
+        p.times ? `<div style="font-size:13px;color:#45504A">⏰ ${esc(p.times)}</div>` : ""
+      }${p.detail ? `<div style="margin-top:4px;font-size:14px;white-space:pre-line">${esc(p.detail)}</div>` : ""}${p.phone ? `<div style="margin-top:4px"><a href="tel:${esc(p.phone)}">📞 ${esc(p.phone)}</a></div>` : ""}${
+        /^https?:\/\//.test(p.link || "") ? `<div><a href="${esc(p.link)}" target="_blank" rel="noreferrer">🔗 เปิดลิงก์</a></div>` : ""
+      }</div>`;
+      drawPlace(p, g, { faded: soon }).bindPopup(html);
+    }
+  }, [places]);
 
   // 📢 เสียงตามสาย wash (9 Oct): only while the layer is switched on
   const speakerRef = useRef(null);

@@ -412,6 +412,19 @@ export default function RepairApp() {
       .then(setSpeakerPts)
       .catch(() => {});
   }, [speakerOn, page]);
+  // 🗺️ places the admin drew (shops, areas, routes, timed activities): refreshed every minute for on / soon
+  const [places, setPlaces] = useState([]);
+  useEffect(() => {
+    if (page !== "map") return;
+    const get = () =>
+      api("/places")
+        .then(setPlaces)
+        .catch(() => {});
+    get();
+    const t = setInterval(get, 60000);
+    return () => clearInterval(t);
+  }, [page]);
+  const placesNow = places.filter((p) => p.times && (p.state === "on" || p.state === "soon"));
   // หาย·เจอ on the map: still open, the last 3 weeks (MapView fades them with age)
   const lostOnMap = useMemo(() => lostOpen.filter((x) => Date.now() - new Date(x.created_at).getTime() < 21 * 864e5), [lostOpen]);
   const openLostFromMap = useCallback((x) => goItem("lost", x.id), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -893,6 +906,15 @@ export default function RepairApp() {
                 <h2 className="font-display min-w-0 flex-1 text-xl font-bold">แผนที่หมู่บ้าน</h2>
                 <span className="shrink-0 text-sm text-[#45504A]">{floodOn ? waterSub(water) : `จุดปัญหา ${openIssues.length} จุด`}</span>
               </div>
+              {placesNow.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5 px-1">
+                  {placesNow.map((p) => (
+                    <span key={p.id} className={`rounded-full px-3 py-1 text-sm font-bold ${p.state === "on" ? "bg-[#E4F0E9] text-[#154D33]" : "bg-[#FFF3D6] text-[#7A4104]"}`}>
+                      {p.emoji} {p.name} · {p.state === "on" ? `กำลังมีตอนนี้${p.when ? ` (${p.when})` : ""}` : `อีก ${p.starts_in} นาที`}
+                    </span>
+                  ))}
+                </div>
+              )}
               <section className="-mx-3 sm:mx-0">
                 <WaterView
                   trips={trips}
@@ -915,6 +937,7 @@ export default function RepairApp() {
                   lost={lostOnMap}
                   onLost={openLostFromMap}
                   speaker={speakerOn ? speakerPts : null}
+                  places={places}
                   tall
                 >
                   <div className="absolute right-3 top-[60px] z-[650] flex flex-col items-end gap-1">

@@ -45,6 +45,7 @@ import nearby  # noqa: E402
 import homeplus  # noqa: E402
 import pets  # noqa: E402
 import push  # noqa: E402
+import places  # noqa: E402
 import fund  # noqa: E402
 import team  # noqa: E402
 import weather  # noqa: E402
@@ -659,6 +660,7 @@ app.include_router(myhome.build_router(db, rate_limit, require_admin, locate_hou
 app.include_router(pets.build_router(db, rate_limit, _house, locate_house, claim_media, delete_media))
 push_router = push.build_router(db, rate_limit, require_admin, audit, locate_house, _house, myhome.soi_parity, myhome.WASTE_ROUNDS, myhome.THAI_DAYS)
 app.include_router(push_router)
+app.include_router(places.build_router(db, require_admin, audit))
 app.include_router(nearby.build_router(db, rate_limit, client_ip, require_admin, locate_house, survey.norm_house, claim_media))
 app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media, staff.SOIS, staff.ZONES["main_road"]))
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.

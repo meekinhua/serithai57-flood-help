@@ -411,6 +411,15 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         out.sort(key=lambda r: (0 if any(f[0] == "red" for f in r["flags"]) else 1 if r["flags"] else 2, hnum(r["house"]) or 0))
         return {"items": out, "sois": sorted(sois, key=lambda x: [int(t) for t in re.findall(r"\d+", x)])}
 
+    @router.post("/admin/addresses/delete")
+    async def addr_delete(body: AddrFix, admin: dict = Depends(require_admin)):
+        """11 Oct: a wrong entry (a typo'd number, a house that doesn't exist): gone from the address book."""
+        h = clean(body.house)
+        r = await db.addresses.delete_one({"house": h})
+        if not r.deleted_count:
+            raise HTTPException(404, "ไม่พบบ้านนี้ในสมุดที่อยู่")
+        return {"ok": True}
+
     @router.post("/admin/addresses/review")
     async def addr_fix(body: AddrFix, admin: dict = Depends(require_admin)):
         h = clean(body.house)
