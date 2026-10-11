@@ -12,6 +12,7 @@ export default function BuildingEdit() {
   const layer = useRef(null);
   const [d, setD] = useState(null);
   const [houses, setHouses] = useState([]);
+  const [sois, setSois] = useState(null);
   const [mode, setMode] = useState("add"); // add | remove
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -22,6 +23,9 @@ export default function BuildingEdit() {
     api("/admin/buildings")
       .then(setD)
       .catch((e) => setMsg(e.message));
+    api("/sois")
+      .then((r) => setSois(r.sois))
+      .catch(() => {});
     api("/admin/addresses/review")
       .then((r) => setHouses(r.items.filter((x) => x.lat != null)))
       .catch(() => {});
@@ -52,6 +56,24 @@ export default function BuildingEdit() {
     }
     const g = layer.current;
     g.clearLayers();
+    // the sois (blue lines + their names) so a block can be told apart
+    for (const [k, so] of Object.entries(sois || {})) {
+      const lines = so.lines || [];
+      for (const ln of lines) L.polyline(ln, { color: so.drawn ? "#7C3AED" : "#2563EB", weight: 4, opacity: 0.55, interactive: false }).addTo(g);
+      const ln = lines.reduce((a, b) => (b.length > a.length ? b : a), []);
+      if (ln.length) {
+        const mid = ln[Math.floor(ln.length / 2)];
+        L.marker(mid, {
+          interactive: false,
+          icon: L.divIcon({
+            className: "",
+            iconSize: null,
+            iconAnchor: [18, 10],
+            html: `<div style="font:800 12px sans-serif;color:#fff;background:${so.drawn ? "#7C3AED" : "#2563EB"};border-radius:6px;padding:1px 6px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.35)">ซ.${k}</div>`,
+          }),
+        }).addTo(g);
+      }
+    }
     for (const h of houses) {
       L.marker([h.lat, h.lng], {
         interactive: false,
@@ -81,7 +103,7 @@ export default function BuildingEdit() {
         })
         .addTo(g);
     }
-  }, [d, houses]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d, houses, sois]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (map.current) map.current.getContainer().style.cursor = mode === "add" ? "crosshair" : "";
@@ -92,8 +114,8 @@ export default function BuildingEdit() {
     <section className="rounded-2xl border bg-white p-3">
       <h2 className="text-lg font-bold">🏘️ อาคาร · เพิ่ม / ลบ จุดหลังคา</h2>
       <p className="text-sm text-neutral-600">
-        จุดเทา = อาคารจาก OpenStreetMap · จุดเขียว = ที่เพิ่มเอง · ✕ แดง = ลบไปแล้ว (แตะเพื่อคืน) · ตัวเลข = บ้านที่ปักหมุดแล้ว · ซูมเข้าไปดูทีละบล็อก เทียบกับ Google ได้ · มี {d.roofs.length} อาคาร
-        (เพิ่มเอง {d.added} · ลบ {d.removed.length})
+        เส้น/ป้ายน้ำเงิน = ซอย (ม่วง = ซอยที่วาดเพิ่ม) · จุดเทา = อาคารจาก OpenStreetMap · จุดเขียว = ที่เพิ่มเอง · ✕ แดง = ลบไปแล้ว (แตะเพื่อคืน) · ตัวเลข = บ้านที่ปักหมุดแล้ว · ซูมเข้าไปดูทีละบล็อก
+        เทียบกับ Google ได้ · มี {d.roofs.length} อาคาร (เพิ่มเอง {d.added} · ลบ {d.removed.length})
       </p>
       <div className="mt-2 grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1">
         {[
