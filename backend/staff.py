@@ -53,6 +53,16 @@ ZONES = json.loads((Path(__file__).parent / "data" / "zones.json").read_text(enc
 # 1,5xx building centres inside the village (OSM has footprints but no house numbers): staff tap one
 # to say "this building is 4/xxx".
 BUILDINGS = json.loads((Path(__file__).parent / "data" / "buildings.json").read_text(encoding="utf-8"))
+# 11 Oct: the roofs from OpenStreetMap miss / merge some houses. The admin adds and removes roof points
+# (settings "building_edits": {"added": [[lat, lng, id]], "removed": [id]}); the list is rebuilt in place so every
+# module holding BUILDINGS["buildings"] sees the change.
+BASE_BUILDINGS: list = [list(b) for b in BUILDINGS["buildings"]]
+
+
+def apply_building_edits(edits: dict):
+    removed = set((edits or {}).get("removed") or [])
+    rows = [b for b in BASE_BUILDINGS if b[2] not in removed] + [list(b) for b in (edits or {}).get("added") or [] if b[2] not in removed]
+    BUILDINGS["buildings"][:] = rows
 
 HOUSE_RE = re.compile(r"(?<![\d/])4\s*/\s*(\d{1,4})(?![\d/])")  # village house numbers are 4/xxxx
 SOI_RE = re.compile(r"(?:แยก|ซอย|ซ\.)\s*(\d{1,3}(?:\s*/\s*\d{1,2})?)")
@@ -127,6 +137,12 @@ class HandoffBody(BaseModel):
 class InviteCreate(BaseModel):
     expires_hours: int = Field(72, ge=1, le=24 * 30)
     importer: bool = False  # account for the central LINE import (tools/push_line.py), not for people
+
+
+class RoofEdit(BaseModel):
+    lat: Optional[float] = Field(None, ge=13.7, le=13.9)
+    lng: Optional[float] = Field(None, ge=100.6, le=100.8)
+    id: Optional[int] = None
 
 
 class SoiLines(BaseModel):
@@ -436,6 +452,54 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         _ranges["at"] = 0
         await audit(admin, "set_soi_ranges", f"{len(items)} ช่วง")
         return await number_runs()
+
+    async def roof_edits() -> dict:
+        doc = await db.settings.find_one({"id": "building_edits"}, {"_id": 0}) or {}
+        return {"added": doc.get("added") or [], "removed": doc.get("removed") or []}
+
+    async def save_roofs(e: dict, admin: dict, what: str):
+        await db.settings.update_one({"id": "building_edits"}, {"$set": {"id": "building_edits", **e, "by": admin.get("name", ""), "at": now()}}, upsert=True)
+        apply_building_edits(e)
+        await audit(admin, "edit_buildings", what, "")
+        return await roofs_view()
+
+    async def roofs_view():
+        e = await roof_edits()
+        added = {b[2] for b in e["added"]}
+        base = {b[2]: b for b in BASE_BUILDINGS}
+        return {
+            "roofs": [[b[0], b[1], b[2], 1 if b[2] in added else 0] for b in BUILDINGS["buildings"]],
+            "removed": [[base[i][0], base[i][1], i] for i in e["removed"] if i in base],
+            "added": len(e["added"]),
+        }
+
+    @router.get("/admin/buildings")
+    async def get_roofs(admin: dict = Depends(require_admin)):
+        return await roofs_view()
+
+    @router.post("/admin/buildings/add")
+    async def add_roof(body: RoofEdit, admin: dict = Depends(require_admin)):
+        if body.lat is None or body.lng is None:
+            raise HTTPException(422, "แตะบนแผนที่ตรงหลังคา")
+        e = await roof_edits()
+        new_id = 9_000_000_000 + int(time.time() * 1000) % 1_000_000_000
+        e["added"].append([round(body.lat, 6), round(body.lng, 6), new_id])
+        return await save_roofs(e, admin, f"+ {body.lat:.5f},{body.lng:.5f}")
+
+    @router.post("/admin/buildings/remove")
+    async def remove_roof(body: RoofEdit, admin: dict = Depends(require_admin)):
+        e = await roof_edits()
+        if any(b[2] == body.id for b in e["added"]):
+            e["added"] = [b for b in e["added"] if b[2] != body.id]  # one the admin added: just gone
+        elif body.id not in e["removed"]:
+            e["removed"].append(body.id)
+        return await save_roofs(e, admin, f"- {body.id}")
+
+    @router.post("/admin/buildings/restore")
+    async def restore_roof(body: RoofEdit, admin: dict = Depends(require_admin)):
+        e = await roof_edits()
+        e["removed"] = [i for i in e["removed"] if i != body.id]
+        return await save_roofs(e, admin, f"restore {body.id}")
 
     @router.get("/admin/sois/drawn")
     async def drawn_sois(admin: dict = Depends(require_admin)):

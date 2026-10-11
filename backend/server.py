@@ -684,6 +684,7 @@ app.add_middleware(CORSMiddleware, allow_origin_regex=".*", allow_credentials=Tr
 @app.on_event("startup")
 async def startup():
     staff.apply_soi_extra(((await db.settings.find_one({"id": "soi_extra"}, {"_id": 0, "sois": 1})) or {}).get("sois") or {})
+    staff.apply_building_edits((await db.settings.find_one({"id": "building_edits"}, {"_id": 0})) or {})
 
     # 10 Oct: the site runs several workers; a soi drawn / deleted on one must reach the others → re-read every 20 s
     async def soi_extra_sync():
@@ -692,9 +693,11 @@ async def startup():
             await asyncio.sleep(20)
             try:
                 extra = ((await db.settings.find_one({"id": "soi_extra"}, {"_id": 0, "sois": 1})) or {}).get("sois") or {}
-                key = json.dumps(extra, sort_keys=True)
+                roofs = (await db.settings.find_one({"id": "building_edits"}, {"_id": 0, "added": 1, "removed": 1})) or {}
+                key = json.dumps([extra, roofs], sort_keys=True)
                 if key != last:
                     staff.apply_soi_extra(extra)
+                    staff.apply_building_edits(roofs)
                     last = key
             except Exception:
                 pass
