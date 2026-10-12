@@ -62,6 +62,7 @@ BASE_BUILDINGS: list = [list(b) for b in BUILDINGS["buildings"]]
 # 12 Oct: building outlines for the 3D map (OSM ways of the same ids) + default floors. Admin edits add "shapes"
 # {id: [[lat, lng], …]} (outline of an added house or a corrected one) and "levels" {id: floors} to building_edits.
 FOOTPRINTS = json.loads((Path(__file__).parent / "data" / "footprints.json").read_text(encoding="utf-8"))["shapes"]
+GREEN = json.loads((Path(__file__).parent / "data" / "green.json").read_text(encoding="utf-8"))["areas"]  # parks, pitches, ponds (OSM)
 
 
 def box_around(lat: float, lng: float, w: float = 7.0, d: float = 10.0) -> list:
@@ -551,13 +552,13 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
 
     @router.get("/admin/buildings3d")
     async def admin_3d(admin: dict = Depends(require_admin)):
-        return {"buildings": building_shapes(await roof_edits(), with_removed=True)}
+        return {"buildings": building_shapes(await roof_edits(), with_removed=True), "green": GREEN}
 
     @router.get("/buildings3d")
     async def public_3d():
         """Outlines + floors for the 3D village map (no house numbers)."""
         e = await roof_edits()
-        return {"source": "© OpenStreetMap contributors", "buildings": [{k: v for k, v in b.items() if k != "s"} for b in building_shapes(e)]}
+        return {"source": "© OpenStreetMap contributors", "buildings": [{k: v for k, v in b.items() if k != "s"} for b in building_shapes(e)], "green": GREEN}
 
     @router.post("/admin/buildings/restore")
     async def restore_roof(body: RoofEdit, admin: dict = Depends(require_admin)):

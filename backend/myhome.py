@@ -9,6 +9,7 @@ Identity is checked in person when it matters (a volunteer walks over), not by t
 import hashlib
 import math
 import re
+import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import List, Literal, Optional
@@ -349,6 +350,58 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
     def hnum(h):
         m = re.match(r"4/(\d+)", h or "")
         return int(m.group(1)) if m else None
+
+    # ---------- 🏙️ 13 Oct: the 3D map paints each house by its soi, from the address book members filled in ----------
+    _m3d = {"at": 0, "soi": {}, "house": {}}
+
+    async def map3d_index():
+        if time.time() - _m3d["at"] < 120:
+            return _m3d
+        pins = [(d["lat"], d["lng"], d["house"], d.get("soi")) async for d in db.addresses.find({"lat": {"$ne": None}}, {"_id": 0, "house": 1, "soi": 1, "lat": 1, "lng": 1})]
+        segs = [(name, a_, b_) for name, sv in sois.items() for line in sv.get("lines") or [] for a_, b_ in zip(line, line[1:])]
+        soi_of, house_of = {}, {}
+        for lat, lng, bid in list(buildings):
+            p = (lat, lng)
+            near = min(((metres(p, (a, b)), h, so) for a, b, h, so in pins if abs(a - lat) < 0.0002 and abs(b - lng) < 0.0002), default=None)
+            if near and near[0] <= 12:
+                house_of[bid] = near[1]
+                if near[2]:
+                    soi_of[bid] = near[2]
+                    continue
+            best = (1e9, None)
+            for name, a_, b_ in segs:
+                if min(a_[0], b_[0]) - 0.0005 > lat or max(a_[0], b_[0]) + 0.0005 < lat or min(a_[1], b_[1]) - 0.0005 > lng or max(a_[1], b_[1]) + 0.0005 < lng:
+                    continue
+                d = to_segment(p, a_, b_)
+                if d < best[0]:
+                    best = (d, name)
+            if best[0] <= 45:
+                soi_of[bid] = best[1]
+        _m3d.update(at=time.time(), soi=soi_of, house=house_of)
+        return _m3d
+
+    @router.get("/map3d/sois")
+    async def map3d_sois():
+        """Which soi each building is on (for colouring the 3D map; no house numbers)."""
+        return {"sois": {str(k): v for k, v in (await map3d_index())["soi"].items()}}
+
+    @router.get("/map3d/me")
+    async def map3d_me(house: str, request: Request):
+        rate_limit(request, "map3d-me", limit=30, window_s=600)
+        h = norm_house(house) if norm_house else house
+        idx = await map3d_index()
+        bid = next((k for k, v in idx["house"].items() if v == h), None)
+        if bid is None:
+            d = await db.addresses.find_one({"house": h, "lat": {"$ne": None}}, {"_id": 0, "lat": 1, "lng": 1})
+            if d:
+                best = min(((metres((d["lat"], d["lng"]), (la, ln)), b) for la, ln, b in list(buildings)), default=None)
+                if best and best[0] <= 25:
+                    bid = best[1]
+        return {"id": bid}
+
+    @router.get("/admin/map3d/houses")
+    async def map3d_houses(admin: dict = Depends(require_admin)):
+        return {"houses": {str(k): v for k, v in (await map3d_index())["house"].items()}}
 
     @router.get("/admin/addresses/review")
     async def addr_review(admin: dict = Depends(require_admin)):
