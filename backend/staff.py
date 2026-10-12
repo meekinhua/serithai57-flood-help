@@ -59,6 +59,36 @@ BUILDINGS = json.loads((Path(__file__).parent / "data" / "buildings.json").read_
 BASE_BUILDINGS: list = [list(b) for b in BUILDINGS["buildings"]]
 
 
+# 12 Oct: building outlines for the 3D map (OSM ways of the same ids) + default floors. Admin edits add "shapes"
+# {id: [[lat, lng], …]} (outline of an added house or a corrected one) and "levels" {id: floors} to building_edits.
+FOOTPRINTS = json.loads((Path(__file__).parent / "data" / "footprints.json").read_text(encoding="utf-8"))["shapes"]
+
+
+def box_around(lat: float, lng: float, w: float = 7.0, d: float = 10.0) -> list:
+    """A plain w × d metre house outline around a point (for added roofs that have no outline)."""
+    dy, dx = d / 2 / 111_320, w / 2 / (111_320 * 0.9715)
+    return [[round(lat - dy, 6), round(lng - dx, 6)], [round(lat - dy, 6), round(lng + dx, 6)], [round(lat + dy, 6), round(lng + dx, 6)], [round(lat + dy, 6), round(lng - dx, 6)]]
+
+
+def building_shapes(edits: dict, with_removed: bool = False) -> list:
+    shapes, levels = (edits or {}).get("shapes") or {}, (edits or {}).get("levels") or {}
+    added = {b[2] for b in (edits or {}).get("added") or []}
+    out = []
+    def one(lat, lng, bid, state):
+        base = FOOTPRINTS.get(str(bid))
+        g = shapes.get(str(bid)) or (base[0] if base else box_around(lat, lng))
+        lv = levels.get(str(bid)) or (base[1] if base else 2)
+        out.append({"id": bid, "g": g, "lv": lv, "s": state})
+    for lat, lng, bid in BUILDINGS["buildings"]:
+        one(lat, lng, bid, "added" if bid in added else "osm")
+    if with_removed:
+        base = {b[2]: b for b in BASE_BUILDINGS}
+        for bid in (edits or {}).get("removed") or []:
+            if bid in base:
+                one(base[bid][0], base[bid][1], bid, "removed")
+    return out
+
+
 def apply_building_edits(edits: dict):
     removed = set((edits or {}).get("removed") or [])
     rows = [b for b in BASE_BUILDINGS if b[2] not in removed] + [list(b) for b in (edits or {}).get("added") or [] if b[2] not in removed]
@@ -143,6 +173,8 @@ class RoofEdit(BaseModel):
     lat: Optional[float] = Field(None, ge=13.7, le=13.9)
     lng: Optional[float] = Field(None, ge=100.6, le=100.8)
     id: Optional[int] = None
+    g: Optional[list[list[float]]] = Field(None, min_length=3, max_length=60)  # outline [[lat, lng], …]
+    lv: Optional[int] = Field(None, ge=1, le=30)  # floors
 
 
 class SoiLines(BaseModel):
@@ -455,7 +487,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
 
     async def roof_edits() -> dict:
         doc = await db.settings.find_one({"id": "building_edits"}, {"_id": 0}) or {}
-        return {"added": doc.get("added") or [], "removed": doc.get("removed") or []}
+        return {"added": doc.get("added") or [], "removed": doc.get("removed") or [], "shapes": doc.get("shapes") or {}, "levels": doc.get("levels") or {}}
 
     async def save_roofs(e: dict, admin: dict, what: str):
         await db.settings.update_one({"id": "building_edits"}, {"$set": {"id": "building_edits", **e, "by": admin.get("name", ""), "at": now()}}, upsert=True)
@@ -479,11 +511,20 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
 
     @router.post("/admin/buildings/add")
     async def add_roof(body: RoofEdit, admin: dict = Depends(require_admin)):
+        if body.g:
+            if not all(13.7 <= a <= 13.9 and 100.6 <= b <= 100.8 for a, b in body.g):
+                raise HTTPException(422, "รูปอาคารอยู่นอกหมู่บ้าน")
+            body.lat = sum(a for a, _ in body.g) / len(body.g)
+            body.lng = sum(b for _, b in body.g) / len(body.g)
         if body.lat is None or body.lng is None:
             raise HTTPException(422, "แตะบนแผนที่ตรงหลังคา")
         e = await roof_edits()
         new_id = 9_000_000_000 + int(time.time() * 1000) % 1_000_000_000
         e["added"].append([round(body.lat, 6), round(body.lng, 6), new_id])
+        if body.g:
+            e["shapes"][str(new_id)] = [[round(a, 6), round(b, 6)] for a, b in body.g]
+        if body.lv:
+            e["levels"][str(new_id)] = body.lv
         return await save_roofs(e, admin, f"+ {body.lat:.5f},{body.lng:.5f}")
 
     @router.post("/admin/buildings/remove")
@@ -494,6 +535,29 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         elif body.id not in e["removed"]:
             e["removed"].append(body.id)
         return await save_roofs(e, admin, f"- {body.id}")
+
+    @router.post("/admin/buildings/shape")
+    async def shape_roof(body: RoofEdit, admin: dict = Depends(require_admin)):
+        """Floors and/or outline of one building (OSM or added)."""
+        if body.id is None or (body.lv is None and not body.g):
+            raise HTTPException(422, "เลือกอาคารก่อน")
+        e = await roof_edits()
+        if body.lv:
+            e["levels"][str(body.id)] = body.lv
+        if body.g:
+            e["shapes"][str(body.id)] = [[round(a, 6), round(b, 6)] for a, b in body.g]
+        await save_roofs(e, admin, f"shape {body.id} {body.lv or ''}")
+        return {"buildings": building_shapes(e, with_removed=True)}
+
+    @router.get("/admin/buildings3d")
+    async def admin_3d(admin: dict = Depends(require_admin)):
+        return {"buildings": building_shapes(await roof_edits(), with_removed=True)}
+
+    @router.get("/buildings3d")
+    async def public_3d():
+        """Outlines + floors for the 3D village map (no house numbers)."""
+        e = await roof_edits()
+        return {"source": "© OpenStreetMap contributors", "buildings": [{k: v for k, v in b.items() if k != "s"} for b in building_shapes(e)]}
 
     @router.post("/admin/buildings/restore")
     async def restore_roof(body: RoofEdit, admin: dict = Depends(require_admin)):

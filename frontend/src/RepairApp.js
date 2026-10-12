@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API, api, load, save, viewerId } from "./api";
 import { HOTLINE_GROUPS, ISSUE_TYPES, LEND_KINDS, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
@@ -27,6 +27,7 @@ import FloodTuck, { useFloodTools } from "./components/FloodTuck";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, HireList, IssueBoard, IssueCard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
+const Map3D = lazy(() => import("./components/Map3D"));
 
 // ซ่อมบ้าน mode (2 Oct 2026): the water is gone. Lend & borrow, ask for hands, tradesmen with neighbours'
 // reviews, soi problems for the district, and an after-flood checklist. The flood board is at /flood (read-only).
@@ -405,6 +406,7 @@ export default function RepairApp() {
   }, [issueGo, issues, openIssue]);
   // 📢 เสียงตามสาย layer: off by default (one switch on the map), loaded when switched on
   const [speakerOn, setSpeakerOn] = useState(() => load("speakerLayer", false));
+  const [view3d, setView3d] = useState(false);
   const [speakerPts, setSpeakerPts] = useState(null);
   useEffect(() => {
     if (!speakerOn || page !== "map") return;
@@ -941,6 +943,9 @@ export default function RepairApp() {
                   tall
                 >
                   <div className="absolute right-3 top-[60px] z-[650] flex flex-col items-end gap-1">
+                    <button onClick={() => setView3d(true)} className="flex min-h-[44px] items-center gap-1 rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-[15px] font-bold shadow">
+                      🏙️ ดูแบบ 3D
+                    </button>
                     <button
                       onClick={() => {
                         setSpeakerOn(!speakerOn);
@@ -976,6 +981,13 @@ export default function RepairApp() {
                   </button>
                 </WaterView>
               </section>
+              {view3d && (
+                <Suspense fallback={null}>
+                  <div className="fixed inset-0 z-[3000] bg-white">
+                    <Map3D className="h-full w-full" onClose={() => setView3d(false)} />
+                  </div>
+                </Suspense>
+              )}
               {!ws.alarm && <FloodTuck on={floodPref} setOn={setFloodPref} className="mb-2" />}
             </>
           )}

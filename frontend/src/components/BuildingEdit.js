@@ -5,8 +5,39 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { api } from "../api";
 import { createBaseMap } from "./MapView";
+import Map3D from "./Map3D";
 
 export default function BuildingEdit() {
+  const [view, setView] = useState("3d");
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1">
+        {[
+          ["3d", "🏙️ 3D · รูปอาคาร + จำนวนชั้น"],
+          ["2d", "📍 2D · จุดหลังคา (แบบเดิม)"],
+        ].map(([k, t]) => (
+          <button key={k} onClick={() => setView(k)} className={`min-h-[44px] rounded-lg text-sm font-semibold ${view === k ? "bg-[#15201A] text-white" : "text-neutral-600"}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+      {view === "3d" ? (
+        <section className="rounded-2xl border bg-white p-3">
+          <h2 className="text-lg font-bold">🏙️ อาคาร 3D · แก้ให้ตรงของจริง</h2>
+          <p className="text-sm text-neutral-600">
+            แตะอาคารเพื่อตั้งจำนวนชั้นหรือลบ · โหมด ➕ แตะที่ว่างเพื่อเพิ่มอาคาร (ใช้รูปร่างของหลังที่ใกล้ที่สุด) · สีเขียว = เพิ่มเอง · แดงแบน = ลบไปแล้ว (แตะเพื่อคืน) · หมุน/เอียงด้วยสองนิ้ว
+            หรือคลิกขวาลาก
+          </p>
+          <Map3D edit className="mt-2 h-[560px] rounded-xl border md:h-[680px]" />
+        </section>
+      ) : (
+        <RoofPoints />
+      )}
+    </div>
+  );
+}
+
+function RoofPoints() {
   const el = useRef(null);
   const map = useRef(null);
   const layer = useRef(null);
