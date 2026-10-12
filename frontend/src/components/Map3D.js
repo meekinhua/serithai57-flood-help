@@ -557,6 +557,7 @@ const TOOLS = [
   ["up", "⬆️", "เพิ่มชั้น"],
   ["down", "⬇️", "ลดชั้น"],
   ["remove", "🔨", "ทุบ"],
+  ["hint", "💡", "ข้อเสนอ"],
 ];
 
 export default function Map3D({ edit = false, onClose, className = "" }) {
@@ -591,6 +592,10 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
   const [linking, setLinking] = useState(null); // ids picked for a group
   const [parts, setParts] = useState(3);
   const [name, setName] = useState("");
+  const [sugg, setSugg] = useState([]); // open suggestions from OSM / Google / Microsoft
+  const [pick, setPick] = useState(null); // the suggestion tapped
+  const [sure, setSure] = useState(false);
+  const suggRef = useRef([]);
   toolRef.current = tool;
   kindRef.current = kind;
 
@@ -654,6 +659,54 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     if (m?.getSource("hit")) m.getSource("hit").setData(hitGeo(data.current));
     labels();
     m?.triggerRepaint();
+  }
+
+  const SRC = { google: "Google", microsoft: "Microsoft", osm: "OpenStreetMap", esri: "Esri" };
+  const suggGeo = (list) => ({
+    type: "FeatureCollection",
+    features: list.filter((x) => x.g).map((x) => ({ type: "Feature", properties: { sid: x.id, kind: x.kind, h: x.annex ? 3 : (x.lv || 2) * 3, annex: !!x.annex }, geometry: { type: "Polygon", coordinates: [ring(x.g)] } })),
+  });
+  const extraGeo = (list) => ({
+    type: "FeatureCollection",
+    features: list
+      .filter((x) => x.kind === "extra")
+      .map((x) => byId(x.ref))
+      .filter(Boolean)
+      .map((b) => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring(b.g)] } })),
+  });
+  function showSugg(list) {
+    suggRef.current = list;
+    setSugg(list);
+    const m = map.current;
+    if (m?.getSource("sugg")) {
+      m.getSource("sugg").setData(suggGeo(list.filter((x) => x.kind === "missing")));
+      m.getSource("extra").setData(extraGeo(list));
+    }
+  }
+  async function decide(x, verb) {
+    if (await call(`/admin/buildings/suggestions/${encodeURIComponent(x.id)}/${verb}`, {})) {
+      showSugg(suggRef.current.filter((y) => y.id !== x.id));
+      setPick(null);
+      popMid(verb === "accept" ? (x.kind === "missing" ? "🏠 เพิ่มแล้ว" : "💥 เอาออกแล้ว") : "👋 ข้ามแล้ว");
+      setDone((n) => n + 1);
+    }
+  }
+  async function acceptAllMissing() {
+    if (!sure) return setSure(true);
+    setSure(false);
+    const todo = suggRef.current.filter((x) => x.kind === "missing" && !x.annex);
+    setBusy(true);
+    for (const x of todo) {
+      try {
+        await api(`/admin/buildings/suggestions/${encodeURIComponent(x.id)}/accept`, { method: "POST", body: "{}" });
+      } catch (e) {
+        // already decided by someone else
+      }
+    }
+    setBusy(false);
+    showSugg(suggRef.current.filter((x) => !todo.includes(x)));
+    await reload();
+    popMid(`🏠 เพิ่ม ${todo.length} หลัง`);
   }
 
   const hitGeo = (list) => ({ type: "FeatureCollection", features: list.map((b) => ({ type: "Feature", properties: { id: b.id, s: b.s || "osm" }, geometry: { type: "Polygon", coordinates: [ring(b.g)] } })) });
@@ -827,6 +880,9 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
           myHouse && !edit ? api(`/map3d/me?house=${encodeURIComponent(myHouse)}`).catch(() => ({})) : Promise.resolve({}),
           edit ? api("/admin/map3d/houses").catch(() => ({ houses: {} })) : Promise.resolve({ houses: {} }),
         ]);
+        const sg = edit ? await api("/admin/buildings/suggestions").catch(() => ({ items: [] })) : { items: [] };
+        suggRef.current = sg.items || [];
+        setSugg(suggRef.current);
         if (dead || !el.current) return;
         data.current = b.buildings;
         soiRef.current = sm.sois || {};
@@ -885,6 +941,13 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
           m.addSource("hit", { type: "geojson", data: hitGeo(b.buildings) });
           m.addLayer({ id: "gone", type: "fill", source: "hit", filter: ["==", ["get", "s"], "removed"], paint: { "fill-color": "#E5484D", "fill-opacity": 0.5 } });
           m.addLayer({ id: "hit", type: "fill", source: "hit", filter: ["!=", ["get", "s"], "removed"], paint: { "fill-color": "#000", "fill-opacity": 0.01 } });
+          if (edit) {
+            // 💡 suggested houses (blue ghosts) and maybe-extra ones (red dashed outline)
+            m.addSource("sugg", { type: "geojson", data: suggGeo(suggRef.current.filter((x) => x.kind === "missing")) });
+            m.addLayer({ id: "sugg", type: "fill-extrusion", source: "sugg", paint: { "fill-extrusion-color": ["case", ["get", "annex"], "#7CD4FF", "#0096FF"], "fill-extrusion-height": ["get", "h"], "fill-extrusion-opacity": 0.6 } });
+            m.addSource("extra", { type: "geojson", data: extraGeo(suggRef.current) });
+            m.addLayer({ id: "extra", type: "line", source: "extra", paint: { "line-color": "#E5484D", "line-width": 3, "line-dasharray": [1.5, 1] } });
+          }
 
           const origin = ml.MercatorCoordinate.fromLngLat([LNG0, LAT0], 0);
           const sc = origin.meterInMercatorCoordinateUnits();
@@ -987,6 +1050,17 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
               if (await call("/admin/buildings/restore", { id: gone.properties.id })) pop(e.point, "✨ คืนแล้ว");
               return;
             }
+            if (t === "hint") {
+              const f = m.queryRenderedFeatures(e.point, { layers: ["sugg"] })[0];
+              let x = f ? suggRef.current.find((y) => y.id === f.properties.sid) : null;
+              if (!x) {
+                const hb = tapHouse(e);
+                x = hb ? suggRef.current.find((y) => y.kind === "extra" && y.ref === hb.id) : null;
+              }
+              setPick(x || null);
+              if (!x) pop(e.point, "แตะก้อนสีฟ้า หรืออาคารเส้นประแดง");
+              return;
+            }
             const b2 = tapHouse(e);
             if (linkRef.current.length) {
               // picking the other buildings of one house
@@ -1059,7 +1133,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
 
   const hint = linking
     ? `แตะอาคารที่เป็นบ้านเดียวกัน (${linking.length} อาคาร)`
-    : { look: "แตะอาคารเพื่อแก้ไข", build: `แตะที่ว่าง วาง ${KINDS[kind].icon} ${KINDS[kind].label}`, up: "แตะบ้าน +1 ชั้น", down: "แตะบ้าน −1 ชั้น", remove: "แตะอาคารที่ไม่มีจริง เพื่อทุบทิ้ง" }[tool];
+    : { look: "แตะอาคารเพื่อแก้ไข", build: `แตะที่ว่าง วาง ${KINDS[kind].icon} ${KINDS[kind].label}`, up: "แตะบ้าน +1 ชั้น", down: "แตะบ้าน −1 ชั้น", remove: "แตะอาคารที่ไม่มีจริง เพื่อทุบทิ้ง", hint: `💡 ข้อเสนอ ${sugg.length} · ฟ้า = อาจขาด · เส้นประแดง = อาจเกิน` }[tool];
   const pad = "flex h-11 min-w-[44px] items-center justify-center rounded-xl bg-[#F1F4F2] px-2 text-lg font-bold shadow-[0_2px_0_#C9D2CC] active:scale-90 disabled:opacity-40";
   const kindOf = sel ? KINDS[sel.t] || KINDS.house : null;
   const flatKind = sel && FLATS.has(sel.t);
@@ -1098,6 +1172,57 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
           </div>
 
           <div className="absolute inset-x-2 bottom-[86px] z-20 space-y-1.5">
+            {tool === "hint" && (
+              <div className="space-y-1.5 rounded-2xl border-2 border-[#00B4FF] bg-white/95 p-2 shadow-lg">
+                {pick ? (
+                  <>
+                    <p className="text-sm leading-snug">
+                      {pick.kind === "missing" && pick.annex ? (
+                        <>
+                          <b>🧱 ส่วนต่อเติมของบ้านข้างๆ (เช่น ครัวหลังบ้าน หลังคาโรงรถ)</b>
+                          <br />
+                          เห็นใน {SRC[pick.src] || pick.src} · ถ้าเพิ่ม จะรวมเป็นบ้านเดียวกับหลังที่ติดกัน
+                        </>
+                      ) : pick.kind === "missing" ? (
+                        <>
+                          <b>🏠 อาจมีบ้านหลังนี้ที่แผนที่เรายังไม่มี</b>
+                          <br />
+                          เห็นใน {SRC[pick.src] || pick.src}
+                          {pick.conf ? ` · มั่นใจ ${Math.round(pick.conf * 100)}%` : ""}
+                        </>
+                      ) : (
+                        <>
+                          <b>❓ อาคารนี้อาจไม่มีอยู่จริงแล้ว</b>
+                          <br />
+                          {pick.src === "osm" ? "OpenStreetMap ล่าสุดไม่มีแล้ว" : `ภาพดาวเทียม (${SRC[pick.src] || pick.src}) ไม่เห็นอาคารตรงนี้`}
+                        </>
+                      )}
+                    </p>
+                    <div className="flex gap-2">
+                      <button onClick={() => decide(pick, "accept")} disabled={busy} className="flex-1 rounded-xl bg-[#1E6B47] py-2 font-bold text-white shadow-[0_3px_0_#154D33] active:scale-95">
+                        {pick.kind === "missing" ? (pick.annex ? "✓ เพิ่มเป็นส่วนของบ้านนี้" : "✓ เพิ่มบ้านนี้") : "🔨 เอาออก"}
+                      </button>
+                      <button onClick={() => decide(pick, "dismiss")} disabled={busy} className="flex-1 rounded-xl bg-neutral-200 py-2 font-bold active:scale-95">
+                        ✕ ไม่ใช่ / ข้าม
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="min-w-0 flex-1">
+                      {sugg.length
+                        ? `อาคารที่อาจขาด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length} (ฟ้าเข้ม) · ส่วนต่อเติม ${sugg.filter((x) => x.annex).length} (ฟ้าอ่อน) · อาจเกิน ${sugg.filter((x) => x.kind === "extra").length} (เส้นประแดง) · แตะเพื่อดูทีละหลัง`
+                        : "ยังไม่มีข้อเสนอ · รอแอดมินรันการเทียบข้อมูล"}
+                    </span>
+                    {sugg.some((x) => x.kind === "missing" && !x.annex) && (
+                      <button onClick={acceptAllMissing} disabled={busy} className={`rounded-xl px-3 py-2 font-bold text-white ${sure ? "bg-red-700" : "bg-[#0090D0]"}`}>
+                        {sure ? "แตะอีกครั้งเพื่อยืนยัน" : `✓ เพิ่มอาคารหลักทั้งหมด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length} หลัง`}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             {tool === "build" && (
               <div className="flex gap-1.5 overflow-x-auto rounded-2xl bg-white/95 p-1.5 shadow-lg">
                 {Object.entries(KINDS).map(([k, v]) => (
@@ -1260,6 +1385,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
               >
                 <span className="text-2xl leading-none">{icon}</span>
                 {label}
+                {k === "hint" && sugg.length ? ` ${sugg.length}` : ""}
               </button>
             ))}
             <button

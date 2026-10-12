@@ -193,6 +193,22 @@ class RoofSplit(BaseModel):
     parts: list[list[list[float]]] = Field(..., min_length=2, max_length=20)
 
 
+class Suggestion(BaseModel):
+    id: str = Field(..., min_length=3, max_length=80)  # stable id from the source (e.g. overture id / osm way)
+    kind: Literal["missing", "extra"]
+    src: str = Field(..., max_length=20)  # google / microsoft / osm / esri …
+    g: Optional[list[list[float]]] = Field(None, min_length=3, max_length=80)
+    ref: Optional[int] = None  # our building: the one that may be extra, or the house an annex belongs to
+    annex: bool = False  # a small add-on touching a house (back kitchen, carport roof)
+    lv: Optional[int] = Field(None, ge=1, le=30)
+    conf: Optional[float] = None
+
+
+class Suggestions(BaseModel):
+    items: list[Suggestion] = Field(..., max_length=3000)
+    note: str = Field("", max_length=200)
+
+
 class RoofGroup(BaseModel):
     ids: list[int] = Field(..., min_length=1, max_length=20)
 
@@ -626,6 +642,52 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
                 e["groups"][str(i)] = lead
         await save_roofs(e, admin, f"group {body.ids}")
         return {"ok": True}
+
+    # ---------- 💡 13 Oct: suggestions from other building datasets (Overture = OSM + Google Open Buildings + Microsoft) ----------
+    # tools/buildings_sync.py compares them with our map and posts what is missing / maybe extra; the admin accepts or
+    # dismisses each one in the 3D editor. Decisions are remembered so a later sync doesn't ask again.
+    @router.post("/admin/buildings/suggestions")
+    async def put_suggestions(body: Suggestions, admin: dict = Depends(require_admin)):
+        decided = {d["id"] async for d in db.building_suggestions.find({"status": {"$in": ["accepted", "dismissed"]}}, {"_id": 0, "id": 1})}
+        await db.building_suggestions.delete_many({"status": "open"})
+        rows = [{**x.model_dump(), "g": _outline_ok(x.g) if x.g else None, "status": "open", "at": now()} for x in body.items if x.id not in decided]
+        if rows:
+            await db.building_suggestions.insert_many(rows)
+        await audit(admin, "building_suggestions", f"{len(rows)} open", body.note)
+        return {"open": len(rows), "skipped_decided": len(body.items) - len(rows)}
+
+    @router.get("/admin/buildings/suggestions")
+    async def get_suggestions(admin: dict = Depends(require_admin)):
+        return {"items": await db.building_suggestions.find({"status": "open"}, {"_id": 0}).to_list(3000)}
+
+    @router.post("/admin/buildings/suggestions/{sid}/{verb}")
+    async def decide_suggestion(sid: str, verb: Literal["accept", "dismiss"], admin: dict = Depends(require_admin)):
+        sg = await db.building_suggestions.find_one({"id": sid, "status": "open"}, {"_id": 0})
+        if not sg:
+            raise HTTPException(404, "ไม่พบข้อเสนอนี้ (อาจตัดสินไปแล้ว)")
+        new_id = None
+        if verb == "accept":
+            e = await roof_edits()
+            if sg["kind"] == "missing" and sg.get("g"):
+                g = sg["g"]
+                new_id = 9_000_000_000 + int(time.time() * 1000) % 1_000_000_000
+                e["added"].append([round(sum(a for a, _ in g) / len(g), 6), round(sum(b for _, b in g) / len(g), 6), new_id])
+                e["shapes"][str(new_id)] = g
+                if sg.get("lv"):
+                    e["levels"][str(new_id)] = sg["lv"]
+                if sg.get("annex") and sg.get("ref") is not None:
+                    e["levels"][str(new_id)] = 1
+                    lead = e["groups"].get(str(sg["ref"]), sg["ref"])
+                    e["groups"][str(sg["ref"])] = lead
+                    e["groups"][str(new_id)] = lead
+            elif sg["kind"] == "extra" and sg.get("ref") is not None:
+                if any(b[2] == sg["ref"] for b in e["added"]):
+                    e["added"] = [b for b in e["added"] if b[2] != sg["ref"]]
+                elif sg["ref"] not in e["removed"]:
+                    e["removed"].append(sg["ref"])
+            await save_roofs(e, admin, f"suggestion {sid} {sg['kind']} ({sg['src']})")
+        await db.building_suggestions.update_one({"id": sid}, {"$set": {"status": "accepted" if verb == "accept" else "dismissed", "by": admin.get("name", ""), "decided_at": now(), "new_id": new_id}})
+        return {"ok": True, "new_id": new_id}
 
     @router.get("/admin/buildings3d")
     async def admin_3d(admin: dict = Depends(require_admin)):
