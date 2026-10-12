@@ -1,0 +1,812 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>เครดิต ภาค 1.5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chonburi&family=Mitr:wght@400;500&family=Bai+Jamjuree:wght@400;600&family=Press+Start+2P&display=swap">
+<style>
+/* Layout: a circus big-top at night (stripes, sweeping spotlights, bunting) with a pixel garbage truck clearing junk piles on the sawdust floor; one centred credit column rolls over it; three end cards close the show. Single dark look by choice. */
+:root {
+  --tent: #1b1030;
+  --plum: #2c1846;
+  --cream: #fff3da;
+  --gold: #ffc93c;
+  --red: #e2384d;
+  --mute: #cdbfe0;
+  --line: rgba(255, 243, 218, .2);
+  --f-display: "Chonburi", "Mitr", "Noto Serif Thai", serif;
+  --f-name: "Mitr", "Noto Sans Thai", "Segoe UI", sans-serif;
+  --f-label: "Bai Jamjuree", "Noto Sans Thai", "Segoe UI", sans-serif;
+  --f-pixel: "Press Start 2P", "Courier New", monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--tent); color: var(--cream); font-family: var(--f-name); overflow: hidden; }
+#stage { position: fixed; inset: 0; overflow: hidden; }
+#sky { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.shade { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent 0, rgba(27,16,48,.0) 18%, rgba(27,16,48,.62) 50%, rgba(27,16,48,.0) 82%, transparent 100%); }
+
+#roll { position: absolute; left: 0; right: 0; top: 0; padding-inline: 16px; will-change: transform; transform: translateY(100vh); }
+.col { max-width: 42rem; margin-inline: auto; display: flex; flex-direction: column; gap: 4.5rem; text-align: center; padding-block: 2rem; text-shadow: 0 2px 10px rgba(0,0,0,.75); }
+section { display: flex; flex-direction: column; gap: .6rem; }
+.role { font-family: var(--f-label); font-weight: 600; font-size: .82rem; letter-spacing: .22em; color: var(--gold); margin: 0; }
+.eyebrow { font-family: var(--f-label); font-size: .85rem; letter-spacing: .18em; color: var(--mute); margin: 0; }
+h1, .big { font-family: var(--f-display); font-weight: 400; margin: 0; line-height: 1.35; text-wrap: balance; }
+h1 { font-size: clamp(2.4rem, 8vw, 4rem); }
+h1 .px { font-family: var(--f-pixel); font-size: .8em; color: var(--gold); letter-spacing: -.04em; }
+.big { font-size: clamp(1.7rem, 5vw, 2.5rem); }
+.sub { font-size: 1.2rem; color: var(--mute); margin: 0; }
+.names { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; font-size: 1.5rem; }
+.names.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.6rem, 1fr)); gap: .45rem 1rem; font-size: 1.15rem; }
+.names.tight { font-size: 1.05rem; gap: .4rem .9rem; }
+.names small, .zones small { display: block; font-family: var(--f-label); font-size: .82rem; color: var(--mute); letter-spacing: .03em; }
+.zones { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem 1.5rem; margin: 0; align-items: baseline; }
+.zones dt { text-align: right; font-family: var(--f-label); font-weight: 600; color: var(--mute); letter-spacing: .1em; font-size: .95rem; }
+.zones dd { text-align: left; margin: 0; font-size: 1.3rem; min-width: 0; font-variant-numeric: tabular-nums; }
+.note { font-family: var(--f-label); color: var(--mute); font-size: .95rem; margin: 0; }
+.say { font-size: 1.25rem; margin: 0; }
+.fund { font-family: var(--f-pixel); font-size: clamp(.9rem, 3.6vw, 1.5rem); color: var(--gold); letter-spacing: -.02em; overflow-wrap: anywhere; line-height: 1.6; }
+.ring { border: 2px dashed var(--line); border-radius: 1.2rem; padding: 1.6rem 1rem; }
+
+.card { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.1rem; padding-inline: 16px; text-align: center; }
+#intro { background: radial-gradient(ellipse at center, rgba(27,16,48,.5), rgba(27,16,48,.9)); transition: opacity .9s ease; }
+#intro.gone { opacity: 0; pointer-events: none; }
+#intro p { margin: 0; }
+.play { font-family: var(--f-label); font-weight: 600; font-size: 1.1rem; letter-spacing: .06em; color: var(--tent); background: var(--gold); border: 0; border-radius: 999px; padding: .85rem 2rem; cursor: pointer; box-shadow: 0 0 0 4px var(--red); }
+.play:hover { filter: brightness(1.08); }
+.play:focus-visible, .ghost:focus-visible { outline: 3px solid var(--cream); outline-offset: 5px; }
+.ghost { font-family: var(--f-label); font-size: .85rem; color: var(--cream); background: rgba(27,16,48,.55); border: 1px solid var(--line); border-radius: 999px; padding: .5rem 1rem; cursor: pointer; }
+#end { pointer-events: none; gap: .4rem; }
+#end .e { font-family: var(--f-display); margin: 0; opacity: 0; transform: translateY(12px); transition: opacity 1s ease, transform 1s ease; text-shadow: 0 2px 18px rgba(0,0,0,.6); }
+#end .e.on { opacity: 1; transform: none; }
+#e1 { font-size: clamp(1.8rem, 6.5vw, 3.2rem); }
+#e2 { font-size: clamp(1.4rem, 4.5vw, 2.2rem); color: var(--mute); }
+#e3 { font-size: clamp(2.6rem, 10vw, 5rem); color: var(--gold); }
+#e3.on { animation: thud .5s cubic-bezier(.3,1.6,.5,1); }
+@keyframes thud { 0% { transform: scale(1.5); opacity: 0; } 100% { transform: none; opacity: 1; } }
+#again { pointer-events: auto; margin-top: 1rem; }
+#e4 { margin-top: 2rem; color: var(--gold); }
+.studio *, .studio *::before { transition: none !important; animation: none !important; }
+.studio .play, .studio #intro .note, .studio .hud { visibility: hidden; }
+.hud { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 12px; display: flex; gap: .5rem; }
+@media (max-width: 480px) {
+  .zones { grid-template-columns: 1fr; gap: .2rem; }
+  .zones dt, .zones dd { text-align: center; }
+  .zones dd { margin-bottom: .8rem; }
+  .names { font-size: 1.3rem; }
+  .names.grid { grid-template-columns: 1fr 1fr; font-size: 1.05rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #end .e, #intro { transition: none; }
+  #e3.on { animation: none; }
+}
+</style>
+
+<div id="stage">
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <div class="shade"></div>
+
+  <div id="roll" aria-live="off">
+    <div class="col">
+      <section>
+        <p class="eyebrow">ภารกิจหลังน้ำลด · 2 – 12 ตุลาคม 2569</p>
+        <h1>ภาค <span class="px">1.5</span></h1>
+        <p class="sub">ศึกขยะชิ้นใหญ่ · หมู่บ้านสหกรณ์ฯ 4 · เสรีไทย 57</p>
+        <p class="note">บอกไว้แล้วว่าไม่สร้างภาคสอง เลยขอเป็นภาค 1.5</p>
+      </section>
+
+      <section>
+        <p class="role">นำแสดงโดย</p>
+        <p class="big">ทีมจิตอาสา GEN Y</p>
+      </section>
+
+      <section>
+        <p class="role">ผู้ถือกระเป๋าเงิน</p>
+        <ul class="names">
+          <li>พี่เอ็ม<small>ดูแลบัญชีรับบริจาค · ไล่ตอบทุกสลิป · จ่ายค่าน้ำค่าข้าวพี่ๆ เจ้าหน้าที่</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ผู้กำกับคิวรถขยะ</p>
+        <ul class="names">
+          <li>พี่โน้ต<small>เรียกรถคีบ รถ 6 ล้อ รถ 10 ล้อ · ออกเงินไปก่อนหลายรอบ</small></li>
+          <li>พี่เอมม์ธิดา · พี่เชม<small>สำนักงาน ค4 · ช่วยประสานและให้คำแนะนำ</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ผู้ประสานงาน</p>
+        <ul class="names">
+          <li>ต้อง<small>หาผู้รู้ ประสานตำรวจ ช่วยคิดทางออก</small></li>
+          <li>มีจัง<small>เบเกอรี่ LOVE KETO · ถุงมือ ถุงขยะ</small></li>
+          <li>บอมบ์<small>ประกาศรอบเก็บขยะ · สำรองจ่ายค่ารองเท้าบู๊ท</small></li>
+          <li>เฟย์<small>ประสานช่างไฟ · คิวงานทุกวัน</small></li>
+          <li>อุ๊<small>น้ำหวาน น้ำแข็ง ทุกรอบที่พี่ๆ มาทำงาน</small></li>
+          <li>แหวน</li>
+          <li>คุณประสงค์<small>ทรายรอบสอง · แนวกั้นน้ำ · รายงานทุกเช้า</small></li>
+          <li>first<small>แนวกั้นน้ำ ซ.19/3 · ขอแรงเรียงกระสอบ</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ยกโซฟา ลากที่นอน แบกทราย</p>
+        <ul class="names grid">
+          <li>kree pup</li><li>Pongpob</li><li>Antz Bullo</li><li>TON K2</li><li>อู๋</li><li>เขมธัช</li>
+          <li>Pinky</li><li>Arita</li><li>Rongnoi</li><li>Bow Arpa</li><li>ปุ๋ย</li><li>nuttfoto</li>
+          <li>สงกรานต์</li><li>Nattapon Adam</li><li>3igJoe</li><li>CanonToon</li><li>Pansan</li><li>ปลื้ม</li>
+          <li>อ.เสกสรร</li><li>Mr.You</li><li>โค้ชปิ๋ม</li><li>Mine&amp;Fancy</li><li>คุณอดิศร ซ.3<small>เติมน้ำมันซาเล้ง</small></li><li>คุณแพน ซ.11<small>ให้ยืมรถเข็น</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ช่างไฟ</p>
+        <ul class="names">
+          <li>ทีมช่างไฟฟ้าทหาร<small>ตรวจซ่อมไฟบ้านที่จมน้ำ ไล่ทีละหลัง</small></li>
+          <li>Odaily<small>จัดคิวบ้านให้ช่าง ตามเก็บงานถึงค่ำ</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">รถและเครื่องจักร</p>
+        <ul class="names">
+          <li>รถคีบขยะ<small>คีบกองใหญ่หน้าซอยทีละกอง</small></li>
+          <li>รถ 6 ล้อ และคนงาน<small>วันเดียว 16 เที่ยว</small></li>
+          <li>รถ 10 ล้อ</li>
+          <li>รถตัก คุณเปรี้ยว<small>ทำงานกลางคืน ยางแตกก็ซ่อมแล้วลุยต่อ</small></li>
+          <li>บ่อขยะสายไหม<small>ปลายทางของทุกเที่ยว</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">หน่วยงาน</p>
+        <ul class="names">
+          <li>ปภ.<small>Big Cleaning · ล้างถนนทั้งหมู่บ้าน</small></li>
+          <li>สำนักงานเขตบึงกุ่ม<small>ฝ่ายรักษาความสะอาด · พี่ๆ พนักงานเก็บขยะ</small></li>
+          <li>ทหารเรือ<small>กลับมาช่วยรอบสอง</small></li>
+          <li>คหบาล<small>คุณมนทิรา · สำนักงาน ค4</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ทรายรอบสอง และเครื่องสูบ</p>
+        <ul class="names">
+          <li>คุณอาประสงค์<small>ทรายบรรจุถุง 1,000 ถุง</small></li>
+          <li>บ.กรุงไทย โกลบอล เวนเจอร์<small>ถุงทราย 200 ถุง</small></li>
+          <li>ร้านคลอง 7 โลหะการ<small>เครื่องสูบน้ำ</small></li>
+          <li>ชุมชนโต๊ะบาง<small>ช่วยเรียงกระสอบทราย</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ครัว น้ำ และร้านค้า</p>
+        <ul class="names">
+          <li>ร้านสเต๊ก 59<small>พี่แสง · พี่ทิพย์ · ข้าวกล่องพี่ๆ เจ้าหน้าที่ทุกวัน</small></li>
+          <li>เฟ<small>อาหารกล่องทีม Big Cleaning</small></li>
+          <li>น้องเฟิร์ส<small>น้ำดื่มให้พี่ๆ เขต</small></li>
+          <li>ร้านมานะ<small>รองเท้าบู๊ท แปรงขัด สเปรย์ให้ช่างไฟ</small></li>
+          <li>ร้านมู้ด ซ.5<small>ศูนย์ประสานงาน</small></li>
+        </ul>
+      </section>
+
+      <section class="ring">
+        <p class="role">ผู้สนับสนุนการแสดง</p>
+        <p class="big">สปอนเซอร์ทุกท่าน</p>
+        <p class="note">ตามสลิปและเงินสดที่บันทึกไว้ใน serithai57.com/fund · เรียงตามตัวอักษร</p>
+      </section>
+
+      <section>
+        <p class="role">องค์กร กลุ่ม และร้านค้า</p>
+        <ul class="names">
+          <li>Toyota bus</li>
+          <li>ศิษย์เก่าจุฬาฯ ซ.42</li>
+          <li>สโมสรโรตารีบึงกุ่ม</li>
+          <li>ร้านป้าณู</li>
+          <li>ร้าน Delish addict ซ.36</li>
+          <li>บ้านอุ๊</li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">สปอนเซอร์อุปกรณ์</p>
+        <ul class="names">
+          <li>คุณกรีชา (kree pup)<small>ซื้อเครื่องสูบน้ำให้หมู่บ้าน</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">สปอนเซอร์ใจดี</p>
+        <ul class="names grid tight"><li>กนกพร อ.</li><li>กมลวรรณ ส.</li><li>กรรณิการ์ ต.<small>GE5572</small></li><li>กรีชา ก.<small>kree pup</small></li><li>กฤษฎ์</li><li>กันตพิชญ์ พ.</li><li>กันต์ ค.</li><li>กันยารัตน์ s.<small>Kanya</small></li><li>กัลยา ต.<small>เอื้อย</small></li><li>กัลยา ร.<small>กัน</small></li><li>กานต์ ศ.</li><li>ขวัญชนก เ.</li><li>คมกฤช จ.<small>KC</small></li><li>คุณพ่อของต้อง</li><li>คุณแมว<small>แยก 50/1</small></li><li>จันทร์พร น.</li><li>จารุตร์ น.</li><li>จิรภาส บ.<small>อาร์ต</small></li><li>จิราพร ว.</li><li>ฉัตรลักขณา พ.</li><li>ชนิดา ด.<small>kib</small></li><li>ชนิสา แ.</li><li>ชลธิศา</li><li>ชวลิต อ.</li><li>ชัชวาล พ.</li><li>ชัยปสิทธิ์ เ.</li><li>ชาญกิจ ศ.</li><li>ฐิตินันท์ ว.</li><li>ฐิติพร บ.</li><li>ณชญาดา ว.</li><li>ณฐาพร ก.</li><li>ณัชชาภัทร อ.<small>เต๋าเต๋า</small></li><li>ณัฏฐ์</li><li>ณัฐนี</li><li>ณัฐวดี ภ.</li><li>ณัฐวร บ.</li><li>ดวงเนตร ส.</li><li>ดังเดือน เ.</li><li>ดาริณี ไ.</li><li>ดิถีพร บ.</li><li>ตวงพร</li><li>ทรงชัย ส.</li><li>ทัศรินทร์ เ.</li><li>ทิพาพร ค.<small>TK</small></li><li>ธนกรณ์ เ.</li><li>ธนวัช น.</li><li>ธนิต ท.<small>นิต</small></li><li>ธรากรณ์<small>อ๋อ</small></li><li>ธราภรณ์</li><li>ธัชวิธ อ.<small>tcwit</small></li><li>ธารทิพย์ พ.</li><li>ธารา</li><li>ธิติ พ.</li><li>ธีระ ธ.</li><li>ธเนศ ส.</li><li>นรเกติ</li><li>นักรบ น.<small>Hawk</small></li><li>นันทกานต์ เ.<small>Pang 123</small></li><li>นันทนาท ส.</li><li>นิดา ก.</li><li>นิภาภรณ์ ฮ.</li><li>นิภารัตน์</li><li>นีลกมล ภ.</li><li>นุชนภา</li><li>นุชนาฏ น.</li><li>น้ำทิพย์ ด.</li><li>บุญหลง</li><li>ปกรณ์ เ.<small>หมึก</small></li><li>ปฐมพงศ์ ธ.<small>ชาย17</small></li><li>ปฐมา ว.</li><li>ปนัดดา อ.</li><li>ประคอง ว.<small>นิด</small></li><li>ประภาศรี ล.<small>แอ๊ว</small></li><li>ประสารพงษ์ พ.</li><li>ปรารถนา ว.</li><li>ปริภาดา อ.</li><li>ปริยาพันธุ์ แ.</li><li>ปรีชา พ.</li><li>ปรียา ก.</li><li>ปาริฉัตร ร.<small>Poun</small></li><li>ปิยมาส ธ.</li><li>ปิยะพร ว.</li><li>พงศธร ท.</li><li>พรพิชชา ส.</li><li>พลสิทธิ์ ช.<small>นัต</small></li><li>พัชรวลี ไ.</li><li>พัฒนาภา ส.</li><li>พัณณ์แสง ช.<small>แสง</small></li><li>พิชดา ห.<small>Da</small></li><li>พินรัตน์ พ.</li><li>พิมพ์นารา ร.</li><li>พีรสุต ศ.<small>HomeyCatsHouse</small></li><li>ภณิดา ร.</li><li>ภรภัทร แ.</li><li>ภัทร์สรรพ์พร บ.</li><li>ภัสส์ธิตากร ก.</li><li>มงคล ช.</li><li>มงคลลักษณ์ ป.</li><li>มธุรดา เ.<small>Beetle</small></li><li>มานภา ท.</li><li>มาลี ร.</li><li>ยุติมา ผ.</li><li>ยุภาวดี น.</li><li>ยุภาวรรณ พ.<small>กัญญารัตน์</small></li><li>รฐา</li><li>รสริน ไ.</li><li>รัชนีวรรณ์ แ.</li><li>รุ่งฤดี เ.</li><li>ฤญช์ น.</li><li>ลลิล</li><li>ละไม บ.</li><li>ลาวัลย์ ม.</li><li>วรพร พ.<small>ทวนทอง</small></li><li>วรรัตน์ อ.<small>มณ</small></li><li>วรัญญู</li><li>วรารมย์ ก.</li><li>วริษฐา บ.</li><li>วรเวทย์ ธ.</li><li>วัชรัตน์ น.</li><li>วัฐพงศ์ น.</li><li>วัลลภา</li><li>วาสนา ส.</li><li>วิกานดา ว.</li><li>วิภา เ.</li><li>วิมัล<small>Pooky</small></li><li>วิมิส</li><li>วิสุทธิ์</li><li>วีรพงษ์</li><li>วีริน</li><li>วุฒิวิทย์ ว.</li><li>ศศิลักษณ์ ร.</li><li>ศักดิธร ย.</li><li>ศันสนีย์ ล.<small>ครูจั่น</small></li><li>ศิกรา</li><li>ศิธร ม.</li><li>ศิรินทร์ ล.</li><li>สมมิตร ล.</li><li>สมหมาย แ.</li><li>สมาพร ธ.</li><li>สหทัศน์ น.</li><li>สันสนีย์ ส.</li><li>สายสวาท ธ.</li><li>สำเนียง ป.</li><li>สุชาสินี เ.</li><li>สุทธิดา พ.</li><li>สุทธิลักษณ์ ม.</li><li>สุธิวุฒิ จ.</li><li>สุนิสา ช.</li><li>สุพร ท.</li><li>สุพรรัตน์</li><li>สุพัตรา ป.</li><li>สุภาพร ว.</li><li>สุภาพร ศ.</li><li>สุภาภรณ์ ส.</li><li>สุภาวดี<small>Nong 1456</small></li><li>สุภาวรรณ ห.</li><li>สุรภีร์ ว.<small>เอื้อย</small></li><li>สโรชา</li><li>หทยา ท.</li><li>หนามเตย น.<small>เตย</small></li><li>องศา ห.</li><li>อดิศักดิ์ ศ.</li><li>อนงค์นารถ จ.</li><li>อนัญญา ฉ.</li><li>อภิชาต<small>ผึ้ง</small></li><li>อภิญญา ภ.</li><li>อภินุช ส.</li><li>อภิรดี</li><li>อรวรินทร์ โ.</li><li>อรัญญารัตน์ ก.</li><li>อริสรา เ.</li><li>อัครเดช ท.<small>ต้อย</small></li><li>อัจฉรา ส.</li><li>อัจฉรา ไ.</li><li>อัธยา แ.</li><li>อาทิตยา น.</li><li>อานุภาพ บ.</li><li>อารดา ล.</li><li>อารยา</li><li>อารวี ศ.</li><li>อารักษ์</li><li>อาวุณี อ.</li><li>อิษฎา ร.</li><li>อุมาภรณ์ ช.</li><li>อุษาวรรณ ค.</li><li>เกศวลี พ.</li><li>เจตนิดา ด.</li><li>เทื้อกูล ก.<small>JanFirst</small></li><li>เบญจมาส บ.<small>Ben</small></li><li>เปมิกา ป.</li><li>เพลง</li><li>เพ็ญศรี พ.</li><li>เสาวณีย์ เ.</li><li>เสาวนีย์ พ.</li><li>เสาวลักษณ์ ส.</li><li>เอกวิชญ์ ว.<small>ลุงเอก</small></li><li>เอมอร ม.</li><li>เอมอัชนา</li><li>ไพฑูรย์ จ.</li><li>ไพเสริฐ ธ.</li><li>Ann</li><li>Annppy</li><li>Apple</li><li>Bow Arpa</li><li>FUKIAT S.</li><li>NAREERAT K.</li><li>NAT W.</li><li>NATALIE ROSE N.<small>บี</small></li><li>PAKASRI Y.</li><li>PENSRI SONKHA</li><li>PIANGPAITOON</li><li>PIYANUN SUISU<small>Duan</small></li><li>PK</li><li>PLOENPORN K.</li><li>Panda</li><li>Ploy81</li><li>SIRAPAK L.</li><li>SIRILUK KIATK.</li><li>THANATCHA M.</li></ul>
+      </section>
+
+      <section>
+        <p class="role">ผ่านกระเป๋าคุณประสงค์</p>
+        <ul class="names grid tight">
+          <li>คุณชูพงศ์</li><li>คุณสุเทพ</li><li>อ.กัลยาณี</li><li>คุณไชยศ</li><li>คุณณฤทธิ</li><li>คุณจิน</li><li>คุณดำรงค์</li><li>คุณอมร</li><li>คุณศรัณย์</li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">และสปอนเซอร์นิรนาม</p>
+        <p class="say">อีก 69 รายการ ที่โอนมาโดยไม่ได้ส่งสลิป<br>หรือไม่ประสงค์ออกนาม</p>
+        <p class="note">ยอดเข้าบัญชีตรงทุกบาท แต่ไม่รู้ว่าเป็นใคร ขอบคุณมากครับ</p>
+      </section>
+
+      <section>
+        <p class="role">บันทึกการถ่ายทำ ภาค 1.5</p>
+        <dl class="zones">
+          <dt>เงินสนับสนุน</dt><dd>384,461 บาท</dd>
+          <dt>ใช้ไปกับงานจริง</dt><dd>363,336.25 บาท</dd>
+          <dt>ตรวจกับบัญชีธนาคาร</dt><dd>ครบ 100%</dd>
+          <dt>ถุงทราย</dt><dd>1,400 ถุง</dd>
+          <dt>รถขยะวันที่ 10 ต.ค.</dt><dd>16 เที่ยว</dd>
+          <dt>โซฟาที่ออกมาหน้าบ้าน</dt><dd>นับไม่ทัน</dd>
+          <dt>ชั่วโมงนอนของอาสา</dt><dd>ยังไม่ขอเปิดเผย</dd>
+        </dl>
+        <p class="note">ตัวเลข ณ 12 ต.ค. 2569</p>
+      </section>
+
+      <section class="ring">
+        <p class="role">รายงานบัญชี</p>
+        <p class="say">ดูรายรับ รายจ่าย และสลิป/บิลทุกรายการได้ที่</p>
+        <p class="big fund">serithai57.com/fund</p>
+        <p class="note">เปิดให้ทุกคนตรวจได้ทุกบาท</p>
+      </section>
+
+      <section>
+        <p class="role">ระบบ serithai57.com</p>
+        <ul class="names">
+          <li>Claude<small>อ่านสลิปทีละใบ · กระทบยอดกับแอปธนาคารจนตรงทุกบาท</small></li>
+        </ul>
+      </section>
+
+      <section>
+        <p class="role">ขอบคุณสปอนเซอร์ของระบบ</p>
+        <ul class="names">
+          <li>พี่แมน stockmanday</li>
+          <li>คุณลูกศิษย์ advisee<small>ผู้ซื้อ Claude Max ให้ใช้ทำงาน</small></li>
+        </ul>
+        <p class="note">ภาคนี้ก็ยังใช้คุ้มเหมือนเดิม</p>
+      </section>
+
+      <section>
+        <p class="role">และที่สำคัญที่สุด</p>
+        <p class="big">ลูกบ้านทุกคน</p>
+        <p class="say">ที่ยกขยะออกมาหน้าบ้าน ล้างบ้าน ล้างซอย<br>และช่วยกันคนละไม้คนละมือ</p>
+        <p class="big">และทุกคนที่ตกหล่น</p>
+        <p class="say">จากรายชื่อนี้ ขอโทษและขอบคุณจริงๆ</p>
+        <p class="note">ขยะเกือบเกลี้ยงแล้ว · 12 ตุลาคม 2569</p>
+      </section>
+
+      <section>
+        <p class="role">ผู้ชิงเครดิตคนสุดท้าย (อีกแล้ว)</p>
+        <p class="big">แอดมินเพจ</p>
+        <p class="say">หมู่บ้านสหกรณ์เคหะสถาน ถนนเสรีไทย</p>
+        <p class="note">สัญญาว่าไม่สร้างภาคสอง แต่แอบทำภาค 1.5<br>ระหว่างคนอื่นยกโซฟา แอดมินนั่งนับสลิป 300 ใบ (ให้ AI นับ)</p>
+        <p class="note">ฮ่าๆ</p>
+      </section>
+    </div>
+  </div>
+
+  <div id="end" class="card" aria-live="polite">
+    <p class="e" id="e1">ไม่สร้างภาคสอง (จริงๆ นะ)</p>
+    <p class="e" id="e2">ภาค 1.75 ก็ไม่มี</p>
+    <p class="e" id="e3">ปิดม่าน!</p>
+    <p class="note" id="e4" hidden>รายงานบัญชี · serithai57.com/fund</p>
+    <button class="ghost" id="again" type="button" hidden>↺ ดูอีกรอบ</button>
+  </div>
+
+  <div id="intro" class="card">
+    <p class="eyebrow">ขอบคุณทุกคนที่ช่วยกันเก็บกวาด</p>
+    <h1>ภาค <span class="px">1.5</span></h1>
+    <p class="sub">ศึกขยะชิ้นใหญ่ · หมู่บ้านสหกรณ์ฯ 4</p>
+    <button class="play" id="play" type="button">▶ เปิดม่าน · เปิดเสียง</button>
+    <p class="note">ราว 3 นาทีครึ่ง · ดนตรี 8 บิต สังเคราะห์สดในเบราว์เซอร์</p>
+  </div>
+
+  <div class="hud"><button class="ghost" id="mute" type="button" hidden>🔊 เสียง</button></div>
+</div>
+
+<script>
+(() => {
+  // ---------- music: an original 8-bit circus galop ----------
+  const BPM = 150, BEAT = 60 / BPM, BAR = BEAT * 4, EIGHTH = BEAT / 2;
+  const ROLL = 2;                       // drum roll before the band comes in
+  const SEC = 16;                       // bars per section
+  // per section: [tune, lead, oct, bass, stabs, drums, transpose, staccato]
+  const PLAN = [
+    ["A", .8, 0, 1, .7, .5, 0, 0], ["A", 1, 1, 1, 1, 1, 0, 0],
+    ["B", 1, 0, 1, .8, .7, 0, 0], ["A", 1, 1, 1, 1, 1, 0, 0],
+    ["B", 1, 1, 1, 1, 1, 0, 0], ["A", .9, 0, .8, 0, .6, 0, 1],
+    ["B", 1, 1, 1, 1, 1, 0, 0], ["A", 1, 1, 1, 1, 1, 1, 0],
+  ];
+  const BARS = ROLL + PLAN.length * SEC;
+  const LEN = BARS * BAR;               // the credit roll lasts exactly as long as the score
+  const CHORD = { C: [36, 60, 64, 67], G7: [43, 59, 65, 67], F: [41, 60, 65, 69], C7: [36, 58, 64, 67], Bb: [34, 58, 62, 65] };
+  const TUNE = {
+    A: {
+      ch: "C C G7 G7 G7 G7 C C C C F F C G7 C C".split(" "),
+      mel: [
+        [[79, 1], [76, 1], [79, 1], [76, 1], [84, 1], [83, 1], [84, 1], [79, 1]],
+        [[81, 1], [79, 1], [78, 1], [79, 1], [76, 2], [72, 2]],
+        [[77, 1], [74, 1], [77, 1], [74, 1], [83, 1], [82, 1], [83, 1], [79, 1]],
+        [[81, 1], [79, 1], [77, 1], [76, 1], [74, 2], [67, 2]],
+        [[77, 1], [74, 1], [77, 1], [74, 1], [83, 1], [82, 1], [83, 1], [79, 1]],
+        [[81, 1], [83, 1], [84, 1], [86, 1], [89, 1], [88, 1], [86, 1], [83, 1]],
+        [[84, 2], [79, 1], [76, 1], [72, 2], [76, 1], [79, 1]],
+        [[84, 2], [79, 1], [84, 1], [null, 4]],
+        [[79, 1], [76, 1], [79, 1], [76, 1], [84, 1], [83, 1], [84, 1], [79, 1]],
+        [[81, 1], [79, 1], [78, 1], [79, 1], [76, 2], [72, 2]],
+        [[81, 1], [77, 1], [81, 1], [77, 1], [86, 1], [85, 1], [86, 1], [81, 1]],
+        [[84, 1], [81, 1], [80, 1], [81, 1], [77, 2], [72, 2]],
+        [[79, 1], [76, 1], [79, 1], [84, 1], [88, 1], [86, 1], [84, 1], [79, 1]],
+        [[77, 1], [76, 1], [74, 1], [79, 1], [83, 1], [81, 1], [79, 1], [77, 1]],
+        [[76, 1], [79, 1], [84, 1], [79, 1], [76, 1], [79, 1], [84, 1], [88, 1]],
+        [[84, 1], [null, 1], [79, 1], [84, 1], [null, 4]],
+      ],
+    },
+    B: {
+      ch: "F F C7 C7 C7 C7 F F F F Bb Bb F C7 F F".split(" "),
+      mel: [
+        [[81, 2], [84, 2], [89, 2], [84, 2]],
+        [[81, 1], [82, 1], [81, 1], [79, 1], [77, 4]],
+        [[79, 2], [82, 2], [88, 2], [82, 2]],
+        [[79, 1], [81, 1], [79, 1], [77, 1], [76, 4]],
+        [[79, 1], [76, 1], [79, 1], [82, 1], [84, 2], [82, 2]],
+        [[81, 1], [79, 1], [77, 1], [76, 1], [74, 2], [72, 2]],
+        [[77, 1], [81, 1], [84, 1], [89, 1], [88, 1], [89, 1], [91, 1], [89, 1]],
+        [[89, 2], [84, 2], [77, 2], [null, 2]],
+        [[81, 2], [84, 2], [89, 2], [84, 2]],
+        [[81, 1], [82, 1], [81, 1], [79, 1], [77, 4]],
+        [[82, 2], [86, 2], [89, 2], [86, 2]],
+        [[84, 1], [82, 1], [81, 1], [79, 1], [77, 2], [74, 2]],
+        [[84, 2], [81, 1], [77, 1], [84, 2], [81, 2]],
+        [[82, 1], [81, 1], [79, 1], [76, 1], [72, 2], [76, 2]],
+        [[77, 1], [79, 1], [81, 1], [82, 1], [84, 1], [86, 1], [88, 1], [89, 1]],
+        [[89, 2], [84, 1], [81, 1], [77, 2], [null, 2]],
+      ],
+    },
+  };
+  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  let ac = null, master, dry, echo, noise, pulse25, pulse12, timer = null, step = 0, nextT = 0, t0 = 0, muted = false;
+
+  function pulseWave(duty) {           // NES-style pulse from its Fourier series
+    const n = 64, re = new Float32Array(n), im = new Float32Array(n);
+    for (let k = 1; k < n; k++) im[k] = (2 / (k * Math.PI)) * Math.sin(k * Math.PI * duty);
+    return ac.createPeriodicWave(re, im);
+  }
+  function initAudio(ctx) {
+    if (ctx) ac = ctx;
+    else {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ac = new AC();
+    }
+    master = ac.createGain(); master.gain.value = .85;
+    const comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.ratio.value = 3;
+    master.connect(comp); comp.connect(ac.destination);
+    dry = ac.createGain(); dry.connect(master);
+    echo = ac.createDelay(1); echo.delayTime.value = EIGHTH * 1.5;
+    const fb = ac.createGain(); fb.gain.value = .22;
+    const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3000;
+    echo.connect(lp); lp.connect(fb); fb.connect(echo);
+    const eg = ac.createGain(); eg.gain.value = .35; lp.connect(eg); eg.connect(master);
+    noise = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const nd = noise.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    pulse25 = pulseWave(.25); pulse12 = pulseWave(.125);
+  }
+  function out(node, e = 0) {
+    node.connect(dry);
+    if (e) { const g = ac.createGain(); g.gain.value = e; node.connect(g); g.connect(echo); }
+  }
+  function env(g, t, a, peak, hold, rel) {
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + a);
+    g.gain.setValueAtTime(peak, t + a + hold);
+    g.gain.exponentialRampToValueAtTime(.0001, t + a + hold + rel);
+    return t + a + hold + rel + .03;
+  }
+  // lead: 25% pulse with a little delayed vibrato
+  function lead(m, t, d, vol, short) {
+    const o = ac.createOscillator(); o.setPeriodicWave(pulse25); o.frequency.value = mtof(m);
+    if (d > EIGHTH * 1.5 && !short) {
+      const lfo = ac.createOscillator(), lg = ac.createGain();
+      lfo.frequency.value = 6; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(mtof(m) * .012, t + d * .8);
+      lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t + d + .1);
+    }
+    const g = ac.createGain(); o.connect(g); out(g, .4);
+    const hold = short ? .03 : Math.max(.02, d - .06);
+    const end = env(g, t, .005, vol, hold, short ? .07 : .05);
+    o.start(t); o.stop(end);
+  }
+  function stab(notes, t, vol) {
+    for (const m of notes) {
+      const o = ac.createOscillator(); o.setPeriodicWave(pulse12); o.frequency.value = mtof(m);
+      const g = ac.createGain(); o.connect(g); out(g);
+      const end = env(g, t, .003, vol, .03, .06);
+      o.start(t); o.stop(end);
+    }
+  }
+  function tri(m, t, d, vol) {         // triangle bass, like the NES's
+    const o = ac.createOscillator(); o.type = "triangle"; o.frequency.value = mtof(m);
+    const g = ac.createGain(); o.connect(g); out(g);
+    const end = env(g, t, .004, vol, d * .55, d * .3);
+    o.start(t); o.stop(end);
+  }
+  function hit(t, vol, hp, lp, dec) {
+    const n = ac.createBufferSource(); n.buffer = noise;
+    const h = ac.createBiquadFilter(); h.type = "highpass"; h.frequency.value = hp;
+    const l = ac.createBiquadFilter(); l.type = "lowpass"; l.frequency.value = lp;
+    const g = ac.createGain(); n.connect(h); h.connect(l); l.connect(g); out(g);
+    const end = env(g, t, .002, vol, 0, dec);
+    n.start(t, Math.random() * .5); n.stop(end);
+  }
+  function kick(t, vol = .5) {
+    const o = ac.createOscillator(); o.type = "square";
+    o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(45, t + .08);
+    const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 600;
+    const g = ac.createGain(); o.connect(f); f.connect(g); out(g);
+    const end = env(g, t, .002, vol * .5, 0, .12);
+    o.start(t); o.stop(end);
+  }
+  const snare = (t, v = .16) => hit(t, v, 1200, 9000, .09);
+  const hat = (t, v = .05) => hit(t, v, 7000, 16000, .025);
+  const crash = (t, v = .14) => hit(t, v, 4000, 16000, 1.2);
+  function tom(t, from, vol = .3) {
+    const o = ac.createOscillator(); o.type = "triangle";
+    o.frequency.setValueAtTime(from, t); o.frequency.exponentialRampToValueAtTime(from * .55, t + .15);
+    const g = ac.createGain(); o.connect(g); out(g);
+    const end = env(g, t, .002, vol, 0, .18);
+    o.start(t); o.stop(end);
+  }
+  function whistle(t, from, to, dur, vol = .09) {   // slide whistle
+    const o = ac.createOscillator(); o.type = "sine";
+    o.frequency.setValueAtTime(from, t); o.frequency.exponentialRampToValueAtTime(to, t + dur);
+    const lfo = ac.createOscillator(), lg = ac.createGain(); lfo.frequency.value = 7; lg.gain.value = 18;
+    lfo.connect(lg); lg.connect(o.frequency);
+    const g = ac.createGain(); o.connect(g); out(g, .3);
+    const end = env(g, t, .04, vol, dur - .1, .15);
+    o.start(t); lfo.start(t); o.stop(end); lfo.stop(end);
+  }
+  function rimshot(t) {                 // ba-dum-tss
+    tom(t, 260); tom(t + .18, 170); kick(t + .38, .6); crash(t + .38, .2);
+  }
+
+  function playStep(s, t) {
+    const b = Math.floor(s / 8), e = s % 8;
+    if (b < ROLL) {                     // drum roll that swells into the band
+      const k = (b * 8 + e) / (ROLL * 8);
+      snare(t, .04 + .12 * k); snare(t + EIGHTH / 2, .04 + .12 * k);
+      return;
+    }
+    const sec = Math.floor((b - ROLL) / SEC), bi = (b - ROLL) % SEC;
+    const [name, ld, oct, bs, st, dr, tr, short] = PLAN[sec];
+    const tune = TUNE[name], ch = CHORD[tune.ch[bi]].map((m) => m + tr);
+    if (e === 0) {
+      if (bi === 0) crash(t, .12);
+      let off = 0;
+      for (const [m, d] of tune.mel[bi]) {
+        if (m) {
+          lead(m + tr, t + off * EIGHTH, d * EIGHTH, .085 * ld, short);
+          if (oct) lead(m + tr - 12, t + off * EIGHTH, d * EIGHTH, .03, short);
+        }
+        off += d;
+      }
+    }
+    const rest = tune.mel[bi].at(-1)[0] === null && e >= 8 - tune.mel[bi].at(-1)[1];
+    if (bs && e % 2 === 0) tri(ch[0] + (e % 4 === 2 ? 7 : 0) + 12, t, EIGHTH * .9, .26 * bs);
+    if (st && e % 2 === 1 && !rest) stab(ch.slice(1), t, .022 * st);
+    if (dr) {
+      if (rest && name === "A") {       // the gap at the end of each phrase gets a fill
+        if (e === 4) tom(t, 300); if (e === 5) tom(t, 220); if (e === 6) { kick(t); crash(t, .1); }
+        return;
+      }
+      if (e === 0 || e === 4) kick(t, .5 * dr);
+      if (e === 2 || e === 6) snare(t, .13 * dr);
+      if (e % 2) hat(t, .045 * dr);
+    }
+  }
+  function finale(t) {
+    const tr = PLAN.at(-1)[6];
+    stab([60 + tr, 64 + tr, 67 + tr, 72 + tr], t, .05);
+    lead(84 + tr, t, 1.2, .08); lead(72 + tr, t, 1.2, .03);
+    tri(36 + tr, t, 1.4, .3); crash(t, .2);
+    whistle(t + LEN_END.e1 - .1, 500, 1600, .6);
+    whistle(t + LEN_END.e2 - .1, 1500, 420, .9);
+    rimshot(t + LEN_END.e3 - .4);
+  }
+  function tick() {
+    while (nextT < ac.currentTime + .3) {
+      if (step >= BARS * 8) { finale(nextT); clearInterval(timer); timer = null; return; }
+      playStep(step, nextT); step++; nextT += EIGHTH;
+    }
+  }
+
+  // ---------- picture: the big top, the floor, the junk and the truck ----------
+  const cv = document.getElementById("sky"), cx = cv.getContext("2d");
+  const roll = document.getElementById("roll");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let W = 0, H = 0, dpr = 1, PX = 4, piles = [], confetti = [], bits = [];
+  const LEN_END = { e1: 1.2, e2: 3.2, e3: 5.4, again: 8.5 };
+  const PASSES = 3;
+
+  // tiny sprites: one character per pixel
+  const PAL = { k: "#1d1424", r: "#e2384d", R: "#b51f36", w: "#f4ead2", b: "#7aa6d8", s: "#b9b3c6", S: "#827b93", g: "#3fae6a", G: "#2b7d4b", y: "#ffc93c", o: "#ff8a3d", n: "#7a4a2a", N: "#5a331b", p: "#9b6fd1", d: "#2a2a35" };
+  const SPR = {
+    sofa: ["..rrrrrrrrrrrr..", ".rRRRRRRRRRRRRr.", "rrRRRRRRRRRRRRrr", "rrrrrrrrrrrrrrrr", "rRrrrrrrrrrrrrRr", "rrrrrrrrrrrrrrrr", ".n............n."],
+    mattress: ["....wwwwwwwwwwww", "..wwbwwbwwbwwbww", "wwwwwwwwwwwwwww.", "wbwwbwwbwwbww...", "wwwwwwwwwww....."],
+    fridge: ["sssssss", "sSsssss", "sSsssss", "sssssss", "SSSSSSS", "sSsssss", "sSsssss", "sssssss", "sssssss", "sssssss", "k.....k"],
+    cabinet: ["nnnnnnnnnn", "nNNNNnNNNn", "nNyNNnNyNn", "nNNNNnNNNn", "nnnnnnnnnn", "nNNNNNNNNn", "nNNNyyNNNn", "nnnnnnnnnn"],
+    bags: ["...kk.....", "..kddk..k.", ".kddddkkdk", "kddddddkdk", "kddddddddk", ".kkkkkkkk."],
+    tire: ["..kkkk..", ".kkddkk.", "kkd..dkk", "kkd..dkk", ".kkddkk.", "..kkkk.."],
+    chair: ["p......", "p......", "p......", "ppppppp", "p.....p", "p.....p"],
+    truck: [
+      ".......................yyyyyy..",
+      "..gggggggggggggggggg..yybbbbyy.",
+      ".gGGGGGGGGGGGGGGGGGg..ybbbbbbyy",
+      ".gGgggGgggGgggGgggGg..ybbbbbbyy",
+      ".gGGGGGGGGGGGGGGGGGg..yyyyyyyyy",
+      ".rrrrrrrrrrrrrrrrrrrrryyyyyyyyo",
+      ".gggggggggggggggggggggyyyyyyyyy",
+      "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+    ],
+  };
+  function sprite(name, x, y, px, flip = false) {
+    const rows = SPR[name], h = rows.length;
+    for (let r = 0; r < h; r++) {
+      const row = rows[r];
+      for (let c = 0; c < row.length; c++) {
+        const ch = row[flip ? row.length - 1 - c : c];
+        if (ch === ".") continue;
+        cx.fillStyle = PAL[ch];
+        cx.fillRect(Math.round(x + c * px), Math.round(y + r * px), px, px);
+      }
+    }
+  }
+  const spriteW = (n, px) => SPR[n][0].length * px, spriteH = (n, px) => SPR[n].length * px;
+
+  function seeded(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+  function resize() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    PX = Math.max(3, Math.round(Math.min(W, H) / 180));
+    const r = seeded(15);
+    const kinds = ["sofa", "mattress", "fridge", "cabinet", "bags", "tire", "chair", "bags"];
+    const tw = spriteW("truck", PX);
+    piles = [];
+    for (let x = 10 + r() * 30; x < W - 20; x += 70 + r() * 90) {
+      const items = [];
+      let stackY = 0;
+      for (let k = 0, n = 1 + Math.floor(r() * 3); k < n; k++) {
+        const kind = kinds[Math.floor(r() * kinds.length)];
+        items.push({ kind, dx: (r() - .5) * 20, dy: stackY, flip: r() < .5 });
+        stackY += spriteH(kind, PX) * .7;
+      }
+      const pass = Math.floor(r() * PASSES);
+      // cleared when the truck's back reaches the pile on its assigned pass
+      const at = (pass + (x + tw * .3 + 2 * tw) / (W + 4 * tw)) / PASSES * .97;
+      piles.push({ x, items, at });
+    }
+    confetti = Array.from({ length: 70 }, () => ({ x: r() * W, y: r() * H, v: 20 + r() * 40, s: 3 + r() * 4, ph: r() * 6, c: ["#ffc93c", "#e2384d", "#7aa6d8", "#3fae6a", "#f4ead2", "#9b6fd1"][Math.floor(r() * 6)] }));
+  }
+  const smooth = (a, b, x) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
+
+  let lastT = 0;
+  function draw(p, t) {
+    const dt = Math.max(0, Math.min(.05, t - lastT)); lastT = t;
+    const floorY = H * .86;
+    // tent: canvas stripes fanning out from the king pole
+    cx.fillStyle = "#1b1030"; cx.fillRect(0, 0, W, H);
+    const ax = W / 2, ay = -H * .35, n = 22;
+    for (let i = 0; i < n; i++) {
+      const a0 = Math.PI * (.12 + .76 * i / n), a1 = Math.PI * (.12 + .76 * (i + 1) / n);
+      cx.beginPath(); cx.moveTo(ax, ay);
+      cx.lineTo(ax + Math.cos(a0) * H * 3, ay + Math.sin(a0) * H * 3);
+      cx.lineTo(ax + Math.cos(a1) * H * 3, ay + Math.sin(a1) * H * 3);
+      cx.closePath();
+      cx.fillStyle = i % 2 ? "#3a1430" : "#251339"; cx.fill();
+    }
+    const dim = cx.createLinearGradient(0, 0, 0, H);
+    dim.addColorStop(0, "rgba(27,16,48,.15)"); dim.addColorStop(.7, "rgba(27,16,48,.55)"); dim.addColorStop(1, "rgba(27,16,48,.2)");
+    cx.fillStyle = dim; cx.fillRect(0, 0, W, H);
+    // two spotlights sweeping the ring, brighter as the floor gets cleaner
+    const lit = .1 + .14 * p;
+    cx.save(); cx.globalCompositeOperation = "lighter";
+    for (const [sx, ph] of [[W * .08, 0], [W * .92, 2.4]]) {
+      const tx = W / 2 + Math.sin((reduce ? 0 : t) * .45 + ph) * W * .32;
+      const g = cx.createLinearGradient(sx, 0, tx, floorY);
+      g.addColorStop(0, `rgba(255,236,190,${lit * 1.4})`); g.addColorStop(1, `rgba(255,236,190,${lit * .4})`);
+      cx.beginPath(); cx.moveTo(sx - 6, -10); cx.lineTo(sx + 6, -10); cx.lineTo(tx + W * .09, floorY); cx.lineTo(tx - W * .09, floorY); cx.closePath();
+      cx.fillStyle = g; cx.fill();
+      cx.beginPath(); cx.ellipse(tx, floorY + 6, W * .1, 10, 0, 0, Math.PI * 2);
+      cx.fillStyle = `rgba(255,236,190,${lit * .9})`; cx.fill();
+    }
+    cx.restore();
+    // bunting across the top
+    const bw = 34, sway = reduce ? 0 : Math.sin(t * 1.4) * 3;
+    cx.strokeStyle = "rgba(244,234,210,.5)"; cx.lineWidth = 1.5;
+    cx.beginPath();
+    for (let x = -bw; x <= W + bw; x += 4) cx.lineTo(x, 14 + Math.sin(x / W * Math.PI) * 22 + sway * Math.sin(x * .01));
+    cx.stroke();
+    for (let i = 0, x = 0; x < W + bw; i++, x += bw) {
+      const y = 14 + Math.sin((x + bw / 2) / W * Math.PI) * 22 + sway * Math.sin(x * .01);
+      cx.beginPath(); cx.moveTo(x + 3, y); cx.lineTo(x + bw - 3, y); cx.lineTo(x + bw / 2, y + 26 + sway); cx.closePath();
+      cx.fillStyle = ["#e2384d", "#ffc93c", "#7aa6d8", "#3fae6a"][i % 4]; cx.fill();
+    }
+    // sawdust floor with a painted ring edge
+    const fg = cx.createLinearGradient(0, floorY, 0, H);
+    fg.addColorStop(0, "#6b4524"); fg.addColorStop(1, "#3b2414");
+    cx.fillStyle = fg; cx.fillRect(0, floorY, W, H - floorY);
+    cx.fillStyle = "#e2384d"; cx.fillRect(0, floorY, W, PX);
+    cx.fillStyle = "#f4ead2";
+    for (let x = 0; x < W; x += PX * 6) cx.fillRect(x, floorY, PX * 3, PX);
+    // junk piles; each vanishes when the truck comes for it
+    let left = 0;
+    for (const pl of piles) {
+      const k = 1 - smooth(pl.at, pl.at + .006, p);
+      if (k <= 0) {
+        if (!pl.gone) { pl.gone = true; for (let i = 0; i < 10; i++) bits.push({ x: pl.x + 20, y: floorY - 20, vx: (Math.random() - .3) * 160, vy: -120 - Math.random() * 160, life: 1 }); }
+        continue;
+      }
+      pl.gone = false; left++;
+      for (const it of pl.items) {
+        const h = spriteH(it.kind, PX);
+        cx.save(); cx.globalAlpha = k;
+        sprite(it.kind, pl.x + it.dx, floorY - h - it.dy * k, PX, it.flip);
+        cx.restore();
+      }
+    }
+    // the garbage truck, three passes over the show
+    const tw = spriteW("truck", PX), th = spriteH("truck", PX);
+    const lap = p * PASSES / .97;
+    if (lap < PASSES) {
+      const f = lap % 1, x = -2 * tw + (W + 4 * tw) * f;
+      const bob = reduce ? 0 : (Math.sin(t * 18) > 0 ? 0 : 1) * PX * .5;
+      sprite("truck", x, floorY - th - PX * 3 + bob, PX);
+      // claw arm reaching forward
+      cx.strokeStyle = "#ffc93c"; cx.lineWidth = PX;
+      const ex = x + tw * .55, ey = floorY - th - PX * 3, swing = Math.sin(t * 5) * PX * 3;
+      cx.beginPath(); cx.moveTo(ex, ey); cx.lineTo(ex + tw * .35, ey - th * .6 + swing); cx.lineTo(ex + tw * .55, ey + th * .2 + swing); cx.stroke();
+      for (const wx of [x + tw * .15, x + tw * .5, x + tw * .85]) {
+        cx.fillStyle = "#1d1424"; cx.beginPath(); cx.arc(wx, floorY - PX * 2.5, PX * 2.5, 0, Math.PI * 2); cx.fill();
+        cx.fillStyle = "#b9b3c6"; cx.fillRect(wx - PX / 2, floorY - PX * 3, PX, PX);
+      }
+    }
+    // debris flying into the truck
+    for (const d of bits) {
+      d.vy += 420 * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.life -= dt * .9;
+      if (d.life > 0) { cx.fillStyle = `rgba(244,234,210,${d.life})`; cx.fillRect(d.x, d.y, PX, PX); }
+    }
+    bits = bits.filter((d) => d.life > 0 && d.y < H);
+    // confetti, thicker toward the finale
+    if (!reduce) {
+      const m = Math.floor(confetti.length * (.25 + .75 * smooth(.85, 1, p)));
+      for (let i = 0; i < m; i++) {
+        const c = confetti[i];
+        c.y += c.v * dt; c.x += Math.sin(t * 2 + c.ph) * 12 * dt;
+        if (c.y > floorY) { c.y = -10; c.x = Math.random() * W; }
+        cx.fillStyle = c.c; cx.fillRect(c.x, c.y, c.s, c.s * (.4 + .6 * Math.abs(Math.sin(t * 3 + c.ph))));
+      }
+    }
+    // junk meter, the sequel to part one's water gauge
+    if (W >= 560) {
+      const gx = W - 58, top = floorY - H * .34, gh = H * .3, frac = piles.length ? left / piles.length : 0;
+      cx.fillStyle = "rgba(244,234,210,.85)"; cx.fillRect(gx, top, 10, gh);
+      cx.fillStyle = "#1d1424"; cx.fillRect(gx + 2, top + 2, 6, gh - 4);
+      cx.fillStyle = "#e2384d"; cx.fillRect(gx + 2, top + 2 + (gh - 4) * (1 - frac), 6, (gh - 4) * frac);
+      cx.textAlign = "center"; cx.fillStyle = "#ffc93c";
+      cx.font = "600 12px 'Bai Jamjuree', sans-serif";
+      cx.fillText("ขยะคงเหลือ", gx + 5, top - 34);
+      cx.font = frac ? "14px 'Press Start 2P', monospace" : "600 20px 'Bai Jamjuree', sans-serif";
+      cx.fillText(frac ? Math.round(frac * 100) + "%" : "เกลี้ยง", gx + 5, top - 12);
+    }
+  }
+
+  // ---------- timeline ----------
+  const intro = document.getElementById("intro"), muteBtn = document.getElementById("mute");
+  const e1 = document.getElementById("e1"), e2 = document.getElementById("e2"), e3 = document.getElementById("e3"), again = document.getElementById("again"), e4 = document.getElementById("e4");
+  let running = false, rollH = 0;
+  const now = () => (ac ? ac.currentTime : performance.now() / 1000);
+  function elapsed() { return running ? now() - t0 : 0; }
+
+  function start() {
+    if (!ac) initAudio();
+    if (ac && ac.state === "suspended") ac.resume();
+    [e1, e2, e3].forEach((x) => x.classList.remove("on"));
+    again.hidden = true; e4.hidden = true;
+    intro.classList.add("gone");
+    muteBtn.hidden = !ac;
+    rollH = roll.offsetHeight;
+    piles.forEach((pl) => (pl.gone = false));
+    t0 = now() + .15; step = 0; nextT = t0; running = true;
+    if (ac) { if (timer) clearInterval(timer); timer = setInterval(tick, 40); tick(); }
+  }
+  function frame() {
+    if (studio) return;
+    const t = performance.now() / 1000, el = Math.max(0, elapsed());
+    const p = running ? Math.min(1, el / LEN) : 0;
+    draw(p, t);
+    roll.style.transform = `translateY(${H - (H + rollH) * p}px)`;
+    if (running && el > LEN) {
+      const k = el - LEN;
+      if (k > LEN_END.e1) e1.classList.add("on");
+      if (k > LEN_END.e2) e2.classList.add("on");
+      if (k > LEN_END.e3) e3.classList.add("on");
+      if (k > LEN_END.again) { again.hidden = false; e4.hidden = false; }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // jump ahead for rehearsals: __seek(seconds) moves picture and score together
+  window.__seek = (sec) => {
+    t0 -= sec;
+    if (ac && timer) { step = Math.min(BARS * 8, Math.ceil((ac.currentTime + .05 - t0) / EIGHTH)); nextT = t0 + step * EIGHTH; }
+  };
+  document.getElementById("play").addEventListener("click", start);
+  again.addEventListener("click", start);
+  muteBtn.addEventListener("click", () => {
+    muted = !muted;
+    master.gain.setTargetAtTime(muted ? 0 : .85, ac.currentTime, .05);
+    muteBtn.textContent = muted ? "🔇 ปิดเสียง" : "🔊 เสียง";
+  });
+  addEventListener("resize", () => { resize(); rollH = roll.offsetHeight; });
+  // ---------- studio: frame-exact rendering for the vertical video ----------
+  const INTRO = 3.5;
+  let studio = false;
+  const clamp = (x) => Math.min(1, Math.max(0, x));
+  window.__studio = {
+    INTRO, LEN, total: INTRO + LEN + 11.5,
+    at(vt) {
+      if (!studio) { studio = true; document.documentElement.classList.add("studio"); rollH = roll.offsetHeight; }
+      const el = vt - INTRO, p = clamp(el / LEN);
+      intro.style.opacity = 1 - smooth(INTRO - 1, INTRO, vt);
+      draw(p, vt);
+      roll.style.transform = `translateY(${H - (H + rollH) * p}px)`;
+      const k = el - LEN;
+      [[e1, LEN_END.e1], [e2, LEN_END.e2]].forEach(([n, at]) => {
+        const a = clamp((k - at) / 1.1);
+        n.style.opacity = a; n.style.transform = `translateY(${12 * (1 - a)}px)`;
+      });
+      const a3 = clamp((k - LEN_END.e3) / .35);
+      e3.style.opacity = a3; e3.style.transform = `scale(${1 + .5 * (1 - a3) * (1 - a3)})`;
+    },
+    async audio() {
+      const SR = 44100, total = this.total;
+      initAudio(new OfflineAudioContext(2, Math.ceil(SR * total), SR));
+      for (let s = 0; s < BARS * 8; s++) playStep(s, INTRO + s * EIGHTH);
+      finale(INTRO + LEN);
+      const buf = await ac.startRendering();
+      const n = buf.length, L = buf.getChannelData(0), R = buf.getChannelData(1);
+      let peak = 0;
+      for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i]));
+      const gain = peak > 0 ? .95 / Math.max(peak, .5) : 1;
+      const wav = new DataView(new ArrayBuffer(44 + n * 4));
+      const w = (o, str) => [...str].forEach((c, i) => wav.setUint8(o + i, c.charCodeAt(0)));
+      w(0, "RIFF"); wav.setUint32(4, 36 + n * 4, true); w(8, "WAVEfmt ");
+      wav.setUint32(16, 16, true); wav.setUint16(20, 1, true); wav.setUint16(22, 2, true);
+      wav.setUint32(24, SR, true); wav.setUint32(28, SR * 4, true); wav.setUint16(32, 4, true); wav.setUint16(34, 16, true);
+      w(36, "data"); wav.setUint32(40, n * 4, true);
+      for (let i = 0, o = 44; i < n; i++, o += 4) {
+        wav.setInt16(o, Math.max(-1, Math.min(1, L[i] * gain)) * 32767, true);
+        wav.setInt16(o + 2, Math.max(-1, Math.min(1, R[i] * gain)) * 32767, true);
+      }
+      this.wav = new Uint8Array(wav.buffer);
+      return this.wav.length;
+    },
+    chunk(i, size) {
+      let s = ""; const part = this.wav.subarray(i, i + size);
+      for (let j = 0; j < part.length; j += 8192) s += String.fromCharCode.apply(null, part.subarray(j, j + 8192));
+      return btoa(s);
+    },
+  };
+  resize();
+  rollH = roll.offsetHeight;
+  requestAnimationFrame(frame);
+})();
+</script>
