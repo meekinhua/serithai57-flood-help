@@ -73,13 +73,21 @@ def box_around(lat: float, lng: float, w: float = 7.0, d: float = 10.0) -> list:
 
 def building_shapes(edits: dict, with_removed: bool = False) -> list:
     shapes, levels = (edits or {}).get("shapes") or {}, (edits or {}).get("levels") or {}
+    types, names, groups = (edits or {}).get("types") or {}, (edits or {}).get("names") or {}, (edits or {}).get("groups") or {}
     added = {b[2] for b in (edits or {}).get("added") or []}
     out = []
     def one(lat, lng, bid, state):
         base = FOOTPRINTS.get(str(bid))
         g = shapes.get(str(bid)) or (base[0] if base else box_around(lat, lng))
         lv = levels.get(str(bid)) or (base[1] if base else 2)
-        out.append({"id": bid, "g": g, "lv": lv, "s": state})
+        row = {"id": bid, "g": g, "lv": lv, "s": state}
+        if types.get(str(bid)):
+            row["t"] = types[str(bid)]
+        if names.get(str(bid)):
+            row["n"] = names[str(bid)]
+        if groups.get(str(bid)):
+            row["grp"] = groups[str(bid)]
+        out.append(row)
     for lat, lng, bid in BUILDINGS["buildings"]:
         one(lat, lng, bid, "added" if bid in added else "osm")
     if with_removed:
@@ -176,6 +184,17 @@ class RoofEdit(BaseModel):
     id: Optional[int] = None
     g: Optional[list[list[float]]] = Field(None, min_length=3, max_length=60)  # outline [[lat, lng], …]
     lv: Optional[int] = Field(None, ge=1, le=30)  # floors
+    t: Optional[str] = Field(None, pattern=r"^(house|townhouse|hall|pool|tennis|basket|badminton|park|shrine|office|shop|school|other)$")
+    n: Optional[str] = Field(None, max_length=40)  # name shown on the 3D map ("" clears)
+
+
+class RoofSplit(BaseModel):
+    id: int
+    parts: list[list[list[float]]] = Field(..., min_length=2, max_length=20)
+
+
+class RoofGroup(BaseModel):
+    ids: list[int] = Field(..., min_length=1, max_length=20)
 
 
 class SoiLines(BaseModel):
@@ -488,7 +507,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
 
     async def roof_edits() -> dict:
         doc = await db.settings.find_one({"id": "building_edits"}, {"_id": 0}) or {}
-        return {"added": doc.get("added") or [], "removed": doc.get("removed") or [], "shapes": doc.get("shapes") or {}, "levels": doc.get("levels") or {}}
+        return {k: doc.get(k) or ({} if k not in ("added", "removed") else []) for k in ("added", "removed", "shapes", "levels", "types", "names", "groups")}
 
     async def save_roofs(e: dict, admin: dict, what: str):
         await db.settings.update_one({"id": "building_edits"}, {"$set": {"id": "building_edits", **e, "by": admin.get("name", ""), "at": now()}}, upsert=True)
@@ -526,6 +545,10 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
             e["shapes"][str(new_id)] = [[round(a, 6), round(b, 6)] for a, b in body.g]
         if body.lv:
             e["levels"][str(new_id)] = body.lv
+        if body.t:
+            e["types"][str(new_id)] = body.t
+        if body.n:
+            e["names"][str(new_id)] = body.n.strip()
         return await save_roofs(e, admin, f"+ {body.lat:.5f},{body.lng:.5f}")
 
     @router.post("/admin/buildings/remove")
@@ -540,15 +563,69 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
     @router.post("/admin/buildings/shape")
     async def shape_roof(body: RoofEdit, admin: dict = Depends(require_admin)):
         """Floors and/or outline of one building (OSM or added)."""
-        if body.id is None or (body.lv is None and not body.g):
+        if body.id is None or (body.lv is None and not body.g and body.t is None and body.n is None):
             raise HTTPException(422, "เลือกอาคารก่อน")
         e = await roof_edits()
+        if body.t:
+            e["types"][str(body.id)] = body.t
+        if body.n is not None:
+            if body.n.strip():
+                e["names"][str(body.id)] = body.n.strip()
+            else:
+                e["names"].pop(str(body.id), None)
         if body.lv:
             e["levels"][str(body.id)] = body.lv
         if body.g:
-            e["shapes"][str(body.id)] = [[round(a, 6), round(b, 6)] for a, b in body.g]
-        await save_roofs(e, admin, f"shape {body.id} {body.lv or ''}")
+            e["shapes"][str(body.id)] = _outline_ok(body.g)
+        await save_roofs(e, admin, f"shape {body.id} {body.lv or ''} {body.t or ''}")
         return {"buildings": building_shapes(e, with_removed=True)}
+
+    def _outline_ok(g):
+        if not all(13.7 <= a <= 13.9 and 100.6 <= b <= 100.8 for a, b in g):
+            raise HTTPException(422, "รูปอาคารอยู่นอกหมู่บ้าน")
+        return [[round(a, 6), round(b, 6)] for a, b in g]
+
+    @router.post("/admin/buildings/split")
+    async def split_roof(body: RoofSplit, admin: dict = Depends(require_admin)):
+        """A long block (townhouses / shophouses) becomes one building per unit; returns the new ids."""
+        e = await roof_edits()
+        sid = str(body.id)
+        lv, t = e["levels"].get(sid), e["types"].get(sid)
+        if lv is None:
+            base = FOOTPRINTS.get(sid)
+            lv = base[1] if base else 2
+        if any(b[2] == body.id for b in e["added"]):
+            e["added"] = [b for b in e["added"] if b[2] != body.id]
+        elif body.id not in e["removed"]:
+            e["removed"].append(body.id)
+        new_ids, t0 = [], int(time.time() * 1000) % 1_000_000_000
+        for k, g in enumerate(body.parts):
+            g = _outline_ok(g)
+            nid = 9_000_000_000 + (t0 + k) % 1_000_000_000
+            e["added"].append([round(sum(a for a, _ in g) / len(g), 6), round(sum(b for _, b in g) / len(g), 6), nid])
+            e["shapes"][str(nid)] = g
+            e["levels"][str(nid)] = lv
+            e["types"][str(nid)] = t if t and t != "house" else "townhouse"
+            new_ids.append(nid)
+        await save_roofs(e, admin, f"split {body.id} → {len(new_ids)}")
+        return {"ids": new_ids}
+
+    @router.post("/admin/buildings/group")
+    async def group_roofs(body: RoofGroup, admin: dict = Depends(require_admin)):
+        """Several buildings that are one house (a house + its annex): they share the leader's colour and label."""
+        e = await roof_edits()
+        if len(body.ids) == 1:  # ungroup the whole group this building is in
+            lead = e["groups"].get(str(body.ids[0]), body.ids[0])
+            e["groups"] = {k: v for k, v in e["groups"].items() if v != lead}
+        else:
+            lead = e["groups"].get(str(body.ids[0]), body.ids[0])
+            for i in body.ids:
+                old = e["groups"].get(str(i))
+                if old and old != lead:  # merging two groups
+                    e["groups"] = {k: (lead if v == old else v) for k, v in e["groups"].items()}
+                e["groups"][str(i)] = lead
+        await save_roofs(e, admin, f"group {body.ids}")
+        return {"ok": True}
 
     @router.get("/admin/buildings3d")
     async def admin_3d(admin: dict = Depends(require_admin)):

@@ -147,12 +147,32 @@ function makeBuilder(THREE) {
   };
 }
 
+const toLLr = ([x, z]) => [+(LAT0 - z / KZ).toFixed(7), +(LNG0 + x / KX).toFixed(7)];
+
 const FLOOR = 3;
-function buildHouse(B, b, wall, roof, segs) {
+// what a building can be (the admin picks one); size = default footprint [w, d] in metres when placed new
+export const KINDS = {
+  house: { icon: "🏠", label: "บ้าน", size: [7, 10] },
+  townhouse: { icon: "🏘️", label: "ทาวน์เฮาส์/ตึกแถว", size: [5, 14] },
+  shop: { icon: "🏪", label: "ร้านค้า", size: [6, 12] },
+  office: { icon: "🏢", label: "ออฟฟิศหมู่บ้าน", size: [10, 14] },
+  hall: { icon: "🏛️", label: "หอประชุม", size: [20, 30] },
+  shrine: { icon: "🛕", label: "หอพระ", size: [8, 12] },
+  school: { icon: "🏫", label: "โรงเรียน", size: [12, 40] },
+  pool: { icon: "🏊", label: "สระว่ายน้ำ", size: [12, 25] },
+  tennis: { icon: "🎾", label: "สนามเทนนิส", size: [18, 36] },
+  basket: { icon: "🏀", label: "สนามบาส", size: [15, 28] },
+  badminton: { icon: "🏸", label: "สนามแบด", size: [6.1, 13.4] },
+  park: { icon: "🌳", label: "สวนสาธารณะ", size: [30, 30] },
+  other: { icon: "📦", label: "อื่นๆ", size: [8, 8] },
+};
+export const FLATS = new Set(["pool", "tennis", "basket", "badminton", "park"]);
+
+// the building's own frame: centre, front (towards the street), half width/depth
+function frame(b, segs) {
   const o = obb(b.g.map(toL));
-  if (!o) return;
+  if (!o) return null;
   const { cx, cz, ux, uz, hu, hv } = o;
-  // the door faces the street: pick the side pointing at the nearest road
   const road = nearestRoad(segs, cx, cz);
   const vx = -uz;
   const vz = ux;
@@ -174,55 +194,175 @@ function buildHouse(B, b, wall, roof, segs) {
     hw = pick[3];
   }
   const s = [f[1], -f[0]];
-  const P = (x, y, z) => [cx + s[0] * x + f[0] * z, y, cz + s[1] * x + f[1] * z];
-  const H = b.lv * FLOOR;
-  // walls
-  B.quad(P(-hw, 0, hd), P(hw, 0, hd), P(hw, H, hd), P(-hw, H, hd), wall);
-  B.quad(P(-hw, 0, -hd), P(hw, 0, -hd), P(hw, H, -hd), P(-hw, H, -hd), wall);
-  B.quad(P(hw, 0, -hd), P(hw, 0, hd), P(hw, H, hd), P(hw, H, -hd), wall);
-  B.quad(P(-hw, 0, -hd), P(-hw, 0, hd), P(-hw, H, hd), P(-hw, H, -hd), wall);
-  // roof: a gable on houses, flat on big blocks
-  const big = Math.max(hw, hd) > 14 || b.lv >= 5;
-  if (big) {
-    B.quad(P(-hw, H, -hd), P(hw, H, -hd), P(hw, H, hd), P(-hw, H, hd), roof);
-    const r = 0.6;
-    B.quad(P(-hw, H, hd), P(hw, H, hd), P(hw, H + r, hd), P(-hw, H + r, hd), roof);
-    B.quad(P(-hw, H, -hd), P(hw, H, -hd), P(hw, H + r, -hd), P(-hw, H + r, -hd), roof);
-    B.quad(P(hw, H, -hd), P(hw, H, hd), P(hw, H + r, hd), P(hw, H + r, -hd), roof);
-    B.quad(P(-hw, H, -hd), P(-hw, H, hd), P(-hw, H + r, hd), P(-hw, H + r, -hd), roof);
-  } else {
-    const R = 0.55 * Math.min(hw, hd) + 0.7;
-    const ov = 0.4;
+  return { cx, cz, hw, hd, P: (x, y, z) => [cx + s[0] * x + f[0] * z, y, cz + s[1] * x + f[1] * z], long: hu >= hv ? [ux, uz] : [vx, vz] };
+}
+
+function toolkit(B, P) {
+  const box = (x0, x1, y0, y1, z0, z1, hex, top = true) => {
+    B.quad(P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1), hex);
+    B.quad(P(x0, y0, z0), P(x1, y0, z0), P(x1, y1, z0), P(x0, y1, z0), hex);
+    B.quad(P(x1, y0, z0), P(x1, y0, z1), P(x1, y1, z1), P(x1, y1, z0), hex);
+    B.quad(P(x0, y0, z0), P(x0, y0, z1), P(x0, y1, z1), P(x0, y1, z0), hex);
+    if (top) B.quad(P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1), hex);
+  };
+  const floor = (x0, x1, z0, z1, y, hex) => B.quad(P(x0, y, z0), P(x1, y, z0), P(x1, y, z1), P(x0, y, z1), hex);
+  // a gable roof over [-hw, hw] × [-hd, hd] from height H, ridge along the longer side
+  const gable = (hw, hd, H, R, ov, roof, wall) => {
+    const X = hw + ov;
+    const Z = hd + ov;
     if (hw >= hd) {
-      // ridge runs left–right, slopes face the street
-      const X = hw + ov;
-      const Z = hd + ov;
       B.quad(P(-X, H, Z), P(X, H, Z), P(X, H + R, 0), P(-X, H + R, 0), roof);
       B.quad(P(-X, H, -Z), P(X, H, -Z), P(X, H + R, 0), P(-X, H + R, 0), roof);
       B.tri(P(hw, H, -hd), P(hw, H, hd), P(hw, H + R, 0), wall);
       B.tri(P(-hw, H, -hd), P(-hw, H, hd), P(-hw, H + R, 0), wall);
     } else {
-      // ridge runs front–back: the gable faces the street
-      const X = hw + ov;
-      const Z = hd + ov;
       B.quad(P(X, H, -Z), P(X, H, Z), P(0, H + R, Z), P(0, H + R, -Z), roof);
       B.quad(P(-X, H, -Z), P(-X, H, Z), P(0, H + R, Z), P(0, H + R, -Z), roof);
       B.tri(P(-hw, H, hd), P(hw, H, hd), P(0, H + R, hd), wall);
       B.tri(P(-hw, H, -hd), P(hw, H, -hd), P(0, H + R, -hd), wall);
     }
-  }
-  // door + windows on the street side, a window per floor on the ends
+  };
+  const lineX = (x0, x1, z, y, hex = "#FFFFFF", w = 0.08) => floor(x0, x1, z - w, z + w, y, hex);
+  const lineZ = (z0, z1, x, y, hex = "#FFFFFF", w = 0.08) => floor(x - w, x + w, z0, z1, y, hex);
+  return { box, floor, gable, lineX, lineZ };
+}
+
+function buildThing(B, b, wall, roof, segs, tree) {
+  const F = frame(b, segs);
+  if (!F) return;
+  const { hw, hd, P } = F;
+  const K = toolkit(B, P);
+  const t = b.t || "house";
   const front = hd + 0.03;
   const rect = (x, y, w, h, z, hex) => B.quad(P(x - w, y - h, z), P(x + w, y - h, z), P(x + w, y + h, z), P(x - w, y + h, z), hex);
-  const side = (sx, y, w, h, hex) => B.quad(P(sx, y - h, -w), P(sx, y - h, w), P(sx, y + h, w), P(sx, y + h, -w), hex);
   const win = (x, y) => {
     rect(x, y, 0.62, 0.62, front, "#FFFFFF");
     rect(x, y, 0.48, 0.48, front + 0.02, "#8FD3F4");
   };
-  const dx = hw > 1.8 ? -hw * 0.38 : 0;
-  rect(dx, 1.05, 0.5, 1.05, front, "#8B5A3C");
-  rect(dx + 0.3, 1.0, 0.07, 0.07, front + 0.02, "#FFD43B");
-  if (hw > 1.8) win(hw * 0.4, 1.6);
+  // courts and pools lie along their long side
+  const L = Math.max(hw, hd);
+  const S = Math.min(hw, hd);
+  const along = hw >= hd; // long side runs along x
+  const C = (a, y, c) => (along ? P(a, y, c) : P(c, y, a)); // a = along the long side, c = across
+  const cfloor = (a0, a1, c0, c1, y, hex) => B.quad(C(a0, y, c0), C(a1, y, c0), C(a1, y, c1), C(a0, y, c1), hex);
+  const court = (base, inner, line, inset) => {
+    cfloor(-L, L, -S, S, 0.05, base);
+    const l = L * inset;
+    const s2 = S * inset;
+    cfloor(-l, l, -s2, s2, 0.07, inner);
+    const w = 0.09;
+    cfloor(-l, l, s2 - w, s2 + w, 0.09, line);
+    cfloor(-l, l, -s2 - w, -s2 + w, 0.09, line);
+    cfloor(l - w, l + w, -s2, s2, 0.09, line);
+    cfloor(-l - w, -l + w, -s2, s2, 0.09, line);
+    return { l, s2 };
+  };
+  const net = (s2, h, hex = "#F4F4F4") => {
+    B.quad(C(-0.04, 0, -s2), C(-0.04, 0, s2), C(-0.04, h, s2), C(-0.04, h, -s2), hex);
+    for (const c of [-s2, s2]) K.box(...(along ? [-0.1, 0.1, 0, h + 0.1, c - 0.1, c + 0.1] : [c - 0.1, c + 0.1, 0, h + 0.1, -0.1, 0.1]), "#7A7A7A");
+  };
+
+  if (t === "pool") {
+    cfloor(-L, L, -S, S, 0.25, "#EDE6D6");
+    K.box(-hw, hw, 0, 0.25, -hd, hd, "#EDE6D6", false);
+    const l = L - 1.2;
+    const s2 = S - 1.2;
+    cfloor(-l, l, -s2, s2, 0.28, "#4FC3F7");
+    for (let k = 1; k < 5; k++) {
+      const c = -s2 + (2 * s2 * k) / 5;
+      cfloor(-l + 1, l - 1, c - 0.06, c + 0.06, 0.3, "#E1F5FE");
+    }
+    return;
+  }
+  if (t === "tennis") {
+    const { s2 } = court("#4E9F6A", "#3A86B5", "#FFFFFF", 0.82);
+    cfloor(-0.05, 0.05, -s2, s2, 0.09, "#FFFFFF");
+    net(s2 + 0.4, 1.07);
+    return;
+  }
+  if (t === "badminton") {
+    const { l, s2 } = court("#2E8B57", "#2F9E66", "#FFFFFF", 0.92);
+    for (const a of [-l * 0.3, l * 0.3]) cfloor(a - 0.05, a + 0.05, -s2, s2, 0.09, "#FFFFFF");
+    cfloor(-l, l, -0.05, 0.05, 0.09, "#FFFFFF");
+    net(s2 + 0.2, 1.55);
+    return;
+  }
+  if (t === "basket") {
+    const { l, s2 } = court("#E9824A", "#D9733B", "#FFFFFF", 0.9);
+    cfloor(-0.06, 0.06, -s2, s2, 0.09, "#FFFFFF");
+    for (const end of [-1, 1]) {
+      const a = end * (l - 0.2);
+      const key = end * (l - 5.8);
+      cfloor(Math.min(a, key), Math.max(a, key), -2.4, 2.4, 0.08, "#C4572A");
+      const pole = end * (l + 0.6);
+      K.box(...(along ? [pole - 0.12, pole + 0.12, 0, 3.4, -0.12, 0.12] : [-0.12, 0.12, 0, 3.4, pole - 0.12, pole + 0.12]), "#5C6670");
+      const bd = end * (l - 0.1);
+      B.quad(C(bd, 2.8, -0.9), C(bd, 2.8, 0.9), C(bd, 3.9, 0.9), C(bd, 3.9, -0.9), "#FFFFFF");
+      const r = end * (l - 0.55);
+      cfloor(r - 0.25, r + 0.25, -0.25, 0.25, 3.05, "#FF6B1A");
+    }
+    return;
+  }
+  if (t === "park") {
+    cfloor(-L, L, -S, S, 0.04, "#A8DD86");
+    let seed = Math.abs(b.id) % 2147483647 || 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const n = Math.min(14, Math.max(3, Math.round((L * S) / 40)));
+    for (let k = 0; k < n; k++) {
+      const p = C((rnd() * 2 - 1) * L * 0.85, 0, (rnd() * 2 - 1) * S * 0.85);
+      tree(p[0], p[2], rnd);
+    }
+    cfloor(-L * 0.9, L * 0.9, -0.6, 0.6, 0.06, "#E9DFC6"); // a footpath
+    return;
+  }
+  if (t === "shrine") {
+    // หอพระ: a white hall on a plinth, two stacked red roofs with a gold ridge and chofa
+    K.box(-hw - 0.8, hw + 0.8, 0, 0.8, -hd - 0.8, hd + 0.8, "#E9E1CF");
+    K.box(-hw, hw, 0.8, 4.6, -hd, hd, "#FFFFFF", false);
+    rect(0, 2.2, 0.8, 1.4, front, "#B8860B");
+    const R1 = 0.55 * S + 1.2;
+    K.gable(hw, hd, 4.6, R1, 0.7, "#C0392B", "#FFFFFF");
+    K.gable(hw * 0.72, hd * 0.72, 4.6 + R1 * 0.55, R1 * 0.75, 0.3, "#E67E22", "#FFFFFF");
+    const top = 4.6 + R1 * 0.55 + R1 * 0.75;
+    if (hw >= hd) K.box(-hw * 0.72 - 0.3, hw * 0.72 + 0.3, top - 0.1, top + 0.25, -0.12, 0.12, "#F4C430");
+    else K.box(-0.12, 0.12, top - 0.1, top + 0.25, -hd * 0.72 - 0.3, hd * 0.72 + 0.3, "#F4C430");
+    for (const sx of [-1, 1]) {
+      const end = hw >= hd ? P(sx * (hw * 0.72 + 0.3), top, 0) : P(0, top, sx * (hd * 0.72 + 0.3));
+      B.tri([end[0] - 0.15, top, end[2]], [end[0] + 0.15, top, end[2]], [end[0], top + 1.4, end[2]], "#F4C430");
+    }
+    return;
+  }
+
+  // buildings with walls
+  const isHall = t === "hall" || t === "school";
+  const H = t === "hall" ? Math.max(7, b.lv * FLOOR) : b.lv * FLOOR;
+  K.box(-hw, hw, 0, H, -hd, hd, wall, false);
+  const big = Math.max(hw, hd) > 14 || b.lv >= 5 || t === "school";
+  if (big && t !== "hall") {
+    K.floor(-hw, hw, -hd, hd, H, roof);
+    K.box(-hw, hw, H, H + 0.6, -hd, hd, roof, false);
+  } else K.gable(hw, hd, H, (t === "hall" ? 0.4 : 0.55) * Math.min(hw, hd) + 0.7, 0.4, roof, wall);
+  const dx = hw > 1.8 && !isHall ? -hw * 0.38 : 0;
+  rect(dx, isHall ? 1.6 : 1.05, isHall ? 1.4 : 0.5, isHall ? 1.6 : 1.05, front, "#8B5A3C");
+  if (!isHall) rect(dx + 0.3, 1.0, 0.07, 0.07, front + 0.02, "#FFD43B");
+  if (t === "hall") for (const x of [-hw * 0.8, -hw * 0.4, hw * 0.4, hw * 0.8]) K.box(x - 0.3, x + 0.3, 0, H, hd + 0.4, hd + 1.0, "#FFFFFF");
+  if (t === "shop") {
+    // a striped awning over the shopfront
+    const n = Math.max(3, Math.round(hw * 2));
+    for (let k = 0; k < n; k++) {
+      const x0 = -hw + (2 * hw * k) / n;
+      const x1 = -hw + (2 * hw * (k + 1)) / n;
+      B.quad(P(x0, 2.9, hd), P(x1, 2.9, hd), P(x1, 2.4, hd + 1.3), P(x0, 2.4, hd + 1.3), k % 2 ? "#FFFFFF" : "#E8505B");
+    }
+  }
+  if (t === "office") {
+    // a flagpole with the Thai flag
+    const px = hw + 1.5;
+    K.box(px - 0.08, px + 0.08, 0, H + 3, hd - 0.08, hd + 0.08, "#C9CED6");
+    const st = ["#ED1C24", "#FFFFFF", "#241D4F", "#241D4F", "#FFFFFF", "#ED1C24"];
+    st.forEach((c, k) => B.quad(P(px + 0.1, H + 2.9 - k * 0.2, hd), P(px + 1.9, H + 2.9 - k * 0.2, hd), P(px + 1.9, H + 2.7 - k * 0.2, hd), P(px + 0.1, H + 2.7 - k * 0.2, hd), c));
+  }
+  if (!isHall && hw > 1.8 && t !== "shop") win(hw * 0.4, 1.6);
   for (let k = 1; k < Math.min(b.lv, 6); k++) {
     const y = k * FLOOR + 1.6;
     if (hw > 2.2) {
@@ -230,20 +370,75 @@ function buildHouse(B, b, wall, roof, segs) {
       win(hw * 0.45, y);
     } else win(0, y);
   }
-  if (hd > 2.5)
-    for (let k = 0; k < Math.min(b.lv, 6); k++) {
+  if (hd > 2.5 && t !== "townhouse")
+    for (let k = 0; k < Math.min(b.lv, 6); k++)
       for (const sx of [hw + 0.03, -hw - 0.03]) {
-        side(sx, k * FLOOR + 1.6, 0.6, 0.6, "#FFFFFF");
-        side(sx + Math.sign(sx) * 0.02, k * FLOOR + 1.6, 0.46, 0.46, "#8FD3F4");
+        B.quad(P(sx, k * FLOOR + 1.0, -0.6), P(sx, k * FLOOR + 1.0, 0.6), P(sx, k * FLOOR + 2.2, 0.6), P(sx, k * FLOOR + 2.2, -0.6), "#FFFFFF");
+        const s2 = sx + Math.sign(sx) * 0.02;
+        B.quad(P(s2, k * FLOOR + 1.14, -0.46), P(s2, k * FLOOR + 1.14, 0.46), P(s2, k * FLOOR + 2.06, 0.46), P(s2, k * FLOOR + 2.06, -0.46), "#8FD3F4");
       }
-    }
 }
 
-function buildTrees(B, THREE, green, places) {
-  let seed = 57;
-  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+// geometry helpers for the editor
+const rotL = ([x, z], c, a) => {
+  const cs = Math.cos(a);
+  const sn = Math.sin(a);
+  return [c[0] + (x - c[0]) * cs - (z - c[1]) * sn, c[1] + (x - c[0]) * sn + (z - c[1]) * cs];
+};
+const lCentre = (pts) => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
+export function rotate(g, deg) {
+  const pts = g.map(toL);
+  const c = lCentre(pts);
+  return pts.map((p) => toLLr(rotL(p, c, (deg * Math.PI) / 180)));
+}
+export function scale(g, k) {
+  const pts = g.map(toL);
+  const c = lCentre(pts);
+  return pts.map(([x, z]) => toLLr([c[0] + (x - c[0]) * k, c[1] + (z - c[1]) * k]));
+}
+export function move(g, dx, dz) {
+  return g.map(toL).map(([x, z]) => toLLr([x + dx, z + dz]));
+}
+// cut a long block into n equal units along its long side (townhouses / shophouses)
+export function split(g, n) {
+  const o = obb(g.map(toL));
+  const along = o.hu >= o.hv;
+  const [ax, az] = along ? [o.ux, o.uz] : [-o.uz, o.ux];
+  const [bx, bz] = along ? [-o.uz, o.ux] : [o.ux, o.uz];
+  const L = along ? o.hu : o.hv;
+  const S = along ? o.hv : o.hu;
+  const pt = (a, c) => toLLr([o.cx + ax * a + bx * c, o.cz + az * a + bz * c]);
+  return Array.from({ length: n }, (_, k) => {
+    const a0 = -L + (2 * L * k) / n;
+    const a1 = -L + (2 * L * (k + 1)) / n;
+    return [pt(a0, -S), pt(a1, -S), pt(a1, S), pt(a0, S)];
+  });
+}
+// a new footprint of w × d metres at a point, lined up with a reference outline if there is one
+export function rectAt(at, w, d, ref) {
+  const [cx, cz] = toL(at);
+  let ux = 1;
+  let uz = 0;
+  if (ref) {
+    const o = obb(ref.map(toL));
+    if (o) [ux, uz] = o.hu >= o.hv ? [o.ux, o.uz] : [-o.uz, o.ux];
+  }
+  const vx = -uz;
+  const vz = ux;
+  const [a, c] = [d / 2, w / 2];
+  return [
+    [-a, -c],
+    [a, -c],
+    [a, c],
+    [-a, c],
+  ].map(([p, q]) => toLLr([cx + ux * p + vx * q, cz + uz * p + vz * q]));
+}
+
+
+// a lollipop tree (trunk + faceted ball)
+function makeTree(B, THREE) {
   const ico = new THREE.IcosahedronGeometry(1, 0).toNonIndexed().getAttribute("position");
-  const tree = (x, z) => {
+  return (x, z, rnd) => {
     const r = 1.8 + rnd() * 1.3;
     const t = 2 + rnd();
     const w = 0.28;
@@ -258,6 +453,11 @@ function buildTrees(B, THREE, green, places) {
       B.tri(v(0), v(1), v(2), leaf);
     }
   };
+}
+
+function buildTrees(B, tree, green, places) {
+  let seed = 57;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const inPoly = ([x, z], g) => {
     let c = false;
     for (let i = 0, j = g.length - 1; i < g.length; j = i++) {
@@ -277,7 +477,7 @@ function buildTrees(B, THREE, green, places) {
       const p = [x0 + rnd() * (x1 - x0), z0 + rnd() * (z1 - z0)];
       if (!inPoly(p, g)) continue;
       i++;
-      tree(p[0], p[1]);
+      tree(p[0], p[1], rnd);
     }
   };
   B.setOwner(0);
@@ -286,8 +486,8 @@ function buildTrees(B, THREE, green, places) {
 }
 
 const TOOLS = [
-  ["look", "👆", "ดู"],
-  ["add", "🏠", "วางบ้าน"],
+  ["look", "👆", "เลือก"],
+  ["build", "🏗️", "สร้าง"],
   ["up", "⬆️", "เพิ่มชั้น"],
   ["down", "⬇️", "ลดชั้น"],
   ["remove", "🔨", "ทุบ"],
@@ -296,19 +496,25 @@ const TOOLS = [
 export default function Map3D({ edit = false, onClose, className = "" }) {
   const el = useRef(null);
   const map = useRef(null);
-  const world = useRef({}); // THREE, scene, mesh, segs, green, places
+  const world = useRef({});
   const data = useRef([]);
   const soiRef = useRef({});
   const housesRef = useRef({});
   const mineRef = useRef(null);
   const selRef = useRef(null);
+  const linkRef = useRef([]);
   const toolRef = useRef("look");
+  const kindRef = useRef("house");
   const undoRef = useRef([]);
   const busyRef = useRef(false);
+  const saveT = useRef(null);
+  const pending = useRef(null); // {id, prev} while the admin rotates / resizes / moves
+  const labelsRef = useRef([]);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
   const [sel, setSel] = useState(null);
   const [tool, setTool] = useState("look");
+  const [kind, setKind] = useState("house");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [flat, setFlat] = useState(false);
@@ -316,9 +522,33 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
   const [undoN, setUndoN] = useState(0);
   const [done, setDone] = useState(0);
   const [pops, setPops] = useState([]);
+  const [linking, setLinking] = useState(null); // ids picked for a group
+  const [parts, setParts] = useState(3);
+  const [name, setName] = useState("");
   toolRef.current = tool;
+  kindRef.current = kind;
 
   const path = edit ? "/admin/buildings3d" : "/buildings3d";
+  const leader = (b) => (b ? b.grp || b.id : null);
+  const byId = (id) => data.current.find((x) => x.id === id) || null;
+
+  function labels() {
+    const ml = window.maplibregl;
+    const m = map.current;
+    if (!ml || !m) return;
+    labelsRef.current.forEach((k) => k.remove());
+    labelsRef.current = [];
+    for (const b of data.current) {
+      if (b.s === "removed" || b.grp) continue;
+      const k = KINDS[b.t];
+      if (!b.n && (!k || b.t === "house" || b.t === "townhouse")) continue;
+      const c = centroid(b.g);
+      const d = document.createElement("div");
+      d.innerHTML = `<div style="font:700 12px sans-serif;background:#fff;border-radius:999px;padding:2px 8px;box-shadow:0 2px 6px rgba(0,0,0,.25);white-space:nowrap">${k ? k.icon : "📍"} ${String(b.n || k.label).replace(/[<>&]/g, "")}</div>`;
+      d.style.pointerEvents = "none";
+      labelsRef.current.push(new ml.Marker({ element: d, anchor: "bottom", offset: [0, -18] }).setLngLat([c[1], c[0]]).addTo(m));
+    }
+  }
 
   function rebuild() {
     const W = world.current;
@@ -328,19 +558,27 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
       W.mesh.geometry.dispose();
     }
     const B = makeBuilder(W.THREE);
+    const tree = makeTree(B, W.THREE);
+    const selLead = selRef.current;
+    const linked = new Set(linkRef.current);
     for (const b of data.current) {
       if (b.s === "removed") continue;
       B.setOwner(b.id);
-      let [wall, roof] = b.id === mineRef.current ? ["#FFFFFF", "#FF3B5C"] : colours(soiRef.current[b.id]);
-      if (b.s === "added") wall = "#C9F2D5";
-      if (b.id === selRef.current) wall = "#FFD43B";
-      buildHouse(B, b, wall, roof, W.segs);
+      const lead = leader(b);
+      let [wall, roof] = lead === mineRef.current || b.id === mineRef.current ? ["#FFFFFF", "#FF3B5C"] : colours(soiRef.current[lead] || soiRef.current[b.id]);
+      if (b.s === "added" && !b.t) wall = "#C9F2D5";
+      if (b.t === "hall" || b.t === "office") [wall, roof] = ["#FFFFFF", "#C0392B"];
+      if (b.t === "school") [wall, roof] = ["#FFF3C4", "#8A97A6"];
+      if (selLead != null && lead === selLead) wall = "#FFD43B";
+      if (linked.has(b.id)) wall = "#7DE3F4";
+      buildThing(B, b, wall, roof, W.segs, tree);
     }
-    buildTrees(B, W.THREE, W.green, W.places);
+    buildTrees(B, tree, W.green, W.places);
     W.mesh = B.mesh();
     W.scene.add(W.mesh);
     const m = map.current;
     if (m?.getSource("hit")) m.getSource("hit").setData(hitGeo(data.current));
+    labels();
     m?.triggerRepaint();
   }
 
@@ -351,10 +589,15 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     setPops((p) => [...p, { id, x: point.x, y: point.y, text }]);
     setTimeout(() => setPops((p) => p.filter((q) => q.id !== id)), 1100);
   }
+  const popMid = (text) => {
+    const c = map.current?.getCanvas();
+    if (c) pop({ x: c.clientWidth / 2, y: c.clientHeight / 2 }, text);
+  };
 
   async function reload() {
     const r = await api(path);
     data.current = r.buildings;
+    if (selRef.current != null) setSel(byId(selRef.current));
     rebuild();
     return r.buildings;
   }
@@ -364,8 +607,9 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     busyRef.current = true;
     setMsg("");
     try {
-      await api(p, { method: "POST", body: JSON.stringify(body) });
-      return await reload();
+      const r = await api(p, { method: "POST", body: JSON.stringify(body) });
+      await reload();
+      return r || true;
     } catch (e) {
       setMsg(e.message);
       return null;
@@ -374,39 +618,125 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
       busyRef.current = false;
     }
   }
+  const pushUndo = (u) => {
+    undoRef.current.push(u);
+    setUndoN(undoRef.current.length);
+    setDone((n) => n + 1);
+  };
 
   const select = (id) => {
+    flushShape();
     selRef.current = id;
-    setSel(id == null ? null : data.current.find((x) => x.id === id) || null);
+    const b = id == null ? null : byId(id);
+    setSel(b);
+    setName(b?.n || "");
     rebuild();
   };
 
-  async function act(kind, b, point) {
-    if (kind === "remove") {
+  // rotate / resize / move: shown at once, saved when the admin pauses
+  function reshape(fn) {
+    const b = byId(selRef.current);
+    if (!b) return;
+    if (!pending.current || pending.current.id !== b.id) {
+      flushShape();
+      pending.current = { id: b.id, prev: b.g };
+    }
+    b.g = fn(b.g);
+    setSel({ ...b });
+    rebuild();
+    clearTimeout(saveT.current);
+    saveT.current = setTimeout(flushShape, 700);
+  }
+  function flushShape() {
+    clearTimeout(saveT.current);
+    const p = pending.current;
+    if (!p) return;
+    pending.current = null;
+    const b = byId(p.id);
+    if (!b) return;
+    pushUndo({ kind: "shape", id: p.id, prev: p.prev });
+    call("/admin/buildings/shape", { id: p.id, g: b.g });
+  }
+  const nudge = (up, right) => {
+    const br = ((map.current?.getBearing() || 0) * Math.PI) / 180;
+    const dx = Math.sin(br) * up + Math.cos(br) * right;
+    const dz = -Math.cos(br) * up + Math.sin(br) * right;
+    reshape((g) => move(g, dx, dz));
+  };
+
+  async function setType(t) {
+    const b = byId(selRef.current);
+    if (!b) return;
+    const prev = b.t || "house";
+    if (await call("/admin/buildings/shape", { id: b.id, t })) {
+      pushUndo({ kind: "type", id: b.id, prev });
+      popMid(`${KINDS[t].icon} ${KINDS[t].label}`);
+    }
+  }
+  async function saveName() {
+    const b = byId(selRef.current);
+    if (!b || (b.n || "") === name.trim()) return;
+    if (await call("/admin/buildings/shape", { id: b.id, n: name.trim() })) popMid("✏️ ตั้งชื่อแล้ว");
+  }
+  async function doSplit() {
+    const b = byId(selRef.current);
+    if (!b) return;
+    flushShape();
+    const r = await call("/admin/buildings/split", { id: b.id, parts: split(b.g, parts) });
+    if (r?.ids) {
+      pushUndo({ kind: "split", id: b.id, ids: r.ids });
+      select(null);
+      popMid(`✂️ แบ่งเป็น ${parts} ห้อง`);
+    }
+  }
+  async function doGroup() {
+    const ids = linking || [];
+    if (ids.length < 2) return setMsg("แตะอาคารอื่นที่เป็นบ้านเดียวกันอย่างน้อย 1 หลัง");
+    if (await call("/admin/buildings/group", { ids })) {
+      pushUndo({ kind: "group", ids });
+      popMid(`🔗 รวม ${ids.length} อาคารเป็นบ้านเดียวกัน`);
+    }
+    linkRef.current = [];
+    setLinking(null);
+    rebuild();
+  }
+  async function unGroup() {
+    const b = byId(selRef.current);
+    if (b && (await call("/admin/buildings/group", { ids: [b.id] }))) popMid("แยกกลุ่มแล้ว");
+  }
+
+  async function act(t, b, point) {
+    if (t === "remove") {
       if (await call("/admin/buildings/remove", { id: b.id })) {
-        undoRef.current.push({ kind: "remove", id: b.id });
+        pushUndo({ kind: "remove", id: b.id });
         pop(point, "💥 ทุบแล้ว");
       }
-    } else if (kind === "up" || kind === "down") {
-      const lv = b.lv + (kind === "up" ? 1 : -1);
-      if (lv < 1 || lv > 30) return pop(point, kind === "up" ? "สูงสุดแล้ว" : "ต่ำสุดแล้ว");
+    } else if (t === "up" || t === "down") {
+      const lv = b.lv + (t === "up" ? 1 : -1);
+      if (lv < 1 || lv > 30) return pop(point, t === "up" ? "สูงสุดแล้ว" : "ต่ำสุดแล้ว");
       if (await call("/admin/buildings/shape", { id: b.id, lv })) {
-        undoRef.current.push({ kind: "lv", id: b.id, prev: b.lv });
-        pop(point, kind === "up" ? `⬆️ ${lv} ชั้น` : `⬇️ ${lv} ชั้น`);
+        pushUndo({ kind: "lv", id: b.id, prev: b.lv });
+        pop(point, t === "up" ? `⬆️ ${lv} ชั้น` : `⬇️ ${lv} ชั้น`);
       }
     }
-    setUndoN(undoRef.current.length);
-    setDone((n) => n + 1);
   }
 
   async function undo() {
+    flushShape();
     const u = undoRef.current.pop();
     setUndoN(undoRef.current.length);
     if (!u) return;
     if (u.kind === "remove") await call("/admin/buildings/restore", { id: u.id });
     else if (u.kind === "add") await call("/admin/buildings/remove", { id: u.id });
     else if (u.kind === "lv") await call("/admin/buildings/shape", { id: u.id, lv: u.prev });
-    setMsg("↩️ ย้อนกลับแล้ว");
+    else if (u.kind === "shape") await call("/admin/buildings/shape", { id: u.id, g: u.prev });
+    else if (u.kind === "type") await call("/admin/buildings/shape", { id: u.id, t: u.prev });
+    else if (u.kind === "group") await call("/admin/buildings/group", { ids: [u.ids[0]] });
+    else if (u.kind === "split") {
+      for (const i of u.ids) await call("/admin/buildings/remove", { id: i });
+      await call("/admin/buildings/restore", { id: u.id });
+    }
+    popMid("↩️ ย้อนแล้ว");
   }
 
   useEffect(() => {
@@ -459,6 +789,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
           },
         });
         map.current = m;
+        window.__map3d = m; // for checking from the console
         m.addControl(new ml.NavigationControl({ visualizePitch: true }), "top-left");
         m.on("load", () => {
           const flatF = [];
@@ -477,12 +808,10 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
           const routes = (pl || []).filter((p) => p.kind === "route" && p.geometry?.length > 1).map((p) => ({ type: "Feature", properties: { c: p.color || "#7B68C8" }, geometry: { type: "LineString", coordinates: p.geometry.map(([a, c]) => [c, a]) } }));
           m.addSource("routes", { type: "geojson", data: { type: "FeatureCollection", features: routes } });
           m.addLayer({ id: "routes", type: "line", source: "routes", layout: { "line-cap": "round" }, paint: { "line-color": ["get", "c"], "line-width": 4, "line-dasharray": [1, 1.6] } });
-          // footprints: red patches for removed houses, and a near-invisible layer to tap from straight above
           m.addSource("hit", { type: "geojson", data: hitGeo(b.buildings) });
           m.addLayer({ id: "gone", type: "fill", source: "hit", filter: ["==", ["get", "s"], "removed"], paint: { "fill-color": "#E5484D", "fill-opacity": 0.5 } });
           m.addLayer({ id: "hit", type: "fill", source: "hit", filter: ["!=", ["get", "s"], "removed"], paint: { "fill-color": "#000", "fill-opacity": 0.01 } });
 
-          // the toy houses (three.js on the map's own WebGL context)
           const origin = ml.MercatorCoordinate.fromLngLat([LNG0, LAT0], 0);
           const sc = origin.meterInMercatorCoordinateUnits();
           const base = new THREE.Matrix4().makeTranslation(origin.x, origin.y, origin.z).scale(new THREE.Vector3(sc, -sc, sc)).multiply(new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(1, 0, 0), Math.PI / 2));
@@ -509,7 +838,6 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
               W.renderer.render(W.scene, W.camera);
             },
           });
-          world.current.base = base;
 
           for (const [k, s] of Object.entries(so.sois || {})) {
             const ln = (s.lines || []).reduce((a, x) => (x.length > a.length ? x : a), []);
@@ -559,63 +887,75 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
           setReady(true);
         });
 
-        // tap: ray-cast into the toy houses first (what you see), the footprints second
+        // tap: ray-cast into the models first (what you see), the footprints second
         const tapHouse = (e) => {
           const W = world.current;
           if (W.mesh && W.camera) {
-            const cv = m.getCanvas();
-            const r = cv.getBoundingClientRect();
+            const r = m.getCanvas().getBoundingClientRect();
             const nx = (e.point.x / r.width) * 2 - 1;
             const ny = -(e.point.y / r.height) * 2 + 1;
             const inv = W.camera.projectionMatrix.clone().invert();
             const a = new THREE.Vector3(nx, ny, -1).applyMatrix4(inv);
             const z = new THREE.Vector3(nx, ny, 1).applyMatrix4(inv);
-            const ray = new THREE.Raycaster(a, z.sub(a).normalize());
-            const hit = ray.intersectObject(W.mesh)[0];
+            const hit = new THREE.Raycaster(a, z.sub(a).normalize()).intersectObject(W.mesh)[0];
             const id = hit ? W.mesh.userData.owner[hit.faceIndex] : 0;
-            if (id) return data.current.find((x) => x.id === id) || null;
+            if (id) return byId(id);
           }
           const f = m.queryRenderedFeatures(e.point, { layers: ["hit"] })[0];
-          return f ? data.current.find((x) => x.id === f.properties.id) || null : null;
+          return f ? byId(f.properties.id) : null;
         };
         if (edit) {
           m.on("click", async (e) => {
             if (busyRef.current) return;
-            const gone = m.queryRenderedFeatures(e.point, { layers: ["gone"] })[0];
             const t = toolRef.current;
-            if (gone && t !== "add") {
-              if (await call("/admin/buildings/restore", { id: gone.properties.id })) pop(e.point, "✨ คืนบ้านแล้ว");
+            const gone = m.queryRenderedFeatures(e.point, { layers: ["gone"] })[0];
+            if (gone && t !== "build") {
+              if (await call("/admin/buildings/restore", { id: gone.properties.id })) pop(e.point, "✨ คืนแล้ว");
               return;
             }
             const b2 = tapHouse(e);
-            if (t === "add") {
-              if (b2) return pop(e.point, "มีบ้านอยู่แล้ว");
+            if (linkRef.current.length) {
+              // picking the other buildings of one house
+              if (!b2) return;
+              linkRef.current = linkRef.current.includes(b2.id) ? linkRef.current.filter((i) => i !== b2.id) : [...linkRef.current, b2.id];
+              setLinking([...linkRef.current]);
+              rebuild();
+              return;
+            }
+            if (t === "build") {
+              if (b2) return pop(e.point, "ตรงนี้มีอาคารแล้ว");
               const at = [e.lngLat.lat, e.lngLat.lng];
-              let best = null;
+              const kd = kindRef.current;
+              let near = null;
               for (const x of data.current) {
                 if (x.s === "removed") continue;
                 const d = distM(centroid(x.g), at);
-                if (!best || d < best.d) best = { d, x };
+                if (!near || d < near.d) near = { d, x };
               }
-              const body = { lat: +at[0].toFixed(6), lng: +at[1].toFixed(6) };
-              if (best && best.d < 60) {
-                const c = centroid(best.x.g);
-                body.g = best.x.g.map(([p, q]) => [+(p - c[0] + at[0]).toFixed(6), +(q - c[1] + at[1]).toFixed(6)]);
-                body.lv = best.x.lv;
+              let body;
+              if (kd === "house" && near && near.d < 60) {
+                const c = centroid(near.x.g);
+                body = { g: near.x.g.map(([p, q]) => [+(p - c[0] + at[0]).toFixed(6), +(q - c[1] + at[1]).toFixed(6)]), lv: near.x.lv };
+              } else {
+                const [w, d] = KINDS[kd].size;
+                body = { g: rectAt(at, w, d, near && near.d < 80 ? near.x.g : null), lv: kd === "house" || kd === "townhouse" ? 2 : 1, t: kd };
               }
               const before = new Set(data.current.map((x) => x.id));
-              const after = await call("/admin/buildings/add", body);
-              if (after) {
-                const nb = after.find((x) => !before.has(x.id));
-                if (nb) undoRef.current.push({ kind: "add", id: nb.id });
-                setUndoN(undoRef.current.length);
-                setDone((n) => n + 1);
-                pop(e.point, "🏠 +1 หลัง");
+              if (await call("/admin/buildings/add", body)) {
+                const nb = data.current.find((x) => !before.has(x.id));
+                if (nb) {
+                  pushUndo({ kind: "add", id: nb.id });
+                  if (kd !== "house") {
+                    setTool("look");
+                    select(nb.id);
+                  }
+                }
+                pop(e.point, `${KINDS[kd].icon} +1`);
               }
               return;
             }
             if (!b2) return select(null);
-            if (t === "look") return select(b2.id);
+            if (t === "look") return select(leader(b2) === leader(byId(selRef.current)) && b2.grp ? selRef.current : b2.id);
             act(t, b2, e.point);
           });
         }
@@ -625,6 +965,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     })();
     return () => {
       dead = true;
+      clearTimeout(saveT.current);
       if (map.current) map.current.remove();
       map.current = null;
     };
@@ -642,7 +983,12 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     setFlat(!flat);
   }
 
-  const hint = { look: "แตะบ้านเพื่อดูข้อมูล", add: "แตะที่ว่าง วางบ้านหน้าตาเหมือนหลังข้างๆ", up: "แตะบ้าน +1 ชั้น", down: "แตะบ้าน −1 ชั้น", remove: "แตะบ้านที่ไม่มีจริง เพื่อทุบทิ้ง" }[tool];
+  const hint = linking
+    ? `แตะอาคารที่เป็นบ้านเดียวกัน (${linking.length} อาคาร)`
+    : { look: "แตะอาคารเพื่อแก้ไข", build: `แตะที่ว่าง วาง ${KINDS[kind].icon} ${KINDS[kind].label}`, up: "แตะบ้าน +1 ชั้น", down: "แตะบ้าน −1 ชั้น", remove: "แตะอาคารที่ไม่มีจริง เพื่อทุบทิ้ง" }[tool];
+  const pad = "flex h-11 min-w-[44px] items-center justify-center rounded-xl bg-[#F1F4F2] px-2 text-lg font-bold shadow-[0_2px_0_#C9D2CC] active:scale-90 disabled:opacity-40";
+  const kindOf = sel ? KINDS[sel.t] || KINDS.house : null;
+  const flatKind = sel && FLATS.has(sel.t);
 
   return (
     <div className={`relative overflow-hidden ${className}`} style={{ background: "linear-gradient(#BFE4FF, #EAF6FF 45%, #DCEFD6 46%)" }}>
@@ -655,7 +1001,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
       {!ready && !err && <p className="absolute inset-0 grid place-items-center text-neutral-600">กำลังสร้างหมู่บ้านจำลอง… 🏡</p>}
       {err && <p className="absolute inset-0 grid place-items-center p-6 text-center text-red-700">{err}</p>}
       {pops.map((p) => (
-        <span key={p.id} className="m3d-pop pointer-events-none absolute z-20 rounded-full bg-white px-3 py-1 text-base font-black text-[#15201A] shadow-lg" style={{ left: p.x, top: p.y }}>
+        <span key={p.id} className="m3d-pop pointer-events-none absolute z-30 rounded-full bg-white px-3 py-1 text-base font-black text-[#15201A] shadow-lg" style={{ left: p.x, top: p.y }}>
           {p.text}
         </span>
       ))}
@@ -673,29 +1019,168 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
       {!edit && ready && <p className="absolute bottom-2 left-2 z-10 rounded-lg bg-white/85 px-2 py-1 text-xs text-neutral-700 shadow">สีบ้าน = ซอย (จากข้อมูลที่ลูกบ้านช่วยกันลง) · หมุน/เอียงด้วยสองนิ้ว</p>}
       {edit && (
         <>
-          <div className="absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-[#15201A]/85 px-3 py-1 text-sm font-bold text-white shadow">
-            {busy ? "⏳ กำลังบันทึก…" : `${hint}${done ? ` · แก้แล้ว ${done} ครั้ง` : ""}`}
+          <div className="absolute left-1/2 top-2 z-10 max-w-[70%] -translate-x-1/2 truncate rounded-full bg-[#15201A]/85 px-3 py-1 text-sm font-bold text-white shadow">
+            {busy ? "⏳ กำลังบันทึก…" : `${hint}${done ? ` · แก้แล้ว ${done}` : ""}`}
           </div>
-          {sel && tool === "look" && (
-            <div className="absolute inset-x-2 bottom-[92px] z-10 flex items-center gap-2 rounded-2xl border-2 border-[#FFD43B] bg-white/95 p-2 shadow-lg">
-              <span className="text-3xl">🏠</span>
-              <span className="min-w-0 flex-1 text-sm leading-tight">
-                <b className="block text-base">{housesRef.current[sel.id] || (sel.s === "added" ? "บ้านที่เพิ่มเอง" : "ยังไม่มีเลขที่บ้าน")}</b>
-                {soiRef.current[sel.id] ? `ซ.${soiRef.current[sel.id]}` : "ยังไม่รู้ซอย"} · {sel.lv} ชั้น
-              </span>
-              <button onClick={() => select(null)} className="h-9 w-9 rounded-full bg-neutral-200 font-bold" aria-label="ปิด">
-                ✕
-              </button>
-            </div>
-          )}
-          {msg && <p className={`absolute inset-x-2 bottom-[92px] z-10 rounded-lg bg-white/95 px-2 py-1 text-sm shadow ${msg.startsWith("↩️") ? "text-green-800" : "text-red-700"}`}>{msg}</p>}
-          <div className="absolute inset-x-2 bottom-2 z-10 flex items-end justify-center gap-1.5 rounded-[28px] bg-white/90 p-1.5 shadow-xl backdrop-blur sm:gap-3">
+
+          <div className="absolute inset-x-2 bottom-[86px] z-20 space-y-1.5">
+            {tool === "build" && (
+              <div className="flex gap-1.5 overflow-x-auto rounded-2xl bg-white/95 p-1.5 shadow-lg">
+                {Object.entries(KINDS).map(([k, v]) => (
+                  <button key={k} onClick={() => setKind(k)} className={`flex w-[68px] shrink-0 flex-col items-center rounded-xl py-1 text-[10px] font-bold leading-tight ${kind === k ? "bg-[#FFD43B] shadow-[0_3px_0_#C99A00]" : "bg-[#F1F4F2]"}`}>
+                    <span className="text-2xl">{v.icon}</span>
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {linking && (
+              <div className="flex items-center gap-2 rounded-2xl border-2 border-[#7DE3F4] bg-white/95 p-2 shadow-lg">
+                <span className="min-w-0 flex-1 text-sm font-bold">🔗 แตะอาคารอื่นของบ้านหลังนี้ (เช่น เรือนหลัง โรงรถ) · เลือกแล้ว {linking.length}</span>
+                <button onClick={doGroup} disabled={linking.length < 2 || busy} className="rounded-xl bg-[#0E7490] px-3 py-2 text-sm font-bold text-white disabled:opacity-40">
+                  ✓ รวมเป็นบ้านเดียวกัน
+                </button>
+                <button
+                  onClick={() => {
+                    linkRef.current = [];
+                    setLinking(null);
+                    rebuild();
+                  }}
+                  className="px-2 text-sm text-neutral-600"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            )}
+            {sel && tool === "look" && !linking && (
+              <div className="max-h-[52vh] space-y-2 overflow-y-auto rounded-2xl border-2 border-[#FFD43B] bg-white/95 p-2 shadow-lg">
+                <div className="flex items-center gap-2">
+                  <span className="text-3xl">{kindOf.icon}</span>
+                  <span className="min-w-0 flex-1 text-sm leading-tight">
+                    <b className="block text-base">{sel.n || housesRef.current[leader(sel)] || housesRef.current[sel.id] || kindOf.label}</b>
+                    {soiRef.current[leader(sel)] || soiRef.current[sel.id] ? `ซ.${soiRef.current[leader(sel)] || soiRef.current[sel.id]}` : "ยังไม่รู้ซอย"}
+                    {flatKind ? "" : ` · ${sel.lv} ชั้น`}
+                    {sel.grp ? ` · 🔗 ${data.current.filter((x) => leader(x) === leader(sel) && x.s !== "removed").length} อาคารในบ้านนี้` : ""}
+                  </span>
+                  <button onClick={() => select(null)} className="h-9 w-9 shrink-0 rounded-full bg-neutral-200 font-bold" aria-label="ปิด">
+                    ✕
+                  </button>
+                </div>
+                <div className="flex gap-1 overflow-x-auto pb-1">
+                  {Object.entries(KINDS).map(([k, v]) => (
+                    <button key={k} onClick={() => setType(k)} disabled={busy} className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-xs font-bold ${(sel.t || "house") === k ? "border-[#C99A00] bg-[#FFD43B]" : "bg-white"}`}>
+                      {v.icon} {v.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1">
+                  <input
+                    id="m3d-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onBlur={saveName}
+                    onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                    maxLength={40}
+                    placeholder="ตั้งชื่อ (ถ้ามี) เช่น หอประชุมหมู่บ้าน"
+                    className="min-h-[40px] min-w-0 flex-1 rounded-xl border px-2 text-sm"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-bold text-neutral-500">หมุน</span>
+                  <button className={pad} onClick={() => reshape((g) => rotate(g, -10))} aria-label="หมุนซ้าย 10 องศา">
+                    ⟲
+                  </button>
+                  <button className={pad} onClick={() => reshape((g) => rotate(g, -2))} aria-label="หมุนซ้ายนิดเดียว">
+                    ↶
+                  </button>
+                  <button className={pad} onClick={() => reshape((g) => rotate(g, 2))} aria-label="หมุนขวานิดเดียว">
+                    ↷
+                  </button>
+                  <button className={pad} onClick={() => reshape((g) => rotate(g, 10))} aria-label="หมุนขวา 10 องศา">
+                    ⟳
+                  </button>
+                  <span className="ml-2 text-xs font-bold text-neutral-500">ขนาด</span>
+                  <button className={pad} onClick={() => reshape((g) => scale(g, 0.92))} aria-label="ย่อ">
+                    ➖
+                  </button>
+                  <button className={pad} onClick={() => reshape((g) => scale(g, 1.08))} aria-label="ขยาย">
+                    ➕
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-bold text-neutral-500">เลื่อน</span>
+                  <button className={pad} onClick={() => nudge(0, -1)} aria-label="เลื่อนซ้าย">
+                    ◀
+                  </button>
+                  <button className={pad} onClick={() => nudge(1, 0)} aria-label="เลื่อนขึ้น">
+                    ▲
+                  </button>
+                  <button className={pad} onClick={() => nudge(-1, 0)} aria-label="เลื่อนลง">
+                    ▼
+                  </button>
+                  <button className={pad} onClick={() => nudge(0, 1)} aria-label="เลื่อนขวา">
+                    ▶
+                  </button>
+                  {!flatKind && (
+                    <>
+                      <span className="ml-2 text-xs font-bold text-neutral-500">ชั้น</span>
+                      <button className={pad} disabled={busy || sel.lv <= 1} onClick={() => act("down", sel, { x: 0, y: 0 })} aria-label="ลดชั้น">
+                        ⬇️
+                      </button>
+                      <b className="w-6 text-center">{sel.lv}</b>
+                      <button className={pad} disabled={busy || sel.lv >= 30} onClick={() => act("up", sel, { x: 0, y: 0 })} aria-label="เพิ่มชั้น">
+                        ⬆️
+                      </button>
+                    </>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 border-t pt-2">
+                  <span className="text-xs font-bold text-neutral-500">✂️ แบ่งเป็นห้องๆ</span>
+                  <button className={pad} onClick={() => setParts(Math.max(2, parts - 1))}>
+                    −
+                  </button>
+                  <b className="w-12 text-center">{parts} ห้อง</b>
+                  <button className={pad} onClick={() => setParts(Math.min(20, parts + 1))}>
+                    +
+                  </button>
+                  <button onClick={doSplit} disabled={busy} className="rounded-xl bg-[#7B68C8] px-3 py-2 text-sm font-bold text-white shadow-[0_3px_0_#5A4AA0] active:scale-95">
+                    ✂️ แบ่ง
+                  </button>
+                  {sel.grp ? (
+                    <button onClick={unGroup} disabled={busy} className="ml-auto rounded-xl bg-neutral-200 px-3 py-2 text-sm font-bold">
+                      ⛓️‍💥 แยกกลุ่ม
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        linkRef.current = [sel.id];
+                        setLinking([sel.id]);
+                        rebuild();
+                      }}
+                      className="ml-auto rounded-xl bg-[#0E7490] px-3 py-2 text-sm font-bold text-white shadow-[0_3px_0_#0B5566] active:scale-95"
+                    >
+                      🔗 รวมกับอาคารอื่น
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {msg && <p className="rounded-lg bg-white/95 px-2 py-1 text-sm text-red-700 shadow">{msg}</p>}
+          </div>
+
+          <div className="absolute inset-x-2 bottom-2 z-20 flex items-end justify-center gap-1.5 rounded-[28px] bg-white/90 p-1.5 shadow-xl backdrop-blur sm:gap-3">
             {TOOLS.map(([k, icon, label]) => (
               <button
                 key={k}
-                onClick={() => setTool(k)}
+                onClick={() => {
+                  if (linking) {
+                    linkRef.current = [];
+                    setLinking(null);
+                  }
+                  setTool(k);
+                }}
                 aria-pressed={tool === k}
-                className={`flex h-[66px] w-[60px] flex-col items-center justify-center rounded-[20px] text-[11px] font-bold transition-transform active:scale-90 ${
+                className={`flex h-[66px] w-[58px] flex-col items-center justify-center rounded-[20px] text-[11px] font-bold transition-transform active:scale-90 ${
                   tool === k ? "-translate-y-1 bg-[#FFD43B] text-[#15201A] shadow-[0_4px_0_#C99A00]" : "bg-[#F1F4F2] text-neutral-700 shadow-[0_3px_0_#C9D2CC]"
                 }`}
               >
@@ -706,7 +1191,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
             <button
               onClick={undo}
               disabled={!undoN || busy}
-              className="flex h-[66px] w-[60px] flex-col items-center justify-center rounded-[20px] bg-[#E8F1FF] text-[11px] font-bold text-[#1F5FA8] shadow-[0_3px_0_#B8CDEB] active:scale-90 disabled:opacity-40"
+              className="flex h-[66px] w-[58px] flex-col items-center justify-center rounded-[20px] bg-[#E8F1FF] text-[11px] font-bold text-[#1F5FA8] shadow-[0_3px_0_#B8CDEB] active:scale-90 disabled:opacity-40"
             >
               <span className="text-2xl leading-none">↩️</span>ย้อน{undoN ? ` (${undoN})` : ""}
             </button>
