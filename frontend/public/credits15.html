@@ -27,6 +27,7 @@ body { background: var(--tent); color: var(--cream); font-family: var(--f-name);
 .shade { position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(90deg, transparent 0, rgba(27,16,48,.0) 18%, rgba(27,16,48,.62) 50%, rgba(27,16,48,.0) 82%, transparent 100%); }
 
+#rollwrap { position: absolute; inset: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 80%, transparent 86%); mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 80%, transparent 86%); }
 #roll { position: absolute; left: 0; right: 0; top: 0; padding-inline: 16px; will-change: transform; transform: translateY(100vh); }
 .col { max-width: 42rem; margin-inline: auto; display: flex; flex-direction: column; gap: 4.5rem; text-align: center; padding-block: 2rem; text-shadow: 0 2px 10px rgba(0,0,0,.75); }
 section { display: flex; flex-direction: column; gap: .6rem; }
@@ -87,6 +88,7 @@ h1 .px { font-family: var(--f-pixel); font-size: .8em; color: var(--gold); lette
   <canvas id="sky" aria-hidden="true"></canvas>
   <div class="shade"></div>
 
+  <div id="rollwrap">
   <div id="roll" aria-live="off">
     <div class="col">
       <section>
@@ -289,6 +291,7 @@ h1 .px { font-family: var(--f-pixel); font-size: .8em; color: var(--gold); lette
         <p class="note">ฮ่าๆ</p>
       </section>
     </div>
+  </div>
   </div>
 
   <div id="end" class="card" aria-live="polite">
@@ -577,7 +580,7 @@ h1 .px { font-family: var(--f-pixel); font-size: .8em; color: var(--gold); lette
     W = cv.clientWidth; H = cv.clientHeight;
     cv.width = W * dpr; cv.height = H * dpr;
     cx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    PX = Math.max(3, Math.round(Math.min(W, H) / 180));
+    PX = Math.max(3, Math.round(Math.min(W, H) / 140));
     const r = seeded(15);
     const kinds = ["sofa", "mattress", "fridge", "cabinet", "bags", "tire", "chair", "bags"];
     const tw = spriteW("truck", PX);
@@ -777,6 +780,7 @@ h1 .px { font-family: var(--f-pixel); font-size: .8em; color: var(--gold); lette
       });
       const a3 = clamp((k - LEN_END.e3) / .35);
       e3.style.opacity = a3; e3.style.transform = `scale(${1 + .5 * (1 - a3) * (1 - a3)})`;
+      e4.hidden = k < LEN_END.e3 + 1.2;
     },
     async audio() {
       const SR = 44100, total = this.total;
