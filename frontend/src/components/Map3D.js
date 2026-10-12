@@ -404,10 +404,41 @@ function buildThing(B, b, wall, roof, segs, kit) {
   const H = t === "hall" ? Math.max(7, b.lv * FLOOR) : b.lv * FLOOR;
   K.box(-hw, hw, 0, H, -hd, hd, wall, false);
   const big = Math.max(hw, hd) > 14 || b.lv >= 5 || t === "school";
-  if (big && t !== "hall") {
+  const rs = b.r || (big && t !== "hall" ? "flat" : "gable");
+  const R = (t === "hall" ? 0.4 : 0.55) * Math.min(hw, hd) + 0.7;
+  if (rs === "flat") {
     K.floor(-hw, hw, -hd, hd, H, roof);
     K.box(-hw, hw, H, H + 0.6, -hd, hd, roof, false);
-  } else K.gable(hw, hd, H, (t === "hall" ? 0.4 : 0.55) * Math.min(hw, hd) + 0.7, 0.4, roof, wall);
+  } else if (rs === "hip") {
+    // ปั้นหยา: four slopes, a short ridge along the long side
+    const ov = 0.4;
+    const X = hw + ov;
+    const Z = hd + ov;
+    const k = Math.min(hw, hd);
+    if (hw >= hd) {
+      const rx = Math.max(0, hw - k);
+      B.quad(P(-X, H, Z), P(X, H, Z), P(rx, H + R, 0), P(-rx, H + R, 0), roof);
+      B.quad(P(-X, H, -Z), P(X, H, -Z), P(rx, H + R, 0), P(-rx, H + R, 0), roof);
+      B.tri(P(X, H, -Z), P(X, H, Z), P(rx, H + R, 0), roof);
+      B.tri(P(-X, H, -Z), P(-X, H, Z), P(-rx, H + R, 0), roof);
+    } else {
+      const rz = Math.max(0, hd - k);
+      B.quad(P(X, H, -Z), P(X, H, Z), P(0, H + R, rz), P(0, H + R, -rz), roof);
+      B.quad(P(-X, H, -Z), P(-X, H, Z), P(0, H + R, rz), P(0, H + R, -rz), roof);
+      B.tri(P(-X, H, Z), P(X, H, Z), P(0, H + R, rz), roof);
+      B.tri(P(-X, H, -Z), P(X, H, -Z), P(0, H + R, -rz), roof);
+    }
+  } else if (rs === "shed") {
+    // เพิงหมาแหงน: one slope, high at the back
+    const ov = 0.3;
+    const X = hw + ov;
+    const Z = hd + ov;
+    const r2 = R * 0.7;
+    B.quad(P(-X, H, Z), P(X, H, Z), P(X, H + r2, -Z), P(-X, H + r2, -Z), roof);
+    B.quad(P(-hw, H, -hd), P(hw, H, -hd), P(hw, H + r2, -hd), P(-hw, H + r2, -hd), wall);
+    B.tri(P(hw, H, hd), P(hw, H, -hd), P(hw, H + r2, -hd), wall);
+    B.tri(P(-hw, H, hd), P(-hw, H, -hd), P(-hw, H + r2, -hd), wall);
+  } else K.gable(hw, hd, H, R, 0.4, roof, wall);
   const dx = hw > 1.8 && !isHall ? -hw * 0.38 : 0;
   rect(dx, isHall ? 1.6 : 1.05, isHall ? 1.4 : 0.5, isHall ? 1.6 : 1.05, front, "#8B5A3C");
   if (!isHall) rect(dx + 0.3, 1.0, 0.07, 0.07, front + 0.02, "#FFD43B");
@@ -669,10 +700,10 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
   const extraGeo = (list) => ({
     type: "FeatureCollection",
     features: list
-      .filter((x) => x.kind === "extra")
-      .map((x) => byId(x.ref))
-      .filter(Boolean)
-      .map((b) => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring(b.g)] } })),
+      .filter((x) => x.kind === "extra" || x.kind === "floors")
+      .map((x) => [x, byId(x.ref)])
+      .filter(([, b]) => b)
+      .map(([x, b]) => ({ type: "Feature", properties: { c: x.kind === "floors" ? "#F08C00" : "#E5484D" }, geometry: { type: "Polygon", coordinates: [ring(b.g)] } })),
   });
   function showSugg(list) {
     suggRef.current = list;
@@ -687,7 +718,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     if (await call(`/admin/buildings/suggestions/${encodeURIComponent(x.id)}/${verb}`, {})) {
       showSugg(suggRef.current.filter((y) => y.id !== x.id));
       setPick(null);
-      popMid(verb === "accept" ? (x.kind === "missing" ? "🏠 เพิ่มแล้ว" : "💥 เอาออกแล้ว") : "👋 ข้ามแล้ว");
+      popMid(verb === "accept" ? (x.kind === "missing" ? "🏠 เพิ่มแล้ว" : x.kind === "floors" ? `📏 ${x.lv} ชั้น` : "💥 เอาออกแล้ว") : "👋 ข้ามแล้ว");
       setDone((n) => n + 1);
     }
   }
@@ -800,6 +831,15 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
       popMid(`${KINDS[t].icon} ${KINDS[t].label}`);
     }
   }
+  async function setRoof(r) {
+    const b = byId(selRef.current);
+    if (!b) return;
+    const prev = b.r || "gable";
+    if (await call("/admin/buildings/shape", { id: b.id, r })) {
+      pushUndo({ kind: "roof", id: b.id, prev });
+      popMid("🏠 เปลี่ยนหลังคาแล้ว");
+    }
+  }
   async function saveName() {
     const b = byId(selRef.current);
     if (!b || (b.n || "") === name.trim()) return;
@@ -858,6 +898,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     else if (u.kind === "lv") await call("/admin/buildings/shape", { id: u.id, lv: u.prev });
     else if (u.kind === "shape") await call("/admin/buildings/shape", { id: u.id, g: u.prev });
     else if (u.kind === "type") await call("/admin/buildings/shape", { id: u.id, t: u.prev });
+    else if (u.kind === "roof") await call("/admin/buildings/shape", { id: u.id, r: u.prev });
     else if (u.kind === "group") await call("/admin/buildings/group", { ids: [u.ids[0]] });
     else if (u.kind === "split") {
       for (const i of u.ids) await call("/admin/buildings/remove", { id: i });
@@ -946,7 +987,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
             m.addSource("sugg", { type: "geojson", data: suggGeo(suggRef.current.filter((x) => x.kind === "missing")) });
             m.addLayer({ id: "sugg", type: "fill-extrusion", source: "sugg", paint: { "fill-extrusion-color": ["case", ["get", "annex"], "#7CD4FF", "#0096FF"], "fill-extrusion-height": ["get", "h"], "fill-extrusion-opacity": 0.6 } });
             m.addSource("extra", { type: "geojson", data: extraGeo(suggRef.current) });
-            m.addLayer({ id: "extra", type: "line", source: "extra", paint: { "line-color": "#E5484D", "line-width": 3, "line-dasharray": [1.5, 1] } });
+            m.addLayer({ id: "extra", type: "line", source: "extra", paint: { "line-color": ["get", "c"], "line-width": 3, "line-dasharray": [1.5, 1] } });
           }
 
           const origin = ml.MercatorCoordinate.fromLngLat([LNG0, LAT0], 0);
@@ -1055,7 +1096,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
               let x = f ? suggRef.current.find((y) => y.id === f.properties.sid) : null;
               if (!x) {
                 const hb = tapHouse(e);
-                x = hb ? suggRef.current.find((y) => y.kind === "extra" && y.ref === hb.id) : null;
+                x = hb ? suggRef.current.find((y) => (y.kind === "extra" || y.kind === "floors") && y.ref === hb.id) : null;
               }
               setPick(x || null);
               if (!x) pop(e.point, "แตะก้อนสีฟ้า หรืออาคารเส้นประแดง");
@@ -1177,7 +1218,13 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                 {pick ? (
                   <>
                     <p className="text-sm leading-snug">
-                      {pick.kind === "missing" && pick.annex ? (
+                      {pick.kind === "floors" ? (
+                        <>
+                          <b>📏 วัดความสูงได้ราว {pick.h} ม. ≈ {pick.lv} ชั้น</b>
+                          <br />
+                          จาก{pick.src === "drone" ? "ภาพโดรน" : pick.src === "google25d" ? "ภาพดาวเทียม (Google Open Buildings 2.5D)" : ` ${pick.src}`} · ตอนนี้ตั้งไว้ {byId(pick.ref)?.lv ?? "?"} ชั้น
+                        </>
+                      ) : pick.kind === "missing" && pick.annex ? (
                         <>
                           <b>🧱 ส่วนต่อเติมของบ้านข้างๆ (เช่น ครัวหลังบ้าน หลังคาโรงรถ)</b>
                           <br />
@@ -1200,7 +1247,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                     </p>
                     <div className="flex gap-2">
                       <button onClick={() => decide(pick, "accept")} disabled={busy} className="flex-1 rounded-xl bg-[#1E6B47] py-2 font-bold text-white shadow-[0_3px_0_#154D33] active:scale-95">
-                        {pick.kind === "missing" ? (pick.annex ? "✓ เพิ่มเป็นส่วนของบ้านนี้" : "✓ เพิ่มบ้านนี้") : "🔨 เอาออก"}
+                        {pick.kind === "floors" ? `✓ ตั้งเป็น ${pick.lv} ชั้น` : pick.kind === "missing" ? (pick.annex ? "✓ เพิ่มเป็นส่วนของบ้านนี้" : "✓ เพิ่มบ้านนี้") : "🔨 เอาออก"}
                       </button>
                       <button onClick={() => decide(pick, "dismiss")} disabled={busy} className="flex-1 rounded-xl bg-neutral-200 py-2 font-bold active:scale-95">
                         ✕ ไม่ใช่ / ข้าม
@@ -1211,7 +1258,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="min-w-0 flex-1">
                       {sugg.length
-                        ? `อาคารที่อาจขาด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length} (ฟ้าเข้ม) · ส่วนต่อเติม ${sugg.filter((x) => x.annex).length} (ฟ้าอ่อน) · อาจเกิน ${sugg.filter((x) => x.kind === "extra").length} (เส้นประแดง) · แตะเพื่อดูทีละหลัง`
+                        ? `อาคารที่อาจขาด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length} (ฟ้าเข้ม) · ส่วนต่อเติม ${sugg.filter((x) => x.annex).length} (ฟ้าอ่อน) · อาจเกิน ${sugg.filter((x) => x.kind === "extra").length} (เส้นประแดง) · จำนวนชั้นจากภาพ ${sugg.filter((x) => x.kind === "floors").length} (เส้นประส้ม) · แตะเพื่อดูทีละหลัง`
                         : "ยังไม่มีข้อเสนอ · รอแอดมินรันการเทียบข้อมูล"}
                     </span>
                     {sugg.some((x) => x.kind === "missing" && !x.annex) && (
@@ -1272,6 +1319,21 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                     </button>
                   ))}
                 </div>
+                {!flatKind && sel.t !== "shrine" && (
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="text-xs font-bold text-neutral-500">หลังคา</span>
+                    {[
+                      ["gable", "🔺 จั่ว"],
+                      ["hip", "⛰️ ปั้นหยา"],
+                      ["flat", "▭ แบน"],
+                      ["shed", "◺ เพิงหมาแหงน"],
+                    ].map(([k, label]) => (
+                      <button key={k} onClick={() => setRoof(k)} disabled={busy} className={`rounded-full border px-2 py-1 text-xs font-bold ${sel.r === k ? "border-[#C99A00] bg-[#FFD43B]" : "bg-white"}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="flex gap-1">
                   <input
                     id="m3d-name"

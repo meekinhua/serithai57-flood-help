@@ -74,6 +74,7 @@ def box_around(lat: float, lng: float, w: float = 7.0, d: float = 10.0) -> list:
 def building_shapes(edits: dict, with_removed: bool = False) -> list:
     shapes, levels = (edits or {}).get("shapes") or {}, (edits or {}).get("levels") or {}
     types, names, groups = (edits or {}).get("types") or {}, (edits or {}).get("names") or {}, (edits or {}).get("groups") or {}
+    roofs = (edits or {}).get("roofs") or {}
     added = {b[2] for b in (edits or {}).get("added") or []}
     out = []
     def one(lat, lng, bid, state):
@@ -87,6 +88,8 @@ def building_shapes(edits: dict, with_removed: bool = False) -> list:
             row["n"] = names[str(bid)]
         if groups.get(str(bid)):
             row["grp"] = groups[str(bid)]
+        if roofs.get(str(bid)):
+            row["r"] = roofs[str(bid)]
         out.append(row)
     for lat, lng, bid in BUILDINGS["buildings"]:
         one(lat, lng, bid, "added" if bid in added else "osm")
@@ -186,6 +189,7 @@ class RoofEdit(BaseModel):
     lv: Optional[int] = Field(None, ge=1, le=30)  # floors
     t: Optional[str] = Field(None, pattern=r"^(house|townhouse|hall|pool|tennis|basket|badminton|park|shrine|office|shop|school|other)$")
     n: Optional[str] = Field(None, max_length=40)  # name shown on the 3D map ("" clears)
+    r: Optional[Literal["gable", "hip", "flat", "shed"]] = None  # roof shape
 
 
 class RoofSplit(BaseModel):
@@ -195,18 +199,20 @@ class RoofSplit(BaseModel):
 
 class Suggestion(BaseModel):
     id: str = Field(..., min_length=3, max_length=80)  # stable id from the source (e.g. overture id / osm way)
-    kind: Literal["missing", "extra"]
+    kind: Literal["missing", "extra", "floors"]
     src: str = Field(..., max_length=20)  # google / microsoft / osm / esri …
     g: Optional[list[list[float]]] = Field(None, min_length=3, max_length=80)
     ref: Optional[int] = None  # our building: the one that may be extra, or the house an annex belongs to
     annex: bool = False  # a small add-on touching a house (back kitchen, carport roof)
     lv: Optional[int] = Field(None, ge=1, le=30)
     conf: Optional[float] = None
+    h: Optional[float] = None  # measured height in metres (floors suggestions)
 
 
 class Suggestions(BaseModel):
     items: list[Suggestion] = Field(..., max_length=3000)
     note: str = Field("", max_length=200)
+    kinds: list[Literal["missing", "extra", "floors"]] = []  # which open suggestions this run replaces (default: the kinds it sends)
 
 
 class RoofGroup(BaseModel):
@@ -523,7 +529,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
 
     async def roof_edits() -> dict:
         doc = await db.settings.find_one({"id": "building_edits"}, {"_id": 0}) or {}
-        return {k: doc.get(k) or ({} if k not in ("added", "removed") else []) for k in ("added", "removed", "shapes", "levels", "types", "names", "groups")}
+        return {k: doc.get(k) or ({} if k not in ("added", "removed") else []) for k in ("added", "removed", "shapes", "levels", "types", "names", "groups", "roofs")}
 
     async def save_roofs(e: dict, admin: dict, what: str):
         await db.settings.update_one({"id": "building_edits"}, {"$set": {"id": "building_edits", **e, "by": admin.get("name", ""), "at": now()}}, upsert=True)
@@ -579,9 +585,11 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
     @router.post("/admin/buildings/shape")
     async def shape_roof(body: RoofEdit, admin: dict = Depends(require_admin)):
         """Floors and/or outline of one building (OSM or added)."""
-        if body.id is None or (body.lv is None and not body.g and body.t is None and body.n is None):
+        if body.id is None or (body.lv is None and not body.g and body.t is None and body.n is None and body.r is None):
             raise HTTPException(422, "เลือกอาคารก่อน")
         e = await roof_edits()
+        if body.r:
+            e["roofs"][str(body.id)] = body.r
         if body.t:
             e["types"][str(body.id)] = body.t
         if body.n is not None:
@@ -649,7 +657,8 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
     @router.post("/admin/buildings/suggestions")
     async def put_suggestions(body: Suggestions, admin: dict = Depends(require_admin)):
         decided = {d["id"] async for d in db.building_suggestions.find({"status": {"$in": ["accepted", "dismissed"]}}, {"_id": 0, "id": 1})}
-        await db.building_suggestions.delete_many({"status": "open"})
+        kinds = body.kinds or sorted({x.kind for x in body.items}) or ["missing", "extra"]
+        await db.building_suggestions.delete_many({"status": "open", "kind": {"$in": kinds}})
         rows = [{**x.model_dump(), "g": _outline_ok(x.g) if x.g else None, "status": "open", "at": now()} for x in body.items if x.id not in decided]
         if rows:
             await db.building_suggestions.insert_many(rows)
@@ -680,6 +689,8 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
                     lead = e["groups"].get(str(sg["ref"]), sg["ref"])
                     e["groups"][str(sg["ref"])] = lead
                     e["groups"][str(new_id)] = lead
+            elif sg["kind"] == "floors" and sg.get("ref") is not None and sg.get("lv"):
+                e["levels"][str(sg["ref"])] = sg["lv"]
             elif sg["kind"] == "extra" and sg.get("ref") is not None:
                 if any(b[2] == sg["ref"] for b in e["added"]):
                     e["added"] = [b for b in e["added"] if b[2] != sg["ref"]]
