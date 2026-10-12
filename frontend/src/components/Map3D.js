@@ -135,12 +135,13 @@ function makeBuilder(THREE) {
     tri,
     quad,
     setOwner: (id) => (cur = id),
-    mesh() {
+    mesh(glass = false) {
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
       g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
       g.computeVertexNormals();
-      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial(glass ? { vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.3, depthWrite: false } : { vertexColors: true, side: THREE.DoubleSide }));
+      if (glass) m.renderOrder = 1;
       m.userData.owner = owner;
       return m;
     },
@@ -227,7 +228,8 @@ function toolkit(B, P) {
   return { box, floor, gable, lineX, lineZ };
 }
 
-function buildThing(B, b, wall, roof, segs, tree) {
+function buildThing(B, b, wall, roof, segs, kit) {
+  const tree = kit.tree;
   const F = frame(b, segs);
   if (!F) return;
   const { hw, hd, P } = F;
@@ -316,20 +318,84 @@ function buildThing(B, b, wall, roof, segs, tree) {
     return;
   }
   if (t === "shrine") {
-    // หอพระ: a white hall on a plinth, two stacked red roofs with a gold ridge and chofa
-    K.box(-hw - 0.8, hw + 0.8, 0, 0.8, -hd - 0.8, hd + 0.8, "#E9E1CF");
-    K.box(-hw, hw, 0.8, 4.6, -hd, hd, "#FFFFFF", false);
-    rect(0, 2.2, 0.8, 1.4, front, "#B8860B");
-    const R1 = 0.55 * S + 1.2;
-    K.gable(hw, hd, 4.6, R1, 0.7, "#C0392B", "#FFFFFF");
-    K.gable(hw * 0.72, hd * 0.72, 4.6 + R1 * 0.55, R1 * 0.75, 0.3, "#E67E22", "#FFFFFF");
-    const top = 4.6 + R1 * 0.55 + R1 * 0.75;
-    if (hw >= hd) K.box(-hw * 0.72 - 0.3, hw * 0.72 + 0.3, top - 0.1, top + 0.25, -0.12, 0.12, "#F4C430");
-    else K.box(-0.12, 0.12, top - 0.1, top + 0.25, -hd * 0.72 - 0.3, hd * 0.72 + 0.3, "#F4C430");
-    for (const sx of [-1, 1]) {
-      const end = hw >= hd ? P(sx * (hw * 0.72 + 0.3), top, 0) : P(0, top, sx * (hd * 0.72 + 0.3));
-      B.tri([end[0] - 0.15, top, end[2]], [end[0] + 0.15, top, end[2]], [end[0], top + 1.4, end[2]], "#F4C430");
+    // หอพระ: a golden seated Buddha on a lotus base, inside a clear glass pavilion with a gold-trimmed spire roof
+    const G = kit.G;
+    const gold = "#E6B422";
+    const gold2 = "#F5D061";
+    const ico = (x, y, z, sx, sy, sz, hex) => {
+      const v = kit.ico;
+      for (let i = 0; i < v.count; i += 3) {
+        const q = (k) => P(x + v.getX(i + k) * sx, y + v.getY(i + k) * sy, z + v.getZ(i + k) * sz);
+        B.tri(q(0), q(1), q(2), hex);
+      }
+    };
+    const prism = (r, y0, y1, hex, n = 8) => {
+      for (let i = 0; i < n; i++) {
+        const a0 = (i / n) * 2 * Math.PI;
+        const a1 = ((i + 1) / n) * 2 * Math.PI;
+        const p0 = [Math.cos(a0) * r, Math.sin(a0) * r];
+        const p1 = [Math.cos(a1) * r, Math.sin(a1) * r];
+        B.quad(P(p0[0], y0, p0[1]), P(p1[0], y0, p1[1]), P(p1[0], y1, p1[1]), P(p0[0], y1, p0[1]), hex);
+        B.tri(P(0, y1, 0), P(p0[0], y1, p0[1]), P(p1[0], y1, p1[1]), hex);
+      }
+    };
+    const cone = (x, y, z, r, h, hex, n = 8) => {
+      for (let i = 0; i < n; i++) {
+        const a0 = (i / n) * 2 * Math.PI;
+        const a1 = ((i + 1) / n) * 2 * Math.PI;
+        B.tri(P(x + Math.cos(a0) * r, y, z + Math.sin(a0) * r), P(x + Math.cos(a1) * r, y, z + Math.sin(a1) * r), P(x, y + h, z), hex);
+      }
+    };
+    const bar = (a, b2, w, hex) => {
+      // a thin gold strip between two points of the frame
+      const up = [0, w, 0];
+      B.quad(P(a[0], a[1], a[2]), P(b2[0], b2[1], b2[2]), P(b2[0], b2[1] + up[1], b2[2]), P(a[0], a[1] + up[1], a[2]), hex);
+    };
+    const pl = 0.6;
+    K.box(-hw - 0.6, hw + 0.6, 0, pl, -hd - 0.6, hd + 0.6, "#F3EEE2");
+    // the statue, sized to the pavilion and facing the street
+    const k = Math.max(0.8, Math.min(S * 0.55, 3));
+    const y0 = pl;
+    prism(1.35 * k, y0, y0 + 0.4 * k, "#A3222B");
+    prism(1.45 * k, y0 + 0.4 * k, y0 + 0.5 * k, gold);
+    prism(1.2 * k, y0 + 0.5 * k, y0 + 0.75 * k, gold2, 12);
+    ico(0, y0 + 1.0 * k, 0.12 * k, 1.1 * k, 0.36 * k, 0.78 * k, gold); // crossed legs
+    ico(0, y0 + 1.75 * k, -0.08 * k, 0.68 * k, 0.82 * k, 0.46 * k, gold); // body
+    ico(0, y0 + 1.18 * k, 0.5 * k, 0.32 * k, 0.12 * k, 0.2 * k, gold2); // hands in the lap
+    ico(0, y0 + 2.72 * k, 0, 0.34 * k, 0.4 * k, 0.34 * k, gold2); // head
+    cone(0, y0 + 3.02 * k, 0, 0.16 * k, 0.5 * k, gold2, 6); // flame of the topknot
+    // glass pavilion: white corner posts, clear walls and a clear spire roof with gold edges
+    const H = y0 + 3.7 * k + 0.4;
+    const X = hw;
+    const Z = hd;
+    for (const [px, pz] of [
+      [-X, -Z],
+      [X, -Z],
+      [X, Z],
+      [-X, Z],
+    ])
+      K.box(px - 0.15, px + 0.15, pl, H, pz - 0.15, pz + 0.15, "#FFFFFF");
+    const glass = "#BFE9FF";
+    G.quad(P(-X, pl, Z), P(X, pl, Z), P(X, H, Z), P(-X, H, Z), glass);
+    G.quad(P(-X, pl, -Z), P(X, pl, -Z), P(X, H, -Z), P(-X, H, -Z), glass);
+    G.quad(P(X, pl, -Z), P(X, pl, Z), P(X, H, Z), P(X, H, -Z), glass);
+    G.quad(P(-X, pl, -Z), P(-X, pl, Z), P(-X, H, Z), P(-X, H, -Z), glass);
+    const R = 0.9 * S + 1.4;
+    const ap = [0, H + R, 0];
+    const cs = [
+      [-X - 0.3, H, -Z - 0.3],
+      [X + 0.3, H, -Z - 0.3],
+      [X + 0.3, H, Z + 0.3],
+      [-X - 0.3, H, Z + 0.3],
+    ];
+    for (let i = 0; i < 4; i++) {
+      const c1 = cs[i];
+      const c2 = cs[(i + 1) % 4];
+      G.tri(P(...c1), P(...c2), P(...ap), glass);
+      bar(c1, c2, 0.18, gold);
+      bar(c1, ap, 0.14, gold);
     }
+    cone(0, H + R - 0.1, 0, 0.25, 1.6, gold, 6); // the gold finial
     return;
   }
 
@@ -555,10 +621,16 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     if (!W.scene) return;
     if (W.mesh) {
       W.scene.remove(W.mesh);
+      if (W.glass) {
+        W.scene.remove(W.glass);
+        W.glass.geometry.dispose();
+      }
       W.mesh.geometry.dispose();
     }
     const B = makeBuilder(W.THREE);
-    const tree = makeTree(B, W.THREE);
+    const G = makeBuilder(W.THREE);
+    const kit = { tree: makeTree(B, W.THREE), G, ico: W.ico || (W.ico = new W.THREE.IcosahedronGeometry(1, 1).toNonIndexed().getAttribute("position")) };
+    const tree = kit.tree;
     const selLead = selRef.current;
     const linked = new Set(linkRef.current);
     for (const b of data.current) {
@@ -571,11 +643,13 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
       if (b.t === "school") [wall, roof] = ["#FFF3C4", "#8A97A6"];
       if (selLead != null && lead === selLead) wall = "#FFD43B";
       if (linked.has(b.id)) wall = "#7DE3F4";
-      buildThing(B, b, wall, roof, W.segs, tree);
+      buildThing(B, b, wall, roof, W.segs, kit);
     }
     buildTrees(B, tree, W.green, W.places);
     W.mesh = B.mesh();
     W.scene.add(W.mesh);
+    W.glass = G.mesh(true);
+    W.scene.add(W.glass);
     const m = map.current;
     if (m?.getSource("hit")) m.getSource("hit").setData(hitGeo(data.current));
     labels();
