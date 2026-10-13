@@ -1062,7 +1062,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
               type: "symbol",
               source: "nums",
               minzoom: 17.5,
-              layout: { "text-field": ["get", "t"], "text-font": ["Open Sans Bold"], "text-size": 12, "text-offset": [0, -1.6] },
+              layout: { "text-field": ["get", "t"], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-offset": [0, -1.6] },
               paint: { "text-color": "#15201A", "text-halo-color": "#FFFFFF", "text-halo-width": 1.6 },
             });
           }
