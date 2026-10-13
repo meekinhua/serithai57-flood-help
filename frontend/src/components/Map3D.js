@@ -639,7 +639,7 @@ const TOOLS = [
   ["hint", "💡", "ข้อเสนอ"],
 ];
 
-export default function Map3D({ edit = false, onClose, className = "", pins = null, onPin = null, children = null }) {
+export default function Map3D({ edit = false, onClose, className = "", pins = null, onPin = null, children = null, admin = false }) {
   const el = useRef(null);
   const map = useRef(null);
   const world = useRef({});
@@ -681,6 +681,10 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
   const [repLv, setRepLv] = useState(2);
   const [repMsg, setRepMsg] = useState("");
   const fixRef = useRef(false);
+  const [finding, setFinding] = useState(false); // 🔍 find a house number
+  const [q, setQ] = useState("");
+  const [findMsg, setFindMsg] = useState("");
+  const foundMark = useRef(null);
   const [gps, setGps] = useState(false); // 🧍 follow my phone's GPS
   const [gpsMsg, setGpsMsg] = useState("");
   const gpsRef = useRef({}); // {watch, doll, at, to, heading, raf, follow, compass, bear}
@@ -1005,7 +1009,7 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
           api("/map3d/sois").catch(() => ({ sois: {} })),
           api("/places").catch(() => []),
           myHouse && !edit ? api(`/map3d/me?house=${encodeURIComponent(myHouse)}`).catch(() => ({})) : Promise.resolve({}),
-          edit ? api("/admin/map3d/houses").catch(() => ({ houses: {} })) : Promise.resolve({ houses: {} }),
+          api(edit ? "/admin/map3d/houses" : "/map3d/houses").catch(() => ({ houses: {} })),
         ]);
         const sg = edit ? await api("/admin/buildings/suggestions").catch(() => ({ items: [] })) : { items: [] };
         suggRef.current = sg.items || [];
@@ -1049,7 +1053,11 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
         map.current = m;
         window.__map3d = m; // for checking from the console
         m.addControl(new ml.NavigationControl({ visualizePitch: true }), "top-left");
-        m.on("load", () => {
+        // build as soon as the style is ready; "load" also waits for the OSM background tiles, which can be slow
+        let started = false;
+        const onLoad = () => {
+          if (started || dead) return;
+          started = true;
           const flatF = [];
           for (const a of b.green || [])
             flatF.push({ type: "Feature", properties: { c: a.k === "water" ? "#9FD8F5" : a.k === "pitch" ? "#B6E3A8" : "#C6EBB4", o: 0.95 }, geometry: { type: "Polygon", coordinates: [ring(a.g)] } });
@@ -1061,6 +1069,8 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
           const soiLines = [];
           for (const [k, s] of Object.entries(so.sois || {}))
             for (const ln of s.lines || []) soiLines.push({ type: "Feature", properties: { k }, geometry: { type: "LineString", coordinates: ln.map(([a, c]) => [c, a]) } });
+          m.addSource("lots", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+          m.addLayer({ id: "lots", type: "line", source: "lots", minzoom: 16.5, paint: { "line-color": "#4E6B58", "line-width": ["interpolate", ["linear"], ["zoom"], 16.5, 0.4, 19, 1.1], "line-opacity": ["interpolate", ["linear"], ["zoom"], 16.5, 0, 17.2, 0.35] } });
           m.addSource("soi", { type: "geojson", data: { type: "FeatureCollection", features: soiLines } });
           const w = (n) => ["interpolate", ["exponential", 2], ["zoom"], 15, n / 4, 19, n * 4];
           m.addLayer({ id: "road-edge", type: "line", source: "soi", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#C8D3CB", "line-width": w(9) } });
@@ -1121,15 +1131,48 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
             },
           });
 
+          const nums = {};
+          for (const [bid, h] of Object.entries(housesRef.current)) {
+            const k = soiRef.current[bid];
+            const n = parseInt(String(h).split("/")[1], 10);
+            if (k && n) (nums[k] = nums[k] || []).push(n);
+          }
+          const pills = [];
           for (const [k, s] of Object.entries(so.sois || {})) {
             const ln = (s.lines || []).reduce((a, x) => (x.length > a.length ? x : a), []);
             if (!ln.length) continue;
             const mid = ln[Math.floor(ln.length / 2)];
             const d = document.createElement("div");
+            const ns = (nums[k] || []).sort((x, y) => x - y);
+            // the tightest run holding 80% of the numbers, so a few mis-pinned houses don't stretch the range
+            const kk = Math.max(1, Math.ceil(ns.length * 0.8));
+            let lo = ns[0];
+            let hi = ns[ns.length - 1];
+            for (let i = 0; i + kk - 1 < ns.length; i++) if (ns[i + kk - 1] - ns[i] < hi - lo) [lo, hi] = [ns[i], ns[i + kk - 1]];
+            pills.push([d, `ซ.${k}`, ns.length >= 3 ? `ซ.${k} · ${lo === hi ? lo : `${lo}–${hi}`}` : `ซ.${k}`, [mid[1], mid[0]]]);
             d.textContent = `ซ.${k}`;
             d.style.cssText = `font:800 11px sans-serif;color:#fff;background:${colours(k)[1]};border:2px solid #fff;border-radius:999px;padding:0 6px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25);pointer-events:none`;
             new ml.Marker({ element: d }).setLngLat([mid[1], mid[0]]).addTo(m);
           }
+          // soi pills: the number range when far, just the soi when near; nearer pills win, overlapping ones hide
+          const pillText = () => {
+            const far = m.getZoom() < 17.5;
+            const H = m.getCanvas().clientHeight;
+            const W = m.getCanvas().clientWidth;
+            const placed = [];
+            const order = pills.map((x) => [x, m.project(x[3])]).sort((a, b) => b[1].y - a[1].y);
+            for (const [[d, near, wide], pt] of order) {
+              d.textContent = far ? wide : near;
+              const w = d.offsetWidth + 6;
+              const h = d.offsetHeight + 4;
+              const r = [pt.x - w / 2, pt.y - h / 2, pt.x + w / 2, pt.y + h / 2];
+              const ok = pt.y > H * 0.12 && pt.y < H && pt.x > -w && pt.x < W + w && !placed.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]);
+              d.style.visibility = ok ? "visible" : "hidden";
+              if (ok) placed.push(r);
+            }
+          };
+          pillText();
+          m.on("moveend", pillText);
           for (const p of pl || []) {
             const at = p.kind === "pin" ? p.geometry : p.kind === "area" ? centroid(p.geometry) : p.geometry?.[0];
             if (!at) continue;
@@ -1138,7 +1181,7 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
             d.style.pointerEvents = "none";
             new ml.Marker({ element: d, anchor: "bottom" }).setLngLat([at[1], at[0]]).addTo(m);
           }
-          if (edit) {
+          {
             const pts = b.buildings
               .filter((x) => housesRef.current[x.id])
               .map((x) => {
@@ -1150,8 +1193,14 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
               id: "nums",
               type: "symbol",
               source: "nums",
-              minzoom: 17.5,
-              layout: { "text-field": ["get", "t"], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-offset": [0, -1.6] },
+              minzoom: 17.3,
+              layout: {
+                "text-field": ["get", "t"],
+                "text-font": ["Noto Sans Bold"],
+                "text-size": ["interpolate", ["linear"], ["zoom"], 17.3, 10, 19, 13, 21, 16],
+                "text-offset": [0, -1.6],
+                "text-padding": 3,
+              },
               paint: { "text-color": "#15201A", "text-halo-color": "#FFFFFF", "text-halo-width": 1.6 },
             });
           }
@@ -1168,7 +1217,15 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
             }
           }
           setReady(true);
-        });
+        };
+        m.on("load", onLoad);
+        const poll = setInterval(() => {
+          if (dead || started) return clearInterval(poll);
+          if (m.isStyleLoaded()) {
+            clearInterval(poll);
+            onLoad();
+          }
+        }, 300);
 
         // tap: ray-cast into the models first (what you see), the footprints second
         const tapHouse = (e) => {
@@ -1292,6 +1349,15 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
     if (map.current) map.current.getCanvas().style.cursor = tool === "look" ? "" : "crosshair";
     if (tool !== "look" && selRef.current != null) select(null);
   }, [tool, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // faint land-plot lines (admins always; everyone once the admin opens them). Admin is known only after login loads.
+  useEffect(() => {
+    const m = map.current;
+    if (!ready || !m?.getSource("lots")) return;
+    api(edit || admin ? "/admin/lots" : "/map3d/lots")
+      .then((r) => m.getSource("lots")?.setData({ type: "FeatureCollection", features: (r.lots || []).map((g) => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring(g)] } })) }))
+      .catch(() => {});
+  }, [ready, admin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 📍 issue pins from the map page (clickable)
   useEffect(() => {
@@ -1472,6 +1538,34 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
     }
   }
 
+  function findHouse(e) {
+    e?.preventDefault();
+    const n = (q.match(/\d{1,4}(?!.*\/)/) || [])[0];
+    const want = n ? `4/${parseInt(n, 10)}` : "";
+    const bid = Object.keys(housesRef.current).find((k) => housesRef.current[k] === want);
+    const b = bid ? byId(Number(bid)) : null;
+    if (!b) return setFindMsg(want ? `ยังไม่มีหมุดบ้าน ${want} บนแผนที่` : "พิมพ์เลขที่บ้าน เช่น 102");
+    const m = map.current;
+    const c = centroid(b.g);
+    setFindMsg("");
+    setFinding(false);
+    m.flyTo({ center: [c[1], c[0]], zoom: 19, duration: 1600 });
+    selRef.current = leader(b);
+    rebuild();
+    foundMark.current?.remove();
+    const d = document.createElement("div");
+    d.innerHTML = `<div class="m3d-bob" style="font:800 14px sans-serif;background:#FFD43B;color:#15201A;border:2px solid #fff;border-radius:999px;padding:3px 10px;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap">📍 ${want}</div>`;
+    d.style.pointerEvents = "none";
+    foundMark.current = new window.maplibregl.Marker({ element: d, anchor: "bottom", offset: [0, -34] }).setLngLat([c[1], c[0]]).addTo(m);
+    setTimeout(() => {
+      foundMark.current?.remove();
+      if (selRef.current === leader(b)) {
+        selRef.current = null;
+        rebuild();
+      }
+    }, 8000);
+  }
+
   function fixOff() {
     setWalk(null);
     setFix(false);
@@ -1540,7 +1634,12 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
       <div className={`absolute right-2 top-2 z-10 flex-col items-end gap-1.5 ${walk ? "hidden" : "flex"}`}>
         {onClose && (
           <button onClick={onClose} className="min-h-[44px] rounded-full bg-[#15201A] px-4 text-[15px] font-bold text-white shadow">
-            ✕ ปิด 3D
+            {edit ? "✓ แก้เสร็จ" : "✕ ปิด 3D"}
+          </button>
+        )}
+        {ready && (
+          <button onClick={() => setFinding(!finding)} className="min-h-[40px] rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-sm font-bold shadow">
+            🔍 หาบ้าน
           </button>
         )}
         <button onClick={tilt} className="min-h-[40px] rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-sm font-bold shadow">
@@ -1657,6 +1756,25 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
             </button>
           )}
         </div>
+      )}
+      {finding && (
+        <form onSubmit={findHouse} className="absolute inset-x-2 top-14 z-30 flex flex-wrap items-center gap-1.5 rounded-2xl bg-white p-2 shadow-xl">
+          <span className="pl-1 font-bold">4/</span>
+          <input
+            autoFocus
+            inputMode="numeric"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="เลขที่บ้าน เช่น 102"
+            aria-label="เลขที่บ้าน"
+            className="min-h-[40px] min-w-0 flex-1 rounded-xl border border-[#D5DBD6] px-3 text-base"
+          />
+          <button className="min-h-[40px] rounded-xl bg-[#15201A] px-4 font-bold text-white">ไป</button>
+          <button type="button" onClick={() => setFinding(false)} aria-label="ปิด" className="min-h-[40px] px-2 text-lg">
+            ✕
+          </button>
+          {findMsg && <p className="w-full px-1 text-sm text-red-700">{findMsg}</p>}
+        </form>
       )}
       {walk && (
         <div className={`absolute inset-x-2 z-30 flex items-center gap-1.5 rounded-full bg-[#15201A]/90 p-1.5 text-white shadow-xl ${fix && !edit ? "top-2" : "bottom-2"}`}>

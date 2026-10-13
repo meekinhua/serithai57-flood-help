@@ -436,6 +436,27 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         _m3d.update(at=time.time(), key=key, soi=soi_of, house=house_of)
         return _m3d
 
+    class Lots(BaseModel):
+        lots: List[List[List[float]]] = Field(..., max_length=5000)
+        public: bool = False
+
+    @router.post("/admin/lots")
+    async def put_lots(body: Lots, admin: dict = Depends(require_admin)):
+        """Land-plot lines for the 3D map (traced by the admin team). Off for the public until `public` is set."""
+        lots = [[[round(a, 6), round(b, 6)] for a, b in g] for g in body.lots if 3 <= len(g) <= 200]
+        await db.settings.update_one({"id": "lot_lines"}, {"$set": {"id": "lot_lines", "lots": lots, "public": body.public, "at": time.time()}}, upsert=True)
+        return {"ok": True, "lots": len(lots), "public": body.public}
+
+    @router.get("/admin/lots")
+    async def admin_lots(admin: dict = Depends(require_admin)):
+        d = await db.settings.find_one({"id": "lot_lines"}, {"_id": 0}) or {}
+        return {"lots": d.get("lots") or [], "public": bool(d.get("public"))}
+
+    @router.get("/map3d/lots")
+    async def public_lots():
+        d = await db.settings.find_one({"id": "lot_lines"}, {"_id": 0}) or {}
+        return {"lots": d.get("lots") or [] if d.get("public") else []}
+
     @router.get("/map3d/sois")
     async def map3d_sois():
         """Which soi each building is on (for colouring the 3D map; no house numbers)."""
@@ -454,6 +475,12 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
                 if best and best[0] <= 25:
                     bid = best[1]
         return {"id": bid}
+
+    @router.get("/map3d/houses")
+    async def map3d_houses_public(request: Request):
+        """House numbers on the 3D map (shown when zoomed in, like the plates on the houses)."""
+        rate_limit(request, "map3d-houses", limit=30, window_s=600)
+        return {"houses": {str(k): v for k, v in (await map3d_index())["house"].items()}}
 
     @router.get("/admin/map3d/houses")
     async def map3d_houses(admin: dict = Depends(require_admin)):

@@ -407,6 +407,8 @@ export default function RepairApp() {
   // 📢 เสียงตามสาย layer: off by default (one switch on the map), loaded when switched on
   const [speakerOn, setSpeakerOn] = useState(() => load("speakerLayer", false));
   const [view3d, setView3d] = useState(false);
+  const [edit3d, setEdit3d] = useState(false); // 🛠️ admin: the building editor over the map page
+  const [map3dKey, setMap3dKey] = useState(0);
   const [mapMode, setMapMode] = useState(() => load("mapMode", "3d")); // 13 Oct: the village map opens in 3D
   const pickMap = (v) => {
     setMapMode(v);
@@ -931,7 +933,12 @@ export default function RepairApp() {
                 <section className="-mx-3 sm:mx-0">
                   <div className="h-[calc(100dvh-236px)] min-h-[360px] border-y border-[#DCE2DD] sm:overflow-hidden sm:rounded-xl sm:border">
                     <Suspense fallback={<p className="grid h-full place-items-center text-neutral-600">กำลังสร้างหมู่บ้านจำลอง… 🏡</p>}>
-                      <Map3D className="h-full w-full" pins={issuePins} onPin={openIssue}>
+                      <Map3D key={map3dKey} className="h-full w-full" pins={issuePins} onPin={openIssue} admin={!!admin}>
+                        {admin && (
+                          <button onClick={() => setEdit3d(true)} className="absolute bottom-[164px] right-3 z-10 flex min-h-[44px] items-center gap-1 rounded-full bg-[#15201A] px-3 text-[15px] font-bold text-white shadow-lg">
+                            🛠️ แก้อาคาร
+                          </button>
+                        )}
                         <div className="absolute bottom-10 left-2 z-10 flex flex-col items-start gap-1.5">
                           <button
                             onClick={() => setSheet({ type: "issueHistory" })}
@@ -1022,6 +1029,20 @@ export default function RepairApp() {
                     </button>
                   </WaterView>
                 </section>
+              )}
+              {edit3d && admin && (
+                <Suspense fallback={null}>
+                  <div className="fixed inset-0 z-[3000] bg-white">
+                    <Map3D
+                      edit
+                      className="h-full w-full"
+                      onClose={() => {
+                        setEdit3d(false);
+                        setMap3dKey((k) => k + 1); // show the edits on the map page
+                      }}
+                    />
+                  </div>
+                </Suspense>
               )}
               {view3d && (
                 <Suspense fallback={null}>

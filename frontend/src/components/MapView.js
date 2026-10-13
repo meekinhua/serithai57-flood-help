@@ -10,7 +10,7 @@ import { mediaUrl } from "../media";
 import { drawStaff } from "./staffMarkers";
 import { WATER_LEVELS, WATER_TREND, WATER_WHERE } from "../config";
 import { MAX_AGE_H, STALE_H, describeLevel, estimateAt, fieldBounds, renderField, toPoints } from "../waterField";
-import { load, save } from "../api";
+import { api, load, save } from "../api";
 import { CANALS, CANAL_STATE, LEAK_SEV, LEAK_STATUS, PUMP_STATUS, canalSummary } from "./Canal";
 
 const OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
@@ -147,6 +147,32 @@ export default function MapView({
         .setContent(levelHtml(e.latlng.lat, e.latlng.lng, pointsRef.current))
         .openOn(map);
     });
+    // 13 Oct: the soi lines the team drew / fixed (incl. the small sub-sois the base map lacks), under every pin
+    map.createPane("sois").style.zIndex = 340;
+    map.getPane("sois").style.pointerEvents = "none";
+    const soiLayer = L.layerGroup().addTo(map);
+    api("/sois")
+      .then((r) => {
+        for (const [k, s] of Object.entries(r.sois || {})) {
+          const lines = (s.lines || []).filter((ln) => ln.length > 1);
+          for (const ln of lines) {
+            L.polyline(ln, { pane: "sois", color: "#7C8B82", weight: 6, opacity: 0.6, lineCap: "round", lineJoin: "round", interactive: false }).addTo(soiLayer);
+            L.polyline(ln, { pane: "sois", color: "#FFFFFF", weight: 3.5, opacity: 0.95, lineCap: "round", lineJoin: "round", interactive: false }).addTo(soiLayer);
+          }
+          const ln = lines.reduce((a, x) => (x.length > a.length ? x : a), []);
+          if (ln.length)
+            L.marker(ln[Math.floor(ln.length / 2)], {
+              pane: "sois",
+              interactive: false,
+              keyboard: false,
+              icon: L.divIcon({ className: "soi2d-tag", html: `<span>ซ.${String(k).replace(/[<>&]/g, "")}</span>`, iconSize: null }),
+            }).addTo(soiLayer);
+        }
+      })
+      .catch(() => {});
+    const soiTags = () => elRef.current?.classList.toggle("show-soi-tags", map.getZoom() >= 17);
+    map.on("zoomend", soiTags);
+    soiTags();
     // Map containers that start hidden (mobile tabs) need a size refresh when shown.
     const ro = new ResizeObserver(() => map.invalidateSize());
     ro.observe(elRef.current);
