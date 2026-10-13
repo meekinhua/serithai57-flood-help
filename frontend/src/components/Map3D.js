@@ -7,7 +7,7 @@
 // `edit` (/admin › ที่อยู่ › อาคาร) adds a game-style toolbar: pick a tool, tap houses — 🏠 place a house shaped like
 // its neighbour, ⬆️⬇️ floors, 🔨 knock one down, 👆 look, ↩️ undo. Removed houses show as red patches (tap to restore).
 import { useEffect, useRef, useState } from "react";
-import { api, load } from "../api";
+import { api, load, save } from "../api";
 import { VILLAGE_BOUNDARY, VILLAGE_CENTER } from "../config";
 
 function loadScript(srcs, css, ready) {
@@ -682,6 +682,8 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
   const [repMsg, setRepMsg] = useState("");
   const fixRef = useRef(false);
   const [finding, setFinding] = useState(false); // 🔍 find a house number
+  const [showLots, setShowLots] = useState(() => load("showLots", true)); // ▦ land-plot lines (shared with the 2D map)
+  const [hasLots, setHasLots] = useState(false);
   const [q, setQ] = useState("");
   const [findMsg, setFindMsg] = useState("");
   const foundMark = useRef(null);
@@ -739,6 +741,7 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
     const hint = toolRef.current === "hint";
     const fl = new Set(suggRef.current.filter((x) => x.kind === "floors").map((x) => x.ref));
     const sp = new Set(suggRef.current.filter((x) => x.kind === "split").map((x) => x.ref));
+    const sh = new Set(suggRef.current.filter((x) => x.kind === "shape").map((x) => x.ref));
     const ex = new Set(suggRef.current.filter((x) => x.kind === "extra").map((x) => x.ref));
     for (const b of data.current) {
       if (b.s === "removed") continue;
@@ -755,6 +758,7 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
         if (fl.has(b.id)) [wall, roof] = ["#FFC46B", "#F08C00"];
         if (ex.has(b.id)) [wall, roof] = ["#FF9A9A", "#E5484D"];
         if (sp.has(b.id)) [wall, roof] = ["#D9C8FF", "#8B5CF6"];
+        if (sh.has(b.id)) [wall, roof] = ["#B8F0E6", "#14B8A6"];
       }
       buildThing(B, b, wall, roof, W.segs, kit);
     }
@@ -804,7 +808,7 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
       map.current?.getSource("preview")?.setData({ type: "FeatureCollection", features: [] });
       rebuild();
       popMid(
-        verb === "accept" ? (x.kind === "missing" ? "🏠 เพิ่มแล้ว" : x.kind === "floors" ? `📏 ${x.lv} ชั้น` : x.kind === "split" ? `✂️ ${x.parts?.length} หลัง` : "💥 เอาออกแล้ว") : "👋 ข้ามแล้ว",
+        verb === "accept" ? (x.kind === "missing" ? "🏠 เพิ่มแล้ว" : x.kind === "floors" ? `📏 ${x.lv} ชั้น` : x.kind === "split" ? `✂️ ${x.parts?.length} หลัง` : x.kind === "shape" ? "📐 ตรงแปลงแล้ว" : "💥 เอาออกแล้ว") : "👋 ข้ามแล้ว",
       );
       setDone((n) => n + 1);
     }
@@ -812,19 +816,18 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
   async function acceptAllMissing(which = "missing") {
     if (sure !== which) return setSure(which);
     setSure(false);
-    const todo = suggRef.current.filter((x) => (which === "split" ? x.kind === "split" && x.src === "landsmaps" : x.kind === "missing" && !x.annex));
+    const todo = suggRef.current.filter((x) => (which === "shape" ? x.kind === "shape" : which === "split" ? x.kind === "split" && x.src === "landsmaps" : x.kind === "missing" && !x.annex));
     setBusy(true);
-    for (const x of todo) {
-      try {
-        await api(`/admin/buildings/suggestions/${encodeURIComponent(x.id)}/accept`, { method: "POST", body: "{}" });
-      } catch (e) {
-        // already decided by someone else
-      }
+    try {
+      // one save on the server for the whole batch
+      await api("/admin/buildings/suggestions-accept-all", { method: "POST", body: JSON.stringify({ kind: which, ...(which === "split" ? { src: "landsmaps" } : {}) }) });
+    } catch (e) {
+      setMsg(e.message);
     }
     setBusy(false);
     showSugg(suggRef.current.filter((x) => !todo.includes(x)));
     await reload();
-    popMid(which === "split" ? `✂️ แบ่ง ${todo.length} ตึกตามแปลง` : `🏠 เพิ่ม ${todo.length} หลัง`);
+    popMid(which === "shape" ? `📐 จัด ${todo.length} หลังให้ตรงแปลง` : which === "split" ? `✂️ แบ่ง ${todo.length} ตึกตามแปลง` : `🏠 เพิ่ม ${todo.length} หลัง`);
   }
 
   const hitGeo = (list) => ({
@@ -1271,13 +1274,13 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
               let x = f ? suggRef.current.find((y) => y.id === f.properties.sid) : null;
               if (!x) {
                 const hb = tapHouse(e);
-                x = hb ? suggRef.current.find((y) => (y.kind === "extra" || y.kind === "floors" || y.kind === "split") && y.ref === hb.id) : null;
+                x = hb ? suggRef.current.find((y) => (y.kind === "extra" || y.kind === "floors" || y.kind === "split" || y.kind === "shape") && y.ref === hb.id) : null;
               }
               setPick(x || null);
               if (m.getSource("preview"))
                 m.getSource("preview").setData({
                   type: "FeatureCollection",
-                  features: (x?.parts || []).map((g) => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring(g)] } })),
+                  features: (x?.parts || (x?.kind === "shape" ? [x.g] : [])).map((g) => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring(g)] } })),
                 });
               if (!x) pop(e.point, "แตะก้อนสีฟ้า หรืออาคารเส้นประแดง");
               return;
@@ -1355,9 +1358,16 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
     const m = map.current;
     if (!ready || !m?.getSource("lots")) return;
     api(edit || admin ? "/admin/lots" : "/map3d/lots")
-      .then((r) => m.getSource("lots")?.setData({ type: "FeatureCollection", features: (r.lots || []).map((g) => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring(g)] } })) }))
+      .then((r) => {
+        m.getSource("lots")?.setData({ type: "FeatureCollection", features: (r.lots || []).map((g) => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring(g)] } })) });
+        setHasLots((r.lots || []).length > 0);
+      })
       .catch(() => {});
   }, [ready, admin]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const m = map.current;
+    if (ready && m?.getLayer("lots")) m.setLayoutProperty("lots", "visibility", showLots ? "visible" : "none");
+  }, [ready, showLots]);
 
   // 📍 issue pins from the map page (clickable)
   useEffect(() => {
@@ -1638,13 +1648,29 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
           </button>
         )}
         {ready && (
-          <button onClick={() => setFinding(!finding)} className="min-h-[40px] rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-sm font-bold shadow">
-            🔍 หาบ้าน
-          </button>
+          <div className="flex gap-1">
+            <button onClick={() => setFinding(!finding)} className="min-h-[40px] rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-sm font-bold shadow">
+              🔍 หาบ้าน
+            </button>
+          </div>
         )}
-        <button onClick={tilt} className="min-h-[40px] rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-sm font-bold shadow">
-          {flat ? "🏙️ มุมเฉียง" : "🗺️ มองจากบน"}
-        </button>
+        <div className="flex gap-1">
+            {hasLots && (
+              <button
+                onClick={() => {
+                  setShowLots(!showLots);
+                  save("showLots", !showLots);
+                }}
+                aria-pressed={showLots}
+                className={`min-h-[40px] rounded-full px-3 text-sm font-bold shadow ${showLots ? "bg-[#15201A] text-white" : "border border-[#D5DBD6] bg-white/95"}`}
+              >
+                ▦ แปลง
+              </button>
+            )}
+          <button onClick={tilt} className="min-h-[40px] rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-sm font-bold shadow">
+            {flat ? "🏙️ มุมเฉียง" : "🗺️ มองจากบน"}
+          </button>
+        </div>
         {ready && (
           <div className="flex gap-1">
             {gps && (
@@ -1802,7 +1828,13 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
                 {pick ? (
                   <>
                     <p className="text-sm leading-snug">
-                      {pick.kind === "split" ? (
+                      {pick.kind === "shape" ? (
+                        <>
+                          <b>📐 ตึกนี้เหลื่อมกับแปลงที่ดิน</b>
+                          <br />
+                          เส้นม่วงคือตำแหน่งที่ลงแปลงพอดี · ถ้ารับ จะขยับตึกไปตรงนั้น
+                        </>
+                      ) : pick.kind === "split" ? (
                         <>
                           <b>✂️ ตึกนี้คร่อมแปลงที่ดิน {pick.parts?.length} แปลง</b>
                           <br />
@@ -1843,6 +1875,8 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
                       <button onClick={() => decide(pick, "accept")} disabled={busy} className="flex-1 rounded-xl bg-[#1E6B47] py-2 font-bold text-white shadow-[0_3px_0_#154D33] active:scale-95">
                         {pick.kind === "split"
                           ? `✂️ แบ่งเป็น ${pick.parts?.length} หลัง`
+                          : pick.kind === "shape"
+                          ? "📐 ขยับให้ตรงแปลง"
                           : pick.kind === "floors"
                             ? `✓ ตั้งเป็น ${pick.lv} ชั้น`
                             : pick.kind === "missing"
@@ -1880,18 +1914,27 @@ export default function Map3D({ edit = false, onClose, className = "", pins = nu
                         แบ่งตามแปลง
                       </span>
                       <span>
+                        <i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#14B8A6" }} />
+                        เหลื่อมแปลง
+                      </span>
+                      <span>
                         <i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px] border" style={{ background: "#F2F2EE" }} />
                         บ้านเดิม
                       </span>
                     </span>
                     <span className="min-w-0 flex-1">
                       {sugg.length
-                        ? `อาคารที่อาจขาด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length}  · ส่วนต่อเติม ${sugg.filter((x) => x.annex).length} · เปลี่ยนชั้น ${sugg.filter((x) => x.kind === "floors").length} · แบ่งตามแปลง ${sugg.filter((x) => x.kind === "split").length} · อาจเกิน ${sugg.filter((x) => x.kind === "extra").length} · แตะเพื่อดูทีละหลัง`
+                        ? `อาคารที่อาจขาด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length}  · ส่วนต่อเติม ${sugg.filter((x) => x.annex).length} · เปลี่ยนชั้น ${sugg.filter((x) => x.kind === "floors").length} · แบ่งตามแปลง ${sugg.filter((x) => x.kind === "split").length} · เหลื่อมแปลง ${sugg.filter((x) => x.kind === "shape").length} · อาจเกิน ${sugg.filter((x) => x.kind === "extra").length} · แตะเพื่อดูทีละหลัง`
                         : "ยังไม่มีข้อเสนอ · รอแอดมินรันการเทียบข้อมูล"}
                     </span>
                     {sugg.some((x) => x.kind === "missing" && !x.annex) && (
                       <button onClick={() => acceptAllMissing("missing")} disabled={busy} className={`rounded-xl px-3 py-2 font-bold text-white ${sure === "missing" ? "bg-red-700" : "bg-[#0090D0]"}`}>
                         {sure === "missing" ? "แตะอีกครั้งเพื่อยืนยัน" : `✓ เพิ่มอาคารหลักทั้งหมด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length} หลัง`}
+                      </button>
+                    )}
+                    {sugg.some((x) => x.kind === "shape") && (
+                      <button onClick={() => acceptAllMissing("shape")} disabled={busy} className={`rounded-xl px-3 py-2 font-bold text-white ${sure === "shape" ? "bg-red-700" : "bg-[#0F9488]"}`}>
+                        {sure === "shape" ? "แตะอีกครั้งเพื่อยืนยัน" : `📐 จัดให้ตรงแปลงทั้งหมด ${sugg.filter((x) => x.kind === "shape").length} หลัง`}
                       </button>
                     )}
                     {sugg.some((x) => x.kind === "split" && x.src === "landsmaps") && (

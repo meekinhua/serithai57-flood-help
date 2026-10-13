@@ -108,6 +108,9 @@ export default function MapView({
   const seenPins = useRef(new Set());
   const [showField, setShowField] = useState(() => load("showWaterField", true));
   const [layers, setLayers] = useState(() => ({ ...LAYER_DEFAULTS, ...load("mapLayers", {}) }));
+  const [showLots, setShowLots] = useState(() => load("showLots", true)); // ▦ land-plot lines (shared with the 3D map)
+  const [hasLots, setHasLots] = useState(false);
+  const lotsRef = useRef(null);
   // Two clear views instead of everything at once: 🆘 requests, or 💧 water level (colours + report dots only)
   const [mode, setModeState] = useState("water"); // opens on the water level
   const setMode = (m) => {
@@ -168,6 +171,16 @@ export default function MapView({
               icon: L.divIcon({ className: "soi2d-tag", html: `<span>ซ.${String(k).replace(/[<>&]/g, "")}</span>`, iconSize: null }),
             }).addTo(soiLayer);
         }
+      })
+      .catch(() => {});
+    // ▦ faint land-plot lines, under the sois
+    map.createPane("lots").style.zIndex = 330;
+    map.getPane("lots").style.pointerEvents = "none";
+    lotsRef.current = L.layerGroup();
+    api("/map3d/lots")
+      .then((r) => {
+        for (const g of r.lots || []) L.polygon(g, { pane: "lots", color: "#4E6B58", weight: 0.8, opacity: 0.5, fill: false, interactive: false }).addTo(lotsRef.current);
+        setHasLots((r.lots || []).length > 0);
       })
       .catch(() => {});
     const soiTags = () => elRef.current?.classList.toggle("show-soi-tags", map.getZoom() >= 17);
@@ -489,9 +502,28 @@ export default function MapView({
   ].filter(([, , n]) => n > 0);
   const tabCls = (on) => `pointer-events-auto min-h-[44px] flex-1 rounded-full px-3 text-sm font-bold ${on ? "bg-black text-white" : "text-neutral-800"}`;
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !lotsRef.current) return;
+    if (showLots && hasLots) lotsRef.current.addTo(map);
+    else lotsRef.current.remove();
+  }, [showLots, hasLots]);
+
   return (
     <div className="relative h-full w-full">
       <div ref={elRef} className="h-full w-full" />
+      {hasLots && (
+        <button
+          onClick={() => {
+            setShowLots(!showLots);
+            save("showLots", !showLots);
+          }}
+          aria-pressed={showLots}
+          className={`absolute left-[54px] top-[60px] z-[600] min-h-[36px] rounded-full border px-2.5 text-sm font-bold shadow ${showLots ? "border-[#15201A] bg-[#15201A] text-white" : "border-[#D5DBD6] bg-white/95"}`}
+        >
+          ▦ เส้นแปลง {showLots ? "✓" : ""}
+        </button>
+      )}
       {/* one big switch: what am I looking at */}
       <div className={`pointer-events-none absolute inset-x-0 top-2 z-[600] justify-center px-12 ${flood ? "flex" : "hidden"}`}>
         <div className="pointer-events-auto flex w-full max-w-xs rounded-full border-2 border-black bg-white/95 p-0.5 shadow-lg" role="tablist" aria-label="ดูบนแผนที่">

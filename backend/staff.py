@@ -245,7 +245,7 @@ def _split_equal(g: list, n: int) -> list:
 
 class Suggestion(BaseModel):
     id: str = Field(..., min_length=3, max_length=80)  # stable id from the source (e.g. overture id / osm way)
-    kind: Literal["missing", "extra", "floors", "split"]
+    kind: Literal["missing", "extra", "floors", "split", "shape"]
     src: str = Field(..., max_length=20)  # google / microsoft / osm / esri …
     g: Optional[list[list[float]]] = Field(None, min_length=3, max_length=80)
     ref: Optional[int] = None  # our building: the one that may be extra, or the house an annex belongs to
@@ -260,7 +260,7 @@ class Suggestion(BaseModel):
 class Suggestions(BaseModel):
     items: list[Suggestion] = Field(..., max_length=3000)
     note: str = Field("", max_length=200)
-    kinds: list[Literal["missing", "extra", "floors", "split"]] = []  # which open suggestions this run replaces (default: the kinds it sends)
+    kinds: list[Literal["missing", "extra", "floors", "split", "shape"]] = []  # which open suggestions this run replaces (default: the kinds it sends)
 
 
 class RoofGroup(BaseModel):
@@ -720,11 +720,16 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
 
     async def apply_suggestion(sg: dict, actor: dict):
         """Carry out one suggestion on the building map; returns the new building id for "missing"."""
-        new_id = None
         e = await roof_edits()
+        new_id = _apply(e, sg)
+        await save_roofs(e, actor, f"suggestion {sg['id']} {sg['kind']} ({sg['src']})")
+        return new_id
+
+    def _apply(e: dict, sg: dict, k: int = 0):
+        new_id = None
         if sg["kind"] == "missing" and sg.get("g"):
             g = sg["g"]
-            new_id = 9_000_000_000 + int(time.time() * 1000) % 1_000_000_000
+            new_id = 9_000_000_000 + (int(time.time() * 1000) + k * 64) % 1_000_000_000  # k: distinct ids within one bulk save
             e["added"].append([round(sum(a for a, _ in g) / len(g), 6), round(sum(b for _, b in g) / len(g), 6), new_id])
             e["shapes"][str(new_id)] = g
             if sg.get("lv"):
@@ -745,7 +750,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
                 e["added"] = [b for b in e["added"] if b[2] != sg["ref"]]
             elif sg["ref"] not in e["removed"]:
                 e["removed"].append(sg["ref"])
-            t0 = int(time.time() * 1000) % 1_000_000_000
+            t0 = (int(time.time() * 1000) + k * 64) % 1_000_000_000
             for k, g in enumerate(sg["parts"]):
                 nid = 9_000_000_000 + (t0 + k) % 1_000_000_000
                 e["added"].append([round(sum(a for a, _ in g) / len(g), 6), round(sum(b for _, b in g) / len(g), 6), nid])
@@ -754,13 +759,38 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
                 e["types"][str(nid)] = t if t and t != "house" else "townhouse"
         elif sg["kind"] == "floors" and sg.get("ref") is not None and sg.get("lv"):
             e["levels"][str(sg["ref"])] = sg["lv"]
+        elif sg["kind"] == "shape" and sg.get("ref") is not None and sg.get("g"):
+            # 📐 the same building, slid / turned to sit inside its land plot
+            g = sg["g"]
+            e["shapes"][str(sg["ref"])] = g
+            for row in e["added"]:
+                if row[2] == sg["ref"]:
+                    row[0], row[1] = round(sum(a for a, _ in g) / len(g), 6), round(sum(b for _, b in g) / len(g), 6)
         elif sg["kind"] == "extra" and sg.get("ref") is not None:
             if any(b[2] == sg["ref"] for b in e["added"]):
                 e["added"] = [b for b in e["added"] if b[2] != sg["ref"]]
             elif sg["ref"] not in e["removed"]:
                 e["removed"].append(sg["ref"])
-        await save_roofs(e, actor, f"suggestion {sg['id']} {sg['kind']} ({sg['src']})")
         return new_id
+
+    class AcceptAll(BaseModel):
+        kind: Literal["missing", "split", "shape"]
+        src: Optional[str] = Field(None, max_length=20)
+
+    @router.post("/admin/buildings/suggestions-accept-all")
+    async def accept_all(body: AcceptAll, admin: dict = Depends(require_admin)):
+        """One save for a whole kind (e.g. 📐 every building onto its plot) instead of hundreds of single accepts."""
+        q = {"status": "open", "kind": body.kind, **({"src": body.src} if body.src else {})}
+        if body.kind == "missing":
+            q["annex"] = {"$ne": True}
+        sgs = await db.building_suggestions.find(q, {"_id": 0}).to_list(3000)
+        e = await roof_edits()
+        for i, sg in enumerate(sgs):
+            nid = _apply(e, sg, i)
+            await db.building_suggestions.update_one({"id": sg["id"]}, {"$set": {"status": "accepted", "by": admin.get("name", ""), "decided_at": now(), "new_id": nid}})
+        if sgs:
+            await save_roofs(e, admin, f"accept all {body.kind} ({body.src or 'any'}) × {len(sgs)}")
+        return {"ok": True, "accepted": len(sgs)}
 
     @router.post("/admin/buildings/suggestions/{sid}/{verb}")
     async def decide_suggestion(sid: str, verb: Literal["accept", "dismiss"], admin: dict = Depends(require_admin)):
