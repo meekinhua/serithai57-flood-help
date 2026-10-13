@@ -208,6 +208,7 @@ class Suggestion(BaseModel):
     conf: Optional[float] = None
     h: Optional[float] = None  # measured height in metres (floors suggestions)
     parts: Optional[list[list[list[float]]]] = Field(None, min_length=2, max_length=30)  # split: one outline per plot
+    label: str = Field("", max_length=120)  # extra line on the card (e.g. which house pins this is based on)
 
 
 class Suggestions(BaseModel):

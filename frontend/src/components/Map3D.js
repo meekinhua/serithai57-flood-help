@@ -702,7 +702,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     m?.triggerRepaint();
   }
 
-  const SRC = { google: "Google", microsoft: "Microsoft", osm: "OpenStreetMap", esri: "Esri" };
+  const SRC = { google: "Google", microsoft: "Microsoft", osm: "OpenStreetMap", esri: "Esri", landsmaps: "แปลงที่ดิน (กรมที่ดิน)", neighbors: "หมุดบ้านที่ลูกบ้าน/เพื่อนบ้านปักไว้" };
   const suggGeo = (list) => ({
     type: "FeatureCollection",
     features: list.filter((x) => x.g).map((x) => ({ type: "Feature", properties: { sid: x.id, kind: x.kind, h: x.annex ? 3 : (x.lv || 2) * 3, annex: !!x.annex }, geometry: { type: "Polygon", coordinates: [ring(x.g)] } })),
@@ -1272,6 +1272,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                         </>
                       )}
                     </p>
+                    {pick.label && <p className="text-xs text-neutral-600">📍 {pick.label}</p>}
                     <div className="flex gap-2">
                       <button onClick={() => decide(pick, "accept")} disabled={busy} className="flex-1 rounded-xl bg-[#1E6B47] py-2 font-bold text-white shadow-[0_3px_0_#154D33] active:scale-95">
                         {pick.kind === "split" ? `✂️ แบ่งเป็น ${pick.parts?.length} หลัง` : pick.kind === "floors" ? `✓ ตั้งเป็น ${pick.lv} ชั้น` : pick.kind === "missing" ? (pick.annex ? "✓ เพิ่มเป็นส่วนของบ้านนี้" : "✓ เพิ่มบ้านนี้") : "🔨 เอาออก"}
