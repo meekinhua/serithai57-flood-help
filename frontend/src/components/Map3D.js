@@ -625,7 +625,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
   const [name, setName] = useState("");
   const [sugg, setSugg] = useState([]); // open suggestions from OSM / Google / Microsoft
   const [pick, setPick] = useState(null); // the suggestion tapped
-  const [sure, setSure] = useState(false);
+  const [sure, setSure] = useState(false); // which bulk button is waiting for its second tap
   const suggRef = useRef([]);
   toolRef.current = tool;
   kindRef.current = kind;
@@ -734,10 +734,10 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
       setDone((n) => n + 1);
     }
   }
-  async function acceptAllMissing() {
-    if (!sure) return setSure(true);
+  async function acceptAllMissing(which = "missing") {
+    if (sure !== which) return setSure(which);
     setSure(false);
-    const todo = suggRef.current.filter((x) => x.kind === "missing" && !x.annex);
+    const todo = suggRef.current.filter((x) => (which === "split" ? x.kind === "split" && x.src === "landsmaps" : x.kind === "missing" && !x.annex));
     setBusy(true);
     for (const x of todo) {
       try {
@@ -749,7 +749,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     setBusy(false);
     showSugg(suggRef.current.filter((x) => !todo.includes(x)));
     await reload();
-    popMid(`🏠 เพิ่ม ${todo.length} หลัง`);
+    popMid(which === "split" ? `✂️ แบ่ง ${todo.length} ตึกตามแปลง` : `🏠 เพิ่ม ${todo.length} หลัง`);
   }
 
   const hitGeo = (list) => ({ type: "FeatureCollection", features: list.map((b) => ({ type: "Feature", properties: { id: b.id, s: b.s || "osm" }, geometry: { type: "Polygon", coordinates: [ring(b.g)] } })) });
@@ -1298,8 +1298,13 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                         : "ยังไม่มีข้อเสนอ · รอแอดมินรันการเทียบข้อมูล"}
                     </span>
                     {sugg.some((x) => x.kind === "missing" && !x.annex) && (
-                      <button onClick={acceptAllMissing} disabled={busy} className={`rounded-xl px-3 py-2 font-bold text-white ${sure ? "bg-red-700" : "bg-[#0090D0]"}`}>
-                        {sure ? "แตะอีกครั้งเพื่อยืนยัน" : `✓ เพิ่มอาคารหลักทั้งหมด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length} หลัง`}
+                      <button onClick={() => acceptAllMissing("missing")} disabled={busy} className={`rounded-xl px-3 py-2 font-bold text-white ${sure === "missing" ? "bg-red-700" : "bg-[#0090D0]"}`}>
+                        {sure === "missing" ? "แตะอีกครั้งเพื่อยืนยัน" : `✓ เพิ่มอาคารหลักทั้งหมด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length} หลัง`}
+                      </button>
+                    )}
+                    {sugg.some((x) => x.kind === "split" && x.src === "landsmaps") && (
+                      <button onClick={() => acceptAllMissing("split")} disabled={busy} className={`rounded-xl px-3 py-2 font-bold text-white ${sure === "split" ? "bg-red-700" : "bg-[#8B5CF6]"}`}>
+                        {sure === "split" ? "แตะอีกครั้งเพื่อยืนยัน" : `✂️ แบ่งตามแปลงทั้งหมด ${sugg.filter((x) => x.kind === "split" && x.src === "landsmaps").length} ตึก`}
                       </button>
                     )}
                   </div>
