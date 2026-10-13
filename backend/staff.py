@@ -199,7 +199,7 @@ class RoofSplit(BaseModel):
 
 class Suggestion(BaseModel):
     id: str = Field(..., min_length=3, max_length=80)  # stable id from the source (e.g. overture id / osm way)
-    kind: Literal["missing", "extra", "floors"]
+    kind: Literal["missing", "extra", "floors", "split"]
     src: str = Field(..., max_length=20)  # google / microsoft / osm / esri …
     g: Optional[list[list[float]]] = Field(None, min_length=3, max_length=80)
     ref: Optional[int] = None  # our building: the one that may be extra, or the house an annex belongs to
@@ -207,12 +207,13 @@ class Suggestion(BaseModel):
     lv: Optional[int] = Field(None, ge=1, le=30)
     conf: Optional[float] = None
     h: Optional[float] = None  # measured height in metres (floors suggestions)
+    parts: Optional[list[list[list[float]]]] = Field(None, min_length=2, max_length=30)  # split: one outline per plot
 
 
 class Suggestions(BaseModel):
     items: list[Suggestion] = Field(..., max_length=3000)
     note: str = Field("", max_length=200)
-    kinds: list[Literal["missing", "extra", "floors"]] = []  # which open suggestions this run replaces (default: the kinds it sends)
+    kinds: list[Literal["missing", "extra", "floors", "split"]] = []  # which open suggestions this run replaces (default: the kinds it sends)
 
 
 class RoofGroup(BaseModel):
@@ -659,7 +660,7 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
         decided = {d["id"] async for d in db.building_suggestions.find({"status": {"$in": ["accepted", "dismissed"]}}, {"_id": 0, "id": 1})}
         kinds = body.kinds or sorted({x.kind for x in body.items}) or ["missing", "extra"]
         await db.building_suggestions.delete_many({"status": "open", "kind": {"$in": kinds}})
-        rows = [{**x.model_dump(), "g": _outline_ok(x.g) if x.g else None, "status": "open", "at": now()} for x in body.items if x.id not in decided]
+        rows = [{**x.model_dump(), "g": _outline_ok(x.g) if x.g else None, "parts": [_outline_ok(q) for q in x.parts] if x.parts else None, "status": "open", "at": now()} for x in body.items if x.id not in decided]
         if rows:
             await db.building_suggestions.insert_many(rows)
         await audit(admin, "building_suggestions", f"{len(rows)} open", body.note)
@@ -689,6 +690,24 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
                     lead = e["groups"].get(str(sg["ref"]), sg["ref"])
                     e["groups"][str(sg["ref"])] = lead
                     e["groups"][str(new_id)] = lead
+            elif sg["kind"] == "split" and sg.get("ref") is not None and sg.get("parts"):
+                # one building per land plot (a block of townhouses / shophouses)
+                sid0 = str(sg["ref"])
+                lv, t = e["levels"].get(sid0), e["types"].get(sid0)
+                if lv is None:
+                    base = FOOTPRINTS.get(sid0)
+                    lv = base[1] if base else 2
+                if any(b[2] == sg["ref"] for b in e["added"]):
+                    e["added"] = [b for b in e["added"] if b[2] != sg["ref"]]
+                elif sg["ref"] not in e["removed"]:
+                    e["removed"].append(sg["ref"])
+                t0 = int(time.time() * 1000) % 1_000_000_000
+                for k, g in enumerate(sg["parts"]):
+                    nid = 9_000_000_000 + (t0 + k) % 1_000_000_000
+                    e["added"].append([round(sum(a for a, _ in g) / len(g), 6), round(sum(b for _, b in g) / len(g), 6), nid])
+                    e["shapes"][str(nid)] = g
+                    e["levels"][str(nid)] = lv
+                    e["types"][str(nid)] = t if t and t != "house" else "townhouse"
             elif sg["kind"] == "floors" and sg.get("ref") is not None and sg.get("lv"):
                 e["levels"][str(sg["ref"])] = sg["lv"]
             elif sg["kind"] == "extra" and sg.get("ref") is not None:

@@ -671,6 +671,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     const linked = new Set(linkRef.current);
     const hint = toolRef.current === "hint";
     const fl = new Set(suggRef.current.filter((x) => x.kind === "floors").map((x) => x.ref));
+    const sp = new Set(suggRef.current.filter((x) => x.kind === "split").map((x) => x.ref));
     const ex = new Set(suggRef.current.filter((x) => x.kind === "extra").map((x) => x.ref));
     for (const b of data.current) {
       if (b.s === "removed") continue;
@@ -686,6 +687,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
         [wall, roof] = ["#F2F2EE", "#C9CDD2"];
         if (fl.has(b.id)) [wall, roof] = ["#FFC46B", "#F08C00"];
         if (ex.has(b.id)) [wall, roof] = ["#FF9A9A", "#E5484D"];
+        if (sp.has(b.id)) [wall, roof] = ["#D9C8FF", "#8B5CF6"];
       }
       buildThing(B, b, wall, roof, W.segs, kit);
     }
@@ -726,8 +728,9 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     if (await call(`/admin/buildings/suggestions/${encodeURIComponent(x.id)}/${verb}`, {})) {
       showSugg(suggRef.current.filter((y) => y.id !== x.id));
       setPick(null);
+      map.current?.getSource("preview")?.setData({ type: "FeatureCollection", features: [] });
       rebuild();
-      popMid(verb === "accept" ? (x.kind === "missing" ? "🏠 เพิ่มแล้ว" : x.kind === "floors" ? `📏 ${x.lv} ชั้น` : "💥 เอาออกแล้ว") : "👋 ข้ามแล้ว");
+      popMid(verb === "accept" ? (x.kind === "missing" ? "🏠 เพิ่มแล้ว" : x.kind === "floors" ? `📏 ${x.lv} ชั้น` : x.kind === "split" ? `✂️ ${x.parts?.length} หลัง` : "💥 เอาออกแล้ว") : "👋 ข้ามแล้ว");
       setDone((n) => n + 1);
     }
   }
@@ -998,6 +1001,8 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
             m.addSource("extra", { type: "geojson", data: extraGeo(suggRef.current) });
             m.addLayer({ id: "extra", type: "line", source: "extra", paint: { "line-color": ["get", "c"], "line-width": 3, "line-dasharray": [1.5, 1] } });
             for (const id of ["sugg", "extra"]) m.setLayoutProperty(id, "visibility", "none");
+            m.addSource("preview", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+            m.addLayer({ id: "preview", type: "line", source: "preview", paint: { "line-color": "#6D28D9", "line-width": 3 } });
           }
 
           const origin = ml.MercatorCoordinate.fromLngLat([LNG0, LAT0], 0);
@@ -1106,9 +1111,10 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
               let x = f ? suggRef.current.find((y) => y.id === f.properties.sid) : null;
               if (!x) {
                 const hb = tapHouse(e);
-                x = hb ? suggRef.current.find((y) => (y.kind === "extra" || y.kind === "floors") && y.ref === hb.id) : null;
+                x = hb ? suggRef.current.find((y) => (y.kind === "extra" || y.kind === "floors" || y.kind === "split") && y.ref === hb.id) : null;
               }
               setPick(x || null);
+              if (m.getSource("preview")) m.getSource("preview").setData({ type: "FeatureCollection", features: (x?.parts || []).map((g) => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring(g)] } })) });
               if (!x) pop(e.point, "แตะก้อนสีฟ้า หรืออาคารเส้นประแดง");
               return;
             }
@@ -1175,6 +1181,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     if (m?.getLayer("sugg")) for (const id of ["sugg", "extra"]) m.setLayoutProperty(id, "visibility", tool === "hint" ? "visible" : "none");
     if (ready) rebuild();
     setPick(null);
+    m?.getSource("preview")?.setData({ type: "FeatureCollection", features: [] });
     if (map.current) map.current.getCanvas().style.cursor = tool === "look" ? "" : "crosshair";
     if (tool !== "look" && selRef.current != null) select(null);
   }, [tool, ready]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1232,7 +1239,13 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                 {pick ? (
                   <>
                     <p className="text-sm leading-snug">
-                      {pick.kind === "floors" ? (
+                      {pick.kind === "split" ? (
+                        <>
+                          <b>✂️ ตึกนี้คร่อมแปลงที่ดิน {pick.parts?.length} แปลง</b>
+                          <br />
+                          ปกติ 1 แปลง = 1 หลัง · ถ้ารับ จะแบ่งเป็น {pick.parts?.length} หลังตามแนวแปลง
+                        </>
+                      ) : pick.kind === "floors" ? (
                         <>
                           <b>📏 วัดความสูงได้ราว {pick.h} ม. ≈ {pick.lv} ชั้น</b>
                           <br />
@@ -1261,7 +1274,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                     </p>
                     <div className="flex gap-2">
                       <button onClick={() => decide(pick, "accept")} disabled={busy} className="flex-1 rounded-xl bg-[#1E6B47] py-2 font-bold text-white shadow-[0_3px_0_#154D33] active:scale-95">
-                        {pick.kind === "floors" ? `✓ ตั้งเป็น ${pick.lv} ชั้น` : pick.kind === "missing" ? (pick.annex ? "✓ เพิ่มเป็นส่วนของบ้านนี้" : "✓ เพิ่มบ้านนี้") : "🔨 เอาออก"}
+                        {pick.kind === "split" ? `✂️ แบ่งเป็น ${pick.parts?.length} หลัง` : pick.kind === "floors" ? `✓ ตั้งเป็น ${pick.lv} ชั้น` : pick.kind === "missing" ? (pick.annex ? "✓ เพิ่มเป็นส่วนของบ้านนี้" : "✓ เพิ่มบ้านนี้") : "🔨 เอาออก"}
                       </button>
                       <button onClick={() => decide(pick, "dismiss")} disabled={busy} className="flex-1 rounded-xl bg-neutral-200 py-2 font-bold active:scale-95">
                         ✕ ไม่ใช่ / ข้าม
@@ -1275,11 +1288,12 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                       <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#7CD4FF" }} />ส่วนต่อเติม</span>
                       <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#F08C00" }} />เสนอเปลี่ยนชั้น</span>
                       <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#E5484D" }} />อาจเกิน</span>
+                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#8B5CF6" }} />แบ่งตามแปลง</span>
                       <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px] border" style={{ background: "#F2F2EE" }} />บ้านเดิม</span>
                     </span>
                     <span className="min-w-0 flex-1">
                       {sugg.length
-                        ? `อาคารที่อาจขาด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length}  · ส่วนต่อเติม ${sugg.filter((x) => x.annex).length} · เปลี่ยนชั้น ${sugg.filter((x) => x.kind === "floors").length} · อาจเกิน ${sugg.filter((x) => x.kind === "extra").length} · แตะเพื่อดูทีละหลัง`
+                        ? `อาคารที่อาจขาด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length}  · ส่วนต่อเติม ${sugg.filter((x) => x.annex).length} · เปลี่ยนชั้น ${sugg.filter((x) => x.kind === "floors").length} · แบ่งตามแปลง ${sugg.filter((x) => x.kind === "split").length} · อาจเกิน ${sugg.filter((x) => x.kind === "extra").length} · แตะเพื่อดูทีละหลัง`
                         : "ยังไม่มีข้อเสนอ · รอแอดมินรันการเทียบข้อมูล"}
                     </span>
                     {sugg.some((x) => x.kind === "missing" && !x.annex) && (
