@@ -407,6 +407,11 @@ export default function RepairApp() {
   // 📢 เสียงตามสาย layer: off by default (one switch on the map), loaded when switched on
   const [speakerOn, setSpeakerOn] = useState(() => load("speakerLayer", false));
   const [view3d, setView3d] = useState(false);
+  const [mapMode, setMapMode] = useState(() => load("mapMode", "3d")); // 13 Oct: the village map opens in 3D
+  const pickMap = (v) => {
+    setMapMode(v);
+    save("mapMode", v);
+  };
   const [speakerPts, setSpeakerPts] = useState(null);
   useEffect(() => {
     if (!speakerOn || page !== "map") return;
@@ -436,6 +441,11 @@ export default function RepairApp() {
   // 9 Oct: the water is gone, the flood tools are tucked away (one switch per phone); they come back by themselves if the water rises
   const [floodPref, setFloodPref] = useFloodTools();
   const floodOn = floodPref || !!ws.alarm;
+  const show3d = mapMode === "3d" && !floodOn; // water levels, pumps and the speaker survey live on the 2D map
+  const issuePins = useMemo(
+    () => openIssues.filter((x) => x.lat != null).map((x) => ({ ...x, emoji: (ISSUE_TYPES[x.type] || ["📍"])[0], title: (ISSUE_TYPES[x.type] || ["", "จุดปัญหา"])[1] })),
+    [issues], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const notes = {
     home: homeBadge,
     pros: newestPro > prosSeen ? { level: "general", reasons: ["🔧 มีร้าน / ช่างใหม่ในหมู่บ้าน"], sig: `p${newestPro}` } : null,
@@ -917,70 +927,102 @@ export default function RepairApp() {
                   ))}
                 </div>
               )}
-              <section className="-mx-3 sm:mx-0">
-                <WaterView
-                  trips={trips}
-                  focus={focus}
-                  hubs={hubPins}
-                  events={eventsOn}
-                  onFocusTrip={(t) => setFocus({ lat: t.lat, lng: t.lng, t: Date.now() })}
-                  water={water}
-                  canal={canal}
-                  admin={admin}
-                  onWater={() => setSheet({ type: "water" })}
-                  onCanal={() => setSheet({ type: "canal" })}
-                  onLeaks={() => setSheet({ type: "leaks" })}
-                  onLeak={(leak) => setSheet({ type: "leak", leak })}
-                  onPump={(pump) => setSheet({ type: "pump", pump })}
-                  onPumps={() => setSheet({ type: "pumps" })}
-                  issues={openIssues}
-                  flood={floodOn}
-                  onIssue={openIssue}
-                  lost={lostOnMap}
-                  onLost={openLostFromMap}
-                  speaker={speakerOn ? speakerPts : null}
-                  places={places}
-                  tall
-                >
-                  <div className="absolute right-3 top-[60px] z-[650] flex flex-col items-end gap-1">
-                    <button onClick={() => setView3d(true)} className="flex min-h-[44px] items-center gap-1 rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-[15px] font-bold shadow">
-                      🏙️ ดูแบบ 3D
+              {show3d && (
+                <section className="-mx-3 sm:mx-0">
+                  <div className="h-[calc(100dvh-236px)] min-h-[360px] border-y border-[#DCE2DD] sm:overflow-hidden sm:rounded-xl sm:border">
+                    <Suspense fallback={<p className="grid h-full place-items-center text-neutral-600">กำลังสร้างหมู่บ้านจำลอง… 🏡</p>}>
+                      <Map3D className="h-full w-full" pins={issuePins} onPin={openIssue}>
+                        <div className="absolute bottom-10 left-2 z-10 flex flex-col items-start gap-1.5">
+                          <button
+                            onClick={() => setSheet({ type: "issueHistory" })}
+                            className="flex min-h-[44px] items-center gap-1 rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-[15px] font-bold shadow"
+                          >
+                            🕘 ประวัติ
+                          </button>
+                          <button onClick={() => pickMap("2d")} className="flex min-h-[44px] items-center gap-1 rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-[15px] font-bold shadow">
+                            🗺️ แผนที่ 2D · น้ำ · เสียงตามสาย
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => setSheet({ type: "quickReport" })}
+                          className="absolute bottom-24 right-3 z-10 flex min-h-[52px] items-center gap-1.5 rounded-full bg-[#1E6B47] px-4 text-base font-bold text-white shadow-lg active:bg-[#154D33]"
+                        >
+                          📍 แจ้งจุดปัญหา
+                        </button>
+                      </Map3D>
+                    </Suspense>
+                  </div>
+                </section>
+              )}
+              {!show3d && (
+                <section className="-mx-3 sm:mx-0">
+                  <WaterView
+                    trips={trips}
+                    focus={focus}
+                    hubs={hubPins}
+                    events={eventsOn}
+                    onFocusTrip={(t) => setFocus({ lat: t.lat, lng: t.lng, t: Date.now() })}
+                    water={water}
+                    canal={canal}
+                    admin={admin}
+                    onWater={() => setSheet({ type: "water" })}
+                    onCanal={() => setSheet({ type: "canal" })}
+                    onLeaks={() => setSheet({ type: "leaks" })}
+                    onLeak={(leak) => setSheet({ type: "leak", leak })}
+                    onPump={(pump) => setSheet({ type: "pump", pump })}
+                    onPumps={() => setSheet({ type: "pumps" })}
+                    issues={openIssues}
+                    flood={floodOn}
+                    onIssue={openIssue}
+                    lost={lostOnMap}
+                    onLost={openLostFromMap}
+                    speaker={speakerOn ? speakerPts : null}
+                    places={places}
+                    tall
+                  >
+                    <div className="absolute right-3 top-[60px] z-[650] flex flex-col items-end gap-1">
+                      <button
+                        onClick={() => (floodOn ? setView3d(true) : pickMap("3d"))}
+                        className="flex min-h-[44px] items-center gap-1 rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-[15px] font-bold shadow"
+                      >
+                        🏙️ ดูแบบ 3D
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSpeakerOn(!speakerOn);
+                          save("speakerLayer", !speakerOn);
+                        }}
+                        aria-pressed={speakerOn}
+                        className={`flex min-h-[44px] items-center gap-1 rounded-full border px-3 text-[15px] font-bold shadow ${speakerOn ? "border-[#15201A] bg-[#15201A] text-white" : "border-[#D5DBD6] bg-white/95"}`}
+                      >
+                        📢 เสียงตามสาย {speakerOn ? "✓" : ""}
+                      </button>
+                      {speakerOn && (
+                        <span className="rounded-lg bg-white/95 px-2 py-1 text-xs shadow">
+                          <span className="text-[#B42318]">■</span> ไม่ได้ยิน · <span className="text-[#1E6B47]">■</span> ได้ยินชัด · {speakerPts ? `${speakerPts.length} บ้านตอบ` : "…"}
+                        </span>
+                      )}
+                      {speakerOn && (
+                        <button onClick={() => window.dispatchEvent(new Event("speaker:go"))} className="min-h-[40px] rounded-full bg-[#15201A] px-3 text-sm font-bold text-white shadow">
+                          บ้านฉันได้ยินไหม? ตอบ ›
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setSheet({ type: "issueHistory" })}
+                      className="absolute right-3 top-3 z-[650] flex min-h-[44px] items-center gap-1 rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-[15px] font-bold shadow"
+                    >
+                      🕘 ประวัติ
                     </button>
                     <button
-                      onClick={() => {
-                        setSpeakerOn(!speakerOn);
-                        save("speakerLayer", !speakerOn);
-                      }}
-                      aria-pressed={speakerOn}
-                      className={`flex min-h-[44px] items-center gap-1 rounded-full border px-3 text-[15px] font-bold shadow ${speakerOn ? "border-[#15201A] bg-[#15201A] text-white" : "border-[#D5DBD6] bg-white/95"}`}
+                      onClick={() => setSheet({ type: "quickReport" })}
+                      className="absolute bottom-24 right-3 z-[650] flex min-h-[52px] items-center gap-1.5 rounded-full bg-[#1E6B47] px-4 text-base font-bold text-white shadow-lg active:bg-[#154D33]"
                     >
-                      📢 เสียงตามสาย {speakerOn ? "✓" : ""}
+                      📍 แจ้งจุดปัญหา
                     </button>
-                    {speakerOn && (
-                      <span className="rounded-lg bg-white/95 px-2 py-1 text-xs shadow">
-                        <span className="text-[#B42318]">■</span> ไม่ได้ยิน · <span className="text-[#1E6B47]">■</span> ได้ยินชัด · {speakerPts ? `${speakerPts.length} บ้านตอบ` : "…"}
-                      </span>
-                    )}
-                    {speakerOn && (
-                      <button onClick={() => window.dispatchEvent(new Event("speaker:go"))} className="min-h-[40px] rounded-full bg-[#15201A] px-3 text-sm font-bold text-white shadow">
-                        บ้านฉันได้ยินไหม? ตอบ ›
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setSheet({ type: "issueHistory" })}
-                    className="absolute right-3 top-3 z-[650] flex min-h-[44px] items-center gap-1 rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-[15px] font-bold shadow"
-                  >
-                    🕘 ประวัติ
-                  </button>
-                  <button
-                    onClick={() => setSheet({ type: "quickReport" })}
-                    className="absolute bottom-24 right-3 z-[650] flex min-h-[52px] items-center gap-1.5 rounded-full bg-[#1E6B47] px-4 text-base font-bold text-white shadow-lg active:bg-[#154D33]"
-                  >
-                    📍 แจ้งจุดปัญหา
-                  </button>
-                </WaterView>
-              </section>
+                  </WaterView>
+                </section>
+              )}
               {view3d && (
                 <Suspense fallback={null}>
                   <div className="fixed inset-0 z-[3000] bg-white">

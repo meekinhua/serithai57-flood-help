@@ -656,7 +656,7 @@ def _house(h: str) -> str:
 
 homeplus_router, homeplus_extras = homeplus.build(db, rate_limit, require_admin, locate_house, _house)
 app.include_router(homeplus_router)
-app.include_router(myhome.build_router(db, rate_limit, require_admin, locate_house, learn_address, survey.norm_house, staff.SOIS, staff.BUILDINGS["buildings"], extras=homeplus_extras))
+app.include_router(myhome.build_router(db, rate_limit, require_admin, locate_house, learn_address, survey.norm_house, staff.SOIS, staff.BUILDINGS["buildings"], extras=homeplus_extras, shapes_fn=lambda: staff.live_shapes(db)))
 app.include_router(pets.build_router(db, rate_limit, _house, locate_house, claim_media, delete_media))
 push_router = push.build_router(db, rate_limit, require_admin, audit, locate_house, _house, myhome.soi_parity, myhome.WASTE_ROUNDS, myhome.THAI_DAYS)
 app.include_router(push_router)

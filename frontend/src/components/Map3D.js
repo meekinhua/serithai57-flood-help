@@ -140,7 +140,10 @@ function makeBuilder(THREE) {
       g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
       g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
       g.computeVertexNormals();
-      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial(glass ? { vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.3, depthWrite: false } : { vertexColors: true, side: THREE.DoubleSide }));
+      const m = new THREE.Mesh(
+        g,
+        new THREE.MeshLambertMaterial(glass ? { vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.3, depthWrite: false } : { vertexColors: true, side: THREE.DoubleSide }),
+      );
       if (glass) m.renderOrder = 1;
       m.userData.owner = owner;
       return m;
@@ -531,8 +534,53 @@ export function rectAt(at, w, d, ref) {
   ].map(([p, q]) => toLLr([cx + ux * p + vx * q, cz + uz * p + vz * q]));
 }
 
-
 // a lollipop tree (trunk + faceted ball)
+// 🧍 "me" while walking: a chibi with a big round head (about 5 m tall so it reads at street zoom)
+function makeDoll(THREE) {
+  const g = new THREE.Group();
+  const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
+  const add = (geo, c, x, y, z) => {
+    const m = new THREE.Mesh(geo, mat(c));
+    m.position.set(x, y, z);
+    g.add(m);
+    return m;
+  };
+  const skin = "#FFD9B8";
+  add(new THREE.SphereGeometry(1.55, 24, 18), skin, 0, 3.55, 0); // head
+  const hair = add(new THREE.SphereGeometry(1.62, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2.2), "#2B2B2B", 0, 3.62, 0);
+  hair.rotation.x = -0.25;
+  for (const sx of [-0.55, 0.55]) {
+    add(new THREE.SphereGeometry(0.2, 10, 8), "#15201A", sx, 3.6, 1.42); // eyes
+    add(new THREE.SphereGeometry(0.24, 10, 8), "#FF9AA8", sx * 1.65, 3.15, 1.2); // cheeks
+  }
+  const body = add(new THREE.CylinderGeometry(0.75, 1.05, 1.7, 16), "#FF3B5C", 0, 1.55, 0);
+  body.userData.body = true;
+  const limbs = [];
+  for (const sx of [-1, 1]) {
+    const arm = add(new THREE.CylinderGeometry(0.22, 0.22, 1.1, 8), skin, sx * 1.05, 1.75, 0);
+    arm.rotation.z = sx * 0.5;
+    const leg = add(new THREE.CylinderGeometry(0.28, 0.28, 0.85, 8), "#2F5DA8", sx * 0.42, 0.42, 0);
+    limbs.push(arm, leg);
+  }
+  g.userData.limbs = limbs;
+  // a faint see-through copy drawn over everything: the doll still shows when a house is in the way
+  const ghost = new THREE.MeshBasicMaterial({ color: "#FF3B5C", transparent: true, opacity: 0.35, depthTest: false, depthWrite: false });
+  for (const part of [...g.children]) {
+    const x = new THREE.Mesh(part.geometry, ghost);
+    x.position.copy(part.position);
+    x.rotation.copy(part.rotation);
+    x.renderOrder = 10;
+    part.userData.ghost = x;
+    g.add(x);
+  }
+  const halo = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.9, 40), new THREE.MeshBasicMaterial({ color: "#0090D0", transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+  halo.rotation.x = -Math.PI / 2;
+  halo.position.y = 0.08;
+  g.add(halo);
+  g.userData.halo = halo;
+  return g;
+}
+
 function makeTree(B, THREE) {
   const ico = new THREE.IcosahedronGeometry(1, 0).toNonIndexed().getAttribute("position");
   return (x, z, rnd) => {
@@ -591,7 +639,7 @@ const TOOLS = [
   ["hint", "💡", "ข้อเสนอ"],
 ];
 
-export default function Map3D({ edit = false, onClose, className = "" }) {
+export default function Map3D({ edit = false, onClose, className = "", pins = null, onPin = null, children = null }) {
   const el = useRef(null);
   const map = useRef(null);
   const world = useRef({});
@@ -627,6 +675,21 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
   const [pick, setPick] = useState(null); // the suggestion tapped
   const [sure, setSure] = useState(false); // which bulk button is waiting for its second tap
   const suggRef = useRef([]);
+  const [fix, setFix] = useState(false); // ✏️ a member reporting a wrong building
+  const [rep, setRep] = useState(null); // {b} a building or {at} an empty spot, while fix is on
+  const [repN, setRepN] = useState(3);
+  const [repLv, setRepLv] = useState(2);
+  const [repMsg, setRepMsg] = useState("");
+  const fixRef = useRef(false);
+  const [gps, setGps] = useState(false); // 🧍 follow my phone's GPS
+  const [gpsMsg, setGpsMsg] = useState("");
+  const gpsRef = useRef({}); // {watch, doll, at, to, heading, raf, follow, compass, bear}
+  const [walk, setWalk] = useState(null); // 👓 walking survey: "vr" (eye-level model) or "ar" (model over the camera)
+  const walkRef = useRef(null);
+  const video = useRef(null);
+  walkRef.current = walk;
+  const pinMarks = useRef([]);
+  fixRef.current = fix;
   toolRef.current = tool;
   kindRef.current = kind;
 
@@ -694,6 +757,10 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     buildTrees(B, tree, W.green, W.places);
     W.mesh = B.mesh();
     W.scene.add(W.mesh);
+    if (walkRef.current === "ar") {
+      W.mesh.material.transparent = true;
+      W.mesh.material.opacity = 0.55;
+    }
     W.glass = G.mesh(true);
     W.scene.add(W.glass);
     const m = map.current;
@@ -702,10 +769,12 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     m?.triggerRepaint();
   }
 
-  const SRC = { google: "Google", microsoft: "Microsoft", osm: "OpenStreetMap", esri: "Esri", landsmaps: "แปลงที่ดิน (กรมที่ดิน)", neighbors: "หมุดบ้านที่ลูกบ้าน/เพื่อนบ้านปักไว้" };
+  const SRC = { google: "Google", microsoft: "Microsoft", osm: "OpenStreetMap", esri: "Esri", landsmaps: "แปลงที่ดิน (กรมที่ดิน)", neighbors: "หมุดบ้านที่ลูกบ้าน/เพื่อนบ้านปักไว้", member: "ลูกบ้านแจ้งจากแผนที่ 3D" };
   const suggGeo = (list) => ({
     type: "FeatureCollection",
-    features: list.filter((x) => x.g).map((x) => ({ type: "Feature", properties: { sid: x.id, kind: x.kind, h: x.annex ? 3 : (x.lv || 2) * 3, annex: !!x.annex }, geometry: { type: "Polygon", coordinates: [ring(x.g)] } })),
+    features: list
+      .filter((x) => x.g)
+      .map((x) => ({ type: "Feature", properties: { sid: x.id, kind: x.kind, h: x.annex ? 3 : (x.lv || 2) * 3, annex: !!x.annex }, geometry: { type: "Polygon", coordinates: [ring(x.g)] } })),
   });
   const extraGeo = (list) => ({
     type: "FeatureCollection",
@@ -730,7 +799,9 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
       setPick(null);
       map.current?.getSource("preview")?.setData({ type: "FeatureCollection", features: [] });
       rebuild();
-      popMid(verb === "accept" ? (x.kind === "missing" ? "🏠 เพิ่มแล้ว" : x.kind === "floors" ? `📏 ${x.lv} ชั้น` : x.kind === "split" ? `✂️ ${x.parts?.length} หลัง` : "💥 เอาออกแล้ว") : "👋 ข้ามแล้ว");
+      popMid(
+        verb === "accept" ? (x.kind === "missing" ? "🏠 เพิ่มแล้ว" : x.kind === "floors" ? `📏 ${x.lv} ชั้น` : x.kind === "split" ? `✂️ ${x.parts?.length} หลัง` : "💥 เอาออกแล้ว") : "👋 ข้ามแล้ว",
+      );
       setDone((n) => n + 1);
     }
   }
@@ -752,7 +823,10 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     popMid(which === "split" ? `✂️ แบ่ง ${todo.length} ตึกตามแปลง` : `🏠 เพิ่ม ${todo.length} หลัง`);
   }
 
-  const hitGeo = (list) => ({ type: "FeatureCollection", features: list.map((b) => ({ type: "Feature", properties: { id: b.id, s: b.s || "osm" }, geometry: { type: "Polygon", coordinates: [ring(b.g)] } })) });
+  const hitGeo = (list) => ({
+    type: "FeatureCollection",
+    features: list.map((b) => ({ type: "Feature", properties: { id: b.id, s: b.s || "osm" }, geometry: { type: "Polygon", coordinates: [ring(b.g)] } })),
+  });
 
   function pop(point, text) {
     const id = Math.random();
@@ -958,7 +1032,8 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
           zoom: 17,
           pitch: 60,
           bearing: -24,
-          maxPitch: 78,
+          maxPitch: 85,
+          maxZoom: 23,
           antialias: true,
           attributionControl: { compact: true },
           style: {
@@ -976,19 +1051,25 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
         m.addControl(new ml.NavigationControl({ visualizePitch: true }), "top-left");
         m.on("load", () => {
           const flatF = [];
-          for (const a of b.green || []) flatF.push({ type: "Feature", properties: { c: a.k === "water" ? "#9FD8F5" : a.k === "pitch" ? "#B6E3A8" : "#C6EBB4", o: 0.95 }, geometry: { type: "Polygon", coordinates: [ring(a.g)] } });
-          for (const p of pl || []) if (p.kind === "area" && p.geometry?.length > 2) flatF.push({ type: "Feature", properties: { c: p.color || "#1E6B47", o: 0.35 }, geometry: { type: "Polygon", coordinates: [ring(p.geometry)] } });
+          for (const a of b.green || [])
+            flatF.push({ type: "Feature", properties: { c: a.k === "water" ? "#9FD8F5" : a.k === "pitch" ? "#B6E3A8" : "#C6EBB4", o: 0.95 }, geometry: { type: "Polygon", coordinates: [ring(a.g)] } });
+          for (const p of pl || [])
+            if (p.kind === "area" && p.geometry?.length > 2)
+              flatF.push({ type: "Feature", properties: { c: p.color || "#1E6B47", o: 0.35 }, geometry: { type: "Polygon", coordinates: [ring(p.geometry)] } });
           m.addSource("flat", { type: "geojson", data: { type: "FeatureCollection", features: flatF } });
           m.addLayer({ id: "flat", type: "fill", source: "flat", paint: { "fill-color": ["get", "c"], "fill-opacity": ["get", "o"] } });
           const soiLines = [];
-          for (const [k, s] of Object.entries(so.sois || {})) for (const ln of s.lines || []) soiLines.push({ type: "Feature", properties: { k }, geometry: { type: "LineString", coordinates: ln.map(([a, c]) => [c, a]) } });
+          for (const [k, s] of Object.entries(so.sois || {}))
+            for (const ln of s.lines || []) soiLines.push({ type: "Feature", properties: { k }, geometry: { type: "LineString", coordinates: ln.map(([a, c]) => [c, a]) } });
           m.addSource("soi", { type: "geojson", data: { type: "FeatureCollection", features: soiLines } });
           const w = (n) => ["interpolate", ["exponential", 2], ["zoom"], 15, n / 4, 19, n * 4];
           m.addLayer({ id: "road-edge", type: "line", source: "soi", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#C8D3CB", "line-width": w(9) } });
           m.addLayer({ id: "road", type: "line", source: "soi", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#FFFFFF", "line-width": w(7.5) } });
           m.addSource("edge", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [...VILLAGE_BOUNDARY, VILLAGE_BOUNDARY[0]].map(([a, c]) => [c, a]) } } });
           m.addLayer({ id: "edge", type: "line", source: "edge", paint: { "line-color": "#5B7A66", "line-width": 2, "line-dasharray": [2, 2] } });
-          const routes = (pl || []).filter((p) => p.kind === "route" && p.geometry?.length > 1).map((p) => ({ type: "Feature", properties: { c: p.color || "#7B68C8" }, geometry: { type: "LineString", coordinates: p.geometry.map(([a, c]) => [c, a]) } }));
+          const routes = (pl || [])
+            .filter((p) => p.kind === "route" && p.geometry?.length > 1)
+            .map((p) => ({ type: "Feature", properties: { c: p.color || "#7B68C8" }, geometry: { type: "LineString", coordinates: p.geometry.map(([a, c]) => [c, a]) } }));
           m.addSource("routes", { type: "geojson", data: { type: "FeatureCollection", features: routes } });
           m.addLayer({ id: "routes", type: "line", source: "routes", layout: { "line-cap": "round" }, paint: { "line-color": ["get", "c"], "line-width": 4, "line-dasharray": [1, 1.6] } });
           m.addSource("hit", { type: "geojson", data: hitGeo(b.buildings) });
@@ -997,7 +1078,12 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
           if (edit) {
             // 💡 suggested houses (blue ghosts) and maybe-extra ones (red dashed outline)
             m.addSource("sugg", { type: "geojson", data: suggGeo(suggRef.current.filter((x) => x.kind === "missing")) });
-            m.addLayer({ id: "sugg", type: "fill-extrusion", source: "sugg", paint: { "fill-extrusion-color": ["case", ["get", "annex"], "#7CD4FF", "#0096FF"], "fill-extrusion-height": ["get", "h"], "fill-extrusion-opacity": 0.6 } });
+            m.addLayer({
+              id: "sugg",
+              type: "fill-extrusion",
+              source: "sugg",
+              paint: { "fill-extrusion-color": ["case", ["get", "annex"], "#7CD4FF", "#0096FF"], "fill-extrusion-height": ["get", "h"], "fill-extrusion-opacity": 0.6 },
+            });
             m.addSource("extra", { type: "geojson", data: extraGeo(suggRef.current) });
             m.addLayer({ id: "extra", type: "line", source: "extra", paint: { "line-color": ["get", "c"], "line-width": 3, "line-dasharray": [1.5, 1] } });
             for (const id of ["sugg", "extra"]) m.setLayoutProperty(id, "visibility", "none");
@@ -1007,7 +1093,10 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
 
           const origin = ml.MercatorCoordinate.fromLngLat([LNG0, LAT0], 0);
           const sc = origin.meterInMercatorCoordinateUnits();
-          const base = new THREE.Matrix4().makeTranslation(origin.x, origin.y, origin.z).scale(new THREE.Vector3(sc, -sc, sc)).multiply(new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(1, 0, 0), Math.PI / 2));
+          const base = new THREE.Matrix4()
+            .makeTranslation(origin.x, origin.y, origin.z)
+            .scale(new THREE.Vector3(sc, -sc, sc))
+            .multiply(new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(1, 0, 0), Math.PI / 2));
           m.addLayer({
             id: "toys",
             type: "custom",
@@ -1071,7 +1160,8 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
             if (hb) {
               const c = centroid(hb.g);
               const d = document.createElement("div");
-              d.innerHTML = '<div class="m3d-bob" style="font:800 13px sans-serif;background:#15201A;color:#fff;border-radius:999px;padding:3px 10px;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap">🏠 บ้านฉัน</div>';
+              d.innerHTML =
+                '<div class="m3d-bob" style="font:800 13px sans-serif;background:#15201A;color:#fff;border-radius:999px;padding:3px 10px;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap">🏠 บ้านฉัน</div>';
               d.style.pointerEvents = "none";
               new ml.Marker({ element: d, anchor: "bottom", offset: [0, -34] }).setLngLat([c[1], c[0]]).addTo(m);
               m.once("idle", () => m.flyTo({ center: [c[1], c[0]], zoom: 18.2, duration: 1800 }));
@@ -1097,6 +1187,19 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
           const f = m.queryRenderedFeatures(e.point, { layers: ["hit"] })[0];
           return f ? byId(f.properties.id) : null;
         };
+        if (!edit)
+          m.on("click", (e) => {
+            if (!fixRef.current) return;
+            const hb = tapHouse(e);
+            selRef.current = hb ? leader(hb) : null;
+            rebuild();
+            setRepMsg("");
+            if (hb) {
+              setRepLv(hb.lv || 2);
+              setRepN(3);
+            }
+            setRep(hb ? { b: hb } : { at: [e.lngLat.lat, e.lngLat.lng] });
+          });
         if (edit) {
           m.on("click", async (e) => {
             if (busyRef.current) return;
@@ -1114,7 +1217,11 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                 x = hb ? suggRef.current.find((y) => (y.kind === "extra" || y.kind === "floors" || y.kind === "split") && y.ref === hb.id) : null;
               }
               setPick(x || null);
-              if (m.getSource("preview")) m.getSource("preview").setData({ type: "FeatureCollection", features: (x?.parts || []).map((g) => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring(g)] } })) });
+              if (m.getSource("preview"))
+                m.getSource("preview").setData({
+                  type: "FeatureCollection",
+                  features: (x?.parts || []).map((g) => ({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring(g)] } })),
+                });
               if (!x) pop(e.point, "แตะก้อนสีฟ้า หรืออาคารเส้นประแดง");
               return;
             }
@@ -1186,6 +1293,213 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     if (tool !== "look" && selRef.current != null) select(null);
   }, [tool, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 📍 issue pins from the map page (clickable)
+  useEffect(() => {
+    const ml = window.maplibregl;
+    const m = map.current;
+    pinMarks.current.forEach((k) => k.remove());
+    pinMarks.current = [];
+    if (!ready || !ml || !m || !pins) return;
+    for (const p of pins) {
+      if (p.lat == null || p.lng == null) continue;
+      const d = document.createElement("button");
+      d.type = "button";
+      d.title = p.title || "";
+      d.innerHTML = `<div class="m3d-bob" style="font:20px sans-serif;width:36px;height:36px;display:grid;place-items:center;background:#fff;border:3px solid ${p.color || "#E5484D"};border-radius:999px 999px 999px 4px;transform:rotate(-45deg);box-shadow:0 3px 8px rgba(0,0,0,.3)"><span style="transform:rotate(45deg)">${p.emoji || "📍"}</span></div>`;
+      d.style.cssText = "background:none;border:0;padding:0;cursor:pointer";
+      if (onPin)
+        d.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          onPin(p);
+        });
+      pinMarks.current.push(new ml.Marker({ element: d, anchor: "bottom" }).setLngLat([p.lng, p.lat]).addTo(m));
+    }
+  }, [pins, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 🧍 where am I: watch the GPS and walk the doll there
+  useEffect(() => {
+    const G = gpsRef.current;
+    const W = world.current;
+    const m = map.current;
+    if (!gps || !ready || !W.scene || !m) return undefined;
+    if (!navigator.geolocation) {
+      setGpsMsg("เครื่องนี้ไม่มี GPS ให้ใช้");
+      setGps(false);
+      return undefined;
+    }
+    G.doll = G.doll || makeDoll(W.THREE);
+    G.doll.visible = false;
+    W.scene.add(G.doll);
+    G.follow = true;
+    setGpsMsg("กำลังหาตำแหน่ง… 🛰️");
+    G.watch = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude: la, longitude: ln, accuracy } = pos.coords;
+        const to = toL([la, ln]);
+        if (!G.at) G.at = to;
+        if (Math.hypot(to[0] - G.at[0], to[1] - G.at[1]) > 0.6) G.heading = Math.atan2(to[0] - G.at[0], to[1] - G.at[1]);
+        G.to = to;
+        G.doll.visible = true;
+        const far = distM([la, ln], [LAT0, LNG0]) > 1500;
+        setGpsMsg(far ? "ตอนนี้คุณอยู่นอกหมู่บ้าน 🙂" : accuracy > 40 ? `GPS ยังไม่แม่น (±${Math.round(accuracy)} ม.)` : "");
+        if (G.follow && !far) {
+          m.easeTo({ center: [ln, la], zoom: Math.max(m.getZoom(), 18), duration: 900 });
+          G.follow = false; // first fix only; after that the map stays where the user drags it
+        }
+      },
+      (e) => {
+        setGpsMsg(e.code === 1 ? "ยังไม่ได้อนุญาตให้ใช้ตำแหน่ง · กดอนุญาตในเบราว์เซอร์ก่อนนะ" : "หาตำแหน่งไม่ได้ ลองออกไปที่โล่งๆ");
+      },
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 },
+    );
+    let t0 = performance.now();
+    const step = (t) => {
+      const dt = Math.min(0.1, (t - t0) / 1000);
+      t0 = t;
+      const d = G.doll;
+      if (G.to && d) {
+        G.at = G.at || G.to;
+        const dx = G.to[0] - G.at[0];
+        const dz = G.to[1] - G.at[1];
+        const gap = Math.hypot(dx, dz);
+        const k = gap > 60 ? 1 : Math.min(1, dt * 2.5);
+        G.at = [G.at[0] + dx * k, G.at[1] + dz * k];
+        const walking = gap > 0.3;
+        const ph = t / 130;
+        d.position.set(G.at[0], walking ? Math.abs(Math.sin(ph)) * 0.35 : 0, G.at[1]);
+        if (G.heading != null) d.rotation.y = G.heading;
+        d.userData.limbs.forEach((l, i) => {
+          l.rotation.x = walking ? Math.sin(ph) * 0.6 * (i < 2 ? 1 : -1) * (i % 2 ? 1 : -1) : 0; // arm swings against its leg, sides alternate
+          l.userData.ghost.rotation.x = l.rotation.x;
+        });
+        const pulse = 1 + 0.25 * Math.sin(t / 300);
+        d.userData.halo.scale.set(pulse, pulse, pulse);
+        d.visible = walkRef.current !== "ar"; // AR: you are the camera; VR: the doll walks just ahead of it
+        d.scale.setScalar(Math.max(1.8, Math.min(6, 1.7 * 2 ** (19 - m.getZoom())))); // stands above the roofs at any zoom
+        if (walkRef.current) {
+          // facing: the phone's compass, else the way we walk
+          const want = G.compass != null ? G.compass : G.heading != null ? 180 - (G.heading * 180) / Math.PI : G.bear || 0;
+          const diff = ((((want - (G.bear || 0)) % 360) + 540) % 360) - 180;
+          G.bear = ((G.bear || 0) + diff * Math.min(1, dt * 4) + 360) % 360;
+          const r = (G.bear * Math.PI) / 180;
+          if (walkRef.current === "ar") {
+            // AR: the camera stands where you stand, eye-level, looking the way the phone faces
+            const eye = toLLr(G.at);
+            const ahead = toLLr([G.at[0] + Math.sin(r) * 40, G.at[1] - Math.cos(r) * 40]);
+            const cam = m.calculateCameraOptionsFromTo(new window.maplibregl.LngLat(eye[1], eye[0]), 2, new window.maplibregl.LngLat(ahead[1], ahead[0]), 0);
+            m.jumpTo({ ...cam, pitch: Math.min(85, cam.pitch) });
+          } else {
+            // VR: a game camera behind the doll, turning with you
+            const c = toLLr(G.at);
+            m.jumpTo({ center: [c[1], c[0]], zoom: 19.2, pitch: 58, bearing: G.bear });
+          }
+        }
+        m.triggerRepaint();
+      }
+      G.raf = requestAnimationFrame(step);
+    };
+    G.raf = requestAnimationFrame(step);
+    return () => {
+      navigator.geolocation.clearWatch(G.watch);
+      cancelAnimationFrame(G.raf);
+      if (G.doll) W.scene.remove(G.doll);
+      G.at = G.to = null;
+      m.triggerRepaint();
+    };
+  }, [gps, ready]);
+  useEffect(() => {
+    const G = gpsRef.current;
+    const m = map.current;
+    const W = world.current;
+    if (!walk || !m) return undefined;
+    const onOri = (e) => {
+      const h = e.webkitCompassHeading != null ? e.webkitCompassHeading : e.absolute && e.alpha != null ? 360 - e.alpha : null;
+      if (h != null) G.compass = (h + ((window.screen.orientation && window.screen.orientation.angle) || 0)) % 360;
+    };
+    const evt = "ondeviceorientationabsolute" in window ? "deviceorientationabsolute" : "deviceorientation";
+    window.addEventListener(evt, onOri);
+    const ar = walk === "ar";
+    let stream = null;
+    if (ar && navigator.mediaDevices?.getUserMedia)
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "environment" }, audio: false })
+        .then((st) => {
+          stream = st;
+          if (video.current) video.current.srcObject = st;
+        })
+        .catch(() => setGpsMsg("เปิดกล้องไม่ได้ · ใช้แบบ VR ไปก่อน"));
+    const paint = (id, k, v) => m.getLayer(id) && m.setPaintProperty(id, k, v);
+    paint("ground", "background-opacity", ar ? 0 : 1);
+    paint("osm", "raster-opacity", ar ? 0 : 0.22);
+    paint("flat", "fill-opacity", ar ? 0.15 : ["get", "o"]);
+    if (W.mesh) {
+      W.mesh.material.transparent = ar;
+      W.mesh.material.opacity = ar ? 0.55 : 1;
+      W.mesh.material.needsUpdate = true;
+    }
+    if (!edit) setFix(true);
+    return () => {
+      window.removeEventListener(evt, onOri);
+      G.compass = null;
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      paint("ground", "background-opacity", 1);
+      paint("osm", "raster-opacity", 0.22);
+      paint("flat", "fill-opacity", ["get", "o"]);
+      if (W.mesh) {
+        W.mesh.material.transparent = false;
+        W.mesh.material.opacity = 1;
+        W.mesh.material.needsUpdate = true;
+      }
+      m.easeTo({ pitch: 60, zoom: 18, duration: 600 });
+    };
+  }, [walk]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function startWalk(kind) {
+    // iOS asks for the compass only from a tap
+    try {
+      if (window.DeviceOrientationEvent?.requestPermission) await window.DeviceOrientationEvent.requestPermission();
+    } catch (e) {
+      // no compass: we face the way we walk
+    }
+    if (!gps) setGps(true);
+    setWalk(kind);
+  }
+  function findMe() {
+    const G = gpsRef.current;
+    if (!gps) return setGps(true);
+    if (G.to && map.current) {
+      const [la, ln] = toLLr(G.to);
+      map.current.easeTo({ center: [ln, la], zoom: Math.max(map.current.getZoom(), 18), duration: 700 });
+    }
+  }
+
+  function fixOff() {
+    setWalk(null);
+    setFix(false);
+    setRep(null);
+    setRepMsg("");
+    selRef.current = null;
+    rebuild();
+  }
+  async function report(kind) {
+    const by = load("myHouse", "");
+    if (!by) return setRepMsg("ลงเลขที่บ้านและปักหมุดบ้านคุณในหน้า บ้านฉัน ก่อนนะครับ");
+    const body = { by, kind, ...(rep.b ? { ref: rep.b.id } : { lat: rep.at[0], lng: rep.at[1] }), ...(kind === "split" ? { n: repN } : {}), ...(kind === "floors" ? { lv: repLv } : {}) };
+    setBusy(true);
+    try {
+      const r = await api("/buildings/report", { method: "POST", body: JSON.stringify(body) });
+      if (r.applied) await reload();
+      popMid(r.applied ? "✨ แก้แผนที่แล้ว" : "🙏 รับเรื่องแล้ว");
+      setRepMsg(r.note || "ขอบคุณครับ");
+      setRep(null);
+      selRef.current = null;
+      rebuild();
+    } catch (e) {
+      setRepMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function tilt() {
     const m = map.current;
     if (!m) return;
@@ -1195,13 +1509,21 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
 
   const hint = linking
     ? `แตะอาคารที่เป็นบ้านเดียวกัน (${linking.length} อาคาร)`
-    : { look: "แตะอาคารเพื่อแก้ไข", build: `แตะที่ว่าง วาง ${KINDS[kind].icon} ${KINDS[kind].label}`, up: "แตะบ้าน +1 ชั้น", down: "แตะบ้าน −1 ชั้น", remove: "แตะอาคารที่ไม่มีจริง เพื่อทุบทิ้ง", hint: `💡 ข้อเสนอ ${sugg.length} · แตะอันที่มีสีเพื่อตัดสินใจ` }[tool];
+    : {
+        look: "แตะอาคารเพื่อแก้ไข",
+        build: `แตะที่ว่าง วาง ${KINDS[kind].icon} ${KINDS[kind].label}`,
+        up: "แตะบ้าน +1 ชั้น",
+        down: "แตะบ้าน −1 ชั้น",
+        remove: "แตะอาคารที่ไม่มีจริง เพื่อทุบทิ้ง",
+        hint: `💡 ข้อเสนอ ${sugg.length} · แตะอันที่มีสีเพื่อตัดสินใจ`,
+      }[tool];
   const pad = "flex h-11 min-w-[44px] items-center justify-center rounded-xl bg-[#F1F4F2] px-2 text-lg font-bold shadow-[0_2px_0_#C9D2CC] active:scale-90 disabled:opacity-40";
   const kindOf = sel ? KINDS[sel.t] || KINDS.house : null;
   const flatKind = sel && FLATS.has(sel.t);
 
   return (
-    <div className={`relative overflow-hidden ${className}`} style={{ background: "linear-gradient(#BFE4FF, #EAF6FF 45%, #DCEFD6 46%)" }}>
+    <div className={`relative overflow-hidden ${className}`} style={{ background: walk === "ar" ? "#000" : "linear-gradient(#BFE4FF, #EAF6FF 45%, #DCEFD6 46%)" }}>
+      {walk === "ar" && <video ref={video} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />}
       <style>
         {"@keyframes m3dbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}.m3d-bob{animation:m3dbob 1.6s ease-in-out infinite}" +
           "@keyframes m3dpop{0%{transform:translate(-50%,-50%) scale(.6);opacity:0}20%{transform:translate(-50%,-90%) scale(1.15);opacity:1}100%{transform:translate(-50%,-220%) scale(1);opacity:0}}.m3d-pop{animation:m3dpop 1.1s ease-out forwards}" +
@@ -1215,7 +1537,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
           {p.text}
         </span>
       ))}
-      <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1.5">
+      <div className={`absolute right-2 top-2 z-10 flex-col items-end gap-1.5 ${walk ? "hidden" : "flex"}`}>
         {onClose && (
           <button onClick={onClose} className="min-h-[44px] rounded-full bg-[#15201A] px-4 text-[15px] font-bold text-white shadow">
             ✕ ปิด 3D
@@ -1224,9 +1546,132 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
         <button onClick={tilt} className="min-h-[40px] rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-sm font-bold shadow">
           {flat ? "🏙️ มุมเฉียง" : "🗺️ มองจากบน"}
         </button>
+        {ready && (
+          <div className="flex gap-1">
+            {gps && (
+              <button
+                onClick={() => {
+                  setGps(false);
+                  setGpsMsg("");
+                }}
+                aria-label="ปิดตำแหน่งฉัน"
+                className="min-h-[40px] rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-sm font-bold shadow"
+              >
+                ✕
+              </button>
+            )}
+            {!walk && (
+              <button onClick={() => startWalk("vr")} className="min-h-[40px] rounded-full border border-[#D5DBD6] bg-white/95 px-3 text-sm font-bold shadow">
+                👓 เดินสำรวจ
+              </button>
+            )}
+            <button
+              onClick={findMe}
+              aria-pressed={gps}
+              className={`min-h-[40px] rounded-full px-3 text-sm font-bold shadow ${gps ? "bg-[#0090D0] text-white" : "border border-[#D5DBD6] bg-white/95"}`}
+            >
+              🧍 {gps ? "ไปที่ฉัน" : "ฉันอยู่ไหน"}
+            </button>
+          </div>
+        )}
+        {gpsMsg && <span className="max-w-[12rem] rounded-lg bg-white/90 px-2 py-1 text-right text-xs shadow">{gpsMsg}</span>}
         {!edit && mine == null && ready && <span className="max-w-[12rem] rounded-lg bg-white/90 px-2 py-1 text-right text-xs shadow">ลงเลขที่บ้านในหน้า บ้านฉัน แล้วบ้านคุณจะขึ้นป้าย 🏠 ตรงนี้</span>}
       </div>
-      {!edit && ready && <p className="absolute bottom-2 left-2 z-10 rounded-lg bg-white/85 px-2 py-1 text-xs text-neutral-700 shadow">สีบ้าน = ซอย (จากข้อมูลที่ลูกบ้านช่วยกันลง) · หมุน/เอียงด้วยสองนิ้ว</p>}
+      {!edit && ready && !fix && !children && (
+        <p className="absolute bottom-2 left-2 z-10 max-w-[60%] rounded-lg bg-white/85 px-2 py-1 text-xs text-neutral-700 shadow">
+          สีบ้าน = ซอย (จากข้อมูลที่ลูกบ้านช่วยกันลง) · หมุน/เอียงด้วยสองนิ้ว
+        </p>
+      )}
+      {!edit && ready && !walk && (
+        <div className="absolute left-12 top-2 z-10">
+          <button
+            onClick={() => (fix ? fixOff() : setFix(true))}
+            className={`min-h-[40px] rounded-full px-3 text-sm font-bold shadow ${fix ? "bg-[#15201A] text-white" : "border border-[#D5DBD6] bg-white/95"}`}
+          >
+            {fix ? "✓ เสร็จ" : "✏️ แผนที่ผิด? แจ้งแก้"}
+          </button>
+        </div>
+      )}
+      {!edit && fix && (
+        <div className="absolute inset-x-2 bottom-2 z-20 rounded-2xl bg-white p-3 text-[15px] shadow-xl">
+          {!rep ? (
+            <p>
+              <b>✏️ ช่วยแก้แผนที่รอบบ้านคุณ</b>
+              <br />
+              แตะอาคารที่ผิด หรือแตะที่ว่างที่มีบ้านจริงแต่แผนที่ไม่มี · เพื่อนบ้านแจ้งตรงกัน 2 หลัง แผนที่จะแก้ให้ทันที
+            </p>
+          ) : rep.b ? (
+            <div className="space-y-2">
+              <p className="font-bold">อาคารนี้ผิดยังไงครับ?</p>
+              <button disabled={busy} onClick={() => report("extra")} className="block min-h-[44px] w-full rounded-xl bg-[#FDECEC] px-3 text-left font-bold text-red-800">
+                🚫 ไม่มีอาคารนี้จริง (ที่ว่าง / รื้อไปแล้ว)
+              </button>
+              <div className="flex items-center gap-2 rounded-xl bg-[#F1ECFF] px-3 py-1.5">
+                <span className="flex-1 font-bold text-[#5B3BB5]">✂️ แบ่งเป็น</span>
+                <button onClick={() => setRepN((n) => Math.max(2, n - 1))} className="h-9 w-9 rounded-lg bg-white font-bold shadow">
+                  −
+                </button>
+                <b className="w-6 text-center">{repN}</b>
+                <button onClick={() => setRepN((n) => Math.min(20, n + 1))} className="h-9 w-9 rounded-lg bg-white font-bold shadow">
+                  +
+                </button>
+                <span>หลัง</span>
+                <button disabled={busy} onClick={() => report("split")} className="min-h-[36px] rounded-lg bg-[#8B5CF6] px-3 font-bold text-white">
+                  ส่ง
+                </button>
+              </div>
+              <div className="flex items-center gap-2 rounded-xl bg-[#FFF3E0] px-3 py-1.5">
+                <span className="flex-1 font-bold text-[#9A5B00]">📏 จริงๆ มี</span>
+                <button onClick={() => setRepLv((n) => Math.max(1, n - 1))} className="h-9 w-9 rounded-lg bg-white font-bold shadow">
+                  −
+                </button>
+                <b className="w-6 text-center">{repLv}</b>
+                <button onClick={() => setRepLv((n) => Math.min(30, n + 1))} className="h-9 w-9 rounded-lg bg-white font-bold shadow">
+                  +
+                </button>
+                <span>ชั้น</span>
+                <button disabled={busy || repLv === (rep.b.lv || 2)} onClick={() => report("floors")} className="min-h-[36px] rounded-lg bg-[#F08C00] px-3 font-bold text-white disabled:opacity-40">
+                  ส่ง
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="font-bold">ตรงนี้แผนที่ยังไม่มีอาคาร</p>
+              <button disabled={busy} onClick={() => report("missing")} className="block min-h-[44px] w-full rounded-xl bg-[#E3F4FF] px-3 text-left font-bold text-[#0B5E8E]">
+                🏠 ตรงนี้มีบ้านจริง เพิ่มให้หน่อย
+              </button>
+            </div>
+          )}
+          {repMsg && <p className="mt-2 rounded-lg bg-[#F1F4F2] px-2 py-1.5 text-sm">{repMsg}</p>}
+          {rep && (
+            <button
+              onClick={() => {
+                setRep(null);
+                selRef.current = null;
+                rebuild();
+              }}
+              className="mt-2 text-sm text-neutral-600 underline"
+            >
+              ยกเลิก
+            </button>
+          )}
+        </div>
+      )}
+      {walk && (
+        <div className={`absolute inset-x-2 z-30 flex items-center gap-1.5 rounded-full bg-[#15201A]/90 p-1.5 text-white shadow-xl ${fix && !edit ? "top-2" : "bottom-2"}`}>
+          {["vr", "ar"].map((k) => (
+            <button key={k} onClick={() => setWalk(k)} aria-pressed={walk === k} className={`min-h-[40px] rounded-full px-3 text-sm font-bold ${walk === k ? "bg-white text-[#15201A]" : ""}`}>
+              {k === "vr" ? "👓 VR" : "📷 AR"}
+            </button>
+          ))}
+          <span className="min-w-0 flex-1 truncate text-xs">{gpsMsg || (gpsRef.current.to ? "เดินไปเรื่อยๆ · หันมือถือไปทางไหน แผนที่หันตาม · แตะตึกที่ผิดเพื่อแจ้งแก้" : "กำลังหาตำแหน่ง… 🛰️")}</span>
+          <button onClick={() => setWalk(null)} className="min-h-[40px] rounded-full bg-white/15 px-3 text-sm font-bold">
+            ✕ ออก
+          </button>
+        </div>
+      )}
+      {!fix && !walk && children}
       {edit && (
         <>
           <div className="absolute left-1/2 top-2 z-10 max-w-[70%] -translate-x-1/2 truncate rounded-full bg-[#15201A]/85 px-3 py-1 text-sm font-bold text-white shadow">
@@ -1247,9 +1692,12 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                         </>
                       ) : pick.kind === "floors" ? (
                         <>
-                          <b>📏 วัดความสูงได้ราว {pick.h} ม. ≈ {pick.lv} ชั้น</b>
+                          <b>
+                            📏 วัดความสูงได้ราว {pick.h} ม. ≈ {pick.lv} ชั้น
+                          </b>
                           <br />
-                          จาก{pick.src === "drone" ? "ภาพโดรน" : pick.src === "google25d" ? "ภาพดาวเทียม (Google Open Buildings 2.5D)" : ` ${pick.src}`} · ตอนนี้ตั้งไว้ {byId(pick.ref)?.lv ?? "?"} ชั้น
+                          จาก{pick.src === "drone" ? "ภาพโดรน" : pick.src === "google25d" ? "ภาพดาวเทียม (Google Open Buildings 2.5D)" : ` ${pick.src}`} · ตอนนี้ตั้งไว้ {byId(pick.ref)?.lv ?? "?"}{" "}
+                          ชั้น
                         </>
                       ) : pick.kind === "missing" && pick.annex ? (
                         <>
@@ -1275,7 +1723,15 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                     {pick.label && <p className="text-xs text-neutral-600">📍 {pick.label}</p>}
                     <div className="flex gap-2">
                       <button onClick={() => decide(pick, "accept")} disabled={busy} className="flex-1 rounded-xl bg-[#1E6B47] py-2 font-bold text-white shadow-[0_3px_0_#154D33] active:scale-95">
-                        {pick.kind === "split" ? `✂️ แบ่งเป็น ${pick.parts?.length} หลัง` : pick.kind === "floors" ? `✓ ตั้งเป็น ${pick.lv} ชั้น` : pick.kind === "missing" ? (pick.annex ? "✓ เพิ่มเป็นส่วนของบ้านนี้" : "✓ เพิ่มบ้านนี้") : "🔨 เอาออก"}
+                        {pick.kind === "split"
+                          ? `✂️ แบ่งเป็น ${pick.parts?.length} หลัง`
+                          : pick.kind === "floors"
+                            ? `✓ ตั้งเป็น ${pick.lv} ชั้น`
+                            : pick.kind === "missing"
+                              ? pick.annex
+                                ? "✓ เพิ่มเป็นส่วนของบ้านนี้"
+                                : "✓ เพิ่มบ้านนี้"
+                              : "🔨 เอาออก"}
                       </button>
                       <button onClick={() => decide(pick, "dismiss")} disabled={busy} className="flex-1 rounded-xl bg-neutral-200 py-2 font-bold active:scale-95">
                         ✕ ไม่ใช่ / ข้าม
@@ -1285,12 +1741,30 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                 ) : (
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="flex w-full flex-wrap gap-x-3 gap-y-1 text-xs font-bold">
-                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#0096FF" }} />อาจขาด</span>
-                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#7CD4FF" }} />ส่วนต่อเติม</span>
-                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#F08C00" }} />เสนอเปลี่ยนชั้น</span>
-                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#E5484D" }} />อาจเกิน</span>
-                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#8B5CF6" }} />แบ่งตามแปลง</span>
-                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px] border" style={{ background: "#F2F2EE" }} />บ้านเดิม</span>
+                      <span>
+                        <i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#0096FF" }} />
+                        อาจขาด
+                      </span>
+                      <span>
+                        <i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#7CD4FF" }} />
+                        ส่วนต่อเติม
+                      </span>
+                      <span>
+                        <i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#F08C00" }} />
+                        เสนอเปลี่ยนชั้น
+                      </span>
+                      <span>
+                        <i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#E5484D" }} />
+                        อาจเกิน
+                      </span>
+                      <span>
+                        <i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#8B5CF6" }} />
+                        แบ่งตามแปลง
+                      </span>
+                      <span>
+                        <i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px] border" style={{ background: "#F2F2EE" }} />
+                        บ้านเดิม
+                      </span>
                     </span>
                     <span className="min-w-0 flex-1">
                       {sugg.length
@@ -1314,7 +1788,11 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
             {tool === "build" && (
               <div className="flex gap-1.5 overflow-x-auto rounded-2xl bg-white/95 p-1.5 shadow-lg">
                 {Object.entries(KINDS).map(([k, v]) => (
-                  <button key={k} onClick={() => setKind(k)} className={`flex w-[68px] shrink-0 flex-col items-center rounded-xl py-1 text-[10px] font-bold leading-tight ${kind === k ? "bg-[#FFD43B] shadow-[0_3px_0_#C99A00]" : "bg-[#F1F4F2]"}`}>
+                  <button
+                    key={k}
+                    onClick={() => setKind(k)}
+                    className={`flex w-[68px] shrink-0 flex-col items-center rounded-xl py-1 text-[10px] font-bold leading-tight ${kind === k ? "bg-[#FFD43B] shadow-[0_3px_0_#C99A00]" : "bg-[#F1F4F2]"}`}
+                  >
                     <span className="text-2xl">{v.icon}</span>
                     {v.label}
                   </button>
@@ -1355,7 +1833,12 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                 </div>
                 <div className="flex gap-1 overflow-x-auto pb-1">
                   {Object.entries(KINDS).map(([k, v]) => (
-                    <button key={k} onClick={() => setType(k)} disabled={busy} className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-xs font-bold ${(sel.t || "house") === k ? "border-[#C99A00] bg-[#FFD43B]" : "bg-white"}`}>
+                    <button
+                      key={k}
+                      onClick={() => setType(k)}
+                      disabled={busy}
+                      className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-xs font-bold ${(sel.t || "house") === k ? "border-[#C99A00] bg-[#FFD43B]" : "bg-white"}`}
+                    >
                       {v.icon} {v.label}
                     </button>
                   ))}
@@ -1369,7 +1852,12 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                       ["flat", "▭ แบน"],
                       ["shed", "◺ เพิงหมาแหงน"],
                     ].map(([k, label]) => (
-                      <button key={k} onClick={() => setRoof(k)} disabled={busy} className={`rounded-full border px-2 py-1 text-xs font-bold ${sel.r === k ? "border-[#C99A00] bg-[#FFD43B]" : "bg-white"}`}>
+                      <button
+                        key={k}
+                        onClick={() => setRoof(k)}
+                        disabled={busy}
+                        className={`rounded-full border px-2 py-1 text-xs font-bold ${sel.r === k ? "border-[#C99A00] bg-[#FFD43B]" : "bg-white"}`}
+                      >
                         {label}
                       </button>
                     ))}

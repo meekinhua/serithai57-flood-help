@@ -18,6 +18,7 @@
 import bisect
 import hashlib
 import json
+import math
 import re
 import secrets
 import time
@@ -99,6 +100,11 @@ def building_shapes(edits: dict, with_removed: bool = False) -> list:
             if bid in base:
                 one(base[bid][0], base[bid][1], bid, "removed")
     return out
+
+
+async def live_shapes(db) -> list:
+    """Every building on the map now, with outline / group (for matching members' pins)."""
+    return building_shapes(await db.settings.find_one({"id": "building_edits"}, {"_id": 0}) or {})
 
 
 def apply_building_edits(edits: dict):
@@ -195,6 +201,46 @@ class RoofEdit(BaseModel):
 class RoofSplit(BaseModel):
     id: int
     parts: list[list[list[float]]] = Field(..., min_length=2, max_length=20)
+
+
+class MemberReport(BaseModel):
+    by: str = Field(..., min_length=1, max_length=12)  # the member's own house number (pinned in บ้านฉัน)
+    kind: Literal["extra", "missing", "split", "floors"]
+    ref: Optional[int] = None
+    lat: Optional[float] = Field(None, ge=13.7, le=13.9)
+    lng: Optional[float] = Field(None, ge=100.6, le=100.8)
+    n: Optional[int] = Field(None, ge=2, le=20)
+    lv: Optional[int] = Field(None, ge=1, le=30)
+
+
+def _m(a, b) -> float:
+    return math.hypot((a[0] - b[0]) * 110574, (a[1] - b[1]) * 111320 * math.cos(math.radians(a[0])))
+
+
+def _split_equal(g: list, n: int) -> list:
+    """n equal units across the long side of an outline's smallest rectangle."""
+    lat0 = sum(q[0] for q in g) / len(g)
+    kx, kz = 111320 * math.cos(math.radians(lat0)), 110574
+    P = [((q[1] - g[0][1]) * kx, (q[0] - g[0][0]) * kz) for q in g]
+    best = None
+    for i in range(len(P)):
+        (x1, z1), (x2, z2) = P[i - 1], P[i]
+        ln = math.hypot(x2 - x1, z2 - z1)
+        if ln < 0.3:
+            continue
+        ux, uz = (x2 - x1) / ln, (z2 - z1) / ln
+        s_ = [x * ux + z * uz for x, z in P]
+        t_ = [-x * uz + z * ux for x, z in P]
+        ar = (max(s_) - min(s_)) * (max(t_) - min(t_))
+        if not best or ar < best[0]:
+            best = (ar, ux, uz, min(s_), max(s_), min(t_), max(t_))
+    _, ux, uz, s0, s1, t0, t1 = best
+    if s1 - s0 < t1 - t0:
+        ux, uz, s0, s1, t0, t1 = -uz, ux, t0, t1, -s1, -s0
+    def ll(s_, t_):
+        x, z = s_ * ux - t_ * uz, s_ * uz + t_ * ux
+        return [round(g[0][0] + z / kz, 6), round(g[0][1] + x / kx, 6)]
+    return [[ll(s0 + (s1 - s0) * k / n, t0), ll(s0 + (s1 - s0) * (k + 1) / n, t0), ll(s0 + (s1 - s0) * (k + 1) / n, t1), ll(s0 + (s1 - s0) * k / n, t1)] for k in range(n)]
 
 
 class Suggestion(BaseModel):
@@ -660,8 +706,9 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
     async def put_suggestions(body: Suggestions, admin: dict = Depends(require_admin)):
         decided = {d["id"] async for d in db.building_suggestions.find({"status": {"$in": ["accepted", "dismissed"]}}, {"_id": 0, "id": 1})}
         kinds = body.kinds or sorted({x.kind for x in body.items}) or ["missing", "extra"]
-        await db.building_suggestions.delete_many({"status": "open", "kind": {"$in": kinds}})
-        rows = [{**x.model_dump(), "g": _outline_ok(x.g) if x.g else None, "parts": [_outline_ok(q) for q in x.parts] if x.parts else None, "status": "open", "at": now()} for x in body.items if x.id not in decided]
+        # members' own reports (✏️ on the map) carry their votes and are never replaced by a dataset run
+        await db.building_suggestions.delete_many({"status": "open", "kind": {"$in": kinds}, "src": {"$ne": "member"}})
+        rows = [{**x.model_dump(), "g": _outline_ok(x.g) if x.g else None, "parts": [_outline_ok(q) for q in x.parts] if x.parts else None, "status": "open", "at": now()} for x in body.items if x.id not in decided and x.src != "member"]
         if rows:
             await db.building_suggestions.insert_many(rows)
         await audit(admin, "building_suggestions", f"{len(rows)} open", body.note)
@@ -669,56 +716,122 @@ def build_router(db, rate_limit, current_admin, require_admin, start_session, au
 
     @router.get("/admin/buildings/suggestions")
     async def get_suggestions(admin: dict = Depends(require_admin)):
-        return {"items": await db.building_suggestions.find({"status": "open"}, {"_id": 0}).to_list(3000)}
+        return {"items": await db.building_suggestions.find({"status": "open"}, {"_id": 0, "ips": 0}).to_list(3000)}
+
+    async def apply_suggestion(sg: dict, actor: dict):
+        """Carry out one suggestion on the building map; returns the new building id for "missing"."""
+        new_id = None
+        e = await roof_edits()
+        if sg["kind"] == "missing" and sg.get("g"):
+            g = sg["g"]
+            new_id = 9_000_000_000 + int(time.time() * 1000) % 1_000_000_000
+            e["added"].append([round(sum(a for a, _ in g) / len(g), 6), round(sum(b for _, b in g) / len(g), 6), new_id])
+            e["shapes"][str(new_id)] = g
+            if sg.get("lv"):
+                e["levels"][str(new_id)] = sg["lv"]
+            if sg.get("annex") and sg.get("ref") is not None:
+                e["levels"][str(new_id)] = 1
+                lead = e["groups"].get(str(sg["ref"]), sg["ref"])
+                e["groups"][str(sg["ref"])] = lead
+                e["groups"][str(new_id)] = lead
+        elif sg["kind"] == "split" and sg.get("ref") is not None and sg.get("parts"):
+            # one building per land plot (a block of townhouses / shophouses)
+            sid0 = str(sg["ref"])
+            lv, t = e["levels"].get(sid0), e["types"].get(sid0)
+            if lv is None:
+                base = FOOTPRINTS.get(sid0)
+                lv = base[1] if base else 2
+            if any(b[2] == sg["ref"] for b in e["added"]):
+                e["added"] = [b for b in e["added"] if b[2] != sg["ref"]]
+            elif sg["ref"] not in e["removed"]:
+                e["removed"].append(sg["ref"])
+            t0 = int(time.time() * 1000) % 1_000_000_000
+            for k, g in enumerate(sg["parts"]):
+                nid = 9_000_000_000 + (t0 + k) % 1_000_000_000
+                e["added"].append([round(sum(a for a, _ in g) / len(g), 6), round(sum(b for _, b in g) / len(g), 6), nid])
+                e["shapes"][str(nid)] = g
+                e["levels"][str(nid)] = lv
+                e["types"][str(nid)] = t if t and t != "house" else "townhouse"
+        elif sg["kind"] == "floors" and sg.get("ref") is not None and sg.get("lv"):
+            e["levels"][str(sg["ref"])] = sg["lv"]
+        elif sg["kind"] == "extra" and sg.get("ref") is not None:
+            if any(b[2] == sg["ref"] for b in e["added"]):
+                e["added"] = [b for b in e["added"] if b[2] != sg["ref"]]
+            elif sg["ref"] not in e["removed"]:
+                e["removed"].append(sg["ref"])
+        await save_roofs(e, actor, f"suggestion {sg['id']} {sg['kind']} ({sg['src']})")
+        return new_id
 
     @router.post("/admin/buildings/suggestions/{sid}/{verb}")
     async def decide_suggestion(sid: str, verb: Literal["accept", "dismiss"], admin: dict = Depends(require_admin)):
         sg = await db.building_suggestions.find_one({"id": sid, "status": "open"}, {"_id": 0})
         if not sg:
             raise HTTPException(404, "ไม่พบข้อเสนอนี้ (อาจตัดสินไปแล้ว)")
-        new_id = None
-        if verb == "accept":
-            e = await roof_edits()
-            if sg["kind"] == "missing" and sg.get("g"):
-                g = sg["g"]
-                new_id = 9_000_000_000 + int(time.time() * 1000) % 1_000_000_000
-                e["added"].append([round(sum(a for a, _ in g) / len(g), 6), round(sum(b for _, b in g) / len(g), 6), new_id])
-                e["shapes"][str(new_id)] = g
-                if sg.get("lv"):
-                    e["levels"][str(new_id)] = sg["lv"]
-                if sg.get("annex") and sg.get("ref") is not None:
-                    e["levels"][str(new_id)] = 1
-                    lead = e["groups"].get(str(sg["ref"]), sg["ref"])
-                    e["groups"][str(sg["ref"])] = lead
-                    e["groups"][str(new_id)] = lead
-            elif sg["kind"] == "split" and sg.get("ref") is not None and sg.get("parts"):
-                # one building per land plot (a block of townhouses / shophouses)
-                sid0 = str(sg["ref"])
-                lv, t = e["levels"].get(sid0), e["types"].get(sid0)
-                if lv is None:
-                    base = FOOTPRINTS.get(sid0)
-                    lv = base[1] if base else 2
-                if any(b[2] == sg["ref"] for b in e["added"]):
-                    e["added"] = [b for b in e["added"] if b[2] != sg["ref"]]
-                elif sg["ref"] not in e["removed"]:
-                    e["removed"].append(sg["ref"])
-                t0 = int(time.time() * 1000) % 1_000_000_000
-                for k, g in enumerate(sg["parts"]):
-                    nid = 9_000_000_000 + (t0 + k) % 1_000_000_000
-                    e["added"].append([round(sum(a for a, _ in g) / len(g), 6), round(sum(b for _, b in g) / len(g), 6), nid])
-                    e["shapes"][str(nid)] = g
-                    e["levels"][str(nid)] = lv
-                    e["types"][str(nid)] = t if t and t != "house" else "townhouse"
-            elif sg["kind"] == "floors" and sg.get("ref") is not None and sg.get("lv"):
-                e["levels"][str(sg["ref"])] = sg["lv"]
-            elif sg["kind"] == "extra" and sg.get("ref") is not None:
-                if any(b[2] == sg["ref"] for b in e["added"]):
-                    e["added"] = [b for b in e["added"] if b[2] != sg["ref"]]
-                elif sg["ref"] not in e["removed"]:
-                    e["removed"].append(sg["ref"])
-            await save_roofs(e, admin, f"suggestion {sid} {sg['kind']} ({sg['src']})")
+        new_id = await apply_suggestion(sg, admin) if verb == "accept" else None
         await db.building_suggestions.update_one({"id": sid}, {"$set": {"status": "accepted" if verb == "accept" else "dismissed", "by": admin.get("name", ""), "decided_at": now(), "new_id": new_id}})
         return {"ok": True, "new_id": new_id}
+
+    # ---------- ✏️ 13 Oct: members fix the map around their own house; two neighbours agreeing = done ----------
+    @router.post("/buildings/report")
+    async def member_report(body: MemberReport, request: Request):
+        rate_limit(request, "bld-report", limit=30, window_s=600)
+        by = re.sub(r"\s", "", body.by)
+        by = by if by.startswith("4/") else f"4/{by}"
+        me = await db.addresses.find_one({"house": by, "lat": {"$ne": None}}, {"_id": 0, "lat": 1, "lng": 1})
+        if not me:
+            raise HTTPException(422, "ปักหมุดบ้านตัวเองในหน้า บ้านฉัน ก่อน แล้วจะแจ้งแก้แผนที่รอบบ้านได้")
+        here = (me["lat"], me["lng"])
+        b = next((x for x in building_shapes(await roof_edits()) if x["id"] == body.ref), None) if body.ref is not None else None
+        if body.kind != "missing" and not b:
+            raise HTTPException(404, "ไม่พบอาคารนี้ (อาจถูกแก้ไปแล้ว)")
+        at = (sum(q[0] for q in b["g"]) / len(b["g"]), sum(q[1] for q in b["g"]) / len(b["g"])) if b else (body.lat, body.lng)
+        if at[0] is None or _m(here, at) > 180:
+            raise HTTPException(422, "แจ้งแก้ได้เฉพาะรอบๆ บ้านคุณ (ไม่เกิน 150 ม.)")
+        doc = {"src": "member", "status": "open"}
+        if body.kind == "extra":
+            sid, doc["ref"] = f"mb:extra:{b['id']}", b["id"]
+        elif body.kind == "floors":
+            if not body.lv:
+                raise HTTPException(422, "บอกจำนวนชั้น")
+            sid, doc["ref"], doc["lv"] = f"mb:fl:{b['id']}:{body.lv}", b["id"], body.lv
+        elif body.kind == "split":
+            if not body.n:
+                raise HTTPException(422, "บอกว่ามีกี่หลัง")
+            sid, doc["ref"], doc["parts"] = f"mb:split:{b['id']}:{body.n}", b["id"], _split_equal(b["g"], body.n)
+        else:
+            # ตรงนี้มีบ้าน: join a report within 6 m, else shape it like the nearest house
+            near = await db.building_suggestions.find({"kind": "missing", "src": "member", "status": "open"}, {"_id": 0}).to_list(500)
+            hit = next((x for x in near if x.get("g") and _m(at, (sum(q[0] for q in x["g"]) / len(x["g"]), sum(q[1] for q in x["g"]) / len(x["g"]))) < 6), None)
+            if hit:
+                sid = hit["id"]
+            else:
+                shapes = building_shapes(await roof_edits())
+                ref = min(shapes, key=lambda x: _m(at, (sum(q[0] for q in x["g"]) / len(x["g"]), sum(q[1] for q in x["g"]) / len(x["g"]))), default=None)
+                if ref and _m(at, (sum(q[0] for q in ref["g"]) / len(ref["g"]), sum(q[1] for q in ref["g"]) / len(ref["g"]))) < 60:
+                    c0 = (sum(q[0] for q in ref["g"]) / len(ref["g"]), sum(q[1] for q in ref["g"]) / len(ref["g"]))
+                    g = [[round(q[0] - c0[0] + at[0], 6), round(q[1] - c0[1] + at[1], 6)] for q in ref["g"]]
+                    doc["lv"] = ref["lv"]
+                else:
+                    g = box_around(at[0], at[1])
+                sid, doc["g"] = f"mb:miss:{at[0]:.5f},{at[1]:.5f}", _outline_ok(g)
+        # one phone typing two house numbers is still one vote: count distinct networks too (hashed, never shown)
+        ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0].strip()
+        who = hashlib.sha256(f"bld:{ip}".encode()).hexdigest()[:16]
+        cur = await db.building_suggestions.find_one({"id": sid}, {"_id": 0})
+        if cur and cur.get("status") != "open":
+            return {"ok": True, "applied": cur.get("status") == "accepted", "note": "เรื่องนี้แอดมินดูแล้ว ขอบคุณครับ"}
+        await db.building_suggestions.update_one(
+            {"id": sid}, {"$setOnInsert": {"id": sid, "kind": body.kind, "at": now(), **doc}, "$addToSet": {"votes": by, "ips": who}}, upsert=True
+        )
+        sg = await db.building_suggestions.find_one({"id": sid}, {"_id": 0})
+        votes = sg.get("votes") or []
+        await db.building_suggestions.update_one({"id": sid}, {"$set": {"label": f"แจ้งโดยลูกบ้าน {', '.join(votes[:5])}"}})
+        if len(votes) >= 2 and len(sg.get("ips") or []) >= 2:
+            actor = {"id": "members", "name": f"ลูกบ้านช่วยแก้ ({', '.join(votes[:3])})"}
+            new_id = await apply_suggestion(sg, actor)
+            await db.building_suggestions.update_one({"id": sid}, {"$set": {"status": "accepted", "by": actor["name"], "decided_at": now(), "new_id": new_id}})
+            return {"ok": True, "applied": True, "votes": len(votes), "note": "เพื่อนบ้านแจ้งตรงกัน 2 คนแล้ว · แก้แผนที่ให้แล้ว ขอบคุณครับ"}
+        return {"ok": True, "applied": False, "votes": len(votes), "note": "รับเรื่องแล้ว · ถ้าเพื่อนบ้านอีกบ้าน (จากมือถืออีกเครื่อง) แจ้งตรงกัน หรือแอดมินยืนยัน จะแก้ให้ทันที"}
 
     @router.get("/admin/buildings3d")
     async def admin_3d(admin: dict = Depends(require_admin)):

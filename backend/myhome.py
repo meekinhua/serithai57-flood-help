@@ -187,7 +187,16 @@ class ContactBody(BaseModel):
     vulnerable: List[Literal["elder", "bedridden", "child", "alone", "disabled"]] = Field(default_factory=list, max_length=5)
 
 
-def build_router(db, rate_limit, require_admin, locate_house, learn_address, norm_house, sois: dict, buildings: list, extras=None) -> APIRouter:
+def _inside(p, g) -> bool:
+    c = False
+    for i in range(len(g)):
+        (a1, b1), (a2, b2) = g[i - 1], g[i]
+        if (a1 > p[0]) != (a2 > p[0]) and p[1] < (b2 - b1) * (p[0] - a1) / (a2 - a1) + b1:
+            c = not c
+    return c
+
+
+def build_router(db, rate_limit, require_admin, locate_house, learn_address, norm_house, sois: dict, buildings: list, extras=None, shapes_fn=None) -> APIRouter:
     router = APIRouter(prefix="/api")
 
     def clean(house: str) -> str:
@@ -352,32 +361,79 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         return int(m.group(1)) if m else None
 
     # ---------- 🏙️ 13 Oct: the 3D map paints each house by its soi, from the address book members filled in ----------
-    _m3d = {"at": 0, "soi": {}, "house": {}}
+    _m3d = {"at": 0, "key": None, "soi": {}, "house": {}}
 
     async def map3d_index():
-        if time.time() - _m3d["at"] < 120:
+        """Building → house number and soi, from what members pinned (their own house + neighbours') and the soi lines.
+
+        Rebuilt as soon as a pin or a building changes (checked at most every 10 s), so a member's work shows at once."""
+        if time.time() - _m3d["at"] < 10:
+            return _m3d
+        n_pins = await db.addresses.count_documents({"lat": {"$ne": None}})
+        last = await db.addresses.find_one({"lat": {"$ne": None}}, {"_id": 0, "updated_at": 1}, sort=[("updated_at", -1)])
+        key = (n_pins, str((last or {}).get("updated_at")), len(buildings), buildings[-1][2] if buildings else 0)
+        if key == _m3d["key"]:
+            _m3d["at"] = time.time()
             return _m3d
         pins = [(d["lat"], d["lng"], d["house"], d.get("soi")) async for d in db.addresses.find({"lat": {"$ne": None}}, {"_id": 0, "house": 1, "soi": 1, "lat": 1, "lng": 1})]
+        shapes = await shapes_fn() if shapes_fn else [{"id": bid, "g": None, "c": (lat, lng)} for lat, lng, bid in list(buildings)]
+        for b in shapes:
+            g = b.get("g")
+            b["c"] = b.get("c") or (sum(q[0] for q in g) / len(g), sum(q[1] for q in g) / len(g))
+            b["box"] = (min(q[0] for q in g), max(q[0] for q in g), min(q[1] for q in g), max(q[1] for q in g)) if g else None
         segs = [(name, a_, b_) for name, sv in sois.items() for line in sv.get("lines") or [] for a_, b_ in zip(line, line[1:])]
-        soi_of, house_of = {}, {}
-        for lat, lng, bid in list(buildings):
+        soi_of, house_of, orphans, housed = {}, {}, [], []
+        # 1) each pin → the building it sits in (else one whose centre is within 12 m)
+        for lat, lng, h, so in pins:
             p = (lat, lng)
-            near = min(((metres(p, (a, b)), h, so) for a, b, h, so in pins if abs(a - lat) < 0.0002 and abs(b - lng) < 0.0002), default=None)
-            if near and near[0] <= 12:
-                house_of[bid] = near[1]
-                if near[2]:
-                    soi_of[bid] = near[2]
-                    continue
+            hit = next((b for b in shapes if b["box"] and b["box"][0] <= lat <= b["box"][1] and b["box"][2] <= lng <= b["box"][3] and _inside(p, b["g"])), None)
+            if not hit:
+                near = min(((metres(p, b["c"]), b) for b in shapes if abs(b["c"][0] - lat) < 0.0002 and abs(b["c"][1] - lng) < 0.0002), default=None, key=lambda x: x[0])
+                hit = near[1] if near and near[0] <= 12 else None
+            if not hit:
+                orphans.append((lat, lng, h))
+                continue
+            housed.append(f"mb:pin:{h}")
+            bid = hit.get("grp") or hit["id"]
+            if bid not in house_of or (h == house_of[bid] and so):
+                house_of[bid] = h
+            house_of.setdefault(hit["id"], h)
+            if so:
+                soi_of.setdefault(hit["id"], so)
+        # 2) buildings nobody pinned → the nearest soi line (45 m), else the soi of the nearest pin (25 m)
+        for b in shapes:
+            if b["id"] in soi_of:
+                continue
+            p = b["c"]
             best = (1e9, None)
             for name, a_, b_ in segs:
-                if min(a_[0], b_[0]) - 0.0005 > lat or max(a_[0], b_[0]) + 0.0005 < lat or min(a_[1], b_[1]) - 0.0005 > lng or max(a_[1], b_[1]) + 0.0005 < lng:
+                if min(a_[0], b_[0]) - 0.0005 > p[0] or max(a_[0], b_[0]) + 0.0005 < p[0] or min(a_[1], b_[1]) - 0.0005 > p[1] or max(a_[1], b_[1]) + 0.0005 < p[1]:
                     continue
                 d = to_segment(p, a_, b_)
                 if d < best[0]:
                     best = (d, name)
             if best[0] <= 45:
-                soi_of[bid] = best[1]
-        _m3d.update(at=time.time(), soi=soi_of, house=house_of)
+                soi_of[b["id"]] = best[1]
+                continue
+            near = min(((metres(p, (a, c)), so) for a, c, _, so in pins if so and abs(a - p[0]) < 0.0003 and abs(c - p[1]) < 0.0003), default=None)
+            if near and near[0] <= 25:
+                soi_of[b["id"]] = near[1]
+        # group members share the lead's soi
+        for b in shapes:
+            if b.get("grp") and b["grp"] in soi_of:
+                soi_of[b["id"]] = soi_of[b["grp"]]
+        # 3) a pin with no building under it: the pinner's vote for "there is a house here" (one more report adds it)
+        for lat, lng, h in orphans:
+            await db.building_suggestions.update_one(
+                {"id": f"mb:pin:{h}"},
+                {"$setOnInsert": {"id": f"mb:pin:{h}", "kind": "missing", "src": "member", "status": "open", "at": time.time(),
+                                  "g": [[round(lat - 4.5e-5, 6), round(lng - 3.2e-5, 6)], [round(lat - 4.5e-5, 6), round(lng + 3.2e-5, 6)], [round(lat + 4.5e-5, 6), round(lng + 3.2e-5, 6)], [round(lat + 4.5e-5, 6), round(lng - 3.2e-5, 6)]],
+                                  "votes": [h], "ips": ["pin"], "label": f"หมุดบ้าน {h} ยังไม่มีอาคาร"}},
+                upsert=True,
+            )
+        # …and once a building stands there (added by anyone), that vote is done
+        await db.building_suggestions.delete_many({"id": {"$in": housed}, "status": "open"})
+        _m3d.update(at=time.time(), key=key, soi=soi_of, house=house_of)
         return _m3d
 
     @router.get("/map3d/sois")
