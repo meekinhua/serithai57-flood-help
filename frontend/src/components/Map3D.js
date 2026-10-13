@@ -669,6 +669,9 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     const tree = kit.tree;
     const selLead = selRef.current;
     const linked = new Set(linkRef.current);
+    const hint = toolRef.current === "hint";
+    const fl = new Set(suggRef.current.filter((x) => x.kind === "floors").map((x) => x.ref));
+    const ex = new Set(suggRef.current.filter((x) => x.kind === "extra").map((x) => x.ref));
     for (const b of data.current) {
       if (b.s === "removed") continue;
       B.setOwner(b.id);
@@ -679,6 +682,11 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
       if (b.t === "school") [wall, roof] = ["#FFF3C4", "#8A97A6"];
       if (selLead != null && lead === selLead) wall = "#FFD43B";
       if (linked.has(b.id)) wall = "#7DE3F4";
+      if (hint) {
+        [wall, roof] = ["#F2F2EE", "#C9CDD2"];
+        if (fl.has(b.id)) [wall, roof] = ["#FFC46B", "#F08C00"];
+        if (ex.has(b.id)) [wall, roof] = ["#FF9A9A", "#E5484D"];
+      }
       buildThing(B, b, wall, roof, W.segs, kit);
     }
     buildTrees(B, tree, W.green, W.places);
@@ -718,6 +726,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
     if (await call(`/admin/buildings/suggestions/${encodeURIComponent(x.id)}/${verb}`, {})) {
       showSugg(suggRef.current.filter((y) => y.id !== x.id));
       setPick(null);
+      rebuild();
       popMid(verb === "accept" ? (x.kind === "missing" ? "🏠 เพิ่มแล้ว" : x.kind === "floors" ? `📏 ${x.lv} ชั้น` : "💥 เอาออกแล้ว") : "👋 ข้ามแล้ว");
       setDone((n) => n + 1);
     }
@@ -988,6 +997,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
             m.addLayer({ id: "sugg", type: "fill-extrusion", source: "sugg", paint: { "fill-extrusion-color": ["case", ["get", "annex"], "#7CD4FF", "#0096FF"], "fill-extrusion-height": ["get", "h"], "fill-extrusion-opacity": 0.6 } });
             m.addSource("extra", { type: "geojson", data: extraGeo(suggRef.current) });
             m.addLayer({ id: "extra", type: "line", source: "extra", paint: { "line-color": ["get", "c"], "line-width": 3, "line-dasharray": [1.5, 1] } });
+            for (const id of ["sugg", "extra"]) m.setLayoutProperty(id, "visibility", "none");
           }
 
           const origin = ml.MercatorCoordinate.fromLngLat([LNG0, LAT0], 0);
@@ -1161,6 +1171,10 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    const m = map.current;
+    if (m?.getLayer("sugg")) for (const id of ["sugg", "extra"]) m.setLayoutProperty(id, "visibility", tool === "hint" ? "visible" : "none");
+    if (ready) rebuild();
+    setPick(null);
     if (map.current) map.current.getCanvas().style.cursor = tool === "look" ? "" : "crosshair";
     if (tool !== "look" && selRef.current != null) select(null);
   }, [tool, ready]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1174,7 +1188,7 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
 
   const hint = linking
     ? `แตะอาคารที่เป็นบ้านเดียวกัน (${linking.length} อาคาร)`
-    : { look: "แตะอาคารเพื่อแก้ไข", build: `แตะที่ว่าง วาง ${KINDS[kind].icon} ${KINDS[kind].label}`, up: "แตะบ้าน +1 ชั้น", down: "แตะบ้าน −1 ชั้น", remove: "แตะอาคารที่ไม่มีจริง เพื่อทุบทิ้ง", hint: `💡 ข้อเสนอ ${sugg.length} · ฟ้า = อาจขาด · เส้นประแดง = อาจเกิน` }[tool];
+    : { look: "แตะอาคารเพื่อแก้ไข", build: `แตะที่ว่าง วาง ${KINDS[kind].icon} ${KINDS[kind].label}`, up: "แตะบ้าน +1 ชั้น", down: "แตะบ้าน −1 ชั้น", remove: "แตะอาคารที่ไม่มีจริง เพื่อทุบทิ้ง", hint: `💡 ข้อเสนอ ${sugg.length} · แตะอันที่มีสีเพื่อตัดสินใจ` }[tool];
   const pad = "flex h-11 min-w-[44px] items-center justify-center rounded-xl bg-[#F1F4F2] px-2 text-lg font-bold shadow-[0_2px_0_#C9D2CC] active:scale-90 disabled:opacity-40";
   const kindOf = sel ? KINDS[sel.t] || KINDS.house : null;
   const flatKind = sel && FLATS.has(sel.t);
@@ -1256,9 +1270,16 @@ export default function Map3D({ edit = false, onClose, className = "" }) {
                   </>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="flex w-full flex-wrap gap-x-3 gap-y-1 text-xs font-bold">
+                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#0096FF" }} />อาจขาด</span>
+                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#7CD4FF" }} />ส่วนต่อเติม</span>
+                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#F08C00" }} />เสนอเปลี่ยนชั้น</span>
+                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px]" style={{ background: "#E5484D" }} />อาจเกิน</span>
+                      <span><i className="mr-1 inline-block h-3 w-3 rounded-sm align-[-1px] border" style={{ background: "#F2F2EE" }} />บ้านเดิม</span>
+                    </span>
                     <span className="min-w-0 flex-1">
                       {sugg.length
-                        ? `อาคารที่อาจขาด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length} (ฟ้าเข้ม) · ส่วนต่อเติม ${sugg.filter((x) => x.annex).length} (ฟ้าอ่อน) · อาจเกิน ${sugg.filter((x) => x.kind === "extra").length} (เส้นประแดง) · จำนวนชั้นจากภาพ ${sugg.filter((x) => x.kind === "floors").length} (เส้นประส้ม) · แตะเพื่อดูทีละหลัง`
+                        ? `อาคารที่อาจขาด ${sugg.filter((x) => x.kind === "missing" && !x.annex).length}  · ส่วนต่อเติม ${sugg.filter((x) => x.annex).length} · เปลี่ยนชั้น ${sugg.filter((x) => x.kind === "floors").length} · อาจเกิน ${sugg.filter((x) => x.kind === "extra").length} · แตะเพื่อดูทีละหลัง`
                         : "ยังไม่มีข้อเสนอ · รอแอดมินรันการเทียบข้อมูล"}
                     </span>
                     {sugg.some((x) => x.kind === "missing" && !x.annex) && (
