@@ -76,6 +76,66 @@ def now():
     return datetime.now(timezone.utc)
 
 
+# ---------- per-house rich menu: the village menu + a strip on top "🏠 4/917 · ซอย 16 · รถขยะ จ.·พฤ." ----------
+# Text pieces are pre-rendered (tools/line_menu_assets.py) because the server has no Thai font; we only paste them.
+MENU_DIR = Path(__file__).parent / "data" / "line_menu"
+DAY_ABBR = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]
+_glyphs = {}
+
+
+def _glyph(tok: str):
+    from PIL import Image
+    if not _glyphs:
+        _glyphs["m"] = json.loads((MENU_DIR / "glyphs.json").read_text(encoding="utf-8"))
+    g = _glyphs["m"]["glyphs"].get(tok)
+    if not g:
+        return None
+    if tok not in _glyphs:
+        _glyphs[tok] = Image.open(MENU_DIR / "glyphs" / g["file"]).convert("RGBA")
+    return _glyphs[tok]
+
+
+def menu_image(house: str, soi: str, days: str | None, thai_days: list) -> bytes:
+    """2500×1686 JPEG: base.png with the house / soi / truck days written into the top strip."""
+    import io
+    from PIL import Image
+    base = Image.open(MENU_DIR / "base.png").convert("RGB")
+    words = [list(house), ["·"], ["ซอย"], list(soi)]
+    if days:
+        abbr = [DAY_ABBR[i] for i, d in enumerate(thai_days) if d in days]
+        if abbr:
+            words += [["·"], ["รถขยะ"], sum(([a, "dot_y"] for a in abbr), [])[:-1]]
+    pieces, gap = [], 30
+    for w in words:
+        pieces += [_glyph(t) for t in w if _glyph(t) is not None] + [None]  # None = a word gap
+    width = sum(gap if p is None else p.width for p in pieces)
+    x0, room = 250, 2500 - 250 - 40
+    scale = min(1.0, room / max(width, 1))
+    x, strip = x0, _glyphs["m"]["strip"]
+    for p in pieces:
+        if p is None:
+            x += int(gap * scale)
+            continue
+        im = p if scale == 1 else p.resize((max(1, int(p.width * scale)), max(1, int(p.height * scale))))
+        base.paste(im, (x, (strip - im.height) // 2), im)
+        x += im.width
+    out = io.BytesIO()
+    base.save(out, "JPEG", quality=86, optimize=True)
+    return out.getvalue()
+
+
+def menu_areas() -> list:
+    """Tap areas: the strip → บ้านฉัน; the 6 tiles as on the village menu (OA Manager menu 20408889)."""
+    strip, w, h = 230, [833, 833, 834], (1686 - 230) // 2
+    acts = [{"type": "message", "text": "เบอร์ฉุกเฉิน"}, {"type": "uri", "uri": "https://serithai57.com/#issues"}, {"type": "uri", "uri": "https://serithai57.com/#pros"},
+            {"type": "message", "text": "หาย"}, {"type": "message", "text": "ขยะ"}, {"type": "uri", "uri": "https://serithai57.com/#map"}]
+    areas = [{"bounds": {"x": 0, "y": 0, "width": 2500, "height": strip}, "action": {"type": "message", "text": "บ้านฉัน"}}]
+    for i, a in enumerate(acts):
+        r, c = divmod(i, 3)
+        areas.append({"bounds": {"x": sum(w[:c]), "y": strip + r * h, "width": w[c], "height": h if r == 0 else 1686 - strip - h}, "action": a})
+    return areas
+
+
 def norm(t: str) -> str:
     return re.sub(r"\s+", " ", (t or "").strip()).lower()
 
@@ -143,9 +203,10 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         cache["at"] = now()
         return cache["creds"]
 
-    def call(method: str, url: str, token: str, body=None, raw=False, timeout=15):
-        data = json.dumps(body, ensure_ascii=False).encode() if body is not None else None
-        req = urllib.request.Request(url, data=data, method=method, headers={"Authorization": f"Bearer {token}", **({"Content-Type": "application/json"} if data else {})})
+    def call(method: str, url: str, token: str, body=None, raw=False, timeout=15, content=None, ctype="image/jpeg"):
+        data = content if content is not None else json.dumps(body, ensure_ascii=False).encode() if body is not None else None
+        hdr = {"Content-Type": ctype} if content is not None else {"Content-Type": "application/json"} if data else {}
+        req = urllib.request.Request(url, data=data if data is not None else (b"" if method == "POST" else None), method=method, headers={"Authorization": f"Bearer {token}", **hdr})
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 b = r.read()
@@ -239,6 +300,46 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 return parity, days, ("วันนี้" if i == 0 else "พรุ่งนี้" if i == 1 else f"{thai_days[d.weekday()]} {d.day}")
         return parity, days, None
 
+    async def set_menu(user: str, house: str, soi: str):
+        """Give this LINE user the menu with their house on it (shared by everyone linked to the same house + soi).
+        Linking a menu to a user is not a message, so it costs nothing; LINE allows 1000 menus per channel."""
+        c = await creds()
+        _, days, _ = await next_waste(soi)
+        key = f"{house}|{soi}|{days or ''}"
+        m = await db.line_menus.find_one({"key": key})
+        if not m:
+            img = await asyncio.to_thread(menu_image, house, soi, days, thai_days)
+            if c.get("dry"):
+                Path(tempfile.gettempdir(), f"line_menu_{house.replace('/', '-')}.jpg").write_bytes(img)
+                menu_id = "dry-" + uuid.uuid4().hex[:8]
+            else:
+                if await db.line_menus.count_documents({}) >= 900:  # keep well under LINE's 1000: drop menus nobody uses
+                    used = set(await db.line_users.distinct("menu_id"))
+                    async for old in db.line_menus.find({"menu_id": {"$nin": list(used)}}, {"menu_id": 1}):
+                        await asyncio.to_thread(call, "DELETE", f"{API}/richmenu/{old['menu_id']}", c["token"])
+                        await db.line_menus.delete_one({"menu_id": old["menu_id"]})
+                body = {"size": {"width": 2500, "height": 1686}, "selected": False, "name": f"home {house}"[:300], "chatBarText": "เมนูหมู่บ้าน", "areas": menu_areas()}
+                code, r = await asyncio.to_thread(call, "POST", f"{API}/richmenu", c["token"], body)
+                if code != 200:
+                    raise RuntimeError(f"richmenu create {code} {r!r}"[:300])
+                menu_id = r["richMenuId"]
+                code, r = await asyncio.to_thread(call, "POST", f"{DATA_API}/richmenu/{menu_id}/content", c["token"], None, False, 30, img)
+                if code != 200:
+                    await asyncio.to_thread(call, "DELETE", f"{API}/richmenu/{menu_id}", c["token"])
+                    raise RuntimeError(f"richmenu image {code} {r!r}"[:300])
+            m = {"key": key, "house": house, "soi": soi, "days": days, "menu_id": menu_id, "at": now()}
+            await db.line_menus.insert_one(dict(m))
+        if not c.get("dry"):
+            code, r = await asyncio.to_thread(call, "POST", f"{API}/user/{user}/richmenu/{m['menu_id']}", c["token"])
+            if code != 200:
+                raise RuntimeError(f"richmenu link {code} {r!r}"[:300])
+        await db.line_users.update_one({"user": user}, {"$set": {"menu_id": m["menu_id"]}})
+
+    async def clear_menu(user: str):
+        c = await creds()
+        if not c.get("dry"):
+            await asyncio.to_thread(call, "DELETE", f"{API}/user/{user}/richmenu", c["token"])  # back to the village menu
+
     async def waste_reply(user: str) -> list:
         home = await home_of(user)
         if home and home.get("soi"):
@@ -270,6 +371,10 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
     async def link(user: str, house: str, soi: str) -> list:
         await db.line_users.update_one({"user": user}, {"$set": {"user": user, "house": house, "soi": soi, "at": now()}}, upsert=True)
         await drop(user)
+        try:
+            await set_menu(user, house, soi)
+        except Exception as e:  # the link stands even if LINE refuses the menu
+            await db.line_log.insert_one({"at": now(), "error": f"menu: {type(e).__name__}: {e}"[:400]})
         return [text(f"✅ จำแล้วครับ บ้าน {house} · ซ.{soi}\nต่อไปพิมพ์ \"ขยะ\" จะบอกวันรถของซอยคุณ แจ้งหายก็ใส่ซอยให้เอง")] + await home_summary(user)
 
     async def home_summary(user: str) -> list:
@@ -423,6 +528,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         if t in UNLINK_WORDS:
             await drop(user)
             r = await db.line_users.delete_one({"user": user})
+            if r.deleted_count:
+                await clear_menu(user)
             return [text("ลบบ้านเลขที่ออกแล้วครับ 👌" if r.deleted_count else "ยังไม่ได้ใส่บ้านเลขที่ไว้ครับ")]
         if t in SET_HOME_WORDS:
             return await home_ask(user)
@@ -539,6 +646,16 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         except Exception as e:  # never let one bad event break the webhook
             await db.line_log.insert_one({"at": now(), "error": f"{type(e).__name__}: {e}"[:400]})
             out = [text("ขอโทษครับ ระบบขัดข้องชั่วคราว ลองใหม่อีกครั้ง หรือแจ้งที่ serithai57.com/#lost")]
+        if out and not await session(user):
+            home = await home_of(user)
+            chip = (f"🏠 {home['house']} · ซ.{home['soi']}", "บ้านฉัน") if home else ("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่")
+            last = out[-1]
+            items = (last.get("quickReply") or {}).get("items", [])
+            same = [i for i in items if i["action"].get("text") == chip[1]]
+            if same:
+                same[0]["action"]["label"] = chip[0][:20]  # e.g. "🏠 บ้านฉัน" → "🏠 4/917 · ซ.16"
+            else:
+                last["quickReply"] = {"items": (qr(chip)["items"] + items)[:13]}
         if out:
             await reply(tok, out)
 
