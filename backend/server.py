@@ -664,7 +664,7 @@ app.include_router(push_router)
 app.include_router(places.build_router(db, require_admin, audit))
 app.include_router(nearby.build_router(db, rate_limit, client_ip, require_admin, locate_house, survey.norm_house, claim_media))
 app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media, staff.SOIS, staff.ZONES["main_road"]))
-app.include_router(line_bot.build_router(db, require_admin, audit, claim_media))  # LINE OA @004forpb: หาย·เจอ by chat (replies only = free)
+app.include_router(line_bot.build_router(db, require_admin, audit, claim_media, locate_house, survey.norm_house, myhome.HOUSE_RE, myhome.soi_parity, myhome.WASTE_ROUNDS, myhome.THAI_DAYS))  # LINE OA @004forpb: หาย·เจอ by chat (replies only = free)
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 @app.middleware("http")
 async def flood_archive_guard(request: Request, call_next):
