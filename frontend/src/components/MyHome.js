@@ -1143,6 +1143,26 @@ function WasteDays({ days }) {
   ));
 }
 
+// ---------- 💬 the LINE OA @004forpb knows this house: opens the chat with "บ้าน 4/917" already typed (the bot links it) ----------
+function LineLinkCard({ house }) {
+  const done = load("lineHouse", "") === house;
+  const href = `https://line.me/R/oaMessage/@004forpb/?${encodeURIComponent(`บ้าน ${house}`)}`;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" onClick={() => save("lineHouse", house)} className="card mt-2 flex min-h-[60px] items-center gap-3 px-4 py-2">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#06C755] text-xl text-white" aria-hidden="true">
+        💬
+      </span>
+      <span className="min-w-0 flex-1">
+        <b className="block text-base leading-tight">{done ? "LINE รู้จักบ้านนี้แล้ว · เปิดแชท" : `ผูกบ้าน ${house} กับ LINE`}</b>
+        <span className="block text-sm text-[#45504A]">{done ? "ถามวันรถขยะ แจ้งหาย ได้ในแชท @004forpb" : "กดแล้วกดส่งข้อความที่พิมพ์ไว้ให้ · LINE จะบอกวันรถขยะของซอยคุณ"}</span>
+      </span>
+      <span className="text-xl text-[#45504A]" aria-hidden="true">
+        ›
+      </span>
+    </a>
+  );
+}
+
 // ---------- 🤝 อาสาข้างบ้าน: what this house can do for the neighbours (backend nearby.py SKILLS) ----------
 const SKILL_LIST = [
   ["fix", "🔧", "ซ่อมเล็กๆ ในบ้าน"],
@@ -1703,6 +1723,7 @@ export default function MyHome({
               </div>
               <InstallApp />
               <PushCard house={info.house} />
+              <LineLinkCard house={info.house} />
               <div className="card stack mt-2 px-4">
                 <PetsRow house={info.house} setErr={setErr} onLostPosted={onLostPosted} onOpenLost={onLost} />
 

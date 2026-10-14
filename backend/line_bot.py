@@ -124,11 +124,16 @@ def menu_image(house: str, soi: str, days: str | None, thai_days: list) -> bytes
     return out.getvalue()
 
 
-def menu_areas() -> list:
+def home_url(house: str, hash_: str = "") -> str:
+    """A site link that opens on this house (the page keeps ?home= as its บ้านฉัน)."""
+    return f"{SITE}/?home={house}" + (f"#{hash_}" if hash_ else "")
+
+
+def menu_areas(house: str) -> list:
     """Tap areas: the strip → บ้านฉัน; the 6 tiles as on the village menu (OA Manager menu 20408889)."""
     strip, w, h = 230, [833, 833, 834], (1686 - 230) // 2
-    acts = [{"type": "message", "text": "เบอร์ฉุกเฉิน"}, {"type": "uri", "uri": "https://serithai57.com/#issues"}, {"type": "uri", "uri": "https://serithai57.com/#pros"},
-            {"type": "message", "text": "หาย"}, {"type": "message", "text": "ขยะ"}, {"type": "uri", "uri": "https://serithai57.com/#map"}]
+    acts = [{"type": "message", "text": "เบอร์ฉุกเฉิน"}, {"type": "uri", "uri": home_url(house, "issues")}, {"type": "uri", "uri": home_url(house, "pros")},
+            {"type": "message", "text": "หาย"}, {"type": "message", "text": "ขยะ"}, {"type": "uri", "uri": home_url(house, "map")}]
     areas = [{"bounds": {"x": 0, "y": 0, "width": 2500, "height": strip}, "action": {"type": "message", "text": "บ้านฉัน"}}]
     for i, a in enumerate(acts):
         r, c = divmod(i, 3)
@@ -318,7 +323,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                     async for old in db.line_menus.find({"menu_id": {"$nin": list(used)}}, {"menu_id": 1}):
                         await asyncio.to_thread(call, "DELETE", f"{API}/richmenu/{old['menu_id']}", c["token"])
                         await db.line_menus.delete_one({"menu_id": old["menu_id"]})
-                body = {"size": {"width": 2500, "height": 1686}, "selected": False, "name": f"home {house}"[:300], "chatBarText": "เมนูหมู่บ้าน", "areas": menu_areas()}
+                body = {"size": {"width": 2500, "height": 1686}, "selected": False, "name": f"home {house}"[:300], "chatBarText": "เมนูหมู่บ้าน", "areas": menu_areas(house)}
                 code, r = await asyncio.to_thread(call, "POST", f"{API}/richmenu", c["token"], body)
                 if code != 200:
                     raise RuntimeError(f"richmenu create {code} {r!r}"[:300])
@@ -347,7 +352,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             if days:
                 head = (f"🚛 ซ.{home['soi']} (ซอยเลข{'คู่' if parity == 'even' else 'คี่'}) รถเก็บขยะ {days}\nรอบต่อไป: {nxt}"
                         + (" · มัดถุงวางหน้าบ้านคืนนี้" if nxt == "พรุ่งนี้" else ""))
-                return [text(f"{head}\n\n🔔 อยากให้เตือนคืนก่อนรถมา: serithai57.com › บ้านฉัน › เปิดแจ้งเตือน\n\n{WASTE_MORE}", qr(("🏠 บ้านฉัน", "บ้านฉัน")))]
+                return [text(f"{head}\n\n🔔 อยากให้เตือนคืนก่อนรถมา: เปิด {home_url(home['house'])} แล้วกด เปิดแจ้งเตือน\n\n{WASTE_MORE}", qr(("🏠 บ้านฉัน", "บ้านฉัน")))]
         even, odd = (await next_waste("2"))[1], (await next_waste("1"))[1]
         return [text(f"🚛 รถเก็บขยะประจำ\n• ซอยเลขคู่: {even}\n• ซอยเลขคี่: {odd}\n\n🏠 บอกบ้านเลขที่ครั้งเดียว ครั้งหน้าพิมพ์ \"ขยะ\" จะบอกวันรถของซอยคุณเลย\n\n{WASTE_MORE}",
                      qr(("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่")))]
@@ -391,7 +396,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         lines.append(f"📍 ปัญหาในซอยที่ยังไม่แก้ {issues} เรื่อง" if issues else "📍 ซอยคุณไม่มีปัญหาค้าง 👍")
         if lost:
             lines.append(f"🐾 หาย·เจอ ในซอยคุณ {lost} รายการ")
-        lines.append("\nดูเต็มๆ (เงินเยียวยา ไฟ น้ำ ช่าง): serithai57.com")
+        lines.append(f"\nดูเต็มๆ (เงินเยียวยา ไฟ น้ำ ช่าง) เปิดที่บ้านคุณเลย:\n{home_url(home['house'])}")
         return [text("\n".join(lines), qr(("🚛 รถขยะ", "ขยะ"), ("🐾 หาย·เจอ", "หาย"), ("เปลี่ยนบ้าน", "เปลี่ยนบ้าน")))]
 
     # ---------- the list ----------
