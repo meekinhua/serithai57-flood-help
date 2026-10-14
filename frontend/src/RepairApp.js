@@ -1,18 +1,5 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API, api, load, save, viewerId } from "./api";
-// 15 Oct: links from the LINE bot carry ?home=4/917 — that house becomes this phone's บ้านฉัน (no typing it twice)
-(() => {
-  try {
-    const p = new URLSearchParams(window.location.search);
-    const h = (p.get("home") || "").trim();
-    if (!/^\d{1,3}\/\d{1,5}/.test(h)) return;
-    save("myHouse", h);
-    save("lineHouse", h); // this phone came from LINE with that house: the "ผูกกับ LINE" card can say so
-    p.delete("home");
-    const q = p.toString();
-    window.history.replaceState(window.history.state, "", window.location.pathname + (q ? `?${q}` : "") + window.location.hash);
-  } catch {}
-})();
 import { HOTLINE_GROUPS, ISSUE_TYPES, LEND_KINDS, VILLAGE_NAME, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
 import Announcements, { UrgentBar } from "./components/Announcements";
@@ -40,6 +27,19 @@ import FloodTuck, { useFloodTools } from "./components/FloodTuck";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, HireList, IssueBoard, IssueCard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
+// 15 Oct: links from the LINE bot carry ?home=4/917 — that house becomes this phone's บ้านฉัน (no typing it twice)
+(() => {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const h = (p.get("home") || "").trim();
+    if (!/^\d{1,3}\/\d{1,5}/.test(h)) return;
+    save("myHouse", h);
+    save("lineHouse", h); // this phone came from LINE with that house: the "ผูกกับ LINE" card can say so
+    p.delete("home");
+    const q = p.toString();
+    window.history.replaceState(window.history.state, "", window.location.pathname + (q ? `?${q}` : "") + window.location.hash);
+  } catch {}
+})();
 const Map3D = lazy(() => import("./components/Map3D"));
 
 // ซ่อมบ้าน mode (2 Oct 2026): the water is gone. Lend & borrow, ask for hands, tradesmen with neighbours'
