@@ -48,12 +48,19 @@ POSTS_PER_DAY = 5
 OA_KEYWORDS = {  # exactly the OA Manager's keyword lists as set on 14 Oct (keep in sync if they change)
     "เบอร์ฉุกเฉิน", "เบอร์โทร", "รปภ", "ฉุกเฉิน",  # เบอร์ฉุกเฉิน
     "เมนูทั้งหมด", "เมนู", "menu", "เว็บ",  # เมนูทั้งหมด
-    "ขยะ", "รถขยะ", "วันรถขยะ", "ทิ้งขยะ",  # ขยะ
     "ไฟดับ", "ไฟรั่ว", "ไฟถนน",  # ไฟดับ
     "ช่าง", "ร้าน", "หาช่าง", "ซ่อม", "ประปา",  # ช่าง ร้าน
     "บริจาค", "สลิป", "บัญชี", "ยอดบริจาค",  # บริจาค
     "แผนที่", "น้ำท่วม", "ระดับน้ำ",  # แผนที่ น้ำท่วม
-}  # (the OA "หาย เจอ" reply — หาย/เจอ/หมา/แมว — must be switched off: the bot answers those now)
+}  # (the OA "หาย เจอ" and "ขยะ" replies must be switched off: the bot answers those now, per soi)
+WASTE_WORDS = {"ขยะ", "รถขยะ", "วันรถขยะ", "ทิ้งขยะ", "🚛 รถขยะ", "รถขยะซอยฉัน"}
+HOME_WORDS = {"บ้านฉัน", "🏠 บ้านฉัน", "บ้านเลขที่"}
+SET_HOME_WORDS = {"เปลี่ยนบ้าน", "ใส่บ้านเลขที่", "🏠 ใส่บ้านเลขที่", "ผูกบ้าน", "ตั้งบ้าน"}
+UNLINK_WORDS = {"ลบบ้าน", "เลิกผูก", "ลบบ้านเลขที่", "ลืมบ้าน"}
+HOUSE_IN_TEXT = re.compile(r"^(?:บ้าน(?:เลขที่)?\s*)?(4\s*[/.\-]\s*\d{1,5}(?:/\d{1,3})?[ก-ฮ]?)$")
+BKK = timezone(timedelta(hours=7))
+WASTE_MORE = ("• กองขยะค้าง / มีคนเอามาทิ้ง แจ้งพร้อมปักหมุด serithai57.com/#issues\n• แจ้ง กทม. 1555 หรือ Traffy Fondue\n"
+              "• ขยะชิ้นใหญ่ จ้างรถเอง ทิ้งฟรีที่ตลาดหัวมุมเก่า (ถ.ประเสริฐมนูกิจ) 06:00–18:00\n• วิธีแยกขยะ serithai57.com/#waste")
 LIST_WORDS = {"หาย", "เจอ", "หายเจอ", "หาย·เจอ", "หาย เจอ", "สัตว์หาย", "ของหาย", "ดูประกาศ", "แมว", "หมา", "แมวหาย", "หมาหาย", "สุนัข", "สุนัขหาย"}
 CANCEL_WORDS = {"ยกเลิก", "cancel", "เลิก", "❌ ยกเลิก"}
 CAT_TH = {"dog": "หมา", "cat": "แมว", "pet": "สัตว์เลี้ยง", "item": "ของ", "document": "เอกสาร", "vehicle": "รถ", "other": "อื่นๆ"}
@@ -61,7 +68,7 @@ CAT_ICON = {"dog": "🐶", "cat": "🐱", "pet": "🐾", "item": "🎒", "docume
 FALLBACK = (
     "ขอบคุณที่ทักมาครับ 🙏\n\nบัญชีนี้ตอบอัตโนมัติ กดเมนูด้านล่างได้เลย หรือพิมพ์คำเหล่านี้\n"
     "• หาย / เจอ — ดูสัตว์เลี้ยงหาย·เจอ และแจ้งเองได้ในแชทนี้\n• เบอร์ฉุกเฉิน\n• แผนที่ / น้ำท่วม\n• ช่าง / ร้าน\n"
-    "• ไฟดับ • ขยะ • บริจาค\n• เมนู (ดูทุกอย่าง)\n\nเรื่องในหมู่บ้าน แจ้งได้ที่ serithai57.com ครับ"
+    "• ไฟดับ • ขยะ • บริจาค\n• บ้านฉัน — บอกบ้านเลขที่ครั้งเดียว ได้วันรถขยะและเรื่องของซอยคุณ\n• เมนู (ดูทุกอย่าง)\n\nเรื่องในหมู่บ้าน แจ้งได้ที่ serithai57.com ครับ"
 )
 
 
@@ -124,7 +131,7 @@ class BotCreds(BaseModel):
     token: str = Field(..., min_length=20, max_length=400)
 
 
-def build_router(db, require_admin, audit, claim_media) -> APIRouter:
+def build_router(db, require_admin, audit, claim_media, locate_house, norm_house, house_re, soi_parity, waste_rounds, thai_days) -> APIRouter:
     router = APIRouter(prefix="/api")
     bucket = AsyncIOMotorGridFSBucket(db, bucket_name="media")
     cache = {"at": None, "creds": None}
@@ -211,6 +218,77 @@ def build_router(db, require_admin, audit, claim_media) -> APIRouter:
     async def drop(user: str):
         await db.line_sessions.delete_one({"user": user})
 
+    # ---------- บ้านฉัน: one LINE user ↔ one house (only the number and its soi are kept; "ลบบ้าน" forgets it) ----------
+    async def home_of(user: str) -> dict | None:
+        return await db.line_users.find_one({"user": user}, {"_id": 0})
+
+    async def next_waste(soi: str):
+        """(parity, "จันทร์ · พฤหัส", "พรุ่งนี้") for a soi, from the team's rounds (settings) or the defaults."""
+        rounds = {**waste_rounds, **((await db.settings.find_one({"id": "waste"}, {"_id": 0, "rounds": 1}) or {}).get("rounds") or {})}
+        parity = soi_parity(soi)
+        days = rounds.get(parity) if parity else None
+        if not days:
+            return parity, None, None
+        nowb = datetime.now(BKK)
+        today = nowb.date()
+        for i in range(8):
+            if i == 0 and nowb.hour >= 12:
+                continue  # the trucks come in the morning: after noon "today" has gone
+            d = today + timedelta(days=i)
+            if thai_days[d.weekday()] in days:
+                return parity, days, ("วันนี้" if i == 0 else "พรุ่งนี้" if i == 1 else f"{thai_days[d.weekday()]} {d.day}")
+        return parity, days, None
+
+    async def waste_reply(user: str) -> list:
+        home = await home_of(user)
+        if home and home.get("soi"):
+            parity, days, nxt = await next_waste(home["soi"])
+            if days:
+                head = (f"🚛 ซ.{home['soi']} (ซอยเลข{'คู่' if parity == 'even' else 'คี่'}) รถเก็บขยะ {days}\nรอบต่อไป: {nxt}"
+                        + (" · มัดถุงวางหน้าบ้านคืนนี้" if nxt == "พรุ่งนี้" else ""))
+                return [text(f"{head}\n\n🔔 อยากให้เตือนคืนก่อนรถมา: serithai57.com › บ้านฉัน › เปิดแจ้งเตือน\n\n{WASTE_MORE}", qr(("🏠 บ้านฉัน", "บ้านฉัน")))]
+        even, odd = (await next_waste("2"))[1], (await next_waste("1"))[1]
+        return [text(f"🚛 รถเก็บขยะประจำ\n• ซอยเลขคู่: {even}\n• ซอยเลขคี่: {odd}\n\n🏠 บอกบ้านเลขที่ครั้งเดียว ครั้งหน้าพิมพ์ \"ขยะ\" จะบอกวันรถของซอยคุณเลย\n\n{WASTE_MORE}",
+                     qr(("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่")))]
+
+    async def home_ask(user: str) -> list:
+        await drop(user)
+        await save(user, {"step": "house"})
+        return [text("🏠 บ้านเลขที่อะไรครับ (เช่น 4/917 หรือพิมพ์แค่ 917)\nเก็บไว้แค่บ้านเลขที่กับซอย ลบได้ทุกเมื่อด้วยการพิมพ์ \"ลบบ้าน\"", qr(("❌ ยกเลิก", "ยกเลิก")))]
+
+    async def house_entered(user: str, raw: str) -> list:
+        h = norm_house(re.sub(r"^บ้าน(เลขที่)?", "", raw.strip()))
+        if not house_re.match(h):
+            return [text("ใส่บ้านเลขที่แบบ 4/917 ครับ (พิมพ์แค่ 917 ก็ได้)", qr(("❌ ยกเลิก", "ยกเลิก")))]
+        loc = await locate_house(h)
+        if loc.get("soi"):
+            await save(user, {"step": "house_confirm", "house": h, "soi": loc["soi"]})
+            return [text(f"บ้าน {h} อยู่ ซ.{loc['soi']} ใช่ไหมครับ", qr(("✅ ใช่", "ใช่"), ("ซอยไม่ใช่", "ซอยไม่ใช่"), ("❌ ยกเลิก", "ยกเลิก")))]
+        await save(user, {"step": "house_soi", "house": h})
+        return [text(f"บ้าน {h} อยู่ซอยอะไรครับ (พิมพ์เลขซอย เช่น 16)", qr(("❌ ยกเลิก", "ยกเลิก")))]
+
+    async def link(user: str, house: str, soi: str) -> list:
+        await db.line_users.update_one({"user": user}, {"$set": {"user": user, "house": house, "soi": soi, "at": now()}}, upsert=True)
+        await drop(user)
+        return [text(f"✅ จำแล้วครับ บ้าน {house} · ซ.{soi}\nต่อไปพิมพ์ \"ขยะ\" จะบอกวันรถของซอยคุณ แจ้งหายก็ใส่ซอยให้เอง")] + await home_summary(user)
+
+    async def home_summary(user: str) -> list:
+        home = await home_of(user)
+        if not home:
+            return await home_ask(user)
+        soi = home.get("soi") or ""
+        parity, days, nxt = await next_waste(soi)
+        issues = await db.issues.count_documents({"status": {"$ne": "fixed"}, "soi": soi}) if soi else 0
+        lost = await db.lost.count_documents({"status": "open", "soi": soi}) if soi else 0
+        lines = [f"🏠 บ้าน {home['house']} · ซ.{soi}"]
+        if days:
+            lines.append(f"🚛 รถขยะ {days} · รอบต่อไป {nxt}")
+        lines.append(f"📍 ปัญหาในซอยที่ยังไม่แก้ {issues} เรื่อง" if issues else "📍 ซอยคุณไม่มีปัญหาค้าง 👍")
+        if lost:
+            lines.append(f"🐾 หาย·เจอ ในซอยคุณ {lost} รายการ")
+        lines.append("\nดูเต็มๆ (เงินเยียวยา ไฟ น้ำ ช่าง): serithai57.com")
+        return [text("\n".join(lines), qr(("🚛 รถขยะ", "ขยะ"), ("🐾 หาย·เจอ", "หาย"), ("เปลี่ยนบ้าน", "เปลี่ยนบ้าน")))]
+
     # ---------- the list ----------
     async def list_messages(only: str = "") -> list:
         q = {"status": "open"}
@@ -253,7 +331,8 @@ def build_router(db, require_admin, audit, claim_media) -> APIRouter:
             ex = "เช่น \"แมวส้ม ชื่อส้มจีน ตัวผู้ หูซ้ายแหว่ง ปลอกคอแดง\"" if lost else "เช่น \"หมาพันธุ์ไทย สีน้ำตาล ปลอกคอฟ้า เดินอยู่หน้าซอย\""
             return text(f"บอกลักษณะสั้นๆ ให้คนจำได้ครับ\n{ex}", qr(("❌ ยกเลิก", "ยกเลิก")))
         if step == "soi":
-            return text(("หายแถวซอยไหนครับ" if lost else "เจอที่ซอยไหนครับ") + " (พิมพ์เลขซอย เช่น 16)", qr(("ไม่แน่ใจ", "ไม่แน่ใจ"), ("❌ ยกเลิก", "ยกเลิก")))
+            mine_soi = [(f"ซ.{s['home_soi']} (ซอยบ้านฉัน)", s["home_soi"])] if s.get("home_soi") else []
+            return text(("หายแถวซอยไหนครับ" if lost else "เจอที่ซอยไหนครับ") + " (พิมพ์เลขซอย เช่น 16)", qr(*mine_soi, ("ไม่แน่ใจ", "ไม่แน่ใจ"), ("❌ ยกเลิก", "ยกเลิก")))
         if step == "when":
             return text(("หายตั้งแต่เมื่อไหร่ครับ" if lost else "เจอเมื่อไหร่ครับ") + " (พิมพ์เองได้ เช่น \"เมื่อคืน 2 ทุ่ม\")",
                         qr(("วันนี้", "วันนี้"), ("เมื่อวาน", "เมื่อวาน"), ("2–3 วันก่อน", "2–3 วันก่อน"), ("❌ ยกเลิก", "ยกเลิก")))
@@ -277,7 +356,7 @@ def build_router(db, require_admin, audit, claim_media) -> APIRouter:
         return [ask(s)]
 
     async def start(user: str, kind: str) -> list:
-        s = {"kind": kind, "step": "category", "media": [], "line_name": await display_name(user)}
+        s = {"kind": kind, "step": "category", "media": [], "line_name": await display_name(user), "home_soi": ((await home_of(user)) or {}).get("soi")}
         await drop(user)
         await save(user, s)
         return [ask(s)]
@@ -341,7 +420,33 @@ def build_router(db, require_admin, audit, claim_media) -> APIRouter:
         if t in ("ได้คืนแล้ว", "🎉 ได้คืนแล้ว", "กลับบ้านแล้ว", "ปิดประกาศ"):
             await drop(user)
             return await mine(user)
+        if t in UNLINK_WORDS:
+            await drop(user)
+            r = await db.line_users.delete_one({"user": user})
+            return [text("ลบบ้านเลขที่ออกแล้วครับ 👌" if r.deleted_count else "ยังไม่ได้ใส่บ้านเลขที่ไว้ครับ")]
+        if t in SET_HOME_WORDS:
+            return await home_ask(user)
+        if t in HOME_WORDS:
+            await drop(user)
+            return await home_summary(user)
+        if t == "ไว้ก่อน":
+            return [text("ได้ครับ 👌 ใส่ทีหลังได้ พิมพ์ \"บ้านฉัน\"")]
         s = await session(user)
+        if s and s["step"] in ("house", "house_confirm", "house_soi"):
+            if s["step"] == "house":
+                return await house_entered(user, raw)
+            if s["step"] == "house_confirm":
+                if t in ("ใช่", "✅ ใช่", "ถูก", "ใช่ครับ", "ใช่ค่ะ"):
+                    return await link(user, s["house"], s["soi"])
+                await save(user, {**s, "step": "house_soi"})
+                return [text(f"บ้าน {s['house']} อยู่ซอยอะไรครับ (พิมพ์เลขซอย เช่น 16)", qr(("❌ ยกเลิก", "ยกเลิก")))]
+            m = re.search(r"\d{1,3}(?:/\d{1,2})?", t)
+            if not m:
+                return [text("พิมพ์เลขซอยครับ เช่น 16 หรือ 48/2", qr(("❌ ยกเลิก", "ยกเลิก")))]
+            return await link(user, s["house"], m.group(0))
+        if not s and HOUSE_IN_TEXT.match(raw.strip()):
+            await save(user, {"step": "house"})
+            return await house_entered(user, raw)
         if s:
             step = s["step"]
             if step == "category":
@@ -385,9 +490,12 @@ def build_router(db, require_admin, audit, claim_media) -> APIRouter:
         if t in LIST_WORDS:
             only = "cat" if "แมว" in t else "dog" if ("หมา" in t or "สุนัข" in t) else ""
             return await list_messages(only)
+        if t in WASTE_WORDS:
+            return await waste_reply(user)
         if t in OA_KEYWORDS:
             return []  # the OA Manager's keyword reply answers this one
-        return [text(FALLBACK, qr(("🐾 หาย·เจอ", "หาย"), ("☎️ เบอร์ฉุกเฉิน", "เบอร์ฉุกเฉิน"), ("☰ เมนู", "เมนู")))]
+        linked = await home_of(user)
+        return [text(FALLBACK, qr(*([] if linked else [("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่")]), ("🐾 หาย·เจอ", "หาย"), ("☎️ เบอร์ฉุกเฉิน", "เบอร์ฉุกเฉิน"), ("☰ เมนู", "เมนู")))]
 
     async def on_image(user: str, message_id: str) -> list:
         s = await session(user)
@@ -417,6 +525,10 @@ def build_router(db, require_admin, audit, claim_media) -> APIRouter:
                     out = await on_text(user, m.get("text", ""))
                 elif m["type"] == "image":
                     out = await on_image(user, m["id"])
+            elif ev["type"] == "follow" and not await home_of(user):
+                # the OA greeting has already said hello; this only asks for the house (a reply, so free)
+                out = [text("อีกนิดครับ 🏠 บอกบ้านเลขที่ครั้งเดียว (เช่น 4/917)\nแล้วถามเรื่องรถขยะ ปัญหาในซอย หรือแจ้งหาย จะได้คำตอบของซอยคุณเลย",
+                            qr(("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่"), ("ไว้ก่อน", "ไว้ก่อน")))]
             elif ev["type"] == "postback":
                 data = (ev.get("postback") or {}).get("data", "")
                 if data == "publish":
@@ -456,6 +568,7 @@ def build_router(db, require_admin, audit, claim_media) -> APIRouter:
     async def get_status(admin: dict = Depends(require_admin)):
         c = await db.settings.find_one({"id": "line_bot"}, {"_id": 0, "secret": 0, "token": 0}) or {}
         errors = await db.line_log.find({}, {"_id": 0}).sort("at", -1).to_list(5)
-        return {"configured": bool(c.get("set_at")), "events": c.get("events", 0), "last_event_at": c.get("last_event_at"), "errors": errors}
+        return {"configured": bool(c.get("set_at")), "events": c.get("events", 0), "last_event_at": c.get("last_event_at"), "errors": errors,
+                "houses_linked": await db.line_users.count_documents({})}
 
     return router
