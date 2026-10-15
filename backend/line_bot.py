@@ -97,6 +97,7 @@ def now():
 # ---------- per-house rich menu: the village menu + a strip on top "🏠 4/917 · ซอย 16 · รถขยะ จ.·พฤ." ----------
 # Text pieces are pre-rendered (tools/line_menu_assets.py) because the server has no Thai font; we only paste them.
 MENU_DIR = Path(__file__).parent / "data" / "line_menu"
+MENU_VER = "v2"  # bump when base.png / the tiles change, so every house gets a freshly drawn menu
 DAY_ABBR = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]
 _glyphs = {}
 
@@ -328,7 +329,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         Linking a menu to a user is not a message, so it costs nothing; LINE allows 1000 menus per channel."""
         c = await creds()
         _, days, _ = await next_waste(soi)
-        key = f"{house}|{soi}|{days or ''}"
+        key = f"{MENU_VER}|{house}|{soi}|{days or ''}"
         m = await db.line_menus.find_one({"key": key})
         if not m:
             img = await asyncio.to_thread(menu_image, house, soi, days, thai_days)
@@ -356,7 +357,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             code, r = await asyncio.to_thread(call, "POST", f"{API}/user/{user}/richmenu/{m['menu_id']}", c["token"])
             if code != 200:
                 raise RuntimeError(f"richmenu link {code} {r!r}"[:300])
-        await db.line_users.update_one({"user": user}, {"$set": {"menu_id": m["menu_id"]}})
+        await db.line_users.update_one({"user": user}, {"$set": {"menu_id": m["menu_id"], "menu_ver": MENU_VER}})
 
     async def clear_menu(user: str):
         c = await creds()
@@ -842,6 +843,12 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return
         out: list = []
         try:
+            home = await home_of(user)
+            if home and home.get("menu_ver") != MENU_VER and home.get("soi"):  # an older menu image: redraw it quietly
+                try:
+                    await set_menu(user, home["house"], home["soi"])
+                except Exception as e:
+                    await db.line_log.insert_one({"at": now(), "error": f"menu refresh: {type(e).__name__}: {e}"[:400]})
             if ev["type"] == "message":
                 m = ev["message"]
                 if m["type"] == "text":

@@ -901,8 +901,9 @@ export default function RepairApp() {
                 )}
               </div>
 
-              <div className="mt-5 grid grid-cols-3 gap-2" aria-label="เรื่องอื่นในหมู่บ้าน">
-                {Object.entries(MORE_TABS).map(([k, [icon, text]]) => (
+              <div className="mt-5 grid grid-cols-2 gap-2" aria-label="เรื่องอื่นในหมู่บ้าน">
+                {/* 15 Oct: the after-flood checklist is off the list (still reachable at #guide) */}
+                {Object.entries(MORE_TABS).filter(([k]) => k !== "guide").map(([k, [icon, text]]) => (
                   <button
                     key={k}
                     onClick={() => showTab(k)}
