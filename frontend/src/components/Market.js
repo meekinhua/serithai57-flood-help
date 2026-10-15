@@ -3,6 +3,7 @@ import { api } from "../api";
 import { LEND_CATEGORIES, MARKET_FILTERS, SERVICE_CATEGORIES, timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import { rememberCall } from "./Community";
+import { mapLink } from "./PinField";
 import { notify } from "../notify";
 import { ContactButton, NameField, input, label, remember, savedContact, telHref, useKeys } from "./RepairBoards";
 
@@ -44,6 +45,11 @@ function ShopCard({ s }) {
         <b className="block break-words leading-snug">{s.name}</b>
         {s.detail && <p className="line-clamp-2 text-sm text-[#33403A]">{s.detail}</p>}
         {(s.area || s.price) && <p className="text-sm text-[#45504A]">{[s.price, s.area].filter(Boolean).join(" · ")}</p>}
+        {mapLink(s) && (
+          <a href={mapLink(s)} target="_blank" rel="noreferrer" className="inline-block text-sm font-semibold text-[#1F4F8A] underline">
+            🗺️ ดูแผนที่ร้าน
+          </a>
+        )}
         {dial(s.phone).length >= 9 ? (
           <a href={`tel:${dial(s.phone)}`} onClick={() => rememberCall(s)} className="mt-1 flex min-h-[44px] items-center justify-center rounded-xl bg-[#15201A] font-bold text-white">
             📞 โทร {s.phone}
@@ -217,6 +223,11 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
         {x.preorder && <p className="text-[15px] font-bold text-[#1E6B47]">📝 รับสั่งล่วงหน้า · ทำตามออเดอร์</p>}
         {(x.soi || x.when) && <p className="text-[15px]">{[x.soi && `📍 ซ.${x.soi}`, x.when && `🕒 ${x.when}`].filter(Boolean).join(" · ")}</p>}
         {x.pickup && <p className="text-[15px]">🛵 {x.pickup}</p>}
+        {mapLink(x) && (
+          <a href={mapLink(x)} target="_blank" rel="noreferrer" className="inline-block text-[15px] font-semibold text-[#1F4F8A] underline">
+            🗺️ ดูแผนที่จุดรับของ
+          </a>
+        )}
         {x.detail && <p className="line-clamp-4 whitespace-pre-wrap break-words text-[15px] text-[#33403A]">{x.detail}</p>}
         {photos.length > 1 && (
           <div className="flex gap-2 pt-1">

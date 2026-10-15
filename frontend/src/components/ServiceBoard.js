@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { api, load, save } from "../api";
 import MediaPicker, { mediaState } from "./MediaPicker";
+import PinField from "./PinField";
 import { PRICING, REPAIR_SERVICE_ORDER, SERVICE_CATEGORIES, categoryOf, paymentBadge, timeAgo } from "../config";
 
 // Repair mode lists the after-flood trades first and hides the flood-only ones (boats, food, pets...).
@@ -317,6 +318,7 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [files, setFiles] = useState([]); // photos of the shop / the work
+  const [pin, setPin] = useState(null); // 16 Oct: optional map pin
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   async function submit(e) {
@@ -326,7 +328,7 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
     setBusy(true);
     setError("");
     try {
-      const base = { ...form, media_ids: mediaState(files).ids };
+      const base = { ...form, media_ids: mediaState(files).ids, ...(pin ? { lat: pin.lat, lng: pin.lng } : {}) };
       const body = repair && !self ? { ...base, detail: `${form.detail}${form.detail ? " · " : ""}เพื่อนบ้านแนะนำ` } : base;
       const s = await api("/services", { method: "POST", body: JSON.stringify(body) });
       save("serviceKeys", { ...load("serviceKeys", {}), [s.id]: s.edit_key });
@@ -440,6 +442,7 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
       )}
       <p className="text-sm text-neutral-500">ชื่อ เบอร์ และ LINE จะแสดงให้ทุกคนเห็น</p>
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
+      <PinField value={pin} onChange={setPin} title="ร้าน / ที่ทำงาน อยู่ตรงไหน" button="🗺️ ปักหมุดบนแผนที่ (ไม่บังคับ)" />
       <div>
         <p className="mb-1 font-medium">รูปร้าน / ผลงาน (ไม่บังคับ · ช่วยให้คนเลือกง่ายขึ้น)</p>
         <MediaPicker items={files} setItems={setFiles} max={3} />

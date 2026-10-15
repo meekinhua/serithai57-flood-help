@@ -3,6 +3,7 @@ import { api, load, save } from "../api";
 import { MediaStrip } from "./MediaGallery";
 import { JOB_TYPES, LEND_CATEGORIES, LEND_KINDS, SERVICE_CATEGORIES, timeAgo } from "../config";
 import { FORUM_CATEGORIES } from "./Forum";
+import { mapLink } from "./PinField";
 
 // 7 Oct 2026: "เพื่อนบ้านช่วยกัน", redesigned with Claude Design for first-time users (an older neighbour who
 // opens the link from LINE). The most common job, finding a tradesman's number, is one tap from the home page;
@@ -457,6 +458,11 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
               <MediaStrip media={s.media || []} />
               {s.detail && <p className="whitespace-pre-line break-words text-[15px] leading-relaxed text-[#33403A]">{s.detail}</p>}
               {(s.price || s.area) && <p className="text-sm text-[#45504A]">{[s.price, s.area].filter(Boolean).join(" · ")}</p>}
+              {mapLink(s) && (
+                <a href={mapLink(s)} target="_blank" rel="noreferrer" className="inline-block text-sm font-semibold text-[#1F4F8A] underline">
+                  🗺️ ดูแผนที่
+                </a>
+              )}
               <Trust s={s} />
               {s.reports > 0 && <p className="text-sm text-[#B42318]">มีคนแจ้งว่าโทรไม่ติด {s.reports} ครั้ง</p>}
               <div className="flex gap-2 pt-1">
