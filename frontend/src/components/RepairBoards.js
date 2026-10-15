@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { api, load, save } from "../api";
-import { ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, JOB_VERBS, LEND_CATEGORIES, LEND_KINDS, LEND_STATUS, timeAgo } from "../config";
+import { ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, JOB_VERBS, LEND_CATEGORIES, LEND_KINDS, LEND_STATUS, MARKET_CATEGORIES, MARKET_ONLY, timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import { createBaseMap } from "./MapView";
 import LocationPicker from "./LocationPicker";
@@ -17,7 +17,7 @@ const label = "mb-1 block font-medium";
 const telHref = (phone) => `tel:${phone.replace(/[^\d+]/g, "")}`;
 
 // Edit keys live in localStorage; read them on every render so a board sees a key the form just saved.
-function useKeys(store) {
+export function useKeys(store) {
   const [, setTick] = useState(0);
   const keys = load(store, {});
   const add = (id, key) => {
@@ -66,7 +66,7 @@ function Badge({ cls, children }) {
 }
 
 // Tap to show the phone (one item at a time, like the flood board)
-function ContactButton({ path, text = "📞 ดูเบอร์ติดต่อ" }) {
+export function ContactButton({ path, text = "📞 ดูเบอร์ติดต่อ" }) {
   const [c, setC] = useState(null);
   const [err, setErr] = useState("");
   if (c)
@@ -251,6 +251,8 @@ function LendCard({ item: x, editKey, admin, onChanged, onDeleted }) {
       {open && (
         <div className="mt-2 space-y-2">
           {x.detail && <p className="whitespace-pre-wrap break-words">{x.detail}</p>}
+          {x.when && <p className="text-[15px]">🕒 {x.when}</p>}
+          {x.pickup && <p className="text-[15px]">🛵 {x.pickup}</p>}
           <Photos media={x.media} />
           {mine || admin ? <LendOwner item={x} editKey={editKey} onChanged={onChanged} onDeleted={onDeleted} /> : <LendVisitor item={x} onChanged={onChanged} />}
           <History items={x.history} />
@@ -428,7 +430,7 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
 export function LendForm({ kind: initialKind = "lend", onDone }) {
   const c = savedContact();
   const [, addKey] = useKeys("lendKeys");
-  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
+  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
   const [media, setMedia] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -440,7 +442,8 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
     setBusy(true);
     setErr("");
     try {
-      const x = await api("/lend", { method: "POST", body: JSON.stringify({ ...form, media_ids: attached.ids }) });
+      const body = form.kind === "sell" ? form : { ...form, pickup: "", when: "" };
+      const x = await api("/lend", { method: "POST", body: JSON.stringify({ ...body, media_ids: attached.ids }) });
       addKey(x.id, x.edit_key);
       remember(form.name, form.phone);
       save("mySoi", form.soi);
@@ -451,6 +454,9 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
     }
   }
   const want = form.kind === "want";
+  const sell = form.kind === "sell";
+  // selling: the market's choices (homemade first); lend / give / want: the old list without the market-only ones
+  const cats = sell ? MARKET_CATEGORIES.map((k) => [k, LEND_CATEGORIES[k]]) : Object.entries(LEND_CATEGORIES).filter(([k]) => !MARKET_ONLY.includes(k));
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 min-[400px]:grid-cols-4">
@@ -458,7 +464,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
           <button
             type="button"
             key={k}
-            onClick={() => set({ kind: k })}
+            onClick={() => set({ kind: k, ...(form.category && (k === "sell" ? !MARKET_CATEGORIES.includes(form.category) : MARKET_ONLY.includes(form.category)) ? { category: "" } : {}) })}
             aria-pressed={form.kind === k}
             className={`min-h-[44px] rounded-lg text-sm font-semibold ${form.kind === k ? "bg-white shadow" : "text-neutral-600"}`}
           >
@@ -469,7 +475,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
       <fieldset>
         <legend className={label}>เป็นของประเภทไหน *</legend>
         <div className="grid grid-cols-2 gap-2">
-          {Object.entries(LEND_CATEGORIES).map(([k, [emoji, text]]) => (
+          {cats.map(([k, [emoji, text]]) => (
             <button
               type="button"
               key={k}
@@ -495,7 +501,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
           value={form.title}
           onChange={(e) => set({ title: e.target.value })}
           className={input}
-          placeholder={want ? "เช่น บันไดสูง 3 เมตร ขอยืมครึ่งวัน" : "เช่น เครื่องฉีดน้ำแรงดันสูง Karcher K3"}
+          placeholder={want ? "เช่น บันไดสูง 3 เมตร ขอยืมครึ่งวัน" : sell ? "เช่น ขนมกล้วยทำเอง, แกงเขียวหวานไก่" : "เช่น เครื่องฉีดน้ำแรงดันสูง Karcher K3"}
         />
       </div>
       {form.kind === "sell" && (
@@ -503,8 +509,24 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
           <label className={label} htmlFor="lend-price">
             ราคา *
           </label>
-          <input id="lend-price" required maxLength={60} value={form.price} onChange={(e) => set({ price: e.target.value })} className={input} placeholder="เช่น 150 บาท, ต่อรองได้" />
+          <input id="lend-price" required maxLength={60} value={form.price} onChange={(e) => set({ price: e.target.value })} className={input} placeholder="เช่น 50 บาท, กล่องละ 35" />
         </div>
+      )}
+      {sell && (
+        <>
+          <div>
+            <label className={label} htmlFor="lend-when">
+              มีขายเมื่อไหร่
+            </label>
+            <input id="lend-when" maxLength={80} value={form.when} onChange={(e) => set({ when: e.target.value })} className={input} placeholder="เช่น ทุกเช้า 7–9 โมง · สั่งล่วงหน้า 1 วัน" />
+          </div>
+          <div>
+            <label className={label} htmlFor="lend-pickup">
+              รับของที่ไหน
+            </label>
+            <input id="lend-pickup" maxLength={80} value={form.pickup} onChange={(e) => set({ pickup: e.target.value })} className={input} placeholder="เช่น รับที่บ้าน ซ.16 / ส่งในหมู่บ้าน" />
+          </div>
+        </>
       )}
       <div>
         <label className={label} htmlFor="lend-detail">
@@ -517,7 +539,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
           value={form.detail}
           onChange={(e) => set({ detail: e.target.value })}
           className={input}
-          placeholder={want ? "ใช้ทำอะไร ใช้เมื่อไหร่" : "สภาพ / ยืมได้นานเท่าไหร่ / มัดจำไหม / มารับที่ไหน / ต้องใช้ปลั๊กหรือน้ำมัน"}
+          placeholder={want ? "ใช้ทำอะไร ใช้เมื่อไหร่" : sell ? "รสชาติ ขนาด จำนวน สภาพของ" : "สภาพ / ยืมได้นานเท่าไหร่ / มัดจำไหม / มารับที่ไหน / ต้องใช้ปลั๊กหรือน้ำมัน"}
         />
       </div>
       {!want && (
