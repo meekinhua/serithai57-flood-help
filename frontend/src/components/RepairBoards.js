@@ -3,6 +3,7 @@ import L from "leaflet";
 import { api, load, save } from "../api";
 import { ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, JOB_VERBS, LEND_CATEGORIES, LEND_KINDS, LEND_STATUS, MARKET_CATEGORIES, MARKET_ONLY, timeAgo } from "../config";
 import { mediaUrl } from "../media";
+import { currentSub } from "../push";
 import { createBaseMap } from "./MapView";
 import LocationPicker from "./LocationPicker";
 import MediaPicker, { mediaState } from "./MediaPicker";
@@ -13,8 +14,9 @@ import { SPEAKER_RE, SpeakerHint } from "./QuickReport";
 // Same rules as the flood board: no accounts, an edit key in this browser, phones shown one item at a time.
 
 export const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
-const label = "mb-1 block font-medium";
-const telHref = (phone) => `tel:${phone.replace(/[^\d+]/g, "")}`;
+export const label = "mb-1 block font-medium";
+const MADE_TO_ORDER = ["homemade", "dessert", "drinks", "food"]; // ตลาด: these start with "รับสั่งล่วงหน้า" ticked
+export const telHref = (phone) => `tel:${phone.replace(/[^\d+]/g, "")}`;
 
 // Edit keys live in localStorage; read them on every render so a board sees a key the form just saved.
 export function useKeys(store) {
@@ -33,11 +35,11 @@ export function useKeys(store) {
   return [keys, add, drop];
 }
 
-function savedContact() {
+export function savedContact() {
   return load("contact", { name: "", phone: "" });
 }
 
-function remember(name, phone) {
+export function remember(name, phone) {
   save("contact", { ...savedContact(), ...(name ? { name } : {}), ...(phone ? { phone } : {}) });
 }
 
@@ -128,7 +130,7 @@ function History({ items }) {
   );
 }
 
-function NameField({ value, onChange, id, labelText = "ชื่อเล่น *" }) {
+export function NameField({ value, onChange, id, labelText = "ชื่อเล่น *" }) {
   return (
     <div>
       <label className={label} htmlFor={id}>
@@ -430,7 +432,8 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
 export function LendForm({ kind: initialKind = "lend", onDone }) {
   const c = savedContact();
   const [, addKey] = useKeys("lendKeys");
-  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
+  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", preorder: false, soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
+  const [preTouched, setPreTouched] = useState(false);
   const [media, setMedia] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -442,8 +445,10 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
     setBusy(true);
     setErr("");
     try {
-      const body = form.kind === "sell" ? form : { ...form, pickup: "", when: "" };
-      const x = await api("/lend", { method: "POST", body: JSON.stringify({ ...body, media_ids: attached.ids }) });
+      const body = form.kind === "sell" ? form : { ...form, pickup: "", when: "", preorder: false };
+      // a seller's own phone gets "🛎️ ออเดอร์ใหม่" when this item is ordered (only if notifications are already on here)
+      const sub = form.kind === "sell" ? await currentSub().catch(() => null) : null;
+      const x = await api("/lend", { method: "POST", body: JSON.stringify({ ...body, notify_endpoint: sub?.endpoint || "", media_ids: attached.ids }) });
       addKey(x.id, x.edit_key);
       remember(form.name, form.phone);
       save("mySoi", form.soi);
@@ -472,6 +477,11 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
           </button>
         ))}
       </div>
+      {sell && (
+        <p className="rounded-lg bg-[#FFF4D6] p-2.5 text-sm text-[#45504A]">
+          🛍️ ตลาดนี้สำหรับของทำเอง·ทำตามสั่ง·ของเหลือใช้ จากเพื่อนบ้าน · ร้านอาหาร/ร้านค้าที่เปิดขายประจำ ลงที่หน้า <b>ช่าง·ร้าน</b> แทน
+        </p>
+      )}
       <fieldset>
         <legend className={label}>เป็นของประเภทไหน *</legend>
         <div className="grid grid-cols-2 gap-2">
@@ -479,7 +489,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
             <button
               type="button"
               key={k}
-              onClick={() => set({ category: k })}
+              onClick={() => set({ category: k, ...(sell && !preTouched ? { preorder: MADE_TO_ORDER.includes(k) } : {}) })}
               aria-pressed={form.category === k}
               className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.category === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}
             >
@@ -514,6 +524,21 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
       )}
       {sell && (
         <>
+          <label className="flex min-h-[48px] items-start gap-3 rounded-xl border-2 border-[#C9D1CB] bg-white p-3">
+            <input
+              type="checkbox"
+              checked={form.preorder}
+              onChange={(e) => {
+                setPreTouched(true);
+                set({ preorder: e.target.checked });
+              }}
+              className="mt-1 h-5 w-5"
+            />
+            <span>
+              <b>📝 รับสั่งล่วงหน้า · ทำตามออเดอร์</b>
+              <span className="block text-sm text-neutral-600">เพื่อนบ้านกด 🛒 สั่ง/จอง ได้เสมอ ติ๊กนี้ให้รู้ว่าต้องสั่งก่อน · ออเดอร์ขึ้นที่การ์ดของคุณ (เครื่องนี้)</span>
+            </span>
+          </label>
           <div>
             <label className={label} htmlFor="lend-when">
               มีขายเมื่อไหร่

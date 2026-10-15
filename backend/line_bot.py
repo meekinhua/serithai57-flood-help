@@ -11,6 +11,10 @@ free plan's 300 messages a month, so the bot costs nothing however much it is us
   "ลงขาย" / "ขายของ"                   → a short chat: category → photos → what → price → soi → when → name + phone
                                          → confirm → a real ตลาด item, same as the site's form (POST /api/lend)
   "ขายหมดแล้ว" / "ปิดร้าน"              → the person's own open market items → tap one → closed
+  🛒 สั่ง / จอง (button on a card)      → a short chat: how many → when to pick up → name + phone → confirm → an order in
+                                         that item's queue (same as the site's form); homemade sellers cook to order
+  "ออเดอร์"                            → the seller's open orders (name, phone, qty, when) → tap ✅ when handed over;
+                                         a seller with new orders gets a "🛎️ มีออเดอร์ใหม่" line on top of any reply
   "ยกเลิก"                             → drop the chat in progress (either one; one chat per person, and the market's
                                          steps are named m_* so the two chats never read each other's answers)
 
@@ -79,6 +83,8 @@ FALLBACK = (  # 15 Oct: the team reads the chat now
 MARKET_WORDS = {"ตลาด", "ตลาดเพื่อนบ้าน", "ซื้อ", "ของขาย", "ของกิน", "🛍️ ตลาด", "🛍️ ดูตลาด", "ดูตลาด"}
 SELL_WORDS = {"ลงขาย", "ขายของ", "🛍️ ลงขายของ", "ลงขายของ"}
 SOLD_WORDS = {"ขายหมดแล้ว", "✅ ขายหมดแล้ว", "ขายหมด", "ปิดร้าน"}
+ORDER_WORDS = {"ออเดอร์", "ดูออเดอร์", "📋 ออเดอร์", "คำสั่งซื้อ", "ออเดอร์ของฉัน", "order", "orders"}
+PREORDER_HINT = ("สั่ง", "ล่วงหน้า", "พรี", "จอง", "pre")
 MKT_CATS = [("🍲 อาหารทำเอง", "homemade"), ("🧁 ขนม·เบเกอรี่", "dessert"), ("🧋 เครื่องดื่ม", "drinks"),
             ("🧶 งานฝีมือ", "handmade"), ("🪴 ต้นไม้", "plants"), ("📦 ของมือสอง/อื่นๆ", "other")]
 MKT_WORD_CAT = {**{label: c for label, c in MKT_CATS},
@@ -547,11 +553,15 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             body.append({"type": "text", "text": d["price"][:60], "weight": "bold", "size": "lg", "color": "#8F2A1C", "wrap": True})
         if where:
             body.append({"type": "text", "text": where[:100], "size": "sm", "color": "#45504A", "wrap": True, "maxLines": 3})
+        if d.get("preorder"):
+            body.append({"type": "text", "text": "📝 รับสั่งล่วงหน้า", "size": "sm", "weight": "bold", "color": "#1E6B47"})
         b = {
             "type": "bubble", "size": "kilo",
             "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body},
-            "footer": {"type": "box", "layout": "vertical", "contents": [
-                {"type": "button", "style": "primary", "height": "sm", "color": "#1E6B47", "action": {"type": "uri", "label": "ดูรายละเอียด·ติดต่อ", "uri": url}}]},
+            "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": [
+                {"type": "button", "style": "primary", "height": "sm", "color": "#1E6B47",
+                 "action": {"type": "postback", "label": "🛒 สั่ง / จองไว้", "data": f"order:{d['id']}", "displayText": "🛒 สั่ง / จอง"}},
+                {"type": "button", "style": "secondary", "height": "sm", "action": {"type": "uri", "label": "ดูรายละเอียด·โทร", "uri": url}}]},
         }
         media = [m for m in d.get("media") or [] if m.get("type") == "image"]
         if media:
@@ -563,16 +573,17 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         return b
 
     async def market_list() -> list:
-        items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}}, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0}
+        items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}}, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}
                                          ).sort("created_at", -1).to_list(10)
-        chips = qr(("🛍️ ลงขายของ", "ลงขาย"), ("✅ ขายหมดแล้ว", "ขายหมดแล้ว"))
+        chips = qr(("🛍️ ลงขายของ", "ลงขาย"), ("📋 ออเดอร์ของฉัน", "ออเดอร์"), ("✅ ขายหมดแล้ว", "ขายหมดแล้ว"))
         if not items:
             return [text("ตอนนี้ยังไม่มีของขายในตลาดเพื่อนบ้านครับ 🙂\nทำขนม ทำกับข้าว หรือมีของเหลือใช้? กด 🛍️ ลงขายของ ด้านล่างได้เลย", qr(("🛍️ ลงขายของ", "ลงขาย")))]
         bubbles = [market_card(d) for d in items]
         bubbles.append({"type": "bubble", "size": "kilo", "body": {"type": "box", "layout": "vertical", "justifyContent": "center", "spacing": "md", "contents": [
             {"type": "text", "text": "ดูทั้งหมด + แยกตามหมวด", "weight": "bold", "wrap": True, "align": "center"},
             {"type": "button", "style": "secondary", "action": {"type": "uri", "label": "ดูทั้งหมด", "uri": f"{SITE}/#market"}}]}})
-        head = f"🛍️ ตลาดเพื่อนบ้าน {len(items)} รายการล่าสุด · ปัดดูได้ ➡️\nระบบไม่รับเงิน ตกลงกับผู้ขายเอง"
+        head = (f"🛍️ ตลาดเพื่อนบ้าน {len(items)} รายการล่าสุด · ปัดดูได้ ➡️\nของทำเองจากเพื่อนบ้าน กด 🛒 สั่ง/จองไว้ได้ ระบบไม่รับเงิน\n"
+                "(ร้านอาหาร·ร้านค้าที่เปิดประจำ พิมพ์ \"ร้าน\")")
         return [text(head), {"type": "flex", "altText": "ตลาดเพื่อนบ้าน", "contents": {"type": "carousel", "contents": bubbles}, "quickReply": chips}]
 
     MSTEPS = ("m_category", "m_photos", "m_title", "m_price", "m_soi", "m_when", "m_contact", "m_confirm")
@@ -616,7 +627,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                     qr(("✅ ลงขาย", "postback:publish_market"), CANCEL))
 
     def ask_any(s: dict) -> dict:
-        return mask(s) if s.get("flow") == "market" else ask(s)
+        return oask(s) if s.get("flow") == "order" else mask(s) if s.get("flow") == "market" else ask(s)
 
     async def madvance(user: str, s: dict) -> list:
         s["step"] = MSTEPS[MSTEPS.index(s["step"]) + 1]
@@ -683,7 +694,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         cat = s.get("category") if s.get("category") in repair.LEND_CATEGORIES else "other"
         key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
         body = {"name": s["name"], "phone": s["phone"], "kind": "sell", "category": cat, "title": s.get("title", "")[:80] or "ของขาย",
-                "detail": s.get("detail", "")[:400], "soi": s.get("soi", "")[:12], "price": s.get("price", "")[:60], "pickup": "", "when": s.get("when", "")[:80]}
+                "detail": s.get("detail", "")[:400], "soi": s.get("soi", "")[:12], "price": s.get("price", "")[:60], "pickup": "", "when": s.get("when", "")[:80],
+                "preorder": any(w in s.get("when", "").lower() for w in PREORDER_HINT), "notify_endpoint": ""}
         try:
             media = await claim_media(s.get("media", []), f"lend:{item_id}", {"image"})
         except HTTPException:
@@ -697,8 +709,9 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         await db.line_posts.insert_one({"user": user, "id": item_id, "title": doc["title"], "at": t, "type": "market"})
         push.fire(push.on_lend, doc)
         await drop(user)
-        return [text(f"✅ ลงขายแล้วครับ\n{SITE}/#market-{item_id}\n\nเพื่อนบ้านกดดูเบอร์แล้วโทรหาคุณเอง ระบบไม่รับเงิน\nขายหมดแล้ว พิมพ์ \"ขายหมดแล้ว\" ในแชทนี้ เพื่อปิด",
-                     qr(("🛍️ ดูตลาด", "ตลาด")))]
+        return [text(f"✅ ลงขายแล้วครับ\n{SITE}/#market-{item_id}\n\nเพื่อนบ้านกด 🛒 สั่ง/จอง ไว้ได้ หรือโทรหาคุณเอง ระบบไม่รับเงิน\n"
+                     "• มีคนสั่ง บอทจะบอกตอนคุณทักแชทนี้ หรือพิมพ์ \"ออเดอร์\" ดูชื่อ·เบอร์·จำนวน\n• ขายหมดแล้ว พิมพ์ \"ขายหมดแล้ว\" เพื่อปิด",
+                     qr(("📋 ออเดอร์", "ออเดอร์"), ("🛍️ ดูตลาด", "ตลาด")))]
 
     async def market_mine(user: str) -> list:
         ids = [p["id"] async for p in db.line_posts.find({"user": user, "type": "market"}, {"id": 1})]
@@ -718,19 +731,122 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return [text("รายการนี้ปิดไปแล้วครับ")]
         return [text(f"✅ ปิด \"{doc['title'][:40]}\" แล้วครับ ขอบคุณที่ขายให้เพื่อนบ้าน 🙏", qr(("🛍️ ลงขายของ", "ลงขาย")))]
 
+    # ---------- 🛒 สั่ง / จอง (16 Oct): homemade sellers cook to order; the order goes into the item's queue ----------
+    OSTEPS = ("o_qty", "o_pick", "o_contact", "o_confirm")
+
+    def oask(s: dict) -> dict:
+        step, what = s["step"], s.get("title", "")[:40]
+        if step == "o_qty":
+            return text(f"🛒 สั่ง / จอง \"{what}\"\nเอากี่ชิ้น/กี่กล่องครับ (พิมพ์ได้ เช่น \"2 กล่อง ไม่เผ็ด\")",
+                        qr(("1", "1"), ("2", "2"), ("3", "3"), ("5", "5"), CANCEL))
+        if step == "o_pick":
+            return text(f"อยากได้เมื่อไหร่ครับ{(' (ผู้ขายแจ้งว่า ' + s['when'][:40] + ')') if s.get('when') else ''}\nพิมพ์เองได้ เช่น \"เสาร์ 8 โมง\"",
+                        qr(("วันนี้", "วันนี้"), ("พรุ่งนี้เช้า", "พรุ่งนี้เช้า"), ("พรุ่งนี้เย็น", "พรุ่งนี้เย็น"), ("เสาร์-อาทิตย์", "เสาร์-อาทิตย์"), ("ตามสะดวกผู้ขาย", "ตามสะดวกผู้ขาย"), CANCEL))
+        if step == "o_contact":
+            hint = f"\n(ไม่ใส่ชื่อจะใช้ชื่อ LINE \"{s['line_name']}\")" if s.get("line_name") else ""
+            last = [(f"ใช้ {s['last_phone']}", f"{s['last_name']} {s['last_phone']}")] if s.get("last_phone") else []
+            return text(f"ขอชื่อกับเบอร์ให้ผู้ขายโทรยืนยันครับ เช่น \"ฝน 0812345678\"{hint}\nผู้ขายเห็นคนเดียว", qr(*last, CANCEL))
+        lines = [f"🛒 {what}", f"จำนวน {s.get('qty') or '-'}", f"🕒 {s.get('pick') or '-'}", f"☎️ {s.get('name', '')} {s.get('phone', '')}"]
+        return text("เช็กก่อนส่งออเดอร์นะครับ\n\n" + "\n".join(lines) + "\n\nผู้ขายจะโทรยืนยันราคา·เวลารับ ระบบไม่รับเงิน",
+                    qr(("✅ ส่งออเดอร์", "postback:publish_order"), CANCEL))
+
+    async def order_start(user: str, item_id: str) -> list:
+        d = await db.lend_items.find_one({"id": item_id, "kind": "sell"}, {"_id": 0, "title": 1, "status": 1, "when": 1})
+        if not d or d.get("status") == "closed":
+            return [text("รายการนี้ปิดไปแล้วครับ 🙏", qr(("🛍️ ดูตลาด", "ตลาด")))]
+        last = await db.line_buyers.find_one({"user": user}, {"_id": 0}) or {}
+        s = {"flow": "order", "step": "o_qty", "item": item_id, "title": d.get("title", ""), "when": d.get("when", ""),
+             "line_name": await display_name(user), "last_name": last.get("buyer_name", ""), "last_phone": last.get("buyer_phone", "")}
+        await drop(user)
+        await save(user, s)
+        return [oask(s)]
+
+    async def order_step(user: str, s: dict, t: str, raw: str) -> list:
+        step = s["step"]
+        if step == "o_qty":
+            if not t:
+                return [oask(s)]
+            q = raw.strip()[:40]
+            s["qty"] = f"{q} ชิ้น" if re.fullmatch(r"\d{1,3}", q) else q
+        elif step == "o_pick":
+            s["pick"] = raw.strip()[:60]
+        elif step == "o_contact":
+            m = re.search(r"0[\d\s\-]{8,12}", raw)
+            if not m or len(re.sub(r"\D", "", m.group(0))) < 9:
+                return [text("ขอเบอร์โทรด้วยครับ เช่น \"ฝน 0812345678\"", qr(CANCEL))]
+            name = re.sub(r"\s+", " ", raw.replace(m.group(0), " ")).strip(" ,:-") or s.get("line_name") or "ผู้สั่ง"
+            s["phone"], s["name"] = re.sub(r"\D", "", m.group(0))[:15], name[:60]
+        else:
+            return [oask(s)]  # o_confirm: the buttons are on screen
+        s["step"] = OSTEPS[OSTEPS.index(step) + 1]
+        await save(user, s)
+        return [oask(s)]
+
+    async def order_publish(user: str, s: dict) -> list:
+        since = now() - timedelta(days=1)
+        if await db.line_posts.count_documents({"user": user, "type": "order", "at": {"$gte": since}}) >= 10:
+            await drop(user)
+            return [text("วันนี้สั่งครบ 10 ครั้งแล้วครับ โทรหาผู้ขายได้จากหน้าเว็บ")]
+        data = {"name": s["name"], "phone": s["phone"], "qty": s.get("qty", "")[:40], "pick": s.get("pick", "")[:60], "note": ""}
+        doc = await repair.add_to_queue(db, s["item"], data, via="line", line_user=user)
+        await drop(user)
+        if not doc:
+            return [text("รายการนี้ปิดไปแล้วครับ 🙏", qr(("🛍️ ดูตลาด", "ตลาด")))]
+        await db.line_posts.insert_one({"user": user, "id": s["item"], "title": s.get("title", ""), "at": now(), "type": "order"})
+        await db.line_buyers.update_one({"user": user}, {"$set": {"user": user, "buyer_name": s["name"], "buyer_phone": s["phone"], "at": now()}}, upsert=True)
+        return [text(f"✅ ส่งออเดอร์ \"{s.get('title', '')[:40]}\" ให้ผู้ขายแล้วครับ\nผู้ขายจะโทรยืนยันที่ {s['phone']}\n"
+                     f"ถ้าด่วน โทรหาผู้ขายเองได้ที่ {SITE}/#market-{s['item']}", qr(("🛍️ ดูตลาด", "ตลาด")))]
+
+    async def seller_items(user: str) -> list:
+        ids = [p["id"] async for p in db.line_posts.find({"user": user, "type": "market"}, {"id": 1})]
+        if not ids:
+            return []
+        return await db.lend_items.find({"id": {"$in": ids}, "status": {"$ne": "closed"}}, {"_id": 0, "id": 1, "title": 1, "queue": 1}).to_list(20)
+
+    async def unseen_orders(user: str) -> int:
+        return sum(1 for d in await seller_items(user) for q in d.get("queue", []) if not q.get("done") and not q.get("seen"))
+
+    async def seller_orders(user: str) -> list:
+        items = await seller_items(user)
+        rows, chips = [], []
+        for d in items:
+            for q in d.get("queue", []):
+                if q.get("done"):
+                    continue
+                new = "🆕 " if not q.get("seen") else ""
+                rows.append(f"{new}{d['title'][:30]}\n  {q.get('name', '')} ☎️ {q.get('phone', '')}\n  {' · '.join(x for x in (q.get('qty', ''), q.get('pick', ''), q.get('note', '')) if x) or '-'}")
+                chips.append((f"✅ {q.get('name', '')[:8]} ได้แล้ว", f"postback:odone:{d['id']}:{q['id']}"))
+            if any(not q.get("seen") for q in d.get("queue", [])):
+                await db.lend_items.update_one({"id": d["id"]}, {"$set": {"queue.$[q].seen": True}}, array_filters=[{"q.seen": False}])
+        if not items:
+            return [text("ยังไม่มีของที่คุณลงขายผ่าน LINE ที่เปิดอยู่ครับ\n(ลงผ่านเว็บ ดูออเดอร์ได้ที่หน้าตลาด จากเครื่องที่ลง)", qr(("🛍️ ลงขายของ", "ลงขาย")))]
+        if not rows:
+            return [text("ยังไม่มีออเดอร์ใหม่ครับ 🙂 มีคนกดสั่ง บอทจะบอกตอนคุณทักแชทนี้", qr(("🛍️ ดูตลาด", "ตลาด")))]
+        body = "\n\n".join(rows[:15])
+        return [text(f"📋 ออเดอร์ที่ยังไม่ได้ส่ง {len(rows)} รายการ\n\n{body}\n\nโทรยืนยันกับผู้สั่ง แล้วกด ✅ เมื่อได้ของแล้ว"[:4900], qr(*chips[:12]))]
+
+    async def order_done(user: str, item_id: str, entry_id: str) -> list:
+        if not await db.line_posts.find_one({"user": user, "id": item_id, "type": "market"}):
+            return [text("ปิดได้เฉพาะออเดอร์ของร้านคุณครับ")]
+        await db.lend_items.update_one({"id": item_id, "queue.id": entry_id}, {"$set": {"queue.$.done": True, "updated_at": now()}})
+        return [text("✅ เรียบร้อยครับ")] + await seller_orders(user)
+
     # ---------- one incoming message ----------
     async def on_text(user: str, raw: str) -> list:
         t = norm(raw)
         if t in CANCEL_WORDS:
             had = await session(user)
             await drop(user)
-            chip = ("🛍️ ดูตลาด", "ตลาด") if had and had.get("flow") == "market" else ("ดูหาย·เจอ", "หาย")
+            chip = ("🛍️ ดูตลาด", "ตลาด") if had and had.get("flow") in ("market", "order") else ("ดูหาย·เจอ", "หาย")
             return [text("ยกเลิกแล้วครับ 👌" if had else "โอเคครับ", qr(chip))]
         if t in SELL_WORDS:
             return await market_start(user)
         if t in SOLD_WORDS:
             await drop(user)
             return await market_mine(user)
+        if t in ORDER_WORDS:
+            await drop(user)
+            return await seller_orders(user)
         if t in ("แจ้งหาย", "📢 แจ้งสัตว์หาย", "แจ้งสัตว์หาย", "แจ้งของหาย"):
             return await start(user, "lost")
         if t in ("แจ้งเจอ", "🙌 เจอสัตว์หลง", "เจอสัตว์หลง", "แจ้งเจอของ"):
@@ -769,6 +885,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return await house_entered(user, raw)
         if s and s["step"].startswith("m_"):
             return await market_step(user, s, t, raw)
+        if s and s["step"].startswith("o_"):
+            return await order_step(user, s, t, raw)
         if s:
             step = s["step"]
             if step == "category":
@@ -861,14 +979,23 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                             qr(("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่"), ("ไว้ก่อน", "ไว้ก่อน")))]
             elif ev["type"] == "postback":
                 data = (ev.get("postback") or {}).get("data", "")
-                if data in ("publish", "publish_market"):
+                if data in ("publish", "publish_market", "publish_order"):
                     s = await session(user)
                     if s and s["step"] == "confirm":
                         out = await publish(user, s)
                     elif s and s["step"] == "m_confirm":
                         out = await market_publish(user, s)
+                    elif s and s["step"] == "o_confirm":
+                        out = await order_publish(user, s)
+                    elif data == "publish_order":
+                        out = [text("หมดเวลาแล้วครับ พิมพ์ " + '"ตลาด"' + " แล้วกด 🛒 สั่ง อีกครั้ง")]
                     else:
                         out = [text("หมดเวลาแล้วครับ เริ่มใหม่ได้ด้วยการพิมพ์ " + ("\"ลงขาย\"" if data == "publish_market" else "\"แจ้งหาย\""))]
+                elif data.startswith("order:"):
+                    out = await order_start(user, data[6:])
+                elif data.startswith("odone:"):
+                    item_id, _, entry_id = data[6:].partition(":")
+                    out = await order_done(user, item_id, entry_id)
                 elif data.startswith("close:"):
                     out = await close(user, data[6:])
                 elif data.startswith("sold:"):
@@ -877,6 +1004,12 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             await db.line_log.insert_one({"at": now(), "error": f"{type(e).__name__}: {e}"[:400]})
             out = [text("ขอโทษครับ ระบบขัดข้องชั่วคราว ลองใหม่อีกครั้ง หรือแจ้งที่ serithai57.com/#lost")]
         if out and not await session(user):
+            try:  # a seller with orders they haven't seen: one line on top of whatever we answer (a reply, so free)
+                n = 0 if out[0].get("text", "").startswith("📋 ออเดอร์") else await unseen_orders(user)
+                if n and len(out) < 5:
+                    out.insert(0, text(f"🛎️ มีออเดอร์ใหม่ {n} รายการ · พิมพ์ \"ออเดอร์\" ดูชื่อ เบอร์ จำนวน"))
+            except Exception:
+                pass
             home = await home_of(user)
             chip = (f"🏠 {home['house']} · ซ.{home['soi']}", "บ้านฉัน") if home else ("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่")
             last = out[-1]

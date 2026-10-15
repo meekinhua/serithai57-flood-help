@@ -170,6 +170,8 @@ class LendCreate(Contact):
     price: str = Field("", max_length=60)  # for sale: "150 บาท", "ต่อรองได้"
     pickup: str = Field("", max_length=80)  # for sale: "รับที่บ้าน ซ.16 / ส่งในหมู่บ้าน"
     when: str = Field("", max_length=80)  # for sale: "ทุกเช้า 7–9 โมง · สั่งล่วงหน้า 1 วัน"
+    preorder: bool = False  # for sale (16 Oct): made to order — neighbours press "สั่ง / จอง" and the seller cooks after
+    notify_endpoint: str = Field("", max_length=600)  # the seller's own push subscription: a new order pings that phone only
     media_ids: list[str] = Field(default_factory=list, max_length=3)
 
 
@@ -183,6 +185,8 @@ class LendUpdate(BaseModel):
 class QueueJoin(Contact):
     phone: str = Field(..., min_length=3, max_length=40)  # the owner has to be able to call back
     note: str = Field("", max_length=160)  # "ขอใช้ครึ่งวัน พรุ่งนี้เช้า"
+    qty: str = Field("", max_length=40)  # an order (kind sell): "2 กล่อง"
+    pick: str = Field("", max_length=60)  # an order: when they'd like it — "พรุ่งนี้เช้า", "เสาร์ 18 ต.ค."
 
 
 class JobCreate(Contact):
@@ -397,6 +401,26 @@ async def site_mode(db) -> str:
     return (doc or {}).get("mode", "repair")
 
 
+async def add_to_queue(db, item_id: str, data: dict, via: str = "", line_user: str = "") -> Optional[dict]:
+    """One queue entry — for a thing for sale, an order / reservation (สั่ง · จอง). The site's form and the LINE bot's
+    order chat both come here. An order pings the seller's own phone when they posted from a phone with notifications
+    on; LINE sellers see it the next time they write to the bot (the bot never pushes)."""
+    entry = {"id": uuid.uuid4().hex[:10], **data, "at": now(), "done": False, "seen": False,
+             **({"via": via} if via else {}), **({"line_user": line_user} if line_user else {})}
+    kind = (await db.lend_items.find_one({"id": item_id}, {"_id": 0, "kind": 1}) or {}).get("kind")
+    what = (f"สั่ง/จอง {data.get('qty', '')}".strip() if kind == "sell" else "ขอคิวยืม") + (" (ผ่าน LINE)" if via == "line" else "")
+    doc = await db.lend_items.find_one_and_update(
+        {"id": item_id, "status": {"$ne": "closed"}},
+        {"$push": {"queue": entry, "history": {"at": now(), "by": (data.get("name") or "ไม่ระบุชื่อ")[:60], "text": what[:200]}},
+         "$set": {"updated_at": now()}},
+        projection={"_id": 0},
+        return_document=True,
+    )
+    if doc and kind == "sell":
+        push.fire(push.on_order, doc, entry)
+    return doc
+
+
 def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip, claim_media, delete_media) -> APIRouter:
     router = APIRouter(prefix="/api")
 
@@ -413,12 +437,16 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         return doc
 
     def public_lend(d: dict) -> dict:
-        out = {k: v for k, v in d.items() if k not in ("_id", "edit_key_hash", "phone", "queue")}
+        out = {k: v for k, v in d.items() if k not in ("_id", "edit_key_hash", "phone", "queue", "notify_endpoint")}
         out["queue_count"] = len([q for q in d.get("queue", []) if not q.get("done")])
         out["has_phone"] = bool(d.get("phone"))
         out.setdefault("pickup", "")  # older items have no pickup / when
         out.setdefault("when", "")
+        out.setdefault("preorder", False)
         return out
+
+    def owner_queue(d: dict) -> list:
+        return [{k: v for k, v in q.items() if k != "line_user"} for q in d.get("queue", [])]  # the buyer's LINE id stays ours
 
     # ---------------- site mode ----------------
     @router.get("/site")
@@ -486,9 +514,14 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         if body.kind != "want" and len(body.phone.strip()) < 3:
             raise HTTPException(422, "ใส่เบอร์โทรให้คนยืมติดต่อได้")
         key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
+        data = _clean(body.model_dump(exclude={"media_ids"}))
+        if body.kind != "sell":
+            data["preorder"] = False
+        if not data["notify_endpoint"].startswith("https://"):
+            data["notify_endpoint"] = ""
         doc = {
             "id": item_id,
-            **_clean(body.model_dump(exclude={"media_ids"})),
+            **data,
             "media": await claim_media(body.media_ids, f"lend:{item_id}", {"image"}),
             "status": "available",
             "lent_to": "",
@@ -513,15 +546,10 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
 
     @router.post("/lend/{item_id}/queue")
     async def join_queue(item_id: str, body: QueueJoin, request: Request):
-        """'I'd like to borrow it': the owner sees who is waiting, in order, with phone numbers."""
+        """'I'd like to borrow it': the owner sees who is waiting, in order, with phone numbers.
+        For a thing for sale the same queue holds the orders / reservations (สั่ง · จอง): qty + when they want it."""
         rate_limit(request, "lend-queue", limit=20, window_s=600)
-        entry = {"id": uuid.uuid4().hex[:10], **_clean(body.model_dump()), "at": now(), "done": False}
-        doc = await db.lend_items.find_one_and_update(
-            {"id": item_id, "status": {"$ne": "closed"}},
-            {"$push": {"queue": entry, "history": log(body.name, "ขอคิวยืม")}, "$set": {"updated_at": now()}},
-            projection={"_id": 0},
-            return_document=True,
-        )
+        doc = await add_to_queue(db, item_id, _clean(body.model_dump()))
         if not doc:
             raise HTTPException(404, "รายการนี้ปิดไปแล้ว")
         return public_lend(doc)
@@ -529,7 +557,9 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     @router.get("/lend/{item_id}/owner")
     async def lend_owner(item_id: str, request: Request, x_edit_key: str = Header("")):
         doc = await owned(db.lend_items, item_id, x_edit_key, request)
-        return {**public_lend(doc), "queue": doc.get("queue", []), "phone": doc.get("phone", "")}
+        if any(not q.get("seen") for q in doc.get("queue", [])):
+            await db.lend_items.update_one({"id": item_id}, {"$set": {"queue.$[q].seen": True}}, array_filters=[{"q.seen": False}])
+        return {**public_lend(doc), "queue": owner_queue(doc), "phone": doc.get("phone", "")}
 
     @router.patch("/lend/{item_id}")
     async def update_lend(item_id: str, body: LendUpdate, request: Request, x_edit_key: str = Header("")):
