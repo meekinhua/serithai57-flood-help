@@ -234,13 +234,7 @@ export default function Market({ items, setItems, admin, onAdd, onShops }) {
   const count = (k) => open.filter((x) => inFilter(x, k)).length;
   return (
     <div className="space-y-3">
-      <p className="px-1 text-[15px] text-[#45504A]">ของกินทำเอง ทำตามสั่ง ขนม งานฝีมือ จากเพื่อนบ้าน · กดสั่ง/จองไว้ได้ · ระบบไม่รับเงิน ตกลงกันเอง</p>
-      <button onClick={onAdd} className="min-h-[58px] w-full rounded-2xl bg-[#1E6B47] text-lg font-bold text-white shadow-sm active:bg-[#154D33]">
-        + ลงขายของ
-      </button>
-      <a href={LINE_SELL} target="_blank" rel="noopener noreferrer" className="block text-center text-[15px] font-bold text-[#06A045] underline">
-        💬 หรือ ลงขายผ่าน LINE ›
-      </a>
+      <p className="px-1 text-[15px] text-[#45504A]">ของทำเองจากเพื่อนบ้าน · กดสั่ง/จองไว้ได้</p>
       <div className="-mx-3 overflow-x-auto px-3 pb-1">
         <div className="flex w-max gap-2">
           {[["all", "ทั้งหมด"], ...MARKET_FILTERS].map(([k, t]) => {
@@ -269,6 +263,20 @@ export default function Market({ items, setItems, admin, onAdd, onShops }) {
           {open.length ? "หมวดนี้ยังไม่มีของขาย" : "ยังไม่มีใครลงขาย · ทำขนม ทำกับข้าว หรือมีของเหลือใช้? ลงให้เพื่อนบ้านเห็นได้เลย"}
         </p>
       )}
+      {/* for sellers, at the bottom: buyers come to look, so the list comes first (16 Oct) */}
+      <div className="card space-y-2 p-3">
+        <p className="text-[15px] text-[#45504A]">
+          <b className="text-[#15201A]">ทำขายเองไหม?</b> ลงให้เพื่อนบ้านเห็นได้ฟรี · ระบบไม่รับเงิน ตกลงกันเอง
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={onAdd} className="min-h-[48px] rounded-xl border-2 border-[#1E6B47] font-bold text-[#1E6B47]">
+            + ลงขายของ
+          </button>
+          <a href={LINE_SELL} target="_blank" rel="noopener noreferrer" className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-[#06A045] font-bold text-[#06A045]">
+            💬 ลงผ่าน LINE
+          </a>
+        </div>
+      </div>
       {onShops && (
         <button onClick={onShops} className="card flex min-h-[56px] w-full items-center gap-3 p-3 text-left">
           <span className="text-2xl" aria-hidden="true">
