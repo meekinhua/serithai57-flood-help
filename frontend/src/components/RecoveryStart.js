@@ -73,7 +73,7 @@ export default function RecoveryStart({ onTab, onJob, onLend, onIssue, counts = 
 
       <Step n={4} emoji="🔧" title="ซ่อมบ้าน ซ่อมรถ ซ่อมเครื่องใช้ไฟฟ้า" tip="ช่างและร้านที่เพื่อนบ้านใช้แล้วรีวิว · ถามเพื่อนบ้านว่าซ่อมอะไรยังไง ใช้ร้านไหน">
         <Go strong onClick={() => onTab("pros")} badge={counts.pros}>
-          🔧 ช่าง · ร้านแนะนำ
+          🔧 ช่าง · บริการแนะนำ
         </Go>
         <Go onClick={() => onJob("hire")}>🧑‍🔧 ประกาศหาช่าง</Go>
         <Go onClick={() => onTab("forum")}>💬 ถามเพื่อนบ้าน</Go>

@@ -1265,6 +1265,7 @@ export default function MyHome({
   look,
   onIssue,
   onIssues,
+  onWaste,
   onElectricians,
   onPros,
   onBadge,
@@ -1930,6 +1931,7 @@ export default function MyHome({
                 ["🐾", t("myhome.tools.lost", "หาย · เจอ"), t("myhome.tools.lost_sub", "หมาแมวหาย เจอของ ลงรูปไว้"), onLost],
                 ["⚠️", t("myhome.tools.alert", "เตือนเพื่อนบ้าน"), t("myhome.tools.alert_sub2", "ฝาท่อแตก กิ่งไม้ สายไฟ"), () => startNear("alert")],
                 ["📍", t("myhome.tools.report", "แจ้งจุดปัญหา"), t("myhome.tools.report_sub", "ขยะค้าง ฝาท่อแตก จุดอันตราย"), onIssue],
+                ...(onWaste ? [["♻️", t("myhome.tools.waste", "ขยะ · รถเก็บ"), t("myhome.tools.waste_sub", "รอบรถทุกซอย · วิธีแยกขยะ"), onWaste]] : []),
                 [
                   "⚡",
                   t("myhome.tools.outage", "ไฟดับ น้ำไม่ไหล"),

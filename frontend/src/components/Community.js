@@ -21,7 +21,7 @@ export const PRO_GROUPS = [
   { key: "junk", label: "ขนขยะ", cats: ["junk", "porter", "truck"] },
   { key: "build", label: "ช่างไม้ ทาสี", cats: ["carpenter", "painter", "roof", "pest"] },
   { key: "car", label: "ซักพรม ซ่อมรถ", cats: ["vehicle", "rental", "boat"] },
-  { key: "shop", label: "ร้านอาหาร · ร้านค้า", cats: ["shop", "food", "supplies", "beauty", "tutor", "pets"] },
+  { key: "more", label: "บริการอื่นๆ", cats: ["beauty", "tutor", "pets", "other"] }, // 16 Oct: shops moved to ตลาด
 ];
 const groupOf = (cat) => PRO_GROUPS.find((g) => g.cats.includes(cat));
 // ร้านเพื่อนบ้าน: the team marks the ones run by neighbours or selling in the village regularly; the rest are outside shops (ช่าง·ร้าน only)
@@ -34,8 +34,8 @@ export const NEED_CHOICES = [
   { group: "ขอแรงเพื่อนบ้าน", label: "อย่างอื่น", hint: "พิมพ์เล่าได้เลย", go: { sheet: { type: "jobForm", kind: "need", jobType: "" } } },
   { group: "หาย · เจอ", label: "สัตว์เลี้ยงหาย / ของหาย", hint: "ลงรูปไว้ เพื่อนบ้านทั้งหมู่บ้านช่วยกันดู", go: { sheet: { type: "lostForm", kind: "lost" } } },
   { group: "หาของ", label: "ยืม / หาซื้อของ", hint: "เครื่องฉีดน้ำ บันได ของมือสอง", go: { sheet: { type: "lendForm", kind: "want" } } },
-  { group: "จ้างช่าง / หาร้าน (มีค่าจ้าง)", label: "ไปหน้า ช่าง · ร้าน ›", hint: "เบอร์ช่าง ร้าน · ประกาศหาช่าง", go: { tab: "pros" } },
-  { group: "จ้างช่าง / หาร้าน (มีค่าจ้าง)", label: "ประกาศหาช่าง", hint: "ช่างที่ว่างจะติดต่อกลับ", go: { sheet: { type: "jobForm", kind: "need", jobType: "hire" } } },
+  { group: "จ้างช่าง / บริการ (มีค่าจ้าง)", label: "ไปหน้า ช่าง · บริการ ›", hint: "เบอร์ช่าง · ประกาศหาช่าง", go: { tab: "pros" } },
+  { group: "จ้างช่าง / บริการ (มีค่าจ้าง)", label: "ประกาศหาช่าง", hint: "ช่างที่ว่างจะติดต่อกลับ", go: { sheet: { type: "jobForm", kind: "need", jobType: "hire" } } },
 ];
 export const OFFER_CHOICES = [
   { group: "ให้", label: "มีของให้ยืม", hint: "เครื่องมือ บันได ปั๊ม", go: { sheet: { type: "lendForm", kind: "lend" } } },
@@ -43,7 +43,7 @@ export const OFFER_CHOICES = [
   { group: "ให้", label: "ไปช่วยแรงได้ / มีรถ", hint: "ช่วยด้วยน้ำใจ · บ้านที่ขอแรงจะเห็นชื่อคุณ", go: { sheet: { type: "jobForm", kind: "offer", jobType: "" } } },
   { group: "เจอ", label: "เจอสัตว์หลง / เก็บของได้", hint: "ถ่ายรูปลงไว้ เจ้าของจะเห็น", go: { sheet: { type: "lostForm", kind: "found" } } },
   { group: "ขาย", label: "ขายของ · ของทำเอง", hint: "ของกิน ขนม งานฝีมือ ของมือสอง · ขึ้นตลาดเพื่อนบ้าน", go: { sheet: { type: "lendForm", kind: "sell" } } },
-  { group: "ร้านเพื่อนบ้าน", label: "ฉันมีร้าน / รับทำ อยู่ในหมู่บ้าน", hint: "ทีมตรวจแล้วขึ้นเป็นร้านเพื่อนบ้าน · ร้านข้างนอกอยู่หน้า ช่าง·ร้าน", go: { sheet: { type: "serviceForm" } } },
+  { group: "ร้าน · บริการ", label: "ฉันมีร้าน / รับงานบริการ", hint: "ร้านขึ้นในตลาด · ช่างและบริการขึ้นหน้า ช่าง·บริการ", go: { sheet: { type: "serviceForm" } } },
 ];
 
 const Chevron = () => (
@@ -93,7 +93,7 @@ export function ProsQuick({ services, onOpen, look }) {
   return (
     <section className="mb-3 rounded-[20px] border border-[#DCE2DD] bg-white p-3" style={look?.frame}>
       <div className="flex items-center justify-between gap-2 px-1">
-        <h2 className="font-display text-lg font-bold">ช่าง · ร้าน ในหมู่บ้าน</h2>
+        <h2 className="font-display text-lg font-bold">ช่าง · บริการ ในหมู่บ้าน</h2>
         <span className="text-sm text-[#45504A]">{services.length} ราย</span>
       </div>
       <button onClick={() => onOpen("", true)} className="mt-2 flex min-h-[52px] w-full items-center gap-2 rounded-xl border border-[#A9B4AD] bg-white px-3 text-left text-base text-[#45504A]">
@@ -221,7 +221,7 @@ export function IntentChoices({ need, choices, onPick }) {
 const TAG = {
   need: ["ขอแรง", "bg-[#FCEFD9] text-[#7A4104]"],
   offer: ["ช่วยได้", "bg-[#E4F0E9] text-[#154D33]"],
-  pros: ["ช่าง · ร้าน", "bg-[#E3EDF9] text-[#1F4F8A]"],
+  pros: ["ช่าง · บริการ", "bg-[#E3EDF9] text-[#1F4F8A]"],
   local: ["🏠 ร้านเพื่อนบ้าน", "bg-[#E4F0E9] text-[#154D33]"],
   lend: ["ยืม · ให้", "bg-[#EEE8F7] text-[#5B3A92]"],
   sell: ["ขาย", "bg-[#FDE7E4] text-[#8F2A1C]"],
@@ -409,11 +409,11 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
       <div className="flex items-center gap-2">
         <p className="min-w-0 flex-1 text-[15px] text-[#45504A]">เบอร์ที่เพื่อนบ้านแชร์กันมา · ตกลงราคากันเอง</p>
         <button onClick={onAdd} className="min-h-[44px] shrink-0 rounded-xl bg-[#1E6B47] px-3 text-[15px] font-bold text-white">
-          + ลงร้าน / แนะนำ
+          + ลงช่าง / แนะนำ
         </button>
       </div>
       <label className="flex min-h-[50px] items-center gap-2 rounded-xl border border-[#C9D1CB] bg-white px-3">
-        <span className="sr-only">ค้นหาช่างหรือร้าน</span>
+        <span className="sr-only">ค้นหาช่างหรือบริการ</span>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#45504A" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
           <circle cx="11" cy="11" r="7" />
           <path d="M20 20l-3.5-3.5" />
@@ -422,7 +422,7 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoFocus={autoFocus}
-          placeholder="พิมพ์ เช่น แอร์ ปั๊ม ซักพรม ร้านกาแฟ"
+          placeholder="พิมพ์ เช่น แอร์ ปั๊ม ซักพรม ตัดผม"
           className="min-w-0 flex-1 bg-transparent text-base outline-none"
         />
       </label>
@@ -493,7 +493,7 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
       ) : (
         <div className="rounded-2xl bg-[#F2F4F1] p-4 text-center">
           <p className="font-bold">{query || g ? "ยังไม่มีในหมวดนี้" : "ยังไม่มีเบอร์"}</p>
-          <p className="mt-1 text-[15px] text-[#45504A]">ถ้ารู้จักช่างหรือร้านดีๆ แนะนำให้เพื่อนบ้านได้เลย</p>
+          <p className="mt-1 text-[15px] text-[#45504A]">ถ้ารู้จักช่างหรืองานบริการดีๆ แนะนำให้เพื่อนบ้านได้เลย</p>
           <button onClick={onAdd} className="mt-2 min-h-[48px] rounded-xl bg-[#1E6B47] px-4 font-bold text-white">
             แนะนำ
           </button>
@@ -632,7 +632,7 @@ export function PostedSheetBody({ text, onClose }) {
 export function BottomNav({ page, badges = {}, onGo, onHotline }) {
   const items = [
     ["home", "บ้านฉัน", <path key="p" d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />],
-    ["pros", "ช่าง · ร้าน", <path key="p" d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" />],
+    ["pros", "ช่าง · บริการ", <path key="p" d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" />],
     [
       "community",
       "เพื่อนบ้าน",

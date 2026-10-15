@@ -58,7 +58,7 @@ OA_KEYWORDS = {  # exactly the OA Manager's keyword lists as set on 14 Oct (keep
     "เบอร์ฉุกเฉิน", "เบอร์โทร", "รปภ", "ฉุกเฉิน",  # เบอร์ฉุกเฉิน
     "เมนูทั้งหมด", "เมนู", "menu", "เว็บ",  # เมนูทั้งหมด
     "ไฟดับ", "ไฟรั่ว", "ไฟถนน",  # ไฟดับ
-    "ช่าง", "ร้าน", "หาช่าง", "ซ่อม", "ประปา",  # ช่าง ร้าน
+    "ช่าง", "หาช่าง", "ซ่อม", "ประปา",  # ช่าง บริการ (16 Oct: "ร้าน" now opens ตลาด — take it off the OA reply too)
     "บริจาค", "สลิป", "บัญชี", "ยอดบริจาค",  # บริจาค
     "แผนที่", "น้ำท่วม", "ระดับน้ำ",  # แผนที่ น้ำท่วม
 }  # (the OA "หาย เจอ" and "ขยะ" replies must be switched off: the bot answers those now, per soi)
@@ -76,11 +76,14 @@ CAT_TH = {"dog": "หมา", "cat": "แมว", "pet": "สัตว์เล�
 CAT_ICON = {"dog": "🐶", "cat": "🐱", "pet": "🐾", "item": "🎒", "document": "📄", "vehicle": "🚲", "other": "📦"}
 FALLBACK = (  # 15 Oct: the team reads the chat now
     "ได้รับข้อความแล้วครับ 🙏 ทีมงานจะอ่านและตอบกลับ\nระหว่างนี้กดเมนูด้านล่าง หรือพิมพ์:\n"
-    "• หาย / เจอ — สัตว์เลี้ยงหาย·เจอ แจ้งเองได้ในแชทนี้\n• ตลาด — ของกินทำเอง งานฝีมือ จากเพื่อนบ้าน (ลงขายได้ในแชทนี้)\n"
-    "• เบอร์ฉุกเฉิน • ช่าง / ร้าน\n• ไฟดับ • ขยะ • บริจาค\n• บ้านฉัน — บอกบ้านเลขที่ครั้งเดียว ได้วันรถขยะของซอยคุณ\n• เมนู (ดูทุกอย่าง)"
+    "• หาย / เจอ — สัตว์เลี้ยงหาย·เจอ แจ้งเองได้ในแชทนี้\n• ตลาด — ของทำเอง ร้านอาหาร ร้านค้า (สั่ง/จอง ลงขาย ได้ในแชทนี้)\n"
+    "• เบอร์ฉุกเฉิน • ช่าง\n• ไฟดับ • ขยะ • บริจาค\n• บ้านฉัน — บอกบ้านเลขที่ครั้งเดียว ได้วันรถขยะของซอยคุณ\n• เมนู (ดูทุกอย่าง)"
 )
 # ---------- 🛍️ ตลาดเพื่อนบ้าน (15 Oct): lend items of kind "sell" (backend/repair.py), listed and posted from the chat ----------
-MARKET_WORDS = {"ตลาด", "ตลาดเพื่อนบ้าน", "ซื้อ", "ของขาย", "ของกิน", "🛍️ ตลาด", "🛍️ ดูตลาด", "ดูตลาด"}
+MARKET_WORDS = {"ตลาด", "ตลาดเพื่อนบ้าน", "ซื้อ", "ของขาย", "ของกิน", "🛍️ ตลาด", "🛍️ ดูตลาด", "ดูตลาด",
+                "ร้าน", "ร้านอาหาร", "ร้านค้า", "ของใช้", "สั่งอาหาร"}
+SHOP_CATS = ("food", "shop", "supplies")  # 16 Oct: shops from the directory are part of ตลาด (site and bot)
+SHOP_TH = {"food": ("🍜", "ร้านอาหาร"), "shop": ("🏪", "ร้านค้า"), "supplies": ("🧱", "วัสดุ·ของใช้")}
 SELL_WORDS = {"ลงขาย", "ขายของ", "🛍️ ลงขายของ", "ลงขายของ"}
 SOLD_WORDS = {"ขายหมดแล้ว", "✅ ขายหมดแล้ว", "ขายหมด", "ปิดร้าน"}
 ORDER_WORDS = {"ออเดอร์", "ดูออเดอร์", "📋 ออเดอร์", "คำสั่งซื้อ", "ออเดอร์ของฉัน", "order", "orders"}
@@ -572,18 +575,38 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                          "contents": [{"type": "text", "text": MKT_ICON.get(cat, "🛍️"), "size": "3xl", "align": "center"}]}
         return b
 
+    def shop_card(d: dict) -> dict:
+        """A shop open every day (ช่าง·ร้าน directory, food / shop / supplies): name, area, a call button."""
+        icon, cat = SHOP_TH.get(d.get("category"), ("🏪", "ร้าน"))
+        body = [{"type": "text", "text": f"{icon} ร้านประจำ · {cat}", "size": "xs", "weight": "bold", "color": "#1F4F8A"},
+                {"type": "text", "text": d.get("name", "")[:80] or "-", "weight": "bold", "size": "md", "wrap": True, "maxLines": 3}]
+        if d.get("area") or d.get("price"):
+            body.append({"type": "text", "text": " · ".join(x for x in (d.get("price", ""), d.get("area", "")) if x)[:100], "size": "sm", "color": "#45504A", "wrap": True, "maxLines": 2})
+        tel = re.sub(r"[^\d+]", "", d.get("phone") or "")
+        foot = [{"type": "button", "style": "primary", "height": "sm", "color": "#15201A", "action": {"type": "uri", "label": "📞 โทร", "uri": f"tel:{tel}"}}] if len(tel) >= 9 else []
+        foot.append({"type": "button", "style": "secondary", "height": "sm", "action": {"type": "uri", "label": "ดูร้านทั้งหมด", "uri": f"{SITE}/#market"}})
+        return {"type": "bubble", "size": "kilo",
+                "hero": {"type": "box", "layout": "vertical", "height": "90px", "backgroundColor": "#E3EDF9", "justifyContent": "center",
+                         "contents": [{"type": "text", "text": icon, "size": "3xl", "align": "center"}]},
+                "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body},
+                "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": foot}}
+
     async def market_list() -> list:
         items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}}, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}
                                          ).sort("created_at", -1).to_list(10)
         chips = qr(("🛍️ ลงขายของ", "ลงขาย"), ("📋 ออเดอร์ของฉัน", "ออเดอร์"), ("✅ ขายหมดแล้ว", "ขายหมดแล้ว"))
-        if not items:
+        shops = await db.services.find({"category": {"$in": list(SHOP_CATS)}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
+                                       ).sort([("pinned", -1), ("verified", -1), ("updated_at", -1)]).to_list(11)
+        if not items and shops:
+            items = []
+        elif not items:
             return [text("ตอนนี้ยังไม่มีของขายในตลาดเพื่อนบ้านครับ 🙂\nทำขนม ทำกับข้าว หรือมีของเหลือใช้? กด 🛍️ ลงขายของ ด้านล่างได้เลย", qr(("🛍️ ลงขายของ", "ลงขาย")))]
-        bubbles = [market_card(d) for d in items]
+        bubbles = ([market_card(d) for d in items] + [shop_card(d) for d in shops])[:11]
         bubbles.append({"type": "bubble", "size": "kilo", "body": {"type": "box", "layout": "vertical", "justifyContent": "center", "spacing": "md", "contents": [
-            {"type": "text", "text": "ดูทั้งหมด + แยกตามหมวด", "weight": "bold", "wrap": True, "align": "center"},
+            {"type": "text", "text": "ดูทั้งหมด + แยกตามหมวด + ร้านประจำ", "weight": "bold", "wrap": True, "align": "center"},
             {"type": "button", "style": "secondary", "action": {"type": "uri", "label": "ดูทั้งหมด", "uri": f"{SITE}/#market"}}]}})
-        head = (f"🛍️ ตลาดเพื่อนบ้าน {len(items)} รายการล่าสุด · ปัดดูได้ ➡️\nของทำเองจากเพื่อนบ้าน กด 🛒 สั่ง/จองไว้ได้ ระบบไม่รับเงิน\n"
-                "(ร้านอาหาร·ร้านค้าที่เปิดประจำ พิมพ์ \"ร้าน\")")
+        head = (f"🛍️ ตลาดเพื่อนบ้าน · ของทำเอง {len(items)} · ร้านประจำ {len(shops)} · ปัดดูได้ ➡️\n"
+                "ของทำเองกด 🛒 สั่ง/จองไว้ได้ · ร้านกดโทรได้เลย · ระบบไม่รับเงิน")
         return [text(head), {"type": "flex", "altText": "ตลาดเพื่อนบ้าน", "contents": {"type": "carousel", "contents": bubbles}, "quickReply": chips}]
 
     MSTEPS = ("m_category", "m_photos", "m_title", "m_price", "m_soi", "m_when", "m_contact", "m_confirm")

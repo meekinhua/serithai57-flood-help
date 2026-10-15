@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { LEND_CATEGORIES, MARKET_FILTERS, timeAgo } from "../config";
+import { LEND_CATEGORIES, MARKET_FILTERS, SERVICE_CATEGORIES, timeAgo } from "../config";
 import { mediaUrl } from "../media";
+import { rememberCall } from "./Community";
 import { notify } from "../notify";
 import { ContactButton, NameField, input, label, remember, savedContact, telHref, useKeys } from "./RepairBoards";
 
@@ -11,13 +12,49 @@ import { ContactButton, NameField, input, label, remember, savedContact, telHref
 // #market-<id> (the LINE bot's cards, notifications) opens here and flashes that item.
 // 16 Oct: 🛒 สั่ง / จอง — homemade sellers cook to order, so a buyer leaves qty + when + name + phone in the item's
 // queue (the LINE bot's order chat lands in the same queue); the seller sees the orders on this card from the phone
-// they posted with. Shops open every day (ร้านอาหาร ร้านค้า) belong in ช่าง·ร้าน, not here.
+// they posted with. 16 Oct: shops open every day (ช่าง·ร้าน directory, categories food / shop / supplies) are listed
+// here too under 🏪 ร้านประจำ — one place for things to eat and use; ช่าง·บริการ keeps the services.
 
 export const LINE_SELL = "https://line.me/R/oaMessage/@004forpb/?%E0%B8%A5%E0%B8%87%E0%B8%82%E0%B8%B2%E0%B8%A2"; // "ลงขาย" typed in
 
 export const marketOpen = (lend) => lend.filter((x) => x.kind === "sell" && x.status !== "closed");
 
 const PICKS = ["วันนี้", "พรุ่งนี้เช้า", "พรุ่งนี้เย็น", "เสาร์-อาทิตย์", "ตามสะดวกผู้ขาย"];
+
+const dial = (p) => (p || "").replace(/[^\d+]/g, "");
+// a shop from the directory: which market chips it shows under
+const shopIn = (s, f) => f === "all" || f === "shops" || (f === "homemade" && s.category === "food");
+
+function ShopCard({ s }) {
+  const [emoji, catText] = SERVICE_CATEGORIES[s.category] || ["🏪", "ร้าน"];
+  const photo = (s.media || []).find((m) => m.type !== "video");
+  return (
+    <li className="card flex gap-3 p-3">
+      {photo ? (
+        <img src={mediaUrl(photo.id, "thumb")} alt="" loading="lazy" className="h-20 w-20 shrink-0 rounded-xl object-cover" />
+      ) : (
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#E3EDF9] text-4xl" aria-hidden="true">
+          {emoji}
+        </div>
+      )}
+      <div className="min-w-0 flex-1 space-y-1">
+        <p className="text-sm font-bold text-[#1F4F8A]">
+          {emoji} {catText}
+        </p>
+        <b className="block break-words leading-snug">{s.name}</b>
+        {s.detail && <p className="line-clamp-2 text-sm text-[#33403A]">{s.detail}</p>}
+        {(s.area || s.price) && <p className="text-sm text-[#45504A]">{[s.price, s.area].filter(Boolean).join(" · ")}</p>}
+        {dial(s.phone).length >= 9 ? (
+          <a href={`tel:${dial(s.phone)}`} onClick={() => rememberCall(s)} className="mt-1 flex min-h-[44px] items-center justify-center rounded-xl bg-[#15201A] font-bold text-white">
+            📞 โทร {s.phone}
+          </a>
+        ) : (
+          s.phone && <p className="text-sm">ติดต่อ: {s.phone}</p>
+        )}
+      </div>
+    </li>
+  );
+}
 
 const inFilter = (x, f) => {
   if (f === "all") return true;
@@ -226,18 +263,19 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
   );
 }
 
-export default function Market({ items, setItems, admin, onAdd, onShops }) {
+export default function Market({ items, setItems, admin, onAdd, shops = [], onAddShop }) {
   const [f, setF] = useState("all");
   const [keys] = useKeys("lendKeys");
   const open = marketOpen(items).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  const shown = open.filter((x) => inFilter(x, f));
-  const count = (k) => open.filter((x) => inFilter(x, k)).length;
+  const shown = f === "shops" ? [] : open.filter((x) => inFilter(x, f));
+  const shownShops = shops.filter((s) => shopIn(s, f));
+  const count = (k) => (k === "shops" ? shops.length : open.filter((x) => inFilter(x, k)).length);
   return (
     <div className="space-y-3">
       <p className="px-1 text-[15px] text-[#45504A]">ของทำเองจากเพื่อนบ้าน · กดสั่ง/จองไว้ได้</p>
       <div className="-mx-3 overflow-x-auto px-3 pb-1">
         <div className="flex w-max gap-2">
-          {[["all", "ทั้งหมด"], ...MARKET_FILTERS].map(([k, t]) => {
+          {[["all", "ทั้งหมด"], ...MARKET_FILTERS, ...(shops.length ? [["shops", "🏪 ร้านประจำ"]] : [])].map(([k, t]) => {
             const n = k === "all" ? open.length : count(k);
             return (
               <button
@@ -258,15 +296,26 @@ export default function Market({ items, setItems, admin, onAdd, onShops }) {
           <MarketCard key={x.id} item={x} editKey={keys[x.id]} admin={admin} onChanged={(y) => setItems((p) => p.map((z) => (z.id === y.id ? y : z)))} />
         ))}
       </ul>
-      {!shown.length && (
+      {!shown.length && !shownShops.length && (
         <p className="card p-4 text-center text-[15px] text-[#45504A]">
-          {open.length ? "หมวดนี้ยังไม่มีของขาย" : "ยังไม่มีใครลงขาย · ทำขนม ทำกับข้าว หรือมีของเหลือใช้? ลงให้เพื่อนบ้านเห็นได้เลย"}
+          {open.length || shops.length ? "หมวดนี้ยังไม่มีของขาย" : "ยังไม่มีใครลงขาย · ทำขนม ทำกับข้าว หรือมีของเหลือใช้? ลงให้เพื่อนบ้านเห็นได้เลย"}
         </p>
+      )}
+      {shownShops.length > 0 && (
+        <section className="space-y-2 pt-1">
+          <h3 className="px-1 text-lg font-bold">🏪 ร้านประจำ ใกล้หมู่บ้าน ({shownShops.length})</h3>
+          <p className="px-1 text-sm text-[#45504A]">ร้านอาหาร ร้านค้า วัสดุ ที่เปิดเป็นเวลา · โทรสั่งได้เลย</p>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {shownShops.map((s) => (
+              <ShopCard key={s.id} s={s} />
+            ))}
+          </ul>
+        </section>
       )}
       {/* for sellers, at the bottom: buyers come to look, so the list comes first (16 Oct) */}
       <div className="card space-y-2 p-3">
         <p className="text-[15px] text-[#45504A]">
-          <b className="text-[#15201A]">ทำขายเองไหม?</b> ลงให้เพื่อนบ้านเห็นได้ฟรี · ระบบไม่รับเงิน ตกลงกันเอง
+          <b className="text-[#15201A]">ทำขายเองไหม? มีร้าน?</b> ลงให้เพื่อนบ้านเห็นได้ฟรี · ระบบไม่รับเงิน ตกลงกันเอง
         </p>
         <div className="grid grid-cols-2 gap-2">
           <button onClick={onAdd} className="min-h-[48px] rounded-xl border-2 border-[#1E6B47] font-bold text-[#1E6B47]">
@@ -276,19 +325,12 @@ export default function Market({ items, setItems, admin, onAdd, onShops }) {
             💬 ลงผ่าน LINE
           </a>
         </div>
+        {onAddShop && (
+          <button onClick={onAddShop} className="min-h-[44px] w-full text-[15px] font-semibold text-[#1F4F8A] underline">
+            🏪 มีร้านที่เปิดประจำ? ลงร้าน (เบอร์ เวลาเปิด)
+          </button>
+        )}
       </div>
-      {onShops && (
-        <button onClick={onShops} className="card flex min-h-[56px] w-full items-center gap-3 p-3 text-left">
-          <span className="text-2xl" aria-hidden="true">
-            🏪
-          </span>
-          <span className="flex-1">
-            <b className="block">ร้านอาหาร · ร้านค้า ที่เปิดประจำ</b>
-            <span className="text-sm text-[#45504A]">อยู่ในหน้า ช่าง·ร้าน (ตลาดนี้สำหรับของทำเองจากเพื่อนบ้าน)</span>
-          </span>
-          <span aria-hidden="true">›</span>
-        </button>
-      )}
     </div>
   );
 }
