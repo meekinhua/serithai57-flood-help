@@ -210,7 +210,24 @@ export const LEND_CATEGORIES = {
   kids: ["🧸", "ของเด็ก / ของเล่น"],
   plants: ["🪴", "ต้นไม้ / ของแต่งบ้าน"],
   other: ["📦", "อื่นๆ"],
+  homemade: ["🍲", "อาหารทำเอง"],
+  dessert: ["🧁", "ขนม · เบเกอรี่"],
+  drinks: ["🧋", "เครื่องดื่ม"],
+  handmade: ["🧶", "งานฝีมือ"],
 };
+// 🛍️ ตลาดเพื่อนบ้าน (15 Oct): the lend items of kind "sell". The form offers these when selling (homemade first);
+// the four market ones are not offered for lend / give / want.
+export const MARKET_ONLY = ["homemade", "dessert", "drinks", "handmade"];
+export const MARKET_CATEGORIES = [...MARKET_ONLY, "plants", "clothes", "electronics", "furniture", "kids", "other"];
+// the market's filter chips: [key, label, categories] — "used" takes everything not named before it
+export const MARKET_FILTERS = [
+  ["homemade", "🍲 อาหารทำเอง", ["homemade", "food"]],
+  ["dessert", "🧁 ขนม", ["dessert"]],
+  ["drinks", "🧋 เครื่องดื่ม", ["drinks"]],
+  ["handmade", "🧶 งานฝีมือ", ["handmade"]],
+  ["plants", "🪴 ต้นไม้", ["plants"]],
+  ["used", "📦 มือสอง/อื่นๆ", null],
+];
 export const LEND_STATUS = {
   available: { label: "ว่าง", cls: "bg-emerald-100 text-emerald-800" },
   lent: { label: "มีคนยืมอยู่", cls: "bg-amber-100 text-amber-900" },

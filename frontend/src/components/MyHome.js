@@ -1143,7 +1143,30 @@ function WasteDays({ days }) {
   ));
 }
 
-// ---------- 💬 the LINE OA @004forpb knows this house: opens the chat with "บ้าน 4/917" already typed (the bot links it) ----------
+// ---------- 🛍️ ตลาดเพื่อนบ้าน: one line with the newest photos → เพื่อนบ้าน › ตลาด ----------
+function MarketRow({ items, onOpen }) {
+  const pics = [...items]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .filter((x) => x.media?.[0])
+    .slice(0, 3);
+  return (
+    <button onClick={onOpen} className="card mt-2 flex min-h-[60px] w-full items-center gap-2.5 p-2 pr-3 text-left text-[15px]">
+      <span className="ic ic-sm ic-amber" aria-hidden="true">
+        🛍️
+      </span>
+      <span className="min-w-0 flex-1">
+        <b>ตลาดเพื่อนบ้าน</b> · {items.length} รายการ
+      </span>
+      {pics.map((x) => (
+        <img key={x.id} src={mediaUrl(x.media[0].id, "thumb")} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg bg-[#F2F4F1] object-cover" />
+      ))}
+      <span className="shrink-0 font-bold text-[#7A4104]">ดู ›</span>
+    </button>
+  );
+}
+
+// ---------- 💬 the LINE OA @004forpb: opens the chat with "บ้าน 4/917" already typed (the bot links it). Once this phone has
+// sent it, or came from a bot link with ?home=, the card just opens the chat — a ?home= link alone doesn't prove LINE knows the house ----------
 function LineLinkCard({ house }) {
   const done = load("lineHouse", "") === house;
   const href = `https://line.me/R/oaMessage/@004forpb/?${encodeURIComponent(`บ้าน ${house}`)}`;
@@ -1153,8 +1176,8 @@ function LineLinkCard({ house }) {
         💬
       </span>
       <span className="min-w-0 flex-1">
-        <b className="block text-base leading-tight">{done ? "LINE รู้จักบ้านนี้แล้ว · เปิดแชท" : `ผูกบ้าน ${house} กับ LINE`}</b>
-        <span className="block text-sm text-[#45504A]">{done ? "ถามวันรถขยะ แจ้งหาย ได้ในแชท @004forpb" : "กดแล้วกดส่งข้อความที่พิมพ์ไว้ให้ · LINE จะบอกวันรถขยะของซอยคุณ"}</span>
+        <b className="block text-base leading-tight">{done ? "แชท LINE หมู่บ้าน @004forpb" : `ผูกบ้าน ${house} กับ LINE`}</b>
+        <span className="block text-sm text-[#45504A]">{done ? "ถามวันรถขยะ แจ้งหาย ขายของ ได้ในแชท" : "กดแล้วกดส่งข้อความที่พิมพ์ไว้ให้ · LINE จะบอกวันรถขยะของซอยคุณ"}</span>
       </span>
       <span className="text-xl text-[#45504A]" aria-hidden="true">
         ›
@@ -1253,6 +1276,8 @@ export default function MyHome({
   onAskHelp,
   onLost,
   onLostPosted,
+  market = [],
+  onMarket,
 }) {
   // a ขอแรง ask this house's อาสาข้างบ้าน profile can do (job type → skill)
   const JOB_SKILL = { clean: "strong", move: "strong", trash: "strong", fix: "fix", check: "elec", ride: "drive", errand: "errand" };
@@ -1448,7 +1473,7 @@ export default function MyHome({
               ["💰", "เงินเยียวยาน้ำท่วมที่บ้านคุณขอได้"],
               ["🚛", "วันรถขยะซอยคุณ"],
               ["⚡", "ไฟดับ น้ำไม่ไหลแถวบ้าน"],
-              ["💧", "น้ำหน้าบ้านตอนนี้"],
+              ["📍", "ปัญหาในซอยคุณ"],
               ["🔧", "ช่างที่เพื่อนบ้านแนะนำ"],
             ].map(([icon, text]) => (
               <li key={text} className="flex items-center gap-1.5">
@@ -1713,6 +1738,7 @@ export default function MyHome({
                   </>
                 )}
               />
+              {market.length > 0 && <MarketRow items={market} onOpen={onMarket} />}
             </div>
           </div>
           <div className="grp">

@@ -42,7 +42,7 @@ export const OFFER_CHOICES = [
   { group: "ให้", label: "มีของให้ฟรี", hint: "ของใช้ที่ไม่ได้ใช้แล้ว", go: { sheet: { type: "lendForm", kind: "give" } } },
   { group: "ให้", label: "ไปช่วยแรงได้ / มีรถ", hint: "ช่วยด้วยน้ำใจ · บ้านที่ขอแรงจะเห็นชื่อคุณ", go: { sheet: { type: "jobForm", kind: "offer", jobType: "" } } },
   { group: "เจอ", label: "เจอสัตว์หลง / เก็บของได้", hint: "ถ่ายรูปลงไว้ เจ้าของจะเห็น", go: { sheet: { type: "lostForm", kind: "found" } } },
-  { group: "ขาย", label: "ขายของ / ของมือสอง", hint: "ตั้งราคาเอง นัดรับในหมู่บ้าน", go: { sheet: { type: "lendForm", kind: "sell" } } },
+  { group: "ขาย", label: "ขายของ · ของทำเอง", hint: "ของกิน ขนม งานฝีมือ ของมือสอง · ขึ้นตลาดเพื่อนบ้าน", go: { sheet: { type: "lendForm", kind: "sell" } } },
   { group: "ร้านเพื่อนบ้าน", label: "ฉันมีร้าน / รับทำ อยู่ในหมู่บ้าน", hint: "ทีมตรวจแล้วขึ้นเป็นร้านเพื่อนบ้าน · ร้านข้างนอกอยู่หน้า ช่าง·ร้าน", go: { sheet: { type: "serviceForm" } } },
 ];
 
@@ -272,7 +272,7 @@ export function CommunityFeed({ lost = [], lend, jobs, services, topics, onTab, 
       if (x.status === "closed" || !fresh(x.created_at)) continue;
       out.push({
         id: `l${x.id}`,
-        tab: "lend",
+        tab: x.kind === "sell" ? "market" : "lend",
         k: x.kind === "sell" ? "sell" : "lend",
         media: x.media || [],
         title: x.title,
@@ -337,7 +337,7 @@ export function CommunityFeed({ lost = [], lend, jobs, services, topics, onTab, 
                 </button>
               )}
               {(x.k === "lend" || x.k === "sell") && (
-                <button onClick={() => onTab("lend")} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-base font-bold">
+                <button onClick={() => onTab(x.tab)} className="min-h-[48px] w-full rounded-xl border border-[#C9D1CB] text-base font-bold">
                   ดูรายละเอียด / ติดต่อ
                 </button>
               )}

@@ -36,6 +36,7 @@ LendKind = Literal["lend", "give", "want", "sell"]  # ให้ยืม · ใ�
 LEND_CATEGORIES = [
     "washer", "pump", "vacuum", "dryer", "ladder", "cleaning", "tools", "cart", "power", "furniture", "supplies",
     "food", "clothes", "electronics", "kids", "plants", "other",
+    "homemade", "dessert", "drinks", "handmade",  # ตลาดเพื่อนบ้าน (sell): อาหารทำเอง · ขนม·เบเกอรี่ · เครื่องดื่ม · งานฝีมือ
 ]
 LendStatus = Literal["available", "lent", "closed"]  # ว่าง · มีคนยืมอยู่ · ปิด (คืนเจ้าของ/ให้ไปแล้ว/หาได้แล้ว)
 JobKind = Literal["need", "offer"]  # ขอแรง · อาสาพร้อมไปช่วย
@@ -167,6 +168,8 @@ class LendCreate(Contact):
     detail: str = Field("", max_length=400)  # condition, how long, deposit, pick up where
     soi: str = Field("", max_length=12)
     price: str = Field("", max_length=60)  # for sale: "150 บาท", "ต่อรองได้"
+    pickup: str = Field("", max_length=80)  # for sale: "รับที่บ้าน ซ.16 / ส่งในหมู่บ้าน"
+    when: str = Field("", max_length=80)  # for sale: "ทุกเช้า 7–9 โมง · สั่งล่วงหน้า 1 วัน"
     media_ids: list[str] = Field(default_factory=list, max_length=3)
 
 
@@ -413,6 +416,8 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         out = {k: v for k, v in d.items() if k not in ("_id", "edit_key_hash", "phone", "queue")}
         out["queue_count"] = len([q for q in d.get("queue", []) if not q.get("done")])
         out["has_phone"] = bool(d.get("phone"))
+        out.setdefault("pickup", "")  # older items have no pickup / when
+        out.setdefault("when", "")
         return out
 
     # ---------------- site mode ----------------

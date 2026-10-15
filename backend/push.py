@@ -226,7 +226,7 @@ async def on_lend(doc: dict):
     if not doc.get("soi"):
         return
     word = {"want": "อยากยืม", "give": "แจกให้", "sell": "ขาย"}.get(doc.get("kind"), "ให้ยืม")
-    await send({"topics": "help", "soi": doc["soi"]}, f"🧰 เพื่อนบ้าน ซ.{doc['soi']} {word}", doc.get("title") or doc.get("name") or "", f"/#lend-{doc['id']}", tag=f"lend-{doc['id']}")
+    await send({"topics": "help", "soi": doc["soi"]}, f"🧰 เพื่อนบ้าน ซ.{doc['soi']} {word}", doc.get("title") or doc.get("name") or "", f"/#{'market' if doc.get('kind') == 'sell' else 'lend'}-{doc['id']}", tag=f"lend-{doc['id']}")
 
 
 async def on_shop(doc: dict):

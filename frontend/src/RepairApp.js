@@ -27,6 +27,7 @@ import FloodTuck, { useFloodTools } from "./components/FloodTuck";
 import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, HireList, IssueBoard, IssueCard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
+import Market, { marketOpen } from "./components/Market";
 // 15 Oct: links from the LINE bot carry ?home=4/917 — that house becomes this phone's บ้านฉัน (no typing it twice)
 (() => {
   try {
@@ -56,14 +57,16 @@ const MAIN_TABS = {
   jobs: ["🙋", "ขอแรง · ช่วยได้"],
   lend: ["🧰", "ยืม · ให้ · ขาย"],
   forum: ["💬", "กระดานคุยกัน"],
+  market: ["🛍️", "ตลาด"],
 };
 // 8 Oct: เพื่อนบ้าน has its own three tabs; ขอแรง and ยืม·ให้·ขาย are one "ช่วยกัน" tab with two lists
 const GROUPS = [
   ["lost", "🐾", "หาย · เจอ"],
   ["help", "🤝", "ช่วยกัน"],
   ["talk", "💬", "คุยกัน"],
+  ["market", "🛍️", "ตลาด"], // 15 Oct: ตลาดเพื่อนบ้าน (the lend items for sale)
 ];
-const groupOf = (t) => (t === "jobs" || t === "lend" ? "help" : t === "forum" ? "talk" : t === "lost" ? "lost" : null);
+const groupOf = (t) => (t === "jobs" || t === "lend" ? "help" : t === "forum" ? "talk" : t === "lost" ? "lost" : t === "market" ? "market" : null);
 const MORE_TABS = {
   waste: ["♻️", "ขยะ · รถเก็บ"],
   guide: ["📋", "เช็กลิสต์หลังน้ำลด"],
@@ -213,7 +216,7 @@ export default function RepairApp() {
   const [issueGo, setIssueGo] = useState("");
   useEffect(() => {
     const open = (hash) => {
-      const m = (hash || "").match(/^#?(lost|jobs|lend|issue|shop|forum)-([\w-]{6,})$/);
+      const m = (hash || "").match(/^#?(lost|jobs|lend|market|issue|shop|forum)-([\w-]{6,})$/);
       if (!m) return;
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
       if (m[1] === "issue") {
@@ -562,6 +565,8 @@ export default function RepairApp() {
         onNeeds={(id) => goItem("jobs", id)}
         onAskHelp={() => setSheet({ type: "jobForm", kind: "need" })}
         onLost={(id) => goItem("lost", id)}
+        market={marketOpen(lend)}
+        onMarket={() => showTab("market")}
         onLostPosted={(x) => setLost((p) => [x, ...p.filter((y) => y.id !== x.id)])}
       />
     ),
@@ -806,16 +811,16 @@ export default function RepairApp() {
 
           {page === "community" && (
             <>
-              <PageTitle title="เพื่อนบ้านช่วยกัน" sub="หาย·เจอ · ขอแรง ยืม ให้ ขาย · คุยกัน" />
+              <PageTitle title="เพื่อนบ้านช่วยกัน" sub="หาย·เจอ · ขอแรง ยืม ให้ · คุยกัน · ตลาด" />
               <nav className="sticky top-[64px] z-[40] -mx-3 mb-3 bg-[#F2F4F1]/95 px-3 py-2 backdrop-blur sm:-mx-4 sm:px-4" aria-label="เพื่อนบ้าน">
-                <div className="grid grid-cols-3 gap-1 rounded-2xl border border-[#E3E7E2] bg-white p-1 shadow-sm">
+                <div className="grid grid-cols-4 gap-1 rounded-2xl border border-[#E3E7E2] bg-white p-1 shadow-sm">
                   {GROUPS.map(([g, icon, name]) => {
                     const on = groupOf(tab) === g;
                     const n = g === "lost" ? lostOpen.length : g === "help" ? counts.jobs : 0;
                     return (
                       <button
                         key={g}
-                        onClick={() => pick(g === "lost" ? "lost" : g === "talk" ? "forum" : load("helpTab", "jobs"))}
+                        onClick={() => pick(g === "lost" ? "lost" : g === "talk" ? "forum" : g === "market" ? "market" : load("helpTab", "jobs"))}
                         aria-current={on ? "page" : undefined}
                         className={`relative flex min-h-[54px] flex-col items-center justify-center rounded-xl text-[15px] leading-tight transition-colors ${on ? "bg-[#15201A] font-bold text-white" : "text-[#33403A]"}`}
                       >
@@ -879,6 +884,11 @@ export default function RepairApp() {
                       )}
                     </section>
                   </>
+                )}
+                {tab === "market" && (
+                  <section className="card p-3">
+                    <Market items={lend} setItems={setLend} admin={admin} onAdd={() => setSheet({ type: "lendForm", kind: "sell" })} />
+                  </section>
                 )}
                 {tab === "forum" && (
                   <>
@@ -1221,12 +1231,12 @@ export default function RepairApp() {
           </Sheet>
         )}
         {sheet?.type === "lendForm" && (
-          <Sheet title="ยืม · ให้ · ขาย" onClose={() => setSheet(null)}>
+          <Sheet title={sheet.kind === "sell" ? "🛍️ ลงขายของ" : "ยืม · ให้ · ขาย"} onClose={() => setSheet(null)}>
             <LendForm
               kind={sheet.kind}
               onDone={(x) => {
                 setLend((p) => [x, ...p]);
-                posted("lend", `${LEND_KIND_TEXT[x.kind] || "🧰"} ${x.title}${x.price ? ` ${x.price}` : ""}${x.soi ? ` (ซ.${x.soi})` : ""}`);
+                posted(x.kind === "sell" ? "market" : "lend", `${LEND_KIND_TEXT[x.kind] || "🧰"} ${x.title}${x.price ? ` ${x.price}` : ""}${x.soi ? ` (ซ.${x.soi})` : ""}`);
               }}
             />
           </Sheet>
