@@ -1,6 +1,6 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API, api, load, save, viewerId } from "./api";
-import { HOTLINE_GROUPS, ISSUE_TYPES, LEND_KINDS, VILLAGE_NAME, timeAgo } from "./config";
+import { HOTLINE_GROUPS, ISSUE_TYPES, LEND_KINDS, VILLAGE_NAME, isMarketShop, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
 import Announcements, { UrgentBar } from "./components/Announcements";
 import { WeatherAlerts, WeatherChip, WindyMap } from "./components/Weather";
@@ -173,6 +173,9 @@ export default function RepairApp() {
   // highlight boxes (water watch, volunteer hand-out point): admins switch them on /admin, no redeploy
   const [home, setHome] = useState(() => load("homeBlocks", { watch_on: true, watch_title: "", hub: { on: false } }));
   const [services, setServices] = useState([]);
+  // 16 Oct: shops you buy from (food / shop / supplies) live in ตลาด; ช่าง·บริการ lists the rest
+  const prosOnly = services.filter((s) => !isMarketShop(s));
+  const shops = services.filter(isMarketShop);
   const [announcements, setAnnouncements] = useState([]);
   const [updatedTick, setUpdatedTick] = useState(0); // +1 after every refresh
   const [weather, setWeather] = useState(null);
@@ -223,7 +226,7 @@ export default function RepairApp() {
         goPage("map");
         return setIssueGo(m[2]); // opened once the map's reports are loaded
       }
-      if (m[1] === "shop") return openPros("");
+      if (m[1] === "shop") return isMarketShop(services.find((x) => x.id === m[2]) || {}) ? showTab("market") : openPros("");
       if (m[1] === "forum") {
         forumGo.openId = m[2];
         forumGo.compose = false;
@@ -555,6 +558,7 @@ export default function RepairApp() {
         look={home.layout?.myhome ? lookOf(home.layout, "myhome") : null}
         onIssue={() => setSheet({ type: "quickReport" })}
         onIssues={() => showTab("issues")}
+        onWaste={() => showTab("waste")}
         onElectricians={() => openPros("electric")}
         onPros={(g) => openPros(g)}
         onBadge={onHomeBadge}
@@ -779,11 +783,11 @@ export default function RepairApp() {
 
           {page === "pros" && (
             <>
-              <PageTitle title="ช่าง · ร้าน ในหมู่บ้าน" sub={`${services.length} ราย · คนแนะนำเยอะขึ้นก่อน${hires.length ? ` · มีคนกำลังหาช่าง ${hires.length} เรื่อง (ท้ายหน้า)` : ""}`} />
+              <PageTitle title="ช่าง · บริการ ในหมู่บ้าน" sub={`${prosOnly.length} ราย · คนแนะนำเยอะขึ้นก่อน${hires.length ? ` · มีคนกำลังหาช่าง ${hires.length} เรื่อง (ท้ายหน้า)` : ""}`} />
               {/* 7 Oct: everyone (admins too) gets the same list; neighbours looking for a tradesman sit quietly at its end */}
               <ProsList
                 key={`${prosGroup}-${prosFocus}`}
-                services={services}
+                services={prosOnly}
                 setServices={setServices}
                 group={prosGroup}
                 setGroup={setProsGroup}
@@ -887,7 +891,7 @@ export default function RepairApp() {
                 )}
                 {tab === "market" && (
                   <section className="card p-3">
-                    <Market items={lend} setItems={setLend} admin={admin} onAdd={() => setSheet({ type: "lendForm", kind: "sell" })} onShops={() => openPros("shop")} />
+                    <Market items={lend} setItems={setLend} admin={admin} onAdd={() => setSheet({ type: "lendForm", kind: "sell" })} shops={shops} onAddShop={() => setSheet({ type: "serviceForm", prefill: { category: "food" } })} />
                   </section>
                 )}
                 {tab === "forum" && (
@@ -915,25 +919,7 @@ export default function RepairApp() {
                 )}
               </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-2" aria-label="เรื่องอื่นในหมู่บ้าน">
-                {/* 15 Oct: the after-flood checklist is off the list (still reachable at #guide) */}
-                {Object.entries(MORE_TABS).filter(([k]) => k !== "guide").map(([k, [icon, text]]) => (
-                  <button
-                    key={k}
-                    onClick={() => showTab(k)}
-                    aria-current={tab === k ? "page" : undefined}
-                    className={`min-h-[72px] rounded-2xl px-2 py-2 text-left ${tab === k ? "bg-[#15201A] text-white" : "card"}`}
-                  >
-                    <b className="block text-[15px] leading-tight">
-                      {icon} {text}
-                    </b>
-                    <span className={`block text-xs ${tab === k ? "text-[#C5D1CA]" : "text-[#45504A]"}`}>
-                      {MORE_SUB[k]}
-                      {counts[k] > 0 ? ` · ${counts[k]}` : ""}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              {/* 16 Oct: the ขยะ / ปัญหาซอย cards under every tab are gone (clutter) — ขยะ is a บ้านฉัน tool, ปัญหาซอย is on the map + บ้านฉัน; #waste #issues still open */}
             </>
           )}
 
@@ -1085,7 +1071,7 @@ export default function RepairApp() {
             <div className="space-y-3">
               {[
                 ["home", "🏠 บ้านฉัน"],
-                ["pros", "🔧 ช่าง · ร้าน"],
+                ["pros", "🔧 ช่าง · บริการ"],
                 ["community", "👥 เพื่อนบ้าน"],
                 ["map", "🗺️ แผนที่หมู่บ้าน"],
               ]
@@ -1414,12 +1400,13 @@ export default function RepairApp() {
           </Sheet>
         )}
         {sheet?.type === "serviceForm" && (
-          <Sheet title="แนะนำช่าง / ร้าน" onClose={() => setSheet(null)}>
+          <Sheet title={sheet.prefill?.category ? "🏪 ลงร้านในตลาด" : "แนะนำช่าง / ร้าน"} onClose={() => setSheet(null)}>
             <ServiceForm
               repair
+              prefill={sheet.prefill || {}}
               onDone={(s) => {
                 setServices((p) => [s, ...p]);
-                posted("pros", `⭐ แนะนำช่าง/ร้าน: ${s.name}${s.detail ? ` · ${s.detail}` : ""}`);
+                posted(isMarketShop(s) ? "market" : "pros", `⭐ แนะนำช่าง/ร้าน: ${s.name}${s.detail ? ` · ${s.detail}` : ""}`);
               }}
             />
           </Sheet>
@@ -1503,7 +1490,6 @@ function waterSub(water) {
 }
 
 const LEND_KIND_TEXT = { lend: "มีของให้ยืม:", give: "มีของให้ฟรี:", want: "ตามหา / อยากได้:", sell: "ขาย:" };
-const MORE_SUB = { waste: "วันนี้รถเข้าซอยไหน", guide: "ไฟ น้ำ ความปลอดภัย", issues: "ฝาท่อแตก ขยะ ไฟถนน", lost: "สัตว์เลี้ยง ของหาย" };
 
 // Where an event's sign goes: its meeting point, or the middle of its line
 export function eventSpot(e) {

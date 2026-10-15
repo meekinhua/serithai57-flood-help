@@ -479,7 +479,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
       </div>
       {sell && (
         <p className="rounded-lg bg-[#FFF4D6] p-2.5 text-sm text-[#45504A]">
-          🛍️ ตลาดนี้สำหรับของทำเอง·ทำตามสั่ง·ของเหลือใช้ จากเพื่อนบ้าน · ร้านอาหาร/ร้านค้าที่เปิดขายประจำ ลงที่หน้า <b>ช่าง·ร้าน</b> แทน
+          🛍️ ลงของทำเอง·ทำตามสั่ง·ของเหลือใช้ · มีร้านที่เปิดประจำ? ใช้ปุ่ม <b>“ลงร้าน”</b> ท้ายหน้าตลาด
         </p>
       )}
       <fieldset>
@@ -628,7 +628,7 @@ export function JobBoard({ jobs: all, setJobs, admin, onAdd, onPaid, noAdd = fal
       </div>
       {onPaid && (
         <button onClick={onPaid} className="min-h-[44px] w-full rounded-xl bg-[#F2F4F1] px-3 text-left text-[15px]">
-          ช่วยกันด้วยน้ำใจ ไม่มีค่าจ้าง · <b>จะจ้างช่าง หรือรับจ้าง/มีร้าน → ช่าง·ร้าน ›</b>
+          ช่วยกันด้วยน้ำใจ ไม่มีค่าจ้าง · <b>จะจ้างช่าง หรือรับจ้าง → ช่าง·บริการ ›</b>
         </button>
       )}
       <Chips options={FREE_TYPES} value={type} onChange={setType} counts={counts} />
@@ -813,7 +813,7 @@ export function JobForm({ kind = "need", jobType = "", onDone }) {
     <form onSubmit={submit} className="space-y-4">
       <fieldset>
         <legend className={label}>{need ? "ต้องการอะไร *" : "ช่วยอะไรได้ *"}</legend>
-        {jobType !== "hire" && <p className="mb-2 text-sm text-neutral-600">{need ? "ขอแรงเพื่อนบ้าน ช่วยกันด้วยน้ำใจ" : "ช่วยเพื่อนบ้านด้วยน้ำใจ"} · ถ้าคิดค่าจ้าง ลงที่ ช่าง·ร้าน</p>}
+        {jobType !== "hire" && <p className="mb-2 text-sm text-neutral-600">{need ? "ขอแรงเพื่อนบ้าน ช่วยกันด้วยน้ำใจ" : "ช่วยเพื่อนบ้านด้วยน้ำใจ"} · ถ้าคิดค่าจ้าง ลงที่ ช่าง·บริการ</p>}
         <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
           {Object.entries(jobType === "hire" ? { hire: JOB_TYPES.hire } : FREE_TYPES).map(([k, [emoji, text]]) => (
             <button
@@ -1287,7 +1287,7 @@ const AFTER_FLOOD = [
       "อย่าสตาร์ท อย่าลองบิดกุญแจ (เครื่องดูดน้ำเข้า พังหนักกว่าเดิม)",
       "ถ่ายรูปรถและระดับคราบน้ำ แล้วแจ้งประกันก่อน · ชั้น 1 ส่วนใหญ่คุ้มครองน้ำท่วม",
       "ถอดขั้วแบตเตอรี่ · ให้ช่างเช็กน้ำมันเครื่อง กรองอากาศ ระบบไฟ ก่อนใช้",
-      "ต้องลากไปอู่ หาช่าง/รถยกในแท็บ “ช่าง · ร้าน” หมวดซ่อมรถ",
+      "ต้องลากไปอู่ หาช่าง/รถยกในแท็บ “ช่าง · บริการ” หมวดซ่อมรถ",
       "ยังไม่มีรถใช้ ขอติดรถเพื่อนบ้านในแท็บ “ขอแรง · ติดรถ”",
     ],
   },

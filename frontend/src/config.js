@@ -134,6 +134,11 @@ export const PHASES = {
   standby: ["🟢", "ออนไลน์", "bg-emerald-100 text-emerald-900"],
 };
 
+// 16 Oct: shops you buy from (these directory categories) are listed in 🛍️ ตลาด with the homemade things;
+// ช่าง·บริการ keeps the rest. One place for things to eat and use.
+export const MARKET_SHOP_CATS = ["food", "shop", "supplies"];
+export const isMarketShop = (s) => MARKET_SHOP_CATS.includes(s.category);
+
 // Contact board categories. Keys must match SERVICE_CATEGORIES in backend/services.py
 export const SERVICE_CATEGORIES = {
   electrician: ["⚡", "ช่างไฟ"],
@@ -144,8 +149,8 @@ export const SERVICE_CATEGORIES = {
   porter: ["💪", "จ้างขนของ / หิ้วของ"],
   cleaning: ["🧹", "ล้างบ้าน / ทำความสะอาด"],
   repair: ["🛠️", "ช่างซ่อม (แอร์ รถ เครื่องใช้)"],
-  food: ["🍜", "ร้านอาหาร / ส่งอาหาร (เปิดประจำ)"],
-  supplies: ["🛒", "ของใช้ / กระสอบทราย"],
+  food: ["🍜", "ร้านอาหาร / ส่งอาหาร"],
+  supplies: ["🧱", "วัสดุ / ของใช้ / กระสอบทราย"],
   pets: ["🐾", "รับฝากสัตว์เลี้ยง"],
   // after the flood (repair mode)
   ac: ["❄️", "ล้าง / ซ่อมแอร์"],
@@ -157,7 +162,7 @@ export const SERVICE_CATEGORIES = {
   vehicle: ["🚗", "ซ่อมรถ / มอไซค์จมน้ำ"],
   junk: ["🚛", "รับขนขยะ / ของพัง"],
   // the village marketplace after the flood (7 Oct)
-  shop: ["🏪", "ร้านค้า (เปิดประจำ)"], // 16 Oct: homemade / made-to-order goes to ตลาดเพื่อนบ้าน instead
+  shop: ["🏪", "ร้านค้า / ร้านกาแฟ"],
   beauty: ["💇", "ตัดผม / เสริมสวย / นวด"],
   tutor: ["📚", "ติวเตอร์ / สอนพิเศษ"],
   other: ["📞", "อื่นๆ"],
