@@ -8,6 +8,7 @@ import { createBaseMap } from "./MapView";
 import LocationPicker from "./LocationPicker";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinFix from "./PinFix";
+import PinField from "./PinField";
 import { SPEAKER_RE, SpeakerHint } from "./QuickReport";
 
 // After the flood: lend & borrow, ask for hands, soi problems, and the after-flood checklist.
@@ -434,6 +435,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
   const [, addKey] = useKeys("lendKeys");
   const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", preorder: false, soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
   const [preTouched, setPreTouched] = useState(false);
+  const [pin, setPin] = useState(null); // ตลาด: optional pin where to pick it up
   const [media, setMedia] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -448,7 +450,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
       const body = form.kind === "sell" ? form : { ...form, pickup: "", when: "", preorder: false };
       // a seller's own phone gets "🛎️ ออเดอร์ใหม่" when this item is ordered (only if notifications are already on here)
       const sub = form.kind === "sell" ? await currentSub().catch(() => null) : null;
-      const x = await api("/lend", { method: "POST", body: JSON.stringify({ ...body, notify_endpoint: sub?.endpoint || "", media_ids: attached.ids }) });
+      const x = await api("/lend", { method: "POST", body: JSON.stringify({ ...body, notify_endpoint: sub?.endpoint || "", media_ids: attached.ids, ...(sell && pin ? { lat: pin.lat, lng: pin.lng } : {}) }) });
       addKey(x.id, x.edit_key);
       remember(form.name, form.phone);
       save("mySoi", form.soi);
@@ -551,6 +553,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
             </label>
             <input id="lend-pickup" maxLength={80} value={form.pickup} onChange={(e) => set({ pickup: e.target.value })} className={input} placeholder="เช่น รับที่บ้าน ซ.16 / ส่งในหมู่บ้าน" />
           </div>
+          <PinField value={pin} onChange={setPin} title="จุดรับของ" button="🗺️ ปักหมุดจุดรับของ (ไม่บังคับ)" />
         </>
       )}
       <div>

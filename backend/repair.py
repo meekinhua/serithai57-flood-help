@@ -172,6 +172,8 @@ class LendCreate(Contact):
     when: str = Field("", max_length=80)  # for sale: "ทุกเช้า 7–9 โมง · สั่งล่วงหน้า 1 วัน"
     preorder: bool = False  # for sale (16 Oct): made to order — neighbours press "สั่ง / จอง" and the seller cooks after
     notify_endpoint: str = Field("", max_length=600)  # the seller's own push subscription: a new order pings that phone only
+    lat: Optional[float] = Field(None, ge=13.5, le=14.1)  # for sale (16 Oct): optional pin where to pick it up
+    lng: Optional[float] = Field(None, ge=100.4, le=101.0)
     media_ids: list[str] = Field(default_factory=list, max_length=3)
 
 

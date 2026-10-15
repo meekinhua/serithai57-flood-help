@@ -46,6 +46,8 @@ class ServiceCreate(BaseModel):
     price: str = Field("", max_length=100)  # e.g. "300 บาท/เที่ยว"
     area: str = Field("", max_length=100)  # e.g. "ในหมู่บ้าน", "ทั่วบึงกุ่ม"
     media_ids: list[str] = Field(default_factory=list, max_length=3)  # 7 Oct: photos of the shop / the work
+    lat: Optional[float] = Field(None, ge=13.5, le=14.1)  # 16 Oct: where the shop is (optional pin; shops can be outside the village)
+    lng: Optional[float] = Field(None, ge=100.4, le=101.0)
 
 
 class ServiceUpdate(BaseModel):
@@ -63,6 +65,8 @@ class ServiceAdminUpdate(BaseModel):
     verified: Optional[bool] = None
     pinned: Optional[bool] = None
     media_ids: Optional[list[str]] = Field(None, max_length=3)
+    lat: Optional[float] = Field(None, ge=13.5, le=14.1)  # admin can place / move the shop pin
+    lng: Optional[float] = Field(None, ge=100.4, le=101.0)
 
 
 def build_router(db, rate_limit, require_admin, audit, client_ip, claim_media=None, delete_media=None) -> APIRouter:
