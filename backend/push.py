@@ -229,6 +229,16 @@ async def on_lend(doc: dict):
     await send({"topics": "help", "soi": doc["soi"]}, f"🧰 เพื่อนบ้าน ซ.{doc['soi']} {word}", doc.get("title") or doc.get("name") or "", f"/#{'market' if doc.get('kind') == 'sell' else 'lend'}-{doc['id']}", tag=f"lend-{doc['id']}")
 
 
+async def on_order(doc: dict, entry: dict):
+    """ตลาด: someone ordered / reserved — only the seller's own phone (the endpoint saved with the item), never the soi."""
+    ep = doc.get("notify_endpoint")
+    if not ep:
+        return
+    what = " · ".join(x for x in (entry.get("qty", ""), entry.get("pick", "")) if x)
+    await send({"endpoint": ep}, f"🛎️ ออเดอร์ใหม่ · {doc.get('title', '')}"[:80], f"{entry.get('name', '')} {what}".strip() + " · แตะดูเบอร์",
+               f"/#market-{doc['id']}", tag=f"order-{doc['id']}", urgency="high")
+
+
 async def on_shop(doc: dict):
     if not _quiet_ok("shop"):
         return

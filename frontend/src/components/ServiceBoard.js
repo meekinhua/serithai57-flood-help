@@ -379,6 +379,11 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
             </button>
           ))}
         </div>
+        {(form.category === "food" || form.category === "shop") && (
+          <p className="mt-2 rounded-lg bg-[#FFF4D6] p-2.5 text-sm">
+            ช่าง·ร้าน สำหรับร้านที่เปิดขายประจำ · ถ้าทำขายเองเป็นครั้งคราว รับสั่งล่วงหน้า หรือของเหลือใช้ ลงที่ <b>🛍️ ตลาดเพื่อนบ้าน</b> (เพื่อนบ้าน › ตลาด) จะมีปุ่มให้คนกดสั่ง/จอง
+          </p>
+        )}
       </fieldset>
       <div>
         <label className={label} htmlFor="svc-detail">

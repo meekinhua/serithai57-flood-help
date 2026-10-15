@@ -887,7 +887,7 @@ export default function RepairApp() {
                 )}
                 {tab === "market" && (
                   <section className="card p-3">
-                    <Market items={lend} setItems={setLend} admin={admin} onAdd={() => setSheet({ type: "lendForm", kind: "sell" })} />
+                    <Market items={lend} setItems={setLend} admin={admin} onAdd={() => setSheet({ type: "lendForm", kind: "sell" })} onShops={() => openPros("shop")} />
                   </section>
                 )}
                 {tab === "forum" && (

@@ -144,7 +144,7 @@ export const SERVICE_CATEGORIES = {
   porter: ["💪", "จ้างขนของ / หิ้วของ"],
   cleaning: ["🧹", "ล้างบ้าน / ทำความสะอาด"],
   repair: ["🛠️", "ช่างซ่อม (แอร์ รถ เครื่องใช้)"],
-  food: ["🍱", "ส่งอาหาร / น้ำดื่ม"],
+  food: ["🍜", "ร้านอาหาร / ส่งอาหาร (เปิดประจำ)"],
   supplies: ["🛒", "ของใช้ / กระสอบทราย"],
   pets: ["🐾", "รับฝากสัตว์เลี้ยง"],
   // after the flood (repair mode)
@@ -157,7 +157,7 @@ export const SERVICE_CATEGORIES = {
   vehicle: ["🚗", "ซ่อมรถ / มอไซค์จมน้ำ"],
   junk: ["🚛", "รับขนขยะ / ของพัง"],
   // the village marketplace after the flood (7 Oct)
-  shop: ["🏪", "ร้านค้า / ของทำขาย ในหมู่บ้าน"],
+  shop: ["🏪", "ร้านค้า (เปิดประจำ)"], // 16 Oct: homemade / made-to-order goes to ตลาดเพื่อนบ้าน instead
   beauty: ["💇", "ตัดผม / เสริมสวย / นวด"],
   tutor: ["📚", "ติวเตอร์ / สอนพิเศษ"],
   other: ["📞", "อื่นๆ"],

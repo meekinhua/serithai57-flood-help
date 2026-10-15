@@ -21,7 +21,7 @@ export const PRO_GROUPS = [
   { key: "junk", label: "ขนขยะ", cats: ["junk", "porter", "truck"] },
   { key: "build", label: "ช่างไม้ ทาสี", cats: ["carpenter", "painter", "roof", "pest"] },
   { key: "car", label: "ซักพรม ซ่อมรถ", cats: ["vehicle", "rental", "boat"] },
-  { key: "shop", label: "ร้านค้า · บริษัท", cats: ["shop", "food", "supplies", "beauty", "tutor", "pets"] },
+  { key: "shop", label: "ร้านอาหาร · ร้านค้า", cats: ["shop", "food", "supplies", "beauty", "tutor", "pets"] },
 ];
 const groupOf = (cat) => PRO_GROUPS.find((g) => g.cats.includes(cat));
 // ร้านเพื่อนบ้าน: the team marks the ones run by neighbours or selling in the village regularly; the rest are outside shops (ช่าง·ร้าน only)
