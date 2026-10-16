@@ -81,10 +81,11 @@ LIST_WORDS = {"หาย", "เจอ", "หายเจอ", "หาย·เจ
 CANCEL_WORDS = {"ยกเลิก", "cancel", "เลิก", "❌ ยกเลิก"}
 CAT_TH = {"dog": "หมา", "cat": "แมว", "pet": "สัตว์เลี้ยง", "item": "ของ", "document": "เอกสาร", "vehicle": "รถ", "other": "อื่นๆ"}
 CAT_ICON = {"dog": "🐶", "cat": "🐱", "pet": "🐾", "item": "🎒", "document": "📄", "vehicle": "🚲", "other": "📦"}
-FALLBACK = (  # 15 Oct: the team reads the chat now
-    "ได้รับข้อความแล้วครับ 🙏 ทีมงานจะอ่านและตอบกลับ\nระหว่างนี้กดเมนูด้านล่าง หรือพิมพ์:\n"
-    "• หาย / เจอ — สัตว์เลี้ยงหาย·เจอ แจ้งเองได้ในแชทนี้\n• ตลาด — ของทำเอง ร้านอาหาร ร้านค้า (สั่ง/จอง ลงขาย ได้ในแชทนี้)\n"
-    "• เบอร์ฉุกเฉิน • ช่าง\n• ไฟดับ • ขยะ • บริจาค\n• บ้านฉัน — บอกบ้านเลขที่ครั้งเดียว ได้วันรถขยะของซอยคุณ\n• เมนู (ดูทุกอย่าง)\n\n(ทีมอาสาเพื่อนบ้าน · ไม่ใช่ LINE ทางการของคหบาล)"
+FALLBACK = (  # 16 Oct: the admin's own voice (one resident runs this OA alone, not a team), plainly not the นิติ/คหบาล official one
+    "แอดได้รับข้อความแล้วนะครับ 🙏 เดี๋ยวแอดอ่านแล้วตอบกลับ\n"
+    "ระหว่างนี้กดเมนูด้านล่าง หรือพิมพ์: หาย · ตลาด · ขยะ · ช่าง · บ้านฉัน · เมนู\n\n"
+    "ℹ️ LINE นี้แอด (ลูกบ้านคนหนึ่ง) ทำเองคนเดียว ไม่ใช่ LINE ทางการของนิติ/คหบาล "
+    "ไว้ทำเรื่องที่ไลน์ทางการไม่ได้มีให้ เช่น วันรถขยะซอยคุณ หาย·เจอ ตลาด หาช่าง · ประกาศทางการยังดูที่ LINE คหบาลเหมือนเดิมครับ"
 )
 # ---------- 🛍️ ตลาดเพื่อนบ้าน (15 Oct): lend items of kind "sell" (backend/repair.py), listed and posted from the chat ----------
 MARKET_WORDS = {"ตลาด", "ตลาดเพื่อนบ้าน", "ซื้อ", "ของขาย", "ของกิน", "🛍️ ตลาด", "🛍️ ดูตลาด", "ดูตลาด",
@@ -141,11 +142,14 @@ def _glyph(tok: str):
     return _glyphs[tok]
 
 
-def menu_image(house: str, soi: str, days: str | None, thai_days: list) -> bytes:
-    """2500×1686 JPEG: base.png with the house / soi / truck days written into the top strip."""
+def menu_image(house: str, soi: str, days: str | None, thai_days: list, photos: dict | None = None) -> bytes:
+    """2500×1686 JPEG: base.png with the house / soi / truck days written into the top strip (+ live photo tiles)."""
     import io
     from PIL import Image
     base = Image.open(MENU_DIR / "base.png").convert("RGB")
+    for name, idx in PHOTO_TILES:
+        if (photos or {}).get(name):
+            photo_tile(base, _tile_box(idx, 230), photos[name], name)
     words = [list(house), ["·"], ["ซอย"], list(soi)]
     if days:
         abbr = [DAY_ABBR[i] for i, d in enumerate(thai_days) if d in days]
@@ -168,6 +172,57 @@ def menu_image(house: str, soi: str, days: str | None, thai_days: list) -> bytes
     out = io.BytesIO()
     base.save(out, "JPEG", quality=86, optimize=True)
     return out.getvalue()
+
+
+def _tile_box(i: int, strip: int):
+    """(x0, y0, x1, y1) of tile i (0..5, 3 per row) under a top strip of `strip` px."""
+    w, h = [833, 833, 834], (1686 - strip) // 2
+    r, c = divmod(i, 3)
+    x0, y0 = sum(w[:c]), strip + r * h
+    return x0, y0, x0 + w[c], (1686 if r else y0 + h)
+
+
+def photo_tile(base, box, photo: bytes, label: str):
+    """16 Oct: the newest หาย·เจอ / ตลาด photo fills the tile, darkened at the bottom, the label pasted on top."""
+    import io
+    from PIL import Image, ImageOps
+    x0, y0, x1, y1 = box
+    W, H = x1 - x0, y1 - y0
+    im = ImageOps.fit(Image.open(io.BytesIO(photo)).convert("RGB"), (W, H), Image.LANCZOS, centering=(0.5, 0.4))
+    grad = Image.linear_gradient("L").resize((W, H))  # 0 at the top → 255 at the bottom
+    grad = grad.point(lambda v: max(0, int((v - 70) * 1.2)))
+    im = Image.composite(Image.new("RGB", (W, H), (8, 22, 15)), im, grad)
+    lab = Image.open(MENU_DIR / f"label_{label}.png").convert("RGBA")
+    if lab.width > W:
+        lab = lab.resize((W, int(lab.height * W / lab.width)))
+    im.paste(lab, ((W - lab.width) // 2, H - lab.height), lab)
+    base.paste(im, (x0, y0))
+
+
+PHOTO_TILES = (("lost", 3), ("market", 5))
+
+
+def default_menu_image(photos: dict) -> bytes:
+    """The village menu for everyone without a house linked (LINE default menu), with the live photo tiles."""
+    import io
+    from PIL import Image
+    base = Image.open(MENU_DIR / "default.png").convert("RGB")
+    for name, idx in PHOTO_TILES:
+        if photos.get(name):
+            photo_tile(base, _tile_box(idx, 0), photos[name], name)
+    out = io.BytesIO()
+    base.save(out, "JPEG", quality=86, optimize=True)
+    return out.getvalue()
+
+
+def default_areas() -> list:
+    acts = [{"type": "message", "text": "เบอร์ฉุกเฉิน"}, {"type": "uri", "uri": f"{SITE}/#issues"}, {"type": "uri", "uri": f"{SITE}/#pros"},
+            {"type": "message", "text": "หาย"}, {"type": "message", "text": "ขยะ"}, {"type": "message", "text": "ตลาด"}]
+    out = []
+    for i, a in enumerate(acts):
+        x0, y0, x1, y1 = _tile_box(i, 0)
+        out.append({"bounds": {"x": x0, "y": y0, "width": x1 - x0, "height": y1 - y0}, "action": a})
+    return out
 
 
 def home_url(house: str, hash_: str = "") -> str:
@@ -243,7 +298,7 @@ class BotCreds(BaseModel):
     token: str = Field(..., min_length=20, max_length=400)
 
 
-def build_router(db, require_admin, audit, claim_media, locate_house, norm_house, house_re, soi_parity, waste_rounds, thai_days) -> APIRouter:
+def build_router(db, require_admin, audit, claim_media, locate_house, norm_house, house_re, soi_parity, waste_rounds, thai_days, learn_address=None) -> APIRouter:
     router = APIRouter(prefix="/api")
     KIND: dict = {}  # user → what the last text was (for the inbox): smalltalk / waste_report / pros / market / fallback
     NAMES: dict = {}  # LINE display names, fetched once per user
@@ -355,15 +410,95 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 return parity, days, ("วันนี้" if i == 0 else "พรุ่งนี้" if i == 1 else f"{thai_days[d.weekday()]} {d.day}")
         return parity, days, None
 
+    photo_cache: dict = {}
+
+    async def media_bytes(mid: str):
+        """A stored photo (or a clip's poster) as bytes, for the menu tiles."""
+        if mid in photo_cache:
+            return photo_cache[mid]
+        m = await db.media.find_one({"id": mid}, {"_id": 0, "type": 1, "file_id": 1, "thumb_id": 1})
+        fid = (m or {}).get("file_id") if (m or {}).get("type") == "image" else (m or {}).get("thumb_id")
+        if not fid:
+            return None
+        data = await (await bucket.open_download_stream(fid)).read()
+        if len(photo_cache) > 8:
+            photo_cache.clear()
+        photo_cache[mid] = data
+        return data
+
+    async def latest_photos() -> dict:
+        """The media ids for the photo tiles: newest open หาย·เจอ with a photo (pets first), newest thing for sale with one."""
+        lost = None
+        async for d in db.lost.find({"status": "open", "media.type": "image"}, {"_id": 0, "media": 1, "category": 1}).sort("created_at", -1).limit(10):
+            mid = next((x["id"] for x in d["media"] if x.get("type") == "image"), None)
+            if d.get("category") in ("dog", "cat", "pet"):
+                lost = mid
+                break
+            lost = lost or mid
+        sale = await db.lend_items.find_one({"kind": "sell", "status": {"$ne": "closed"}, "media.0": {"$exists": True}}, {"_id": 0, "media": 1}, sort=[("created_at", -1)])
+        return {"lost": lost, "market": (sale or {}).get("media", [{}])[0].get("id")}
+
+    async def menu_key(house: str, soi: str):
+        _, days, _ = await next_waste(soi)
+        ids = await latest_photos()
+        return f"{MENU_VER}|{house}|{soi}|{days or ''}|{ids['lost'] or ''}|{ids['market'] or ''}", days, ids
+
+    async def refresh_default_menu():
+        """16 Oct: the LINE default menu (everyone without a house) is drawn here with the live photo tiles, and
+        redrawn when the newest photos change. It replaces the OA Manager menu (a Messaging API default wins)."""
+        c = await creds()
+        if not c or not c.get("set_at"):
+            return
+        st = await db.settings.find_one({"id": "line_default_menu"}, {"_id": 0}) or {}
+        if st.get("off"):
+            return
+        ids = await latest_photos()
+        key = f"{MENU_VER}|default|{ids['lost'] or ''}|{ids['market'] or ''}"
+        if st.get("key") == key:
+            return
+        photos = {k: await media_bytes(v) for k, v in ids.items() if v}
+        img = await asyncio.to_thread(default_menu_image, photos)
+        if c.get("dry"):
+            Path(tempfile.gettempdir(), "line_menu_default.jpg").write_bytes(img)
+            menu_id = "dry-" + uuid.uuid4().hex[:8]
+        else:
+            body = {"size": {"width": 2500, "height": 1686}, "selected": False, "name": "village default", "chatBarText": "เมนูหมู่บ้าน", "areas": default_areas()}
+            code, r = await asyncio.to_thread(call, "POST", f"{API}/richmenu", c["token"], body)
+            if code != 200:
+                raise RuntimeError(f"default richmenu create {code} {r!r}"[:300])
+            menu_id = r["richMenuId"]
+            code, r = await asyncio.to_thread(call, "POST", f"{DATA_API}/richmenu/{menu_id}/content", c["token"], None, False, 30, img)
+            if code != 200:
+                await asyncio.to_thread(call, "DELETE", f"{API}/richmenu/{menu_id}", c["token"])
+                raise RuntimeError(f"default richmenu image {code} {r!r}"[:300])
+            code, r = await asyncio.to_thread(call, "POST", f"{API}/user/all/richmenu/{menu_id}", c["token"])
+            if code != 200:
+                raise RuntimeError(f"default richmenu set {code} {r!r}"[:300])
+            if st.get("menu_id") and not str(st["menu_id"]).startswith("dry-"):
+                await asyncio.to_thread(call, "DELETE", f"{API}/richmenu/{st['menu_id']}", c["token"])
+        await db.settings.update_one({"id": "line_default_menu"}, {"$set": {"id": "line_default_menu", "key": key, "menu_id": menu_id, "at": now()}}, upsert=True)
+
+    async def default_menu_loop():
+        await asyncio.sleep(30)
+        while True:
+            try:
+                await refresh_default_menu()
+            except Exception as e:
+                await db.line_log.insert_one({"at": now(), "error": f"default menu: {type(e).__name__}: {e}"[:400]})
+            await asyncio.sleep(900)  # every 15 min: a new หาย·เจอ / ตลาด photo shows up within that
+
+    router.default_menu_loop = default_menu_loop
+    router.refresh_default_menu = refresh_default_menu
+
     async def set_menu(user: str, house: str, soi: str):
         """Give this LINE user the menu with their house on it (shared by everyone linked to the same house + soi).
         Linking a menu to a user is not a message, so it costs nothing; LINE allows 1000 menus per channel."""
         c = await creds()
-        _, days, _ = await next_waste(soi)
-        key = f"{MENU_VER}|{house}|{soi}|{days or ''}"
+        key, days, ids = await menu_key(house, soi)
         m = await db.line_menus.find_one({"key": key})
         if not m:
-            img = await asyncio.to_thread(menu_image, house, soi, days, thai_days)
+            photos = {k: await media_bytes(v) for k, v in ids.items() if v}
+            img = await asyncio.to_thread(menu_image, house, soi, days, thai_days, photos)
             if c.get("dry"):
                 Path(tempfile.gettempdir(), f"line_menu_{house.replace('/', '-')}.jpg").write_bytes(img)
                 menu_id = "dry-" + uuid.uuid4().hex[:8]
@@ -388,7 +523,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             code, r = await asyncio.to_thread(call, "POST", f"{API}/user/{user}/richmenu/{m['menu_id']}", c["token"])
             if code != 200:
                 raise RuntimeError(f"richmenu link {code} {r!r}"[:300])
-        await db.line_users.update_one({"user": user}, {"$set": {"menu_id": m["menu_id"], "menu_ver": MENU_VER}})
+        await db.line_users.update_one({"user": user}, {"$set": {"menu_id": m["menu_id"], "menu_ver": MENU_VER, "menu_key": key}})
 
     async def clear_menu(user: str):
         c = await creds()
@@ -400,12 +535,12 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         if home and home.get("soi"):
             parity, days, nxt = await next_waste(home["soi"])
             if days:
-                head = (f"🚛 ซ.{home['soi']} (ซอยเลข{'คู่' if parity == 'even' else 'คี่'}) รถเก็บขยะ {days}\nรอบต่อไป: {nxt}"
+                head = (f"🚛 ซ.{home['soi']} รถเก็บขยะ {days}\nรอบต่อไป: {nxt}"
                         + (" · มัดถุงวางหน้าบ้านคืนนี้" if nxt == "พรุ่งนี้" else ""))
-                return [text(f"{head}\n\n🔔 อยากให้เตือนคืนก่อนรถมา: เปิด {home_url(home['house'])} แล้วกด เปิดแจ้งเตือน\n\n{WASTE_MORE}", qr(("🏠 บ้านฉัน", "บ้านฉัน")))]
+                return [text(f"{head}\n\n🔔 อยากให้เตือนคืนก่อนรถมา: เปิด {home_url(home['house'])} แล้วกด เปิดแจ้งเตือน\n\n{WASTE_MORE}", qr(("🏠 บ้านฉัน", "บ้านฉัน"), ("🚛 รถไม่มา/วันไม่ตรง", "รถขยะไม่มา")))]
         even, odd = (await next_waste("2"))[1], (await next_waste("1"))[1]
         return [text(f"🚛 รถเก็บขยะประจำ\n• ซอยเลขคู่: {even}\n• ซอยเลขคี่: {odd}\n\n🏠 บอกบ้านเลขที่ครั้งเดียว ครั้งหน้าพิมพ์ \"ขยะ\" จะบอกวันรถของซอยคุณเลย\n\n{WASTE_MORE}",
-                     qr(("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่")))]
+                     qr(("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่"), ("🚛 รถไม่มา/วันไม่ตรง", "รถขยะไม่มา")))]
 
     async def home_ask(user: str) -> list:
         await drop(user)
@@ -416,7 +551,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         txt, stated_soi = split_house(raw)
         h = norm_house(txt)
         if house_re.match(h) and stated_soi:
-            return await link(user, h, stated_soi)  # they told us the soi themselves ("4/820 แยก 32")
+            return await link(user, h, stated_soi, told=True)  # they told us the soi themselves ("4/820 แยก 32")
         if not house_re.match(h):
             return [text("ใส่บ้านเลขที่แบบ 4/917 ครับ (พิมพ์แค่ 917 ก็ได้)", qr(("❌ ยกเลิก", "ยกเลิก")))]
         loc = await locate_house(h)
@@ -426,7 +561,12 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         await save(user, {"step": "house_soi", "house": h})
         return [text(f"บ้าน {h} อยู่ซอยอะไรครับ (พิมพ์เลขซอย เช่น 16)", qr(("❌ ยกเลิก", "ยกเลิก")))]
 
-    async def link(user: str, house: str, soi: str) -> list:
+    async def link(user: str, house: str, soi: str, told: bool = False) -> list:
+        if told and learn_address:  # 16 Oct: a soi the resident typed (corrected / "แยก 32") fixes the address book
+            try:
+                await learn_address(house, soi=soi, source="resident", by="LINE")
+            except Exception:
+                pass
         await db.line_users.update_one({"user": user}, {"$set": {"user": user, "house": house, "soi": soi, "at": now()}}, upsert=True)
         await drop(user)
         try:
@@ -523,7 +663,9 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         return [ask(s)]
 
     async def start(user: str, kind: str) -> list:
-        s = {"kind": kind, "step": "category", "media": [], "line_name": await display_name(user), "home_soi": ((await home_of(user)) or {}).get("soi")}
+        had = await session(user) or {}
+        s = {"kind": kind, "step": "category", "media": [m for m in had.get("media", []) if m][:MAX_PHOTOS] if had.get("step") == "photo_what" else [],
+             "line_name": await display_name(user), "home_soi": ((await home_of(user)) or {}).get("soi")}
         await drop(user)
         await save(user, s)
         return [ask(s)]
@@ -620,10 +762,11 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body},
                 "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": foot}}
 
-    async def market_list() -> list:
+    async def market_list(user: str = "") -> list:
         items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}}, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}
                                          ).sort("created_at", -1).to_list(10)
-        chips = qr(("🛍️ ลงขายของ", "ลงขาย"), ("📋 ออเดอร์ของฉัน", "ออเดอร์"), ("✅ ขายหมดแล้ว", "ขายหมดแล้ว"))
+        seller = bool(user) and bool(await seller_items(user))  # 16 Oct: buyers tapped "ออเดอร์ของฉัน" — sellers only now
+        chips = qr(("🛍️ ลงขายของ", "ลงขาย"), *([("📋 ออเดอร์ของฉัน", "ออเดอร์"), ("✅ ขายหมดแล้ว", "ขายหมดแล้ว")] if seller else []))
         shops = await db.services.find({"category": {"$in": list(SHOP_CATS)}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
                                        ).sort([("pinned", -1), ("verified", -1), ("updated_at", -1)]).to_list(11)
         if not items and shops:
@@ -687,7 +830,9 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         return [mask(s)]
 
     async def market_start(user: str) -> list:
-        s = {"flow": "market", "kind": "sell", "step": "m_category", "media": [], "line_name": await display_name(user),
+        had = await session(user) or {}
+        s = {"flow": "market", "kind": "sell", "step": "m_category", "media": [m for m in had.get("media", []) if m][:MAX_PHOTOS] if had.get("step") == "photo_what" else [],
+             "line_name": await display_name(user),
              "home_soi": ((await home_of(user)) or {}).get("soi")}
         await drop(user)
         await save(user, s)
@@ -934,10 +1079,16 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             m = re.search(r"\d{1,3}(?:/\d{1,2})?", t)
             if not m:
                 return [text("พิมพ์เลขซอยครับ เช่น 16 หรือ 48/2", qr(("❌ ยกเลิก", "ยกเลิก")))]
-            return await link(user, s["house"], m.group(0))
+            return await link(user, s["house"], m.group(0), told=True)
         if not s and (HOUSE_IN_TEXT.match(raw.strip()) or HOUSE_ONLY.match(split_house(raw)[0])):
             await save(user, {"step": "house"})
             return await house_entered(user, raw)
+        if s and s["step"] == "photo_what":
+            await drop(user)
+            if t in ("แจ้งปัญหา", "📍 แจ้งปัญหาในซอย"):
+                return [text("📍 แจ้งปัญหาในซอย ปักหมุดพร้อมรูปได้ที่นี่ครับ\nserithai57.com/#issues")]
+            KIND[user] = "photo_note"
+            return [text("ขอบคุณครับ 🙏 แอดได้รูปกับข้อความแล้ว เดี๋ยวแอดดูแล้วจัดการให้นะครับ" + ("\n(ถ้าเป็นประกาศหาย·เจอ แอดจะปิดเป็น 🎉 ได้คืนแล้ว ให้คนอื่นเห็นด้วย)" if "เจอ" in t else ""))]
         if s and s["step"].startswith("m_"):
             return await market_step(user, s, t, raw)
         if s and s["step"].startswith("o_"):
@@ -986,7 +1137,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             only = "cat" if "แมว" in t else "dog" if ("หมา" in t or "สุนัข" in t) else ""
             return await list_messages(only)
         if t in MARKET_WORDS:
-            return await market_list()
+            return await market_list(user)
         if t in WASTE_WORDS:
             return await waste_reply(user)
         if t in OA_KEYWORDS:
@@ -996,26 +1147,37 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             soi = (linked or {}).get("soi", "")
             await db.waste_reports.insert_one({"at": now(), "user": user, "house": (linked or {}).get("house", ""), "soi": soi, "text": raw.strip()[:300]})
             KIND[user] = "waste_report"
-            return [text(f"ขอบคุณที่แจ้งครับ 🙏 บันทึกไว้แล้ว{(' (ซ.' + soi + ')') if soi else ''}\nทีมกำลังรวบรวมวันรถจริงของแต่ละซอยไปเช็กกับสำนักงาน แล้วจะแก้ในระบบให้ตรงครับ"
+            return [text(f"ขอบคุณที่แจ้งนะครับ 🙏 แอดบันทึกไว้แล้ว{(' (ซ.' + soi + ')') if soi else ''}\nแอดกำลังรวบรวมวันรถจริงของแต่ละซอยไปเช็กกับสำนักงาน แล้วจะแก้ในระบบให้ตรงครับ"
+                         + ("\n\nช่วยเล่าเพิ่มหน่อยครับ: ปกติรถมาวันไหนจริง เช่น \"รถขยะมาวันอังคาร ศุกร์\"" if t == "รถขยะไม่มา" else "")
                          + ("" if soi else "\nพิมพ์บ้านเลขที่ไว้ (เช่น 4/917) จะรู้ว่าเป็นซอยไหน"))]
         if re.search(r"ช่าง|ซ่อม", t):
             KIND[user] = "pros"
-            return [text("🔧 ช่าง·บริการที่เพื่อนบ้านแนะนำ (ไฟ แอร์ ประปา ซ่อมบ้าน ฯลฯ)\nserithai57.com/#pros\n\nไม่เจอที่ต้องการ พิมพ์บอกได้เลย ทีมงานอ่านทุกข้อความครับ",
+            return [text("🔧 ช่าง·บริการที่เพื่อนบ้านแนะนำ (ไฟ แอร์ ประปา ซ่อมบ้าน ฯลฯ)\nserithai57.com/#pros\n\nไม่เจอที่ต้องการ พิมพ์บอกแอดได้เลยครับ",
                          qr(("☰ เมนู", "เมนู")))]
         if re.search(r"ร้านอาหาร|ร้านค้า|อยากซื้อ|ขายไหม|มีขาย", t):
             KIND[user] = "market"
-            return await market_list()
+            return await market_list(user)
         # 16 Oct, from the real chats: say thanks back briefly instead of the long fallback
         if len(t) <= 40 and SMALLTALK.match(t):
             KIND[user] = "smalltalk"
-            return [text("ยินดีครับ 🙏 มีอะไรพิมพ์บอกทีมได้ตลอดครับ")]
+            return [text("ยินดีครับ 🙏 มีอะไรพิมพ์บอกแอดได้ตลอดนะครับ")]
         KIND[user] = "fallback"
         return [text(FALLBACK, qr(*([] if linked else [("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่")]), ("🐾 หาย·เจอ", "หาย"), ("🛍️ ตลาด", "ตลาด"), ("☎️ เบอร์ฉุกเฉิน", "เบอร์ฉุกเฉิน"), ("☰ เมนู", "เมนู")))]
 
     async def on_image(user: str, message_id: str) -> list:
         s = await session(user)
-        if not s or s["step"] not in ("photos", "category", "m_photos", "m_category"):
-            return []  # a photo outside a report: nothing to do (the bot never answers random photos)
+        if not s or s["step"] not in ("photos", "category", "m_photos", "m_category", "photo_what"):
+            # 16 Oct: people send a screenshot / a photo to tell us something ("ตัวนี้เจอแล้ว") — keep it, ask what it is
+            mid = await save_photo(message_id)
+            if not mid:
+                return []
+            await drop(user)
+            await save(user, {"step": "photo_what", "media": [mid]})
+            return [text("แอดได้รับรูปแล้วครับ 📷 รูปนี้เรื่องอะไรครับ? กดเลือก หรือพิมพ์เล่าได้เลย แอดอ่านทุกข้อความ",
+                         qr(("🙌 เจอสัตว์/ของ", "แจ้งเจอ"), ("📢 แจ้งหาย", "แจ้งหาย"), ("🎉 ตัวในประกาศเจอแล้ว", "ตัวนี้เจอแล้ว"), ("🛍️ ลงขายของ", "ลงขาย"), ("📍 แจ้งปัญหาในซอย", "แจ้งปัญหา")))]
+        if s["step"] == "photo_what":  # more photos of the same thing: keep them quietly
+            await db.line_sessions.update_one({"user": user}, {"$push": {"media": {"$each": [await save_photo(message_id)]}}, "$set": {"updated_at": now()}})
+            return []
         if len(s.get("media", [])) >= MAX_PHOTOS:
             return [] if s["step"] not in ("photos", "m_photos") else [ask_any(s)]
         mid = await save_photo(message_id)
@@ -1050,7 +1212,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         out: list = []
         try:
             home = await home_of(user)
-            if home and home.get("menu_ver") != MENU_VER and home.get("soi"):  # an older menu image: redraw it quietly
+            if home and home.get("soi") and (home.get("menu_ver") != MENU_VER or home.get("menu_key") != (await menu_key(home["house"], home["soi"]))[0]):  # an older menu image (new photos / days): redraw it quietly
                 try:
                     await set_menu(user, home["house"], home["soi"])
                 except Exception as e:
