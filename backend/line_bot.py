@@ -190,7 +190,7 @@ def photo_tile(base, box, photo: bytes, label: str):
     W, H = x1 - x0, y1 - y0
     im = ImageOps.fit(Image.open(io.BytesIO(photo)).convert("RGB"), (W, H), Image.LANCZOS, centering=(0.5, 0.4))
     grad = Image.linear_gradient("L").resize((W, H))  # 0 at the top → 255 at the bottom
-    grad = grad.point(lambda v: max(0, int((v - 70) * 1.2)))
+    grad = grad.point(lambda v: min(235, max(0, int((v - 40) * 1.45))))  # 16 Oct: darker — "ตลาด" on a bright jar was hard to read
     im = Image.composite(Image.new("RGB", (W, H), (8, 22, 15)), im, grad)
     lab = Image.open(MENU_DIR / f"label_{label}.png").convert("RGBA")
     if lab.width > W:
@@ -426,17 +426,31 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         photo_cache[mid] = data
         return data
 
-    async def latest_photos() -> dict:
-        """The media ids for the photo tiles: newest open หาย·เจอ with a photo (pets first), newest thing for sale with one."""
+    async def photo_picks() -> dict:
+        """Which post feeds each photo tile: newest open หาย·เจอ with a photo (pets first), newest thing for sale with a
+        photo/clip. Posts or media an admin put on the skip list (GET/POST /admin/line-menu-photos) are passed over."""
+        skip = set((await db.settings.find_one({"id": "line_menu_photos"}) or {}).get("skip", []))
         lost = None
-        async for d in db.lost.find({"status": "open", "media.type": "image"}, {"_id": 0, "media": 1, "category": 1}).sort("created_at", -1).limit(10):
-            mid = next((x["id"] for x in d["media"] if x.get("type") == "image"), None)
+        async for d in db.lost.find({"status": "open", "media.type": "image"}, {"_id": 0, "id": 1, "title": 1, "media": 1, "category": 1}).sort("created_at", -1).limit(20):
+            mid = next((x["id"] for x in d["media"] if x.get("type") == "image" and x["id"] not in skip), None)
+            if not mid or d["id"] in skip:
+                continue
+            pick = {"item": d["id"], "title": d.get("title", ""), "media": mid}
             if d.get("category") in ("dog", "cat", "pet"):
-                lost = mid
+                lost = pick
                 break
-            lost = lost or mid
-        sale = await db.lend_items.find_one({"kind": "sell", "status": {"$ne": "closed"}, "media.0": {"$exists": True}}, {"_id": 0, "media": 1}, sort=[("created_at", -1)])
-        return {"lost": lost, "market": (sale or {}).get("media", [{}])[0].get("id")}
+            lost = lost or pick
+        sale = None
+        async for d in db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}, "media.0": {"$exists": True}}, {"_id": 0, "id": 1, "title": 1, "media": 1}).sort("created_at", -1).limit(20):
+            mid = next((x["id"] for x in d["media"] if x["id"] not in skip), None)
+            if mid and d["id"] not in skip:
+                sale = {"item": d["id"], "title": d.get("title", ""), "media": mid}
+                break
+        return {"lost": lost, "market": sale, "skip": sorted(skip)}
+
+    async def latest_photos() -> dict:
+        p = await photo_picks()
+        return {k: (p[k] or {}).get("media") for k in ("lost", "market")}
 
     async def menu_key(house: str, soi: str):
         _, days, _ = await next_waste(soi)
@@ -1294,6 +1308,29 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         cache["at"] = None
         await audit(admin, "line-bot", "settings", "set channel secret/token")
         return {"configured": True}
+
+    class MenuPhotoBody(BaseModel):
+        skip: str | None = Field(None, max_length=64)  # a หาย·เจอ / ตลาด post id, or one media id
+        unskip: str | None = Field(None, max_length=64)
+
+    @router.get("/admin/line-menu-photos")
+    async def get_menu_photos(admin: dict = Depends(require_admin)):
+        """The posts whose photos are on the LINE menu now, and the skip list."""
+        return await photo_picks()
+
+    @router.post("/admin/line-menu-photos")
+    async def set_menu_photos(body: MenuPhotoBody, admin: dict = Depends(require_admin)):
+        """Keep a photo off the LINE menu (a blurry one, one full of text, one the owner doesn't want shown) or let it back."""
+        if body.skip:
+            await db.settings.update_one({"id": "line_menu_photos"}, {"$addToSet": {"skip": body.skip}, "$set": {"id": "line_menu_photos"}}, upsert=True)
+        if body.unskip:
+            await db.settings.update_one({"id": "line_menu_photos"}, {"$pull": {"skip": body.unskip}})
+        await audit(admin, "line_menu_photos", "settings", f"skip={body.skip or ''} unskip={body.unskip or ''}")
+        try:
+            await refresh_default_menu()  # per-house menus follow on each person's next message
+        except Exception as e:
+            await db.line_log.insert_one({"at": now(), "error": f"default menu: {type(e).__name__}: {e}"[:400]})
+        return await photo_picks()
 
     @router.get("/admin/line-inbox")
     async def get_inbox(days: int = 7, team_only: bool = False, admin: dict = Depends(require_admin)):
