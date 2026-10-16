@@ -4,6 +4,7 @@ import { LEND_CATEGORIES, MARKET_FILTERS, SERVICE_CATEGORIES, timeAgo } from "..
 import { mediaUrl } from "../media";
 import { rememberCall } from "./Community";
 import { mapLink } from "./PinField";
+import { MediaStrip } from "./MediaGallery";
 import { notify } from "../notify";
 import { ContactButton, NameField, input, label, remember, savedContact, telHref, useKeys } from "./RepairBoards";
 
@@ -21,6 +22,34 @@ export const LINE_SELL = "https://line.me/R/oaMessage/@004forpb/?%E0%B8%A5%E0%B8
 export const marketOpen = (lend) => lend.filter((x) => x.kind === "sell" && x.status !== "closed");
 
 const PICKS = ["วันนี้", "พรุ่งนี้เช้า", "พรุ่งนี้เย็น", "เสาร์-อาทิตย์", "ตามสะดวกผู้ขาย"];
+
+// 16 Oct: a YouTube link on a thing for sale → its id for the thumbnail (the video itself opens in YouTube)
+export const youtubeId = (u) => (u || "").match(/(?:youtu\.be\/|[?&]v=|shorts\/|live\/)([\w-]{6,})/)?.[1] || "";
+
+function Cover({ x, media, emoji }) {
+  const [play, setPlay] = useState(false);
+  const m = media[0];
+  if (!m)
+    return (
+      <div className="flex h-28 items-center justify-center bg-[#FFF4D6] text-5xl" aria-hidden="true">
+        {emoji}
+      </div>
+    );
+  if (m.type === "video")
+    return play ? (
+      <video controls autoPlay playsInline src={mediaUrl(m.id, "file")} poster={mediaUrl(m.id, "thumb")} className="aspect-[4/3] w-full bg-black object-contain" />
+    ) : (
+      <button type="button" onClick={() => setPlay(true)} aria-label="เล่นคลิป" className="relative block w-full">
+        <img src={mediaUrl(m.id, "thumb")} alt={x.title} loading="lazy" className="aspect-[4/3] w-full bg-[#F2F4F1] object-cover" />
+        <span className="absolute inset-0 flex items-center justify-center text-5xl text-white drop-shadow-lg">▶</span>
+      </button>
+    );
+  return (
+    <a href={mediaUrl(m.id)} target="_blank" rel="noreferrer" className="block">
+      <img src={mediaUrl(m.id, "thumb")} alt={x.title} loading="lazy" className="aspect-[4/3] w-full bg-[#F2F4F1] object-cover" />
+    </a>
+  );
+}
 
 const dial = (p) => (p || "").replace(/[^\d+]/g, "");
 // a shop from the directory: which market chips it shows under
@@ -185,7 +214,8 @@ function SellerOrders({ item: x, editKey }) {
 
 function MarketCard({ item: x, editKey, admin, onChanged }) {
   const [emoji, catText] = LEND_CATEGORIES[x.category] || ["📦", "อื่นๆ"];
-  const photos = (x.media || []).filter((m) => m.type !== "video");
+  const media = x.media || [];
+  const yt = youtubeId(x.youtube);
   const [busy, setBusy] = useState(false);
   const [ordering, setOrdering] = useState(false);
   const [ordered, setOrdered] = useState(false);
@@ -202,15 +232,7 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
   }
   return (
     <li data-item={x.id} className="card anim-row scroll-mt-36 overflow-hidden">
-      {photos[0] ? (
-        <a href={mediaUrl(photos[0].id)} target="_blank" rel="noreferrer" className="block">
-          <img src={mediaUrl(photos[0].id, "thumb")} alt={x.title} loading="lazy" className="aspect-[4/3] w-full bg-[#F2F4F1] object-cover" />
-        </a>
-      ) : (
-        <div className="flex h-28 items-center justify-center bg-[#FFF4D6] text-5xl" aria-hidden="true">
-          {emoji}
-        </div>
-      )}
+      <Cover x={x} media={media} emoji={emoji} />
       <div className="space-y-1.5 p-3">
         <p className="text-sm text-[#45504A]">
           <span className="rounded-full bg-[#FDE7E4] px-2 py-0.5 font-bold text-[#8F2A1C]">
@@ -229,14 +251,14 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
           </a>
         )}
         {x.detail && <p className="line-clamp-4 whitespace-pre-wrap break-words text-[15px] text-[#33403A]">{x.detail}</p>}
-        {photos.length > 1 && (
-          <div className="flex gap-2 pt-1">
-            {photos.slice(1).map((m) => (
-              <a key={m.id} href={mediaUrl(m.id)} target="_blank" rel="noreferrer">
-                <img src={mediaUrl(m.id, "thumb")} alt="" loading="lazy" className="h-16 w-16 rounded-lg object-cover" />
-              </a>
-            ))}
-          </div>
+        {media.length > 1 && <MediaStrip media={media.slice(1)} size={64} />}
+        {yt && (
+          <a href={x.youtube} target="_blank" rel="noreferrer" className="relative block overflow-hidden rounded-xl">
+            <img src={`https://img.youtube.com/vi/${yt}/hqdefault.jpg`} alt="คลิป YouTube" loading="lazy" className="aspect-video w-full object-cover" />
+            <span className="absolute inset-0 flex items-center justify-center">
+              <span className="rounded-xl bg-[#FF0000] px-4 py-2 text-xl font-bold text-white">▶ YouTube</span>
+            </span>
+          </a>
         )}
         <p className="text-[15px] text-[#45504A]">
           👤 {x.name}

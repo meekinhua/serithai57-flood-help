@@ -34,6 +34,19 @@ def soi_parity(soi: Optional[str]) -> Optional[str]:
     return None if not m else ("even" if int(m.group()) % 2 == 0 else "odd")
 
 
+def waste_days(soi: Optional[str], rounds: dict) -> Optional[str]:
+    """The truck days for one soi: a per-soi entry ("33", "54/3") wins over the soi parity ("even" / "odd").
+    16 Oct: residents in ซ.33 / ซ.38 / ซ.48 report days that don't follow parity, so the team can set sois one by one."""
+    s = (soi or "").strip()
+    if s and s in rounds:
+        return rounds[s]
+    m = re.match(r"\d+", s)
+    if m and m.group() in rounds:
+        return rounds[m.group()]
+    p = soi_parity(s)
+    return rounds.get(p) if p else None
+
+
 def metres(a, b):
     dy = (a[0] - b[0]) * 111_320
     dx = (a[1] - b[1]) * 111_320 * math.cos(math.radians(a[0]))
@@ -536,7 +549,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
     async def soon(soi: Optional[str], rounds: dict) -> list:
         today = datetime.now(BKK).date()
         out = []
-        days = rounds.get(soi_parity(soi)) if soi else None
+        days = waste_days(soi, rounds) if soi else None
         if days:
             for d in (today, today + timedelta(days=1)):
                 if THAI_DAYS[d.weekday()] in days:
@@ -590,7 +603,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
                 "soi_group": soi_group,  # … who want to hire one electrician together
                 "village_waiting": village_waiting,
             },
-            "waste": {"parity": parity, "days": rounds.get(parity)} if parity else None,
+            "waste": {"parity": parity, "days": waste_days(soi, rounds)} if parity else None,
             "issues_open": open_issues,
             "questions": qs,
             "soon": coming,
