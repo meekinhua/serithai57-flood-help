@@ -278,7 +278,7 @@ export default function RepairApp() {
       ]);
       if (ft) setTopics(ft);
       setLost(lf.filter((x) => x.status !== "reunited"));
-      setReunited(lf.filter((x) => x.status === "reunited" && Date.now() - new Date(x.updated_at || x.created_at).getTime() < 2 * 864e5));
+      setReunited(lf.filter((x) => x.status === "reunited" && Date.now() - new Date(x.updated_at || x.created_at).getTime() < 7 * 864e5)); // 16 Oct: a week, so people see it was found
       if (hm) {
         setHome(hm);
         save("homeBlocks", hm);

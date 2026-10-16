@@ -53,6 +53,7 @@ LostStatus = Literal["open", "reunited"]
 # Water / canal / leak / pump reports stay open: the rain came back (2 Oct) and the village watches the water.
 # Staff stay open too (live tracking of the helpers' boats and trucks), except the LINE import into the request board.
 FLOOD_WRITES = ("/api/posts", "/api/ops", "/api/team", "/api/staff/import", "/api/zones")
+YOUTUBE = re.compile(r"^https?://(?:www\.|m\.)?(?:youtube\.com/(?:watch\?v=|shorts/|live/)|youtu\.be/)[\w-]{6,}[^\s]*$")
 HIDDEN = {"_id": 0, "edit_key_hash": 0, "phone": 0, "house": 0, "voters": 0, "pet_house": 0}
 
 
@@ -174,7 +175,8 @@ class LendCreate(Contact):
     notify_endpoint: str = Field("", max_length=600)  # the seller's own push subscription: a new order pings that phone only
     lat: Optional[float] = Field(None, ge=13.5, le=14.1)  # for sale (16 Oct): optional pin where to pick it up
     lng: Optional[float] = Field(None, ge=100.4, le=101.0)
-    media_ids: list[str] = Field(default_factory=list, max_length=3)
+    youtube: str = Field("", max_length=200)  # for sale (16 Oct): a YouTube link (how it's made, a shop clip)
+    media_ids: list[str] = Field(default_factory=list, max_length=8)  # for sale: up to 8 photos / clips; others 3
 
 
 class LendUpdate(BaseModel):
@@ -280,7 +282,7 @@ class WasteBody(BaseModel):
     media: Optional[list[dict]] = Field(None, max_length=4)  # None = keep (the page's editor doesn't send it)  # 7 Oct: photo / clip previews (attached via /admin/media/claim)
     # 7 Oct: the regular rounds by soi parity for บ้านฉัน, e.g. {"even": "จันทร์ · พฤหัส", "odd": "พุธ · เสาร์"}
     # None = keep what is stored (the page's editor doesn't send it)
-    rounds: Optional[Dict[Literal["even", "odd"], str]] = None
+    rounds: Optional[Dict[str, str]] = None  # 16 Oct: also per soi, e.g. {"33": "อังคาร · ศุกร์"} (wins over the parity)
 
 
 # How to sort flood waste until the district's own guidance arrives; admins edit it on the page.
@@ -445,6 +447,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         out.setdefault("pickup", "")  # older items have no pickup / when
         out.setdefault("when", "")
         out.setdefault("preorder", False)
+        out.setdefault("youtube", "")
         return out
 
     def owner_queue(d: dict) -> list:
@@ -517,14 +520,20 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             raise HTTPException(422, "ใส่เบอร์โทรให้คนยืมติดต่อได้")
         key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
         data = _clean(body.model_dump(exclude={"media_ids"}))
-        if body.kind != "sell":
+        sell = body.kind == "sell"
+        if not sell:
             data["preorder"] = False
+            data["youtube"] = ""
+            if len(body.media_ids) > 3:
+                raise HTTPException(422, "ใส่รูปได้ไม่เกิน 3 รูป")
+        if data["youtube"] and not YOUTUBE.match(data["youtube"]):
+            raise HTTPException(422, "ลิงก์ YouTube ไม่ถูกต้อง (เช่น https://youtu.be/xxxx)")
         if not data["notify_endpoint"].startswith("https://"):
             data["notify_endpoint"] = ""
         doc = {
             "id": item_id,
             **data,
-            "media": await claim_media(body.media_ids, f"lend:{item_id}", {"image"}),
+            "media": await claim_media(body.media_ids, f"lend:{item_id}", {"image", "video"} if sell else {"image"}),
             "status": "available",
             "lent_to": "",
             "until": "",
@@ -873,6 +882,9 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         if data["rounds"] is None:
             data.pop("rounds")
         else:
+            bad = [k for k in data["rounds"] if k not in ("even", "odd") and not re.fullmatch(r"\d{1,3}(/\d{1,2})?", k)]
+            if bad:
+                raise HTTPException(422, f"คีย์รอบรถไม่ถูกต้อง {bad} · ใช้ even / odd หรือเลขซอย")
             data["rounds"] = {k: v.strip()[:60] for k, v in data["rounds"].items() if v.strip()}
         if data["media"] is None:
             data.pop("media")

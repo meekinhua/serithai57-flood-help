@@ -91,7 +91,7 @@ export function LostBoard({ items, setItems, admin, onAdd, reunited = [], noAdd 
       </ul>
       {reunited.length > 0 && (
         <section className="space-y-2">
-          <p className="text-[15px] font-bold text-[#154D33]">🎉 ได้คืนแล้ว (2 วันล่าสุด) · ขอบคุณทุกคนที่ช่วยดู</p>
+          <p className="text-[15px] font-bold text-[#154D33]">🎉 ได้คืนแล้ว (7 วันล่าสุด) · ขอบคุณทุกคนที่ช่วยดู</p>
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {reunited.map((x) => (
               <LostCard key={x.id} item={x} editKey={keys[x.id]} admin={admin} onChanged={() => {}} onDeleted={() => {}} />

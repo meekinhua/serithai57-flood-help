@@ -433,7 +433,7 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
 export function LendForm({ kind: initialKind = "lend", onDone }) {
   const c = savedContact();
   const [, addKey] = useKeys("lendKeys");
-  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", preorder: false, soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
+  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", preorder: false, youtube: "", soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
   const [preTouched, setPreTouched] = useState(false);
   const [pin, setPin] = useState(null); // ตลาด: optional pin where to pick it up
   const [media, setMedia] = useState([]);
@@ -447,7 +447,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
     setBusy(true);
     setErr("");
     try {
-      const body = form.kind === "sell" ? form : { ...form, pickup: "", when: "", preorder: false };
+      const body = form.kind === "sell" ? form : { ...form, pickup: "", when: "", preorder: false, youtube: "" };
       // a seller's own phone gets "🛎️ ออเดอร์ใหม่" when this item is ordered (only if notifications are already on here)
       const sub = form.kind === "sell" ? await currentSub().catch(() => null) : null;
       const x = await api("/lend", { method: "POST", body: JSON.stringify({ ...body, notify_endpoint: sub?.endpoint || "", media_ids: attached.ids, ...(sell && pin ? { lat: pin.lat, lng: pin.lng } : {}) }) });
@@ -572,8 +572,16 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
       </div>
       {!want && (
         <div>
-          <p className={label}>รูป (ไม่บังคับ)</p>
-          <MediaPicker items={media} setItems={setMedia} max={3} allowVideo={false} />
+          <p className={label}>{sell ? "รูป · คลิป (ไม่บังคับ · ใส่ได้ 8 · รูปแรกเป็นหน้าปก)" : "รูป (ไม่บังคับ)"}</p>
+          <MediaPicker items={media} setItems={setMedia} max={sell ? 8 : 3} allowVideo={sell} />
+        </div>
+      )}
+      {sell && (
+        <div>
+          <label className={label} htmlFor="lend-youtube">
+            ลิงก์ YouTube (ไม่บังคับ)
+          </label>
+          <input id="lend-youtube" type="url" inputMode="url" maxLength={200} value={form.youtube} onChange={(e) => set({ youtube: e.target.value.trim() })} className={input} placeholder="เช่น https://youtu.be/xxxx · คลิปวิธีทำ รีวิว" />
         </div>
       )}
       <div className="grid gap-3 sm:grid-cols-3">
