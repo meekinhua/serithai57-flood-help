@@ -187,7 +187,7 @@ export default function MapView({
             w.where ? `<br>${WATER_WHERE[w.where][0]} วัด${WATER_WHERE[w.where][1]}` : ""
           }<br>${timeAgo(w.created_at)}${w.name ? ` · ${escapeHtml(w.name)}` : ""}${w.note ? `<br>${escapeHtml(w.note)}` : ""}${
             w.media?.[0]
-              ? `<br><a href="${mediaUrl(w.media[0].id)}" target="_blank" rel="noreferrer"><img src="${mediaUrl(w.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
+              ? `<br><a href="${mediaUrl(w.media[0].id)}" data-media="${w.media.map((m) => m.id).join(",")}"><img src="${mediaUrl(w.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
               : ""
           }`,
         )
@@ -263,7 +263,7 @@ export default function MapView({
       mk.bindPopup(
         `<b>${emoji} ${escapeHtml(text)}</b>${x.soi ? ` · ซ.${escapeHtml(x.soi)}` : ""}${x.approx ? " <small>(ตำแหน่งโดยประมาณ)</small>" : ""}${x.detail ? `<br>${escapeHtml(x.detail)}` : ""}<br><small>${x.status === "reported" ? "แจ้งเขตแล้ว · " : ""}${timeAgo(x.created_at)}${x.votes > 1 ? ` · ยืนยัน ${x.votes} คน` : ""}</small>${
           x.media?.[0]
-            ? `<br><a href="${mediaUrl(x.media[0].id)}" target="_blank" rel="noreferrer"><img src="${mediaUrl(x.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
+            ? `<br><a href="${mediaUrl(x.media[0].id)}" data-media="${x.media.map((m) => m.id).join(",")}"><img src="${mediaUrl(x.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
             : ""
         }`,
       ).addTo(layer);
@@ -327,7 +327,7 @@ export default function MapView({
               r.note ? `<br>${escapeHtml(r.note)}` : ""
             }${ageH > 3 ? `<br><b style="color:#b45309">⚠️ รายงานเก่ากว่า 3 ชม.</b>` : ""}${
               r.media?.[0]
-                ? `<br><a href="${mediaUrl(r.media[0].id)}" target="_blank" rel="noreferrer"><img src="${mediaUrl(r.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
+                ? `<br><a href="${mediaUrl(r.media[0].id)}" data-media="${r.media.map((m) => m.id).join(",")}"><img src="${mediaUrl(r.media[0].id, "thumb")}" alt="" style="margin-top:6px;width:180px;max-width:100%;border-radius:6px"></a>`
                 : ""
             }`,
           )

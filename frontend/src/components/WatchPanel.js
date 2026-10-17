@@ -1,6 +1,7 @@
 import { CANAL_STATE, LEAK_STATUS, canalSummary } from "./Canal";
 import { WATER_WHERE, timeAgo, waterOf } from "../config";
 import { mediaUrl } from "../media";
+import { openMedia } from "./MediaGallery";
 import MapView from "./MapView";
 import { TripsStrip } from "./Trips";
 
@@ -202,7 +203,7 @@ export function WaterView({
                   {w.note && ` · ${w.note}`}
                 </span>
                 {w.media?.[0] && (
-                  <a href={mediaUrl(w.media[0].id)} target="_blank" rel="noreferrer" aria-label="ดูรูป" className="shrink-0">
+                  <a href={mediaUrl(w.media[0].id)} onClick={(e) => { e.preventDefault(); openMedia(w.media, 0); }} aria-label="ดูรูป" className="shrink-0">
                     <img src={mediaUrl(w.media[0].id, "thumb")} alt="" loading="lazy" className="h-9 w-9 rounded object-cover" />
                   </a>
                 )}
