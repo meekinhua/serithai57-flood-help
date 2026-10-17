@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { api, load, save } from "../api";
-import { ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, JOB_VERBS, LEND_CATEGORIES, LEND_KINDS, LEND_STATUS, MARKET_CATEGORIES, SHELVES, MARKET_ONLY, timeAgo } from "../config";
+import { ORDERS_ON, ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, JOB_VERBS, LEND_CATEGORIES, LEND_KINDS, LEND_STATUS, MARKET_CATEGORIES, SHELVES, MARKET_ONLY, timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import { openMedia } from "./MediaGallery";
 import { currentSub } from "../push";
@@ -542,7 +542,7 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
             />
             <span>
               <b>📝 รับสั่งล่วงหน้า · ทำตามออเดอร์</b>
-              <span className="block text-sm text-neutral-600">เพื่อนบ้านกด 🛒 สั่ง/จอง ได้เสมอ ติ๊กนี้ให้รู้ว่าต้องสั่งก่อน · ออเดอร์ขึ้นที่การ์ดของคุณ (เครื่องนี้)</span>
+              <span className="block text-sm text-neutral-600">{ORDERS_ON ? "เพื่อนบ้านกด 🛒 สั่ง/จอง ได้เสมอ ติ๊กนี้ให้รู้ว่าต้องสั่งก่อน · ออเดอร์ขึ้นที่การ์ดของคุณ (เครื่องนี้)" : "ติ๊กนี้ให้รู้ว่าต้องโทร/ทักสั่งก่อน"}</span>
             </span>
           </label>
           <div>

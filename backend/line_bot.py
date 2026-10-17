@@ -94,6 +94,8 @@ SHOP_CATS = ("food", "shop", "supplies")  # 16 Oct: shops from the directory are
 SHOP_TH = {"food": ("🍜", "ร้านอาหาร"), "shop": ("🏪", "ร้านค้า"), "supplies": ("🧱", "วัสดุ·ของใช้")}
 SELL_WORDS = {"ลงขาย", "ขายของ", "🛍️ ลงขายของ", "ลงขายของ"}
 SOLD_WORDS = {"ขายหมดแล้ว", "✅ ขายหมดแล้ว", "ขายหมด", "ปิดร้าน"}
+# 17 Oct: 🛒 สั่ง/จอง off for now (admin-posted shops don't read orders here) — same switch as ORDERS_ON in frontend config.js
+ORDERS_ON = False
 ORDER_WORDS = {"ออเดอร์", "ดูออเดอร์", "📋 ออเดอร์", "คำสั่งซื้อ", "ออเดอร์ของฉัน", "order", "orders"}
 PREORDER_HINT = ("สั่ง", "ล่วงหน้า", "พรี", "จอง", "pre")
 EDIT_WORDS = {"แก้ไข", "แก้โพสต์", "แต่งร้าน", "แก้ร้าน", "✏️ แก้ไข", "แก้ไขร้าน", "เพิ่มรูป", "ใส่เมนู"}  # 17 Oct: a LINE seller's edit link
@@ -865,9 +867,10 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             "type": "bubble", "size": "kilo",
             "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body},
             "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": [
-                {"type": "button", "style": "primary", "height": "sm", "color": "#1E6B47",
-                 "action": {"type": "postback", "label": "🛒 สั่ง / จองไว้", "data": f"order:{d['id']}", "displayText": "🛒 สั่ง / จอง"}},
-                {"type": "button", "style": "secondary", "height": "sm", "action": {"type": "uri", "label": "ดูรายละเอียด·โทร", "uri": url}},
+                *([{"type": "button", "style": "primary", "height": "sm", "color": "#1E6B47",
+                    "action": {"type": "postback", "label": "🛒 สั่ง / จองไว้", "data": f"order:{d['id']}", "displayText": "🛒 สั่ง / จอง"}}] if ORDERS_ON else []),
+                {"type": "button", "style": "secondary" if ORDERS_ON else "primary", "height": "sm", **({} if ORDERS_ON else {"color": "#1E6B47"}),
+                 "action": {"type": "uri", "label": "ดูรายละเอียด·โทร", "uri": url}},
                 *([{"type": "button", "style": "link", "height": "sm", "action": {"type": "uri", "label": "▶ ดูคลิป YouTube", "uri": d["youtube"]}}] if d.get("youtube") else []),
                 *([{"type": "button", "style": "link", "height": "sm", "action": {"type": "uri", "label": "🗺️ แผนที่จุดรับของ", "uri": f"https://www.google.com/maps?q={d['lat']},{d['lng']}"}}]
                   if d.get("lat") and d.get("lng") else [])]},
@@ -999,7 +1002,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             {"type": "text", "text": "ดูทั้งหมด + แยกตามหมวด + ร้านประจำ", "weight": "bold", "wrap": True, "align": "center"},
             {"type": "button", "style": "secondary", "action": {"type": "uri", "label": "ดูทั้งหมด", "uri": f"{SITE}/#market"}}]}})
         head = (f"🛍️ ตลาดเพื่อนบ้าน · ของขาย {len(items)} · ร้าน {len(shops)} · รับทำ {n_svc} · ปัดดูได้ ➡️\n"
-                "ของทำเองกด 🛒 สั่ง/จองไว้ได้ · ร้านกดโทรได้เลย · ระบบไม่รับเงิน")
+                ("ของทำเองกด 🛒 สั่ง/จองไว้ได้ · ร้านกดโทรได้เลย · ระบบไม่รับเงิน" if ORDERS_ON else "กดดูรายละเอียด แล้วโทร/ทักผู้ขายได้เลย · ระบบไม่รับเงิน"))
         chips = qr(("🍲 ของกิน", "🍲 ของกิน"), ("🧺 ของใช้", "🧺 ของใช้"), ("🙋 รับทำ", "🙋 รับทำ"), *chips["items"] and [(i["action"]["label"], i["action"]["text"]) for i in chips["items"]])
         return [text(head), {"type": "flex", "altText": "ตลาดเพื่อนบ้าน", "contents": {"type": "carousel", "contents": bubbles}, "quickReply": chips}]
 
@@ -1289,8 +1292,10 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         await db.line_posts.insert_one({"user": user, "id": item_id, "title": doc["title"], "at": t, "type": "market"})
         push.fire(push.on_lend, doc)
         await drop(user)
-        return [text(f"✅ ลงขายแล้วครับ\n{SITE}/#market-{item_id}\n\nเพื่อนบ้านกด 🛒 สั่ง/จอง ไว้ได้ หรือโทรหาคุณเอง ระบบไม่รับเงิน\n"
-                     "• มีคนสั่ง บอทจะบอกตอนคุณทักแชทนี้ หรือพิมพ์ \"ออเดอร์\" ดูชื่อ·เบอร์·จำนวน\n• ขายหมดแล้ว พิมพ์ \"ขายหมดแล้ว\" เพื่อปิด"),
+        return [text(f"✅ ลงขายแล้วครับ\n{SITE}/#market-{item_id}\n\n" + (
+                    "เพื่อนบ้านกด 🛒 สั่ง/จอง ไว้ได้ หรือโทรหาคุณเอง ระบบไม่รับเงิน\n"
+                    "• มีคนสั่ง บอทจะบอกตอนคุณทักแชทนี้ หรือพิมพ์ \"ออเดอร์\" ดูชื่อ·เบอร์·จำนวน\n" if ORDERS_ON else
+                    "เพื่อนบ้านจะโทร/ทักหาคุณเอง ระบบไม่รับเงิน\n") + "• ขายหมดแล้ว พิมพ์ \"ขายหมดแล้ว\" เพื่อปิด"),
                 text(edit_note(item_id, key), qr(("📋 ออเดอร์", "ออเดอร์"), ("🛍️ ดูตลาด", "ตลาด")))]
 
     def edit_note(item_id: str, key: str) -> str:
@@ -1351,6 +1356,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                     qr(("✅ ส่งออเดอร์", "postback:publish_order"), CANCEL))
 
     async def order_start(user: str, item_id: str) -> list:
+        if not ORDERS_ON:  # an old card's 🛒 button
+            return [text("ตอนนี้ยังไม่เปิดสั่งผ่านระบบครับ 🙏 กด \"ดูรายละเอียด·โทร\" แล้วติดต่อผู้ขายได้เลย", qr(("🛍️ ดูตลาด", "ตลาด")))]
         d = await db.lend_items.find_one({"id": item_id, "kind": "sell"}, {"_id": 0, "title": 1, "status": 1, "when": 1})
         if not d or d.get("status") == "closed":
             return [text("รายการนี้ปิดไปแล้วครับ 🙏", qr(("🛍️ ดูตลาด", "ตลาด")))]

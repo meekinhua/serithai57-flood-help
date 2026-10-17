@@ -4,6 +4,10 @@ Upload is chunked (<= 1 MB per request) so it survives flaky mobile networks and
 proxy body-size limits:  POST /api/media -> PUT /api/media/{id}/chunk/{i} ... ->
 POST /api/media/{id}/complete -> poll GET /api/media/{id} until status == "ready".
 
+Chunks wait in MongoDB (db.media_parts), not on local disk (17 Oct): prod runs more than one backend instance, and a
+chunk that landed on one while /complete hit another made ~1 in 3 uploads fail ("ข้อมูลยังไม่ครบ") — phones retried
+and retried, which felt like very slow uploads. Only the processing step uses a temp dir, on whichever instance runs it.
+
 Every file is re-encoded on the server, whatever the client sent:
 - images: EXIF-rotated, EXIF/GPS stripped, max 1600 px, JPEG q78 (+ 480 px thumb)
 - videos: first 60 s, long edge <= 854 px (480p), H.264/AAC MP4 ~1 Mbit/s (+ poster)
@@ -19,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
-from bson import ObjectId
+from bson import Binary, ObjectId
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
@@ -38,6 +42,7 @@ UPLOAD_DIR = Path(tempfile.gettempdir()) / "flood-uploads"
 RANGE_MAX = 2 * 1024 * 1024  # bytes per 206 response
 
 MediaType = Literal["image", "video"]
+VIDEO_SLOTS = asyncio.Semaphore(1)
 
 
 def _now():
@@ -138,11 +143,11 @@ def build_router(db, rate_limit):
         workdir = UPLOAD_DIR / media_id
         try:
             m = await db.media.find_one({"id": media_id})
+            workdir.mkdir(parents=True, exist_ok=True)
             src = workdir / "original"
             with open(src, "wb") as out:
-                for i in range(m["chunks"]):
-                    with open(workdir / f"{i:05d}", "rb") as part:
-                        shutil.copyfileobj(part, out)
+                async for part in db.media_parts.find({"media": media_id}, {"_id": 0, "data": 1}).sort("i", 1):
+                    out.write(part["data"])
             if m["type"] == "image":
                 try:
                     main, thumb, w, h = await asyncio.to_thread(_process_image, src)
@@ -152,7 +157,8 @@ def build_router(db, rate_limit):
                 thumb_id = await bucket.upload_from_stream(f"{media_id}-thumb.jpg", thumb, metadata={"contentType": "image/jpeg"})
                 extra = {"width": w, "height": h, "duration": None, "size": len(main)}
             else:
-                out, poster, w, h, dur = await _process_video(src, workdir)
+                async with VIDEO_SLOTS:  # one ffmpeg at a time per instance, so photos and pages stay quick meanwhile
+                    out, poster, w, h, dur = await _process_video(src, workdir)
                 with open(out, "rb") as f:
                     file_id = await bucket.upload_from_stream(f"{media_id}.mp4", f, metadata={"contentType": "video/mp4"})
                 with open(poster, "rb") as f:
@@ -165,6 +171,7 @@ def build_router(db, rate_limit):
             await db.media.update_one({"id": media_id}, {"$set": {"status": "failed", "error": msg}})
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
+            await db.media_parts.delete_many({"media": media_id})
 
     @router.post("", status_code=201)
     async def init_upload(body: MediaInit, request: Request):
@@ -174,7 +181,6 @@ def build_router(db, rate_limit):
             raise HTTPException(413, f"ไฟล์ใหญ่เกินไป (สูงสุด {mb} MB)" + (" ลองถ่ายคลิปให้สั้นลง" if body.type == "video" else ""))
         media_id = str(uuid.uuid4())
         chunks = -(-body.size // CHUNK_SIZE)
-        (UPLOAD_DIR / media_id).mkdir(parents=True, exist_ok=True)
         await db.media.insert_one(
             {"id": media_id, "type": body.type, "mime": body.mime, "declared_size": body.size, "chunks": chunks, "status": "uploading", "attached_to": None, "created_at": _now()}
         )
@@ -188,9 +194,9 @@ def build_router(db, rate_limit):
         data = await request.body()
         if not data or len(data) > CHUNK_SIZE:
             raise HTTPException(413, "ชิ้นข้อมูลไม่ถูกต้อง")
-        path = UPLOAD_DIR / media_id / f"{index:05d}"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)  # idempotent: a retried chunk just overwrites
+        await db.media_parts.update_one(  # idempotent: a retried chunk just overwrites
+            {"media": media_id, "i": index}, {"$set": {"data": Binary(data), "size": len(data), "at": _now()}}, upsert=True
+        )
 
     @router.post("/{media_id}/complete")
     async def complete_upload(media_id: str):
@@ -199,15 +205,16 @@ def build_router(db, rate_limit):
             raise HTTPException(404, "ไม่พบการอัปโหลด")
         if m["status"] != "uploading":
             return public_media(m)
-        workdir = UPLOAD_DIR / media_id
-        missing = [i for i in range(m["chunks"]) if not (workdir / f"{i:05d}").exists()]
+        sizes = {p["i"]: p["size"] async for p in db.media_parts.find({"media": media_id}, {"_id": 0, "i": 1, "size": 1})}
+        missing = [i for i in range(m["chunks"]) if i not in sizes]
         if missing:
             raise HTTPException(409, f"ข้อมูลยังไม่ครบ ({len(missing)} ชิ้น)")
-        total = sum((workdir / f"{i:05d}").stat().st_size for i in range(m["chunks"]))
-        if total != m["declared_size"]:
+        if sum(sizes.values()) != m["declared_size"]:
             raise HTTPException(409, "ขนาดไฟล์ไม่ตรงกัน")
-        await db.media.update_one({"id": media_id}, {"$set": {"status": "processing"}})
-        start_processing(media_id)
+        # only one /complete (a retried one, or one on another instance) starts the job
+        claimed = await db.media.update_one({"id": media_id, "status": "uploading"}, {"$set": {"status": "processing", "processing_at": _now()}})
+        if claimed.modified_count:
+            start_processing(media_id)
         return {**public_media(m), "status": "processing"}
 
     @router.get("/{media_id}")
@@ -298,12 +305,19 @@ def build_router(db, rate_limit):
         stale = [m["id"] async for m in db.media.find({"attached_to": None, "created_at": {"$lt": cutoff}}, {"id": 1})]
         if stale:
             await delete_media(stale)
-            for mid in stale:
-                shutil.rmtree(UPLOAD_DIR / mid, ignore_errors=True)
+            await db.media_parts.delete_many({"media": {"$in": stale}})
+        await db.media_parts.delete_many({"at": {"$lt": cutoff}})
         await db.media.update_many(
             {"status": {"$in": ["uploading", "processing"]}, "created_at": {"$lt": _now() - timedelta(hours=1)}},
             {"$set": {"status": "failed", "error": "หมดเวลา"}},
         )
+
+    async def _indexes():
+        try:
+            await db.media_parts.create_index([("media", 1), ("i", 1)], unique=True)
+            await db.media_parts.create_index("at")
+        except Exception:
+            log.exception("media_parts index")
 
     def start_processing(media_id: str):
         task = asyncio.create_task(process(media_id))
@@ -312,12 +326,17 @@ def build_router(db, rate_limit):
 
     async def maintenance(first_run: bool = False):
         if first_run:
-            # A restart killed in-flight jobs; their chunks are still on disk, so run them again.
-            async for m in db.media.find({"status": "processing"}, {"id": 1}):
-                if (UPLOAD_DIR / m["id"] / "00000").exists():
-                    start_processing(m["id"])
-                else:
+            await _indexes()
+            # A restart killed in-flight jobs; their chunks are still in media_parts, so run them again. Jobs another
+            # instance started in the last 15 min are left alone, and the claim below stops two restarts doing one twice.
+            old = _now() - timedelta(minutes=15)
+            async for m in db.media.find({"status": "processing", "processing_at": {"$not": {"$gt": old}}}, {"id": 1, "processing_at": 1}):
+                if not await db.media_parts.find_one({"media": m["id"]}, {"_id": 1}):
                     await db.media.update_one({"id": m["id"]}, {"$set": {"status": "failed", "error": "กรุณาแนบใหม่"}})
+                    continue
+                claimed = await db.media.update_one({"id": m["id"], "processing_at": m.get("processing_at")}, {"$set": {"processing_at": _now()}})
+                if claimed.modified_count:
+                    start_processing(m["id"])
         await cleanup()
 
     return router, claim_media, delete_media, maintenance

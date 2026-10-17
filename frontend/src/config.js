@@ -151,6 +151,10 @@ export const SERVICE_GROUPS = [
 ];
 export const SHOP_SHELF = { food: ["food"], goods: ["shop", "supplies"] }; // shops from the directory, by shelf
 export const FOOD_LEND = ["homemade", "dessert", "drinks", "preserved", "catering", "food"];
+// 17 Oct: 🛒 สั่ง/จอง is off for now — many shops in ตลาด were posted by the admin and don't read orders here.
+// Buyers call / walk over instead. Flip to true (and ORDERS_ON in backend/line_bot.py) to bring it back.
+export const ORDERS_ON = false;
+
 export const SHELVES = [
   { key: "food", label: "ของกิน", icon: "🍲", hint: "อาหารทำเอง ขนม เครื่องดื่ม ร้านอาหาร", sell: ["homemade", "dessert", "drinks", "preserved", "catering"] },
   { key: "goods", label: "ของใช้", icon: "🧺", hint: "งานฝีมือ ต้นไม้ เสื้อผ้า มือสอง ร้านค้า", sell: ["handmade", "plants", "clothes", "cosmetics", "petgoods", "electronics", "furniture", "kids", "other"] },
