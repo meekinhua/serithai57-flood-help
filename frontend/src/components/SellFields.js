@@ -97,3 +97,50 @@ export function ShopNameField({ value, onChange, id = "sell-shop" }) {
 
 // the cleaned-up values to send (empty menu rows dropped)
 export const richBody = (f) => ({ shop_name: (f.shop_name || "").trim(), tags: f.tags || [], options: (f.options || []).filter((o) => o.name.trim()) });
+
+// 17 Oct: clips. For ตลาด / ช่าง a YouTube link is the better way (full length, sharp); an upload here is cut to
+// 60 s at 480p so it loads fast on phones. For หาย·เจอ either is fine — whatever is quickest to post.
+export const youtubeId = (u) => (u || "").match(/(?:youtu\.be\/|[?&]v=|shorts\/|live\/)([\w-]{6,})/)?.[1] || "";
+
+export function YouTubeThumb({ url, className = "" }) {
+  const id = youtubeId(url);
+  if (!id) return null;
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className={`relative block overflow-hidden rounded-xl ${className}`}>
+      <img src={`https://img.youtube.com/vi/${id}/hqdefault.jpg`} alt="คลิป YouTube" loading="lazy" className="aspect-video w-full object-cover" />
+      <span className="absolute inset-0 flex items-center justify-center">
+        <span className="rounded-xl bg-[#FF0000] px-4 py-2 text-xl font-bold text-white">▶ YouTube</span>
+      </span>
+    </a>
+  );
+}
+
+export function YouTubeField({ value, onChange, id = "yt", strong = false }) {
+  const bad = value && !youtubeId(value);
+  return (
+    <div>
+      <label className="mb-1 block font-medium" htmlFor={id}>
+        🎬 ลิงก์คลิป YouTube {strong ? "(แนะนำ)" : "(ไม่บังคับ)"}
+      </label>
+      {strong ? (
+        <p className="mb-1.5 rounded-lg bg-[#FFF4D6] p-2.5 text-sm leading-relaxed text-[#5C3B00]">
+          มีคลิปยาวๆ หรืออยากให้ภาพคมชัด <b>ลง YouTube แล้วเอาลิงก์มาวางตรงนี้ดีกว่า</b> — คลิปที่อัปตรงนี้ระบบจะตัดเหลือ 60 วินาทีและลดความคมชัด (480p) ให้โหลดเร็ว · ไม่อยากให้คนทั่วไปเห็นช่อง ตั้งเป็น “ไม่เป็นสาธารณะ (Unlisted)” ก็ได้
+        </p>
+      ) : (
+        <p className="mb-1.5 text-sm text-neutral-600">อัปคลิปสั้นด้านบนได้เลย หรือมีคลิปใน YouTube วางลิงก์ตรงนี้ก็ได้</p>
+      )}
+      <input
+        id={id}
+        type="url"
+        inputMode="url"
+        maxLength={200}
+        value={value}
+        onChange={(e) => onChange(e.target.value.trim())}
+        className={field}
+        placeholder="เช่น https://youtu.be/xxxx หรือ youtube.com/shorts/xxxx"
+      />
+      {bad && <p className="mt-1 text-sm text-red-700">ลิงก์นี้ไม่ใช่ YouTube · คัดลอกจากปุ่ม “แชร์” ในแอป YouTube</p>}
+      {youtubeId(value) && <YouTubeThumb url={value} className="mt-2" />}
+    </div>
+  );
+}

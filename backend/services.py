@@ -6,6 +6,7 @@ their browser) to mark themselves available/busy or remove the listing.
 Residents can flag a number that doesn't work; admins verify, pin or delete.
 """
 import hashlib
+import re
 import secrets
 import uuid
 from datetime import datetime, timezone
@@ -34,6 +35,9 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+YOUTUBE = re.compile(r"^https?://(?:www\.|m\.)?(?:youtube\.com/(?:watch\?v=|shorts/|live/)|youtu\.be/)[\w-]{6,}[^\s]*$")
+
+
 def _hash(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
@@ -48,6 +52,7 @@ class ServiceCreate(BaseModel):
     price: str = Field("", max_length=100)  # e.g. "300 บาท/เที่ยว"
     area: str = Field("", max_length=100)  # e.g. "ในหมู่บ้าน", "ทั่วบึงกุ่ม"
     media_ids: list[str] = Field(default_factory=list, max_length=3)  # 7 Oct: photos of the shop / the work
+    youtube: str = Field("", max_length=200)  # 17 Oct: a clip of the work on YouTube (better quality than an upload here)
     lat: Optional[float] = Field(None, ge=13.5, le=14.1)  # 16 Oct: where the shop is (optional pin; shops can be outside the village)
     lng: Optional[float] = Field(None, ge=100.4, le=101.0)
 
@@ -57,6 +62,7 @@ class ServiceUpdate(BaseModel):
     detail: Optional[str] = Field(None, max_length=500)
     price: Optional[str] = Field(None, max_length=100)
     media_ids: Optional[list[str]] = Field(None, max_length=3)  # replaces the photos
+    youtube: Optional[str] = Field(None, max_length=200)
 
 
 class ServiceAdminUpdate(BaseModel):
@@ -94,6 +100,8 @@ def build_router(db, rate_limit, require_admin, audit, client_ip, claim_media=No
         rate_limit(request, "service", limit=10, window_s=600)
         if body.category not in SERVICE_CATEGORIES:
             raise HTTPException(422, "หมวดหมู่ไม่ถูกต้อง")
+        if body.youtube.strip() and not YOUTUBE.match(body.youtube.strip()):
+            raise HTTPException(422, "ลิงก์ YouTube ไม่ถูกต้อง (เช่น https://youtu.be/xxxx)")
         edit_key = secrets.token_urlsafe(18)
         t = _now()
         sid = str(uuid.uuid4())
@@ -120,6 +128,8 @@ def build_router(db, rate_limit, require_admin, audit, client_ip, claim_media=No
     @router.patch("/services/{service_id}")
     async def update_service(service_id: str, body: ServiceUpdate, x_edit_key: str = Header(...)):
         changes = {k: v for k, v in body.model_dump(exclude={"media_ids"}).items() if v is not None}
+        if changes.get("youtube") and not YOUTUBE.match(changes["youtube"].strip()):
+            raise HTTPException(422, "ลิงก์ YouTube ไม่ถูกต้อง (เช่น https://youtu.be/xxxx)")
         if body.media_ids is not None:
             if not await db.services.find_one({"id": service_id, "edit_key_hash": _hash(x_edit_key)}, {"_id": 1}):
                 raise HTTPException(403, "แก้ไขได้เฉพาะเจ้าของ (จากเครื่องที่ลงชื่อไว้)")
