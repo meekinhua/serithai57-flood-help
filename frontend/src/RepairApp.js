@@ -951,7 +951,7 @@ export default function RepairApp() {
 
           {page === "market" && (
             <>
-              <PageTitle title="🛍️ ตลาดเพื่อนบ้าน" sub="ของกิน · ของใช้ · รับทำ · กดสั่งหรือโทรได้เลย" />
+              <PageTitle title="🛍️ ตลาดเพื่อนบ้าน" sub="ของกิน · ของใช้ · รับทำ · กดดูแล้วโทร·ทักผู้ขายได้เลย" />
               <section className="card p-3">
                 <Market
                   items={lend}

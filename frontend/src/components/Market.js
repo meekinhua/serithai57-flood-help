@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, load } from "../api";
-import { LEND_CATEGORIES, SERVICE_CATEGORIES, SERVICE_GROUPS, SHELVES, shelfOfItem, shelfOfShop, timeAgo } from "../config";
+import { LEND_CATEGORIES, ORDERS_ON, SERVICE_CATEGORIES, SERVICE_GROUPS, SHELVES, shelfOfItem, shelfOfShop, timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import { ProsList, rememberCall } from "./Community";
 import { notify } from "../notify";
@@ -528,14 +528,14 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
         )}
         {(x.options || []).length > 0 && (
           <div className="overflow-hidden rounded-xl border border-[#E4E0D4] bg-[#FFFBF0]">
-            <p className="px-3 pt-2 text-sm font-bold text-[#8F2A1C]">📋 เมนู{!editKey && " · แตะเพื่อสั่ง"}</p>
+            <p className="px-3 pt-2 text-sm font-bold text-[#8F2A1C]">📋 เมนู{ORDERS_ON && !editKey && " · แตะเพื่อสั่ง"}</p>
             <ul>
               {x.options.map((o) => (
                 <li key={o.name} className="border-t border-[#EFE9DA] first:border-t-0">
-                  <button type="button" disabled={!!editKey} onClick={() => setOrdering(`1 × ${o.name}`)} className="flex min-h-[44px] w-full items-center gap-2 px-3 text-left enabled:active:bg-[#FFF1C9]">
+                  <button type="button" disabled={!!editKey || !ORDERS_ON} onClick={() => setOrdering(`1 × ${o.name}`)} className="flex min-h-[44px] w-full items-center gap-2 px-3 text-left enabled:active:bg-[#FFF1C9]">
                     <span className="min-w-0 flex-1 break-words text-[15px]">{o.name}</span>
                     {o.price && <b className="shrink-0 text-[#8F2A1C]">{o.price}</b>}
-                    {!editKey && <span className="shrink-0 rounded-full bg-[#1E6B47] px-2 text-sm font-bold text-white">+</span>}
+                    {ORDERS_ON && !editKey && <span className="shrink-0 rounded-full bg-[#1E6B47] px-2 text-sm font-bold text-white">+</span>}
                   </button>
                 </li>
               ))}
@@ -561,10 +561,10 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
           </div>
         )}
         <YouTubeThumb url={x.youtube} />
-        {(x.shop_name || x.queue_count > 0) && (
+        {(x.shop_name || (ORDERS_ON && x.queue_count > 0)) && (
           <p className="text-[15px] text-[#45504A]">
             {x.shop_name && `👤 ${x.name}`}
-            {x.queue_count > 0 && <span className="ml-1 font-semibold text-[#1E6B47]">· มีคนสั่งอยู่ {x.queue_count}</span>}
+            {ORDERS_ON && x.queue_count > 0 && <span className="ml-1 font-semibold text-[#1E6B47]">· มีคนสั่งอยู่ {x.queue_count}</span>}
           </p>
         )}
         {ordered && <p className="rounded-lg bg-emerald-50 p-2 text-[15px] font-semibold text-emerald-800">✅ ส่งออเดอร์แล้ว ผู้ขายจะโทรยืนยันกลับ</p>}
@@ -583,10 +583,12 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
         ) : (
           !editKey && (
             <div className="grid gap-2 pt-1">
-              <button onClick={() => setOrdering("")} className="min-h-[52px] rounded-xl bg-[#1E6B47] text-lg font-bold text-white">
-                🛒 สั่ง / จองไว้
-              </button>
-              <ContactButton path={`/lend/${x.id}/contact`} text="📞 หรือโทรหาผู้ขาย" />
+              {ORDERS_ON && (
+                <button onClick={() => setOrdering("")} className="min-h-[52px] rounded-xl bg-[#1E6B47] text-lg font-bold text-white">
+                  🛒 สั่ง / จองไว้
+                </button>
+              )}
+              <ContactButton path={`/lend/${x.id}/contact`} text={ORDERS_ON ? "📞 หรือโทรหาผู้ขาย" : "📞 ติดต่อผู้ขาย"} />
             </div>
           )
         )}

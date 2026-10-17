@@ -61,7 +61,7 @@ export function OptionsField({ options, onChange }) {
   return (
     <div>
       <p className="mb-1 block font-medium">เมนู · ขนาด · ราคา (ไม่บังคับ · ถึง 12 รายการ)</p>
-      <p className="mb-1.5 text-sm text-neutral-600">มีหลายอย่างหรือหลายขนาด ใส่แยกราคา คนสั่งกดเลือกจากเมนูได้เลย</p>
+      <p className="mb-1.5 text-sm text-neutral-600">มีหลายอย่างหรือหลายขนาด ใส่แยกราคา ให้คนซื้อดูง่าย</p>
       <div className="space-y-1.5">
         {options.map((o, i) => (
           <div key={i} className="space-y-1.5 rounded-lg bg-[#FFFBF0] p-2">
