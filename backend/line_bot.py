@@ -1295,7 +1295,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
 
     def edit_note(item_id: str, key: str) -> str:
         return (f"✨ แต่งโพสต์ให้น่าซื้อ: ใส่ชื่อร้าน จุดเด่น เมนูหลายราคา เพิ่มรูป/คลิป\n{SITE}/#sell-{item_id}~{key}\n"
-                "(ลิงก์นี้ของคุณคนเดียว อย่าส่งต่อ · เปิดแล้วกด ✏️ แก้ไข ที่การ์ดของคุณ · พิมพ์ \"แก้ไข\" ขอลิงก์ใหม่ได้)")
+                "(ลิงก์นี้ของคุณคนเดียว อย่าส่งต่อ · เปิดแล้วกด ✏️ แก้ไข ที่การ์ดของคุณ · พิมพ์ \"แก้ไข\" ขอลิงก์ใหม่ได้)\n"
+                "📱 อยากดูออเดอร์จากหลายเครื่อง: เปิดลิงก์นี้แล้วกด \"ดูออเดอร์ได้ทุกเครื่อง\" ท้ายหน้าตลาด ทำครั้งเดียว (ไม่ทำก็ได้)")
 
     async def market_edit_links(user: str, item_id: str = "") -> list:
         """17 Oct: a LINE seller gets a fresh private edit link (a new edit key) for one of their items."""

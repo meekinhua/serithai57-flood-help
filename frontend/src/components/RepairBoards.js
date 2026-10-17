@@ -5,6 +5,7 @@ import { ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, JOB_VERBS, LEND_CATEG
 import { mediaUrl } from "../media";
 import { openMedia } from "./MediaGallery";
 import { currentSub } from "../push";
+import { pushKey } from "../sellerSync";
 import { createBaseMap } from "./MapView";
 import LocationPicker from "./LocationPicker";
 import MediaPicker, { mediaState } from "./MediaPicker";
@@ -454,6 +455,7 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
       const sub = form.kind === "sell" ? await currentSub().catch(() => null) : null;
       const x = await api("/lend", { method: "POST", body: JSON.stringify({ ...body, notify_endpoint: sub?.endpoint || "", media_ids: attached.ids, ...(sell && pin ? { lat: pin.lat, lng: pin.lng } : {}) }) });
       addKey(x.id, x.edit_key);
+      pushKey("lend", x.id, x.edit_key); // 17 Oct: other phones with this seller's shop link see it too
       remember(form.name, form.phone);
       save("mySoi", form.soi);
       onDone(x);

@@ -31,6 +31,7 @@ load_dotenv(Path(__file__).parent / ".env")
 
 import canal  # noqa: E402
 import media  # noqa: E402
+import seller  # noqa: E402
 import services  # noqa: E402
 import staff  # noqa: E402
 import trips  # noqa: E402
@@ -661,6 +662,7 @@ app.include_router(myhome.build_router(db, rate_limit, require_admin, locate_hou
 app.include_router(pets.build_router(db, rate_limit, _house, locate_house, claim_media, delete_media))
 push_router = push.build_router(db, rate_limit, require_admin, audit, locate_house, _house, myhome.soi_parity, myhome.WASTE_ROUNDS, myhome.THAI_DAYS)
 app.include_router(push_router)
+app.include_router(seller.build_router(db, rate_limit))  # 17 Oct: ลิงก์ร้านของฉัน — one seller, several phones
 app.include_router(places.build_router(db, require_admin, audit))
 app.include_router(nearby.build_router(db, rate_limit, client_ip, require_admin, locate_house, survey.norm_house, claim_media))
 app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media, staff.SOIS, staff.ZONES["main_road"]))

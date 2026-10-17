@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { api, load, save } from "../api";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinField from "./PinField";
+import { pushKey } from "../sellerSync";
 import { YouTubeField } from "./SellFields";
 import { PRICING, REPAIR_SERVICE_ORDER, SERVICE_CATEGORIES, SERVICE_FORM_ORDER, categoryOf, paymentBadge, timeAgo } from "../config";
 
@@ -337,6 +338,7 @@ export function ServiceForm({ onDone, prefill = {}, repair = false, mode = "" })
       const body = repair && !self ? { ...base, detail: `${form.detail}${form.detail ? " · " : ""}เพื่อนบ้านแนะนำ` } : base;
       const s = await api("/services", { method: "POST", body: JSON.stringify(body) });
       save("serviceKeys", { ...load("serviceKeys", {}), [s.id]: s.edit_key });
+      pushKey("service", s.id, s.edit_key);
       if (self) save("contact", { ...load("contact", {}), name: form.name, phone: form.phone });
       onDone(s);
     } catch (err) {
