@@ -68,7 +68,9 @@ export default function HeroSlides({ slides }) {
       {slides.length > 1 && (
         <div className="mt-2 flex justify-center gap-1.5" aria-hidden="true">
           {slides.slice(0, box.current ? pages() : slides.length).map((s, n) => (
-            <button key={s.key} tabIndex={-1} onClick={() => go(n)} className={`h-2 rounded-full transition-all ${n === i ? "w-6 bg-[#15201A]" : "w-2 bg-[#C5CCC7]"}`} />
+            <button key={s.key} tabIndex={-1} onClick={() => go(n)} aria-label={`สไลด์ ${n + 1}`} className="flex h-8 items-center px-1">
+              <span className={`block h-2 rounded-full transition-all ${n === i ? "w-6 bg-[#15201A]" : "w-2 bg-[#C5CCC7]"}`} />
+            </button>
           ))}
         </div>
       )}

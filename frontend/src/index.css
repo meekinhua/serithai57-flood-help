@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 17 Oct, phones: no grey flash on tap, no double-tap zoom delay on buttons, text size kept when the phone rotates */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+a,
+label,
+summary,
+[role="button"] {
+  touch-action: manipulation;
+}
+
 /* 7 Oct: the redesign (Claude Design) — IBM Plex Sans Thai for reading, Bai Jamjuree for titles, a touch larger for older eyes */
 html {
   font-size: 106.25%;
