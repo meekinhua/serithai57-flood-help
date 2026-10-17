@@ -8,7 +8,7 @@ import { openMedia } from "./MediaGallery";
 import { ContactButton, NameField, input, label, remember, savedContact, telHref, useKeys } from "./RepairBoards";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinField, { mapLink } from "./PinField";
-import { OptionsField, ShopNameField, TagsField, richBody } from "./SellFields";
+import { OptionsField, ShopNameField, TagsField, YouTubeField, YouTubeThumb, richBody } from "./SellFields";
 import { defaultTopics, enablePush, pushStatus, updatePush } from "../push";
 
 // 🛍️ ตลาดเพื่อนบ้าน (15 Oct 2026): homemade food, sweets, drinks, handmade things and second-hand goods from
@@ -345,7 +345,7 @@ function EditSell({ item: x, editKey, onSaved, onCancel }) {
         </label>
         <textarea id={`e-detail-${x.id}`} rows={3} maxLength={400} value={form.detail} onChange={(e) => set({ detail: e.target.value })} className={input} />
       </div>
-      {row("yt", "ลิงก์ YouTube", "youtube", 200, "https://youtu.be/xxxx")}
+      <YouTubeField id={`e-yt-${x.id}`} strong value={form.youtube} onChange={(youtube) => set({ youtube })} />
       {err && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{err}</p>}
       <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={onCancel} className="min-h-[48px] rounded-xl border-2 border-[#15201A] font-semibold">
@@ -391,7 +391,6 @@ function MarketBell() {
 function MarketCard({ item: x, editKey, admin, onChanged }) {
   const [emoji, catText] = LEND_CATEGORIES[x.category] || ["📦", "อื่นๆ"];
   const media = x.media || [];
-  const yt = youtubeId(x.youtube);
   const [busy, setBusy] = useState(false);
   const [ordering, setOrdering] = useState(null); // null | the qty to start with ("" or "1 × กล่องใหญ่")
   const [ordered, setOrdered] = useState(false);
@@ -485,14 +484,7 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
             )}
           </div>
         )}
-        {yt && (
-          <a href={x.youtube} target="_blank" rel="noreferrer" className="relative block overflow-hidden rounded-xl">
-            <img src={`https://img.youtube.com/vi/${yt}/hqdefault.jpg`} alt="คลิป YouTube" loading="lazy" className="aspect-video w-full object-cover" />
-            <span className="absolute inset-0 flex items-center justify-center">
-              <span className="rounded-xl bg-[#FF0000] px-4 py-2 text-xl font-bold text-white">▶ YouTube</span>
-            </span>
-          </a>
-        )}
+        <YouTubeThumb url={x.youtube} />
         {(x.shop_name || x.queue_count > 0) && (
           <p className="text-[15px] text-[#45504A]">
             {x.shop_name && `👤 ${x.name}`}

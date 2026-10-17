@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { api, load, save } from "../api";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinField from "./PinField";
+import { YouTubeField } from "./SellFields";
 import { PRICING, REPAIR_SERVICE_ORDER, SERVICE_CATEGORIES, SERVICE_FORM_ORDER, categoryOf, paymentBadge, timeAgo } from "../config";
 
 // Repair mode lists the after-flood trades first and hides the flood-only ones (boats, food, pets...).
@@ -316,6 +317,7 @@ export function ServiceForm({ onDone, prefill = {}, repair = false, mode = "" })
     pricing: "paid",
     price: prefill.price || "",
     area: "ในหมู่บ้าน",
+    youtube: "",
   });
   const [self, setSelf] = useState(!repair); // repair mode: most people list a tradesman they used, not themselves
   const [busy, setBusy] = useState(false);
@@ -447,9 +449,10 @@ export function ServiceForm({ onDone, prefill = {}, repair = false, mode = "" })
       {error && <p className="rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
       <PinField value={pin} onChange={setPin} title="ร้าน / ที่ทำงาน อยู่ตรงไหน" button="🗺️ ปักหมุดบนแผนที่ (ไม่บังคับ)" />
       <div>
-        <p className="mb-1 font-medium">รูปร้าน / ผลงาน (ไม่บังคับ · ช่วยให้คนเลือกง่ายขึ้น)</p>
+        <p className="mb-1 font-medium">รูปร้าน / ผลงาน · คลิปสั้น (ไม่บังคับ · ช่วยให้คนเลือกง่ายขึ้น)</p>
         <MediaPicker items={files} setItems={setFiles} max={3} />
       </div>
+      <YouTubeField id="svc-youtube" strong value={form.youtube} onChange={(youtube) => set({ youtube })} />
       <button type="submit" disabled={busy} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60">
         {busy ? "กำลังส่ง…" : repair ? "ลงให้เพื่อนบ้านเห็น" : "📇 ลงชื่อในบอร์ดติดต่อ"}
       </button>

@@ -10,7 +10,7 @@ import LocationPicker from "./LocationPicker";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinFix from "./PinFix";
 import PinField from "./PinField";
-import { OptionsField, ShopNameField, TagsField, richBody } from "./SellFields";
+import { OptionsField, ShopNameField, TagsField, YouTubeField, richBody } from "./SellFields";
 import { SPEAKER_RE, SpeakerHint } from "./QuickReport";
 
 // After the flood: lend & borrow, ask for hands, soi problems, and the after-flood checklist.
@@ -582,18 +582,11 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
       </div>
       {!want && (
         <div>
-          <p className={label}>{sell ? "รูป · คลิป (ไม่บังคับ · ใส่ได้ 8 · รูปแรกเป็นหน้าปก)" : "รูป (ไม่บังคับ)"}</p>
+          <p className={label}>{sell ? "รูป · คลิปสั้น (ไม่บังคับ · ใส่ได้ 8 · รูปแรกเป็นหน้าปก)" : "รูป (ไม่บังคับ)"}</p>
           <MediaPicker items={media} setItems={setMedia} max={sell ? 8 : 3} allowVideo={sell} />
         </div>
       )}
-      {sell && (
-        <div>
-          <label className={label} htmlFor="lend-youtube">
-            ลิงก์ YouTube (ไม่บังคับ)
-          </label>
-          <input id="lend-youtube" type="url" inputMode="url" maxLength={200} value={form.youtube} onChange={(e) => set({ youtube: e.target.value.trim() })} className={input} placeholder="เช่น https://youtu.be/xxxx · คลิปวิธีทำ รีวิว" />
-        </div>
-      )}
+      {sell && <YouTubeField id="lend-youtube" strong value={form.youtube} onChange={(youtube) => set({ youtube })} />}
       <div className="grid gap-3 sm:grid-cols-3">
         <NameField id="lend-name" value={form.name} onChange={(name) => set({ name })} />
         <div>

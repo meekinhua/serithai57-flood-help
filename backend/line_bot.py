@@ -44,7 +44,7 @@ import push
 import repair
 from myhome import waste_days
 from fastapi import APIRouter, Depends, HTTPException, Request
-from media import _process_image
+from media import _process_image, _process_video
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel, Field
 
@@ -315,7 +315,7 @@ def card(d: dict) -> dict:
     home = d.get("status") == "reunited"  # 16 Oct: found ones stay visible for a week, marked
     tag = ("🎉 ได้คืนแล้ว" if home else "😢 หาย" if lost else "🙌 เจอ หาเจ้าของ") + " · " + CAT_TH.get(d.get("category"), "")
     where = " · ".join(x for x in (f"ซ.{d['soi']}" if d.get("soi") else "", d.get("when_seen", "")) if x) or "ไม่ระบุที่"
-    media = [m for m in d.get("media") or [] if m.get("type") == "image"]
+    media = [m for m in d.get("media") or [] if m.get("type") in ("image", "video")]  # 17 Oct: a clip shows its poster
     b = {
         "type": "bubble", "size": "kilo",
         "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": [
@@ -326,6 +326,7 @@ def card(d: dict) -> dict:
         "footer": {"type": "box", "layout": "vertical", "contents": [
             {"type": "button", "style": "primary", "height": "sm", "color": "#1E6B47",
              "action": {"type": "uri", "label": "ดูรูป · บอกว่าเห็น", "uri": f"{SITE}/#lost-{d['id']}"}},
+            *([{"type": "button", "style": "link", "height": "sm", "action": {"type": "uri", "label": "▶ ดูคลิป YouTube", "uri": d["youtube"]}}] if d.get("youtube") else []),
         ]},
     }
     if media:
@@ -417,6 +418,66 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                                    "file_id": file_id, "thumb_id": thumb_id, "width": w, "height": h, "duration": None, "size": len(main),
                                    "attached_to": None, "created_at": now(), "ready_at": now(), "via": "line"})
         return mid
+
+    clip_tasks: set = set()
+
+    async def save_clip(message_id: str) -> str | None:
+        """17 Oct: a LINE video → a media doc right away (status processing) so the reply goes out now; LINE's own
+        transcoding is awaited and ffmpeg runs (60 s, 480p, poster) in the background. Publishing waits for it."""
+        mid = str(uuid.uuid4())
+        await db.media.insert_one({"id": mid, "type": "video", "mime": "video/mp4", "declared_size": 0, "chunks": 0, "status": "processing",
+                                   "attached_to": None, "created_at": now(), "via": "line"})
+
+        async def work():
+            work_dir = Path(tempfile.mkdtemp(prefix="lineclip-"))
+            try:
+                c = await creds()
+                src = work_dir / "original.mp4"
+                if c.get("dry"):  # the simulator: a made-up 2-second clip
+                    ff = __import__("media")._ffmpeg()
+                    proc = await asyncio.create_subprocess_exec(ff, "-y", "-f", "lavfi", "-i", "testsrc=size=320x240:rate=15", "-t", "2", str(src),
+                                                                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+                    await proc.wait()
+                else:
+                    for _ in range(30):  # LINE prepares the file first
+                        code, r = await asyncio.to_thread(call, "GET", f"{DATA_API}/message/{message_id}/content/transcoding", c["token"])
+                        if code == 200 and (r or {}).get("status") == "succeeded":
+                            break
+                        if code == 200 and (r or {}).get("status") == "failed":
+                            raise ValueError("LINE transcoding failed")
+                        await asyncio.sleep(2)
+                    code, data = await asyncio.to_thread(call, "GET", f"{DATA_API}/message/{message_id}/content", c["token"], None, True, 120)
+                    if code != 200 or not data or len(data) > 250 * 1024 * 1024:
+                        raise ValueError(f"content {code}")
+                    src.write_bytes(data)
+                out, poster, w, h, dur = await _process_video(src, work_dir)
+                with open(out, "rb") as f:
+                    file_id = await bucket.upload_from_stream(f"{mid}.mp4", f, metadata={"contentType": "video/mp4"})
+                with open(poster, "rb") as f:
+                    thumb_id = await bucket.upload_from_stream(f"{mid}-poster.jpg", f, metadata={"contentType": "image/jpeg"})
+                await db.media.update_one({"id": mid}, {"$set": {"status": "ready", "file_id": file_id, "thumb_id": thumb_id, "width": w, "height": h,
+                                                                  "duration": dur, "size": out.stat().st_size, "ready_at": now()}})
+            except Exception as e:
+                await db.media.update_one({"id": mid}, {"$set": {"status": "failed", "error": "คลิปนี้เปิดไม่ได้"}})
+                await db.line_log.insert_one({"at": now(), "error": f"clip: {type(e).__name__}: {e}"[:400]})
+            finally:
+                import shutil
+                shutil.rmtree(work_dir, ignore_errors=True)
+
+        t = asyncio.create_task(work())
+        clip_tasks.add(t)
+        t.add_done_callback(clip_tasks.discard)
+        return mid
+
+    async def ready_media(ids: list) -> list:
+        """Before publishing: wait (up to ~90 s) for clips still being prepared; keep only what is ready."""
+        ids = [i for i in ids if i]
+        for _ in range(45):
+            docs = {m["id"]: m["status"] async for m in db.media.find({"id": {"$in": ids}}, {"id": 1, "status": 1})}
+            if not any(st == "processing" for st in docs.values()):
+                break
+            await asyncio.sleep(2)
+        return [i for i in ids if docs.get(i) == "ready"]
 
     # ---------- sessions (one chat in progress per LINE user) ----------
     async def session(user: str) -> dict | None:
@@ -685,13 +746,13 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         if step == "photos":
             n = len(s.get("media", []))
             if n:
-                return text(f"ได้รูปแล้ว {n} รูป 👍 ส่งเพิ่มได้อีก {MAX_PHOTOS - n} รูป หรือกด ต่อไป", qr(("➡️ ต่อไป", "ต่อไป"), ("❌ ยกเลิก", "ยกเลิก")))
+                return text(f"ได้แล้ว {n} รายการ 👍 ส่งรูป/คลิปเพิ่มได้อีก {MAX_PHOTOS - n} หรือกด ต่อไป", qr(("➡️ ต่อไป", "ต่อไป"), ("❌ ยกเลิก", "ยกเลิก")))
             chips = {"items": [
                 {"type": "action", "action": {"type": "cameraRoll", "label": "🖼️ เลือกรูป"}},
                 {"type": "action", "action": {"type": "camera", "label": "📷 ถ่ายรูป"}},
                 {"type": "action", "action": {"type": "message", "label": "ไม่มีรูป", "text": "ไม่มีรูป"}},
                 {"type": "action", "action": {"type": "message", "label": "❌ ยกเลิก", "text": "ยกเลิก"}}]}
-            return text("ส่งรูป" + ("น้อง" if s.get("category") in ("dog", "cat", "pet") else "") + f"มาได้เลยครับ (1–{MAX_PHOTOS} รูป) รูปช่วยให้คนจำได้มากที่สุด 📷", chips)
+            return text("ส่งรูป" + ("น้อง" if s.get("category") in ("dog", "cat", "pet") else "") + f"หรือคลิปสั้นมาได้เลยครับ (1–{MAX_PHOTOS} รายการ) ช่วยให้คนจำได้มากที่สุด 📷\nมีคลิปใน YouTube วางลิงก์ได้เลย", chips)
         if step == "desc":
             ex = "เช่น \"แมวส้ม ชื่อส้มจีน ตัวผู้ หูซ้ายแหว่ง ปลอกคอแดง\"" if lost else "เช่น \"หมาพันธุ์ไทย สีน้ำตาล ปลอกคอฟ้า เดินอยู่หน้าซอย\""
             return text(f"บอกลักษณะสั้นๆ ให้คนจำได้ครับ\n{ex}", qr(("❌ ยกเลิก", "ยกเลิก")))
@@ -736,9 +797,10 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return [text("วันนี้ลงประกาศครบ 5 รายการแล้วครับ ถ้าจำเป็นทักเพจ FB หมู่บ้านได้เลย")]
         key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
         body = {"kind": s["kind"], "category": s["category"], "title": s["desc"][:80], "detail": s["desc"] if len(s["desc"]) > 80 else "",
-                "soi": s.get("soi", ""), "when_seen": s.get("when", "")[:60], "name": s["name"], "phone": s["phone"], "lat": s.get("lat"), "lng": s.get("lng")}
+                "soi": s.get("soi", ""), "when_seen": s.get("when", "")[:60], "name": s["name"], "phone": s["phone"], "lat": s.get("lat"), "lng": s.get("lng"),
+                "youtube": s.get("youtube", "")[:200] if repair.YOUTUBE.match(s.get("youtube", "")) else ""}
         try:
-            media = await claim_media(s.get("media", []), f"lost:{item_id}", {"image"})
+            media = await claim_media(await ready_media(s.get("media", [])), f"lost:{item_id}", {"image", "video"})
         except HTTPException:
             media = []
         doc = {
@@ -851,6 +913,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         tel = re.sub(r"[^\d+]", "", d.get("phone") or "")
         foot = [{"type": "button", "style": "primary", "height": "sm", "color": "#15201A", "action": {"type": "uri", "label": "📞 โทร", "uri": f"tel:{tel}"}}] if len(tel) >= 9 else []
         foot.append({"type": "button", "style": "secondary", "height": "sm", "action": {"type": "uri", "label": "ดูรายละเอียด·รูป", "uri": f"{SITE}/#shop-{d['id']}"}})
+        if d.get("youtube"):
+            foot.append({"type": "button", "style": "link", "height": "sm", "action": {"type": "uri", "label": "▶ ดูคลิป YouTube", "uri": d["youtube"]}})
         b = {"type": "bubble", "size": "kilo", "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body},
              "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": foot}}
         media = d.get("media") or []
@@ -969,8 +1033,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         if step == "m_photos":
             n = len(s.get("media", []))
             if n:
-                return text(f"ได้รูปแล้ว {n} รูป 👍 ส่งเพิ่มได้อีก {MAX_PHOTOS - n} รูป หรือกด ต่อไป", qr(("➡️ ต่อไป", "ต่อไป"), CANCEL))
-            return text(f"ส่งรูปของที่ขายมาได้เลยครับ (1–{MAX_PHOTOS} รูป) รูปน่ากิน ขายง่าย 📷\nมีคลิป YouTube วางลิงก์ได้เลย", {"items": [
+                return text(f"ได้แล้ว {n} รายการ 👍 ส่งรูป/คลิปเพิ่มได้อีก {MAX_PHOTOS - n} หรือกด ต่อไป", qr(("➡️ ต่อไป", "ต่อไป"), CANCEL))
+            return text(f"ส่งรูปของที่ขายมาได้เลยครับ (1–{MAX_PHOTOS} รูป) รูปน่ากิน ขายง่าย 📷\n🎬 มีคลิป? คลิปยาวหรืออยากให้ภาพคมชัด ลง YouTube แล้ววางลิงก์ตรงนี้ดีกว่า (คลิปที่ส่งในแชทจะถูกตัดเหลือ 60 วิ ภาพ 480p)", {"items": [
                 {"type": "action", "action": {"type": "cameraRoll", "label": "🖼️ เลือกรูป"}},
                 {"type": "action", "action": {"type": "camera", "label": "📷 ถ่ายรูป"}},
                 {"type": "action", "action": {"type": "message", "label": "ไม่มีรูป", "text": "ไม่มีรูป"}},
@@ -1096,8 +1160,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         if step == "s_photos":
             n = len(s.get("media", []))
             if n:
-                return text(f"ได้รูปแล้ว {n} รูป 👍 ส่งเพิ่มได้อีก {MAX_PHOTOS - n} รูป หรือกด ต่อไป", qr(("➡️ ต่อไป", "ต่อไป"), CANCEL))
-            return text("ส่งรูปผลงาน หรือรูปร้าน ได้เลยครับ (ไม่บังคับ · ถึง 3 รูป) คนเห็นงานจริง เรียกใช้ง่ายขึ้น 📷", {"items": [
+                return text(f"ได้แล้ว {n} รายการ 👍 ส่งรูป/คลิปเพิ่มได้อีก {MAX_PHOTOS - n} หรือกด ต่อไป", qr(("➡️ ต่อไป", "ต่อไป"), CANCEL))
+            return text("ส่งรูปผลงาน หรือรูปร้าน ได้เลยครับ (ไม่บังคับ · ถึง 3 รูป) คนเห็นงานจริง เรียกใช้ง่ายขึ้น 📷\n🎬 คลิปผลงานยาวๆ ลง YouTube แล้ววางลิงก์ดีกว่า (คลิปในแชทจะถูกย่อ)", {"items": [
                 {"type": "action", "action": {"type": "cameraRoll", "label": "🖼️ เลือกรูป"}},
                 {"type": "action", "action": {"type": "message", "label": "ไม่มีรูป", "text": "ไม่มีรูป"}},
                 {"type": "action", "action": {"type": "message", "label": "❌ ยกเลิก", "text": "ยกเลิก"}}]})
@@ -1129,6 +1193,14 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
 
     async def service_step(user: str, s: dict, t: str, raw: str) -> list:
         step = s["step"]
+        yt = YT_IN_TEXT.search(raw or "")
+        if yt and step != "s_cat":  # a YouTube link of the work, pasted anywhere in the flow
+            s["youtube"] = yt.group(0)[:200]
+            await save(user, s)
+            rest = (raw[:yt.start()] + raw[yt.end():]).strip()
+            if not rest:
+                return [text("▶ ได้คลิป YouTube แล้วครับ"), sask(s)]
+            raw, t = rest, norm(rest)
         if step == "s_cat":
             cat = next((c for label, c in SVC_CHOICES["repair" if s.get("mode") == "repair" else "service"] if raw.strip() == label or t in norm(label)), None)
             if not cat:
@@ -1175,12 +1247,13 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return [text(f"วันนี้ลงครบ {POSTS_PER_DAY} รายการแล้วครับ พรุ่งนี้ลงต่อได้")]
         key, sid, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
         try:
-            media = await claim_media(s.get("media", []), f"service:{sid}", {"image"})
+            media = await claim_media(await ready_media(s.get("media", [])), f"service:{sid}", {"image", "video"})
         except HTTPException:
             media = []
         doc = {"id": sid, "category": s.get("category") or "errand", "name": s.get("name", "")[:80] or s.get("line_name") or "เพื่อนบ้าน", "phone": s.get("phone", ""),
                "line_id": "", "detail": s.get("detail", "")[:500], "pricing": "paid" if s.get("price") else "ask", "price": s.get("price", "")[:100],
                "area": s.get("area", "")[:100], "lat": s.get("lat"), "lng": s.get("lng"), "media": media, "available": True, "verified": False, "pinned": False,
+               "youtube": s.get("youtube", "")[:200] if repair.YOUTUBE.match(s.get("youtube", "")) else "",
                "reports": 0, "reporters": [], "via": "line", "created_at": t, "updated_at": t, "edit_key_hash": repair._hash(key)}
         await db.services.insert_one(dict(doc))
         await db.line_posts.insert_one({"user": user, "id": sid, "title": doc["name"], "at": t, "type": "service"})
@@ -1204,7 +1277,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 "youtube": s.get("youtube", "")[:200] if repair.YOUTUBE.match(s.get("youtube", "")) else "",
                 "lat": s.get("lat"), "lng": s.get("lng"), "shop_name": "", "tags": [], "options": []}
         try:
-            media = await claim_media(s.get("media", []), f"lend:{item_id}", {"image"})
+            media = await claim_media(await ready_media(s.get("media", [])), f"lend:{item_id}", {"image", "video"})
         except HTTPException:
             media = []
         doc = {
@@ -1427,6 +1500,14 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return await market_step(user, s, t, raw)
         if s and s["step"].startswith("o_"):
             return await order_step(user, s, t, raw)
+        if s and s.get("step") in STEPS and s["step"] not in ("category", "confirm") and YT_IN_TEXT.search(raw or ""):
+            yt = YT_IN_TEXT.search(raw)
+            s["youtube"] = yt.group(0)[:200]
+            await save(user, s)
+            rest = (raw[:yt.start()] + raw[yt.end():]).strip()
+            if not rest:
+                return [text("▶ ได้คลิป YouTube แล้วครับ"), ask(s)]
+            raw, t = rest, norm(rest)
         if s:
             step = s["step"]
             if step == "category":
@@ -1528,23 +1609,24 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         return [text("📍 ได้ตำแหน่งแล้วครับ\nใช้ปักหมุดได้ตอน 🛍️ ลงขาย (จุดรับของ) หรือ แจ้งหาย·เจอ (จุดที่เห็น) — เริ่มแล้วกด 📍 ส่งตำแหน่ง ตอนบอทถามซอย\nแจ้งปัญหาในซอยพร้อมหมุด: serithai57.com/#issues",
                      qr(("🛍️ ลงขาย", "ลงขาย"), ("📢 แจ้งหาย", "แจ้งหาย"), ("🙌 แจ้งเจอ", "แจ้งเจอ")))]
 
-    async def on_image(user: str, message_id: str) -> list:
+    async def on_image(user: str, message_id: str, clip: bool = False) -> list:
+        save_photo_or_clip = save_clip if clip else save_photo
         s = await session(user)
         if not s or s["step"] not in ("photos", "category", "m_photos", "m_category", "m_shelf", "s_cat", "s_photos", "photo_what"):
             # 16 Oct: people send a screenshot / a photo to tell us something ("ตัวนี้เจอแล้ว") — keep it, ask what it is
-            mid = await save_photo(message_id)
+            mid = await save_photo_or_clip(message_id)
             if not mid:
                 return []
             await drop(user)
             await save(user, {"step": "photo_what", "media": [mid]})
-            return [text("แอดได้รับรูปแล้วครับ 📷 รูปนี้เรื่องอะไรครับ? กดเลือก หรือพิมพ์เล่าได้เลย แอดอ่านทุกข้อความ",
+            return [text(("แอดได้รับคลิปแล้วครับ 🎬 คลิปนี้" if clip else "แอดได้รับรูปแล้วครับ 📷 รูปนี้") + "เรื่องอะไรครับ? กดเลือก หรือพิมพ์เล่าได้เลย แอดอ่านทุกข้อความ",
                          qr(("🙌 เจอสัตว์/ของ", "แจ้งเจอ"), ("📢 แจ้งหาย", "แจ้งหาย"), ("🎉 ตัวในประกาศเจอแล้ว", "ตัวนี้เจอแล้ว"), ("🛍️ ลงขายของ", "ลงขาย"), ("📍 แจ้งปัญหาในซอย", "แจ้งปัญหา")))]
-        if s["step"] == "photo_what":  # more photos of the same thing: keep them quietly
-            await db.line_sessions.update_one({"user": user}, {"$push": {"media": {"$each": [await save_photo(message_id)]}}, "$set": {"updated_at": now()}})
+        if s["step"] == "photo_what":  # more photos / clips of the same thing: keep them quietly
+            await db.line_sessions.update_one({"user": user}, {"$push": {"media": {"$each": [await save_photo_or_clip(message_id)]}}, "$set": {"updated_at": now()}})
             return []
         if len(s.get("media", [])) >= MAX_PHOTOS:
             return [] if s["step"] not in ("photos", "m_photos", "s_photos") else [ask_any(s)]
-        mid = await save_photo(message_id)
+        mid = await save_photo_or_clip(message_id)
         if not mid:
             return [text("รูปนี้เปิดไม่ได้ครับ ลองส่งใหม่อีกครั้ง")]
         # one atomic push: a person often sends 3 photos at once and they arrive as 3 events
@@ -1587,6 +1669,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                     out = await on_text(user, m.get("text", ""))
                 elif m["type"] == "image":
                     out = await on_image(user, m["id"])
+                elif m["type"] == "video":  # 17 Oct: clips too (cut to 60 s / 480p like the site)
+                    out = await on_image(user, m["id"], clip=True)
                 elif m["type"] == "location":
                     out = await on_location(user, m)
                 await keep(user, m, out)

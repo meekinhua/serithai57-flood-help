@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, load, save } from "../api";
 import { MediaStrip } from "./MediaGallery";
+import { YouTubeThumb } from "./SellFields";
 import { JOB_TYPES, LEND_CATEGORIES, LEND_KINDS, SERVICE_CATEGORIES, timeAgo } from "../config";
 import { FORUM_CATEGORIES } from "./Forum";
 import { mapLink } from "./PinField";
@@ -483,6 +484,7 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
                 )}
               </b>
               <MediaStrip media={s.media || []} />
+              <YouTubeThumb url={s.youtube} />
               {s.detail && <MoreText text={s.detail} />}
               {(s.price || s.area) && <p className="text-sm text-[#45504A]">{[s.price, s.area].filter(Boolean).join(" · ")}</p>}
               {mapLink(s) && (

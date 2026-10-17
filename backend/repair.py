@@ -254,7 +254,8 @@ class LostCreate(Contact):
     when_seen: str = Field("", max_length=60)  # "หายตั้งแต่ 29 ก.ย. ตอนน้ำขึ้น"
     lat: Optional[float] = Field(None, ge=13.7, le=13.9)  # 9 Oct: where it was lost / seen (the pin)
     lng: Optional[float] = Field(None, ge=100.6, le=100.8)
-    media_ids: list[str] = Field(default_factory=list, max_length=3)
+    media_ids: list[str] = Field(default_factory=list, max_length=3)  # 17 Oct: photos or a short clip
+    youtube: str = Field("", max_length=200)  # 17 Oct: a longer clip on YouTube
 
 
 class Sighting(BaseModel):
@@ -756,11 +757,13 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         spot = place(body.model_dump(), item_id, NEAR_M)
         if body.lat is not None and spot.get("lat", 0) is None:
             raise HTTPException(422, "หมุดอยู่นอกหมู่บ้าน · ลากหมุดกลับเข้ามาตรงจุด หรือใส่ซอยแทน")
+        if body.youtube.strip() and not YOUTUBE.match(body.youtube.strip()):
+            raise HTTPException(422, "ลิงก์ YouTube ไม่ถูกต้อง (เช่น https://youtu.be/xxxx)")
         doc = {
             "id": item_id,
             **_clean(body.model_dump(exclude={"media_ids"})),
             **spot,
-            "media": await claim_media(body.media_ids, f"lost:{item_id}", {"image"}),
+            "media": await claim_media(body.media_ids, f"lost:{item_id}", {"image", "video"}),
             "has_phone": True,
             "sightings": [],
             "status": "open",

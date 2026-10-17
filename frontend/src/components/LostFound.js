@@ -5,6 +5,7 @@ import { api, load, save } from "../api";
 import { LOST_CATEGORIES, LOST_KINDS, timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import { openMedia } from "./MediaGallery";
+import { YouTubeField, YouTubeThumb } from "./SellFields";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import LocationPicker from "./LocationPicker";
 import PinFix from "./PinFix";
@@ -127,7 +128,10 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
     <li data-item={x.id} className={`anim-row scroll-mt-28 overflow-hidden rounded-xl border bg-white shadow-sm ${x.status === "reunited" ? "opacity-75" : ""}`}>
       {photo ? (
         <a href={mediaUrl(photo.id)} onClick={(e) => { e.preventDefault(); openMedia(x.media, Math.max(0, x.media.indexOf(photo))); }} className="block">
-          <img src={mediaUrl(photo.id, "thumb")} alt={x.title} loading="lazy" className="aspect-[4/3] w-full max-w-full object-cover" />
+          <span className="relative block">
+            <img src={mediaUrl(photo.id, "thumb")} alt={x.title} loading="lazy" className="aspect-[4/3] w-full max-w-full object-cover" />
+            {photo.type === "video" && <span className="absolute inset-0 flex items-center justify-center text-5xl text-white drop-shadow-lg">▶</span>}
+          </span>
         </a>
       ) : (
         <div className="flex aspect-[4/3] max-w-full items-center justify-center bg-neutral-100 text-6xl" aria-hidden="true">
@@ -151,11 +155,15 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
           <div className="flex gap-2">
             {x.media.slice(1).map((m, i) => (
               <a key={m.id} href={mediaUrl(m.id)} onClick={(e) => { e.preventDefault(); openMedia(x.media, i + 1); }}>
-                <img src={mediaUrl(m.id, "thumb")} alt="" loading="lazy" className="h-16 w-16 rounded-lg object-cover" />
+                <span className="relative block">
+                  <img src={mediaUrl(m.id, "thumb")} alt="" loading="lazy" className="h-16 w-16 rounded-lg object-cover" />
+                  {m.type === "video" && <span className="absolute inset-0 flex items-center justify-center text-xl text-white drop-shadow">▶</span>}
+                </span>
               </a>
             ))}
           </div>
         )}
+        <YouTubeThumb url={x.youtube} />
         {x.sightings?.length > 0 && (
           <ul className="space-y-1 rounded-lg bg-sky-50 p-2 text-sm">
             {[...x.sightings]
@@ -331,9 +339,10 @@ export function LostForm({ kind: initialKind = "lost", onDone }) {
         </div>
       </fieldset>
       <div>
-        <p className={label}>รูป (สำคัญมาก โดยเฉพาะสัตว์เลี้ยง)</p>
-        <MediaPicker items={media} setItems={setMedia} max={3} allowVideo={false} />
+        <p className={label}>รูป · คลิปสั้น (สำคัญมาก โดยเฉพาะสัตว์เลี้ยง · ใส่ได้ 3)</p>
+        <MediaPicker items={media} setItems={setMedia} max={3} allowVideo />
       </div>
+      <YouTubeField id="lost-youtube" value={form.youtube || ""} onChange={(youtube) => set({ youtube })} />
       <div>
         <label className={label} htmlFor="lost-title">
           {lost ? "หายอะไร *" : "เจออะไร *"}
