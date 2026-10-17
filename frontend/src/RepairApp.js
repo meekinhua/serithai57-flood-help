@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API, api, load, save, viewerId } from "./api";
+import { pullKeys, pushAll, pushKey } from "./sellerSync";
 import { HOTLINE_GROUPS, ISSUE_TYPES, LEND_KINDS, VILLAGE_NAME, isMarketShop, timeAgo } from "./config";
 import Sheet from "./components/Sheet";
 import Announcements, { UrgentBar } from "./components/Announcements";
@@ -170,6 +171,15 @@ export default function RepairApp() {
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
+  // 17 Oct: a browser joined to a seller's shop link picks up posts made on the seller's other phones
+  useEffect(() => {
+    pullKeys().then((n) => {
+      if (n) {
+        setLend((p) => [...p]);
+        setServices((p) => [...p]);
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [forumGo] = useState({ n: 0 });
   const [, setForumTick] = useState(0); // forumGo is mutated in place: this re-renders after it changed
   const [water, setWater] = useState([]);
@@ -229,8 +239,23 @@ export default function RepairApp() {
       const k = (hash || "").match(/^#?sell-([\w-]{6,})~([\w-]{10,})$/);
       if (k) {
         save("lendKeys", { ...load("lendKeys", {}), [k[1]]: k[2] });
+        pushKey("lend", k[1], k[2]);
         window.history.replaceState(null, "", window.location.pathname + window.location.search);
         return goItem("market", k[1]);
+      }
+      // 17 Oct: ลิงก์ร้านของฉัน opened on another phone / app: this browser joins the seller's shop
+      const sp = (hash || "").match(/^#?shop-pass~([\w-]{20,64})$/);
+      if (sp) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        save("sellerPass", sp[1]);
+        pushAll()
+          .then(pullKeys)
+          .then((n) => {
+            setLend((p) => [...p]);
+            setServices((p) => [...p]);
+            setToast(n ? `✅ เชื่อมร้านแล้ว · เครื่องนี้เห็นของที่คุณขาย ${n} รายการ และออเดอร์` : "✅ เชื่อมร้านแล้ว · ลงขายเครื่องไหน ก็เห็นทุกเครื่อง");
+          });
+        return showTab("market");
       }
       const m = (hash || "").match(/^#?(lost|jobs|lend|market|issue|shop|forum)-([\w-]{6,})$/);
       if (!m) return;

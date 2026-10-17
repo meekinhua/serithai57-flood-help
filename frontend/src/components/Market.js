@@ -5,6 +5,7 @@ import { mediaUrl } from "../media";
 import { ProsList, rememberCall } from "./Community";
 import { notify } from "../notify";
 import { openMedia } from "./MediaGallery";
+import { getPass, passLink, pushAll } from "../sellerSync";
 import { ContactButton, NameField, input, label, remember, savedContact, telHref, useKeys } from "./RepairBoards";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinField, { mapLink } from "./PinField";
@@ -231,6 +232,76 @@ function OrderForm({ item: x, preset = "", onDone, onCancel }) {
   );
 }
 
+// 17 Oct: ลิงก์ร้านของฉัน — not required, but then the posts and orders show on every phone / app the seller uses
+export function SellerSyncBox() {
+  const [pass, setPass] = useState(getPass());
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const link = pass ? passLink(pass) : "";
+  async function make() {
+    setBusy(true);
+    await pushAll();
+    setPass(getPass());
+    setBusy(false);
+    setOpen(true);
+  }
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(link);
+      notify("คัดลอกลิงก์ร้านแล้ว");
+    } catch {
+      window.prompt("คัดลอกลิงก์นี้", link);
+    }
+  }
+  const toLine = `https://line.me/R/msg/text/?${encodeURIComponent(`🔑 ลิงก์ร้านของฉัน serithai57 (เก็บไว้ อย่าส่งให้คนอื่น)\n${link}`)}`;
+  return (
+    <div id="seller-sync" className="scroll-mt-36 space-y-2 rounded-xl border-2 border-dashed border-[#1E6B47] bg-[#F4FAF6] p-3">
+      <button onClick={() => setOpen(!open)} className="flex min-h-[44px] w-full items-center gap-2 text-left">
+        <span className="text-2xl" aria-hidden="true">
+          📱
+        </span>
+        <span className="min-w-0 flex-1">
+          <b className="block">{pass ? "✅ ร้านของคุณเชื่อมหลายเครื่องแล้ว" : "ดูออเดอร์ได้ทุกเครื่อง"}</b>
+          <span className="text-sm text-[#45504A]">{pass ? "แตะเพื่อดูลิงก์ร้าน / เพิ่มเครื่อง" : "ไม่ทำก็ได้ · แต่ทำครั้งเดียวแล้วดีกว่า"}</span>
+        </span>
+        <span className="text-xl text-[#45504A]">{open ? "▴" : "▾"}</span>
+      </button>
+      {open && (
+        <div className="space-y-2 text-[15px] leading-relaxed">
+          {!pass && (
+            <p className="text-[#33403A]">
+              ตอนนี้ของที่คุณขายและออเดอร์ <b>เห็นได้เฉพาะเครื่อง/แอปนี้</b> · ถ้าวันหลังเปิดเว็บจากแอปอื่น (เช่น เปิดใน LINE แล้วมาเปิดใน Chrome) เปลี่ยนมือถือ หรือล้างข้อมูลเบราว์เซอร์ จะไม่เห็น
+            </p>
+          )}
+          <ol className="list-decimal space-y-1 pl-5 text-[#33403A]">
+            <li>{pass ? "ลิงก์ร้านของคุณพร้อมแล้ว" : "กดสร้างลิงก์ร้านของฉัน"}</li>
+            <li>
+              กด <b>ส่งเข้า LINE ตัวเอง</b> (แชท Keep หรือแชทกับตัวเอง) เก็บไว้
+            </li>
+            <li>มือถือเครื่องอื่น หรือแอปอื่น เปิดลิงก์นั้น <b>ครั้งเดียว</b> — เสร็จ</li>
+          </ol>
+          <p className="text-sm text-[#45504A]">ต่อไปลงขายจากเครื่องไหน ทุกเครื่องที่เปิดลิงก์แล้วจะเห็นของ แก้ไขได้ และเห็นออเดอร์เหมือนกัน</p>
+          {pass ? (
+            <div className="grid grid-cols-2 gap-2">
+              <a href={toLine} target="_blank" rel="noreferrer" className="flex min-h-[48px] items-center justify-center rounded-xl bg-[#06C755] font-bold text-white">
+                ส่งเข้า LINE ตัวเอง
+              </a>
+              <button onClick={copy} className="min-h-[48px] rounded-xl border-2 border-[#15201A] font-bold">
+                คัดลอกลิงก์
+              </button>
+            </div>
+          ) : (
+            <button disabled={busy} onClick={make} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-bold text-white disabled:opacity-60">
+              {busy ? "กำลังสร้าง…" : "🔑 สร้างลิงก์ร้านของฉัน"}
+            </button>
+          )}
+          <p className="rounded-lg bg-[#FFF4D6] p-2 text-sm text-[#5C3B00]">⚠️ ลิงก์นี้คือกุญแจร้านของคุณ ใครมีลิงก์จะแก้โพสต์และเห็นออเดอร์ได้ — อย่าส่งให้คนอื่น</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SellerOrders({ item: x, editKey }) {
   const [full, setFull] = useState(null);
   const [err, setErr] = useState("");
@@ -270,6 +341,11 @@ function SellerOrders({ item: x, editKey }) {
         </div>
       ))}
       {full && !orders.length && <p className="text-sm text-[#45504A]">ยังไม่มีออเดอร์ · มีคนสั่ง จะขึ้นที่นี่ (เปิดแจ้งเตือนในบ้านฉัน จะเด้งบอกทันที)</p>}
+      {!getPass() && (
+        <button onClick={() => document.getElementById("seller-sync")?.scrollIntoView({ behavior: "smooth", block: "center" })} className="min-h-[40px] text-left text-sm font-semibold text-[#1E6B47] underline">
+          📱 อยากดูออเดอร์จากมือถือเครื่องอื่นด้วย? ตั้งครั้งเดียว ›
+        </button>
+      )}
       {err && <p className="text-sm text-red-700">{err}</p>}
     </div>
   );
@@ -684,6 +760,8 @@ export default function Market({ items, setItems, admin, onAdd, shops = [], setS
           )}
         </>
       )}
+      {/* the seller's shop link — only once this browser owns something in ตลาด, or already has a pass */}
+      {(getPass() || open.some((x) => keys[x.id]) || shops.some((s) => load("serviceKeys", {})[s.id])) && <SellerSyncBox />}
       {/* one button for sellers, at the bottom: buyers come to look, so the list comes first */}
       <div className="card space-y-2 p-3">
         {!choosing ? (
