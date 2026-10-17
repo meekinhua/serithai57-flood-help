@@ -3,6 +3,7 @@ import L from "leaflet";
 import { api, load, save } from "../api";
 import { ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, JOB_VERBS, LEND_CATEGORIES, LEND_KINDS, LEND_STATUS, MARKET_CATEGORIES, MARKET_ONLY, timeAgo } from "../config";
 import { mediaUrl } from "../media";
+import { openMedia } from "./MediaGallery";
 import { currentSub } from "../push";
 import { createBaseMap } from "./MapView";
 import LocationPicker from "./LocationPicker";
@@ -107,8 +108,8 @@ function Photos({ media }) {
   if (!media?.length) return null;
   return (
     <div className="mt-2 flex gap-2">
-      {media.map((m) => (
-        <a key={m.id} href={mediaUrl(m.id)} target="_blank" rel="noreferrer">
+      {media.map((m, i) => (
+        <a key={m.id} href={mediaUrl(m.id)} onClick={(e) => { e.preventDefault(); openMedia(media, i); }}>
           <img src={mediaUrl(m.id, "thumb")} alt="" loading="lazy" className="h-20 w-20 rounded-lg object-cover" />
         </a>
       ))}

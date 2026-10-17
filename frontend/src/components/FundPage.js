@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, load, save } from "../api";
 import { mediaUrl } from "../media";
+import { openMedia } from "./MediaGallery";
 import MediaPicker, { mediaState } from "./MediaPicker";
 
 // /fund — เงินสมทบทีมอาสา: a dashboard anyone can read in five seconds and check line by line.
@@ -503,8 +504,8 @@ function Ledger({ data }) {
                   <td className="py-2 pr-2 text-right font-semibold tabular-nums">{fmt(x.amount)}</td>
                   <td className="py-2">
                     <span className="flex gap-1">
-                      {(x.receipts || []).map((r) => (
-                        <a key={r.id} href={mediaUrl(r.id)} target="_blank" rel="noreferrer">
+                      {(x.receipts || []).map((r, i) => (
+                        <a key={r.id} href={mediaUrl(r.id)} onClick={(e) => { e.preventDefault(); openMedia(x.receipts, i); }}>
                           <img src={mediaUrl(r.id, "thumb")} alt="ใบเสร็จ" className="h-10 w-10 rounded object-cover" />
                         </a>
                       ))}
@@ -609,7 +610,7 @@ function Treasurer({ tre, onChanged, setToast }) {
         {list.map((d) => (
           <li key={d.id} className="flex flex-wrap items-start gap-2 rounded-xl bg-white p-2">
             {d.slip?.[0] ? (
-              <a href={mediaUrl(d.slip[0].id)} target="_blank" rel="noreferrer" className="shrink-0">
+              <a href={mediaUrl(d.slip[0].id)} onClick={(e) => { e.preventDefault(); openMedia(d.slip, 0); }} className="shrink-0">
                 <img src={mediaUrl(d.slip[0].id, "thumb")} alt="สลิป" className="h-24 rounded object-cover" style={{ width: "4.5rem" }} />
               </a>
             ) : (
@@ -845,7 +846,7 @@ function SlipLink({ d, big = false }) {
   const m = d.slip?.[0];
   if (!m) return d.has_slip ? <span>📎</span> : null;
   return (
-    <a href={mediaUrl(m.id)} target="_blank" rel="noreferrer" title="ดูสลิป" className="shrink-0">
+    <a href={mediaUrl(m.id)} onClick={(e) => { e.preventDefault(); openMedia(d.slip, 0); }} title="ดูสลิป" className="shrink-0">
       <img src={mediaUrl(m.id, "thumb")} alt={`สลิป ${d.name}`} loading="lazy" className={`${big ? "h-12 w-9" : "h-10 w-8"} rounded border object-cover`} />
     </a>
   );

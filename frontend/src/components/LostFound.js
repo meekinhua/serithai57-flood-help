@@ -4,6 +4,7 @@ import { seenVisits } from "../visits";
 import { api, load, save } from "../api";
 import { LOST_CATEGORIES, LOST_KINDS, timeAgo } from "../config";
 import { mediaUrl } from "../media";
+import { openMedia } from "./MediaGallery";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import LocationPicker from "./LocationPicker";
 import PinFix from "./PinFix";
@@ -125,7 +126,7 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
   return (
     <li data-item={x.id} className={`anim-row scroll-mt-28 overflow-hidden rounded-xl border bg-white shadow-sm ${x.status === "reunited" ? "opacity-75" : ""}`}>
       {photo ? (
-        <a href={mediaUrl(photo.id)} target="_blank" rel="noreferrer" className="block">
+        <a href={mediaUrl(photo.id)} onClick={(e) => { e.preventDefault(); openMedia(x.media, Math.max(0, x.media.indexOf(photo))); }} className="block">
           <img src={mediaUrl(photo.id, "thumb")} alt={x.title} loading="lazy" className="aspect-[4/3] w-full max-w-full object-cover" />
         </a>
       ) : (
@@ -148,8 +149,8 @@ function LostCard({ item: x, editKey, admin, onChanged, onDeleted }) {
         <p className="text-xs text-neutral-500">{[x.soi && `ซ.${x.soi}`, x.when_seen, x.name, timeAgo(x.created_at)].filter(Boolean).join(" · ")}</p>
         {x.media?.length > 1 && (
           <div className="flex gap-2">
-            {x.media.slice(1).map((m) => (
-              <a key={m.id} href={mediaUrl(m.id)} target="_blank" rel="noreferrer">
+            {x.media.slice(1).map((m, i) => (
+              <a key={m.id} href={mediaUrl(m.id)} onClick={(e) => { e.preventDefault(); openMedia(x.media, i + 1); }}>
                 <img src={mediaUrl(m.id, "thumb")} alt="" loading="lazy" className="h-16 w-16 rounded-lg object-cover" />
               </a>
             ))}

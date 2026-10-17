@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, load, save } from "../api";
 import { timeAgo } from "../config";
 import { mediaUrl } from "../media";
+import { openMedia } from "./MediaGallery";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import { input } from "./RepairBoards";
 
@@ -286,8 +287,8 @@ function Photos({ media }) {
   if (!media?.length) return null;
   return (
     <div className="mt-2 flex flex-wrap gap-2">
-      {media.map((m) => (
-        <a key={m.id} href={mediaUrl(m.id)} target="_blank" rel="noreferrer">
+      {media.map((m, i) => (
+        <a key={m.id} href={mediaUrl(m.id)} onClick={(e) => { e.preventDefault(); openMedia(media, i); }}>
           <img src={mediaUrl(m.id, "thumb")} alt="" loading="lazy" className="h-24 w-24 rounded-lg object-cover" />
         </a>
       ))}

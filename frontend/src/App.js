@@ -8,6 +8,7 @@ import { PostDetail, PostSummary, waitingHours } from "./components/PostCard";
 import Announcements from "./components/Announcements";
 import AdminPanel, { AdminLogin } from "./components/AdminPanel";
 import { mediaUrl } from "./media";
+import { openMedia } from "./components/MediaGallery";
 import Guide from "./components/Guide";
 import { WeatherAlerts, WeatherCard, WeatherTopBar, WindyMap } from "./components/Weather";
 import { ServiceBoard, ServiceForm, ServiceStrip } from "./components/ServiceBoard";
@@ -534,7 +535,7 @@ export default function App({ archived = false }) {
                           {w.note && ` · ${w.note}`}
                         </span>
                         {w.media?.[0] && (
-                          <a href={mediaUrl(w.media[0].id)} target="_blank" rel="noreferrer" aria-label="ดูรูประดับน้ำ" className="ml-auto flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center">
+                          <a href={mediaUrl(w.media[0].id)} onClick={(e) => { e.preventDefault(); openMedia(w.media, 0); }} aria-label="ดูรูประดับน้ำ" className="ml-auto flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center">
                             <img src={mediaUrl(w.media[0].id, "thumb")} alt="" loading="lazy" className="h-9 w-9 rounded object-cover" />
                           </a>
                         )}

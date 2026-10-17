@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api, load, save } from "../api";
 import { timeAgo } from "../config";
 import { mediaUrl } from "../media";
+import { openMedia } from "./MediaGallery";
 import LocationPicker from "./LocationPicker";
 import MediaPicker, { mediaState } from "./MediaPicker";
 
@@ -453,8 +454,8 @@ export function LeakSheet({ leak, onDone, onDelete }) {
             </p>
           ))}
         <div className="mt-1 flex gap-2">
-          {(leak.media || []).map((m) => (
-            <a key={m.id} href={mediaUrl(m.id)} target="_blank" rel="noreferrer">
+          {(leak.media || []).map((m, i) => (
+            <a key={m.id} href={mediaUrl(m.id)} onClick={(e) => { e.preventDefault(); openMedia(leak.media, i); }}>
               <img src={mediaUrl(m.id, "thumb")} alt="รูรั่ว" className="h-20 w-20 rounded object-cover" />
             </a>
           ))}

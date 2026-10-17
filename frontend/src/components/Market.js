@@ -4,6 +4,7 @@ import { LEND_CATEGORIES, MARKET_FILTERS, SERVICE_CATEGORIES, timeAgo } from "..
 import { mediaUrl } from "../media";
 import { rememberCall } from "./Community";
 import { notify } from "../notify";
+import { openMedia } from "./MediaGallery";
 import { ContactButton, NameField, input, label, remember, savedContact, telHref, useKeys } from "./RepairBoards";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinField, { mapLink } from "./PinField";
@@ -30,7 +31,7 @@ const PICKS = ["วันนี้", "พรุ่งนี้เช้า", "�
 // 16 Oct: a YouTube link on a thing for sale → its id for the thumbnail (the video itself opens in YouTube)
 export const youtubeId = (u) => (u || "").match(/(?:youtu\.be\/|[?&]v=|shorts\/|live\/)([\w-]{6,})/)?.[1] || "";
 
-function Slide({ x, m, i }) {
+function Slide({ x, m, i, all }) {
   const [play, setPlay] = useState(false);
   if (m.type === "video")
     return play ? (
@@ -42,9 +43,9 @@ function Slide({ x, m, i }) {
       </button>
     );
   return (
-    <a href={mediaUrl(m.id)} target="_blank" rel="noreferrer" className="block">
+    <button type="button" onClick={() => openMedia(all, i)} aria-label="ดูรูปเต็มจอ" className="block w-full">
       <img src={mediaUrl(m.id, "thumb")} alt={i ? "" : x.title} loading="lazy" className="aspect-[4/3] w-full bg-[#F2F4F1] object-cover" />
-    </a>
+    </button>
   );
 }
 
@@ -66,7 +67,7 @@ function Gallery({ x, media, emoji, isNew }) {
       <div ref={ref} onScroll={(e) => setAt(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth)))} className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none]">
         {media.map((m, i) => (
           <div key={m.id} className="w-full shrink-0 snap-center">
-            <Slide x={x} m={m} i={i} />
+            <Slide x={x} m={m} i={i} all={media} />
           </div>
         ))}
       </div>
