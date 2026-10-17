@@ -59,7 +59,7 @@ OA_KEYWORDS = {  # exactly the OA Manager's keyword lists as set on 14 Oct (keep
     "เบอร์ฉุกเฉิน", "เบอร์โทร", "รปภ", "ฉุกเฉิน",  # เบอร์ฉุกเฉิน
     "เมนูทั้งหมด", "เมนู", "menu", "เว็บ",  # เมนูทั้งหมด
     "ไฟดับ", "ไฟรั่ว", "ไฟถนน",  # ไฟดับ
-    "ช่าง", "หาช่าง", "ซ่อม", "ประปา",  # ช่าง บริการ (16 Oct: "ร้าน" now opens ตลาด — take it off the OA reply too)
+    # 17 Oct: ช่าง / หาช่าง / ซ่อม / ประปา are answered by the bot (cards per group) — switch the OA "ช่าง บริการ" reply off
     "บริจาค", "สลิป", "บัญชี", "ยอดบริจาค",  # บริจาค
     "แผนที่", "น้ำท่วม", "ระดับน้ำ",  # แผนที่ น้ำท่วม
 }  # (the OA "หาย เจอ" and "ขยะ" replies must be switched off: the bot answers those now, per soi)
@@ -88,7 +88,7 @@ FALLBACK = (  # 16 Oct: the admin's own voice (one resident runs this OA alone, 
     "ไว้ทำเรื่องที่ไลน์ทางการไม่ได้มีให้ เช่น วันรถขยะซอยคุณ หาย·เจอ ตลาด หาช่าง · ประกาศทางการยังดูที่ LINE คหบาลเหมือนเดิมครับ"
 )
 # ---------- 🛍️ ตลาดเพื่อนบ้าน (15 Oct): lend items of kind "sell" (backend/repair.py), listed and posted from the chat ----------
-MARKET_WORDS = {"ตลาด", "ตลาดเพื่อนบ้าน", "ซื้อ", "ของขาย", "ของกิน", "🛍️ ตลาด", "🛍️ ดูตลาด", "ดูตลาด",
+MARKET_WORDS = {"ตลาด", "ตลาดเพื่อนบ้าน", "ซื้อ", "ของขาย", "🛍️ ตลาด", "🛍️ ดูตลาด", "ดูตลาด",
                 "ร้าน", "ร้านอาหาร", "ร้านค้า", "ของใช้", "สั่งอาหาร"}
 SHOP_CATS = ("food", "shop", "supplies")  # 16 Oct: shops from the directory are part of ตลาด (site and bot)
 SHOP_TH = {"food": ("🍜", "ร้านอาหาร"), "shop": ("🏪", "ร้านค้า"), "supplies": ("🧱", "วัสดุ·ของใช้")}
@@ -109,12 +109,44 @@ def with_loc(q: dict) -> dict:
     """A quick-reply set with LINE's own "send my location" button in front (17 Oct)."""
     return {"items": [LOC_CHIP] + q.get("items", [])[:12]}
 MKT_CATS = [("🍲 อาหารทำเอง", "homemade"), ("🧁 ขนม·เบเกอรี่", "dessert"), ("🧋 เครื่องดื่ม", "drinks"),
-            ("🧶 งานฝีมือ", "handmade"), ("🪴 ต้นไม้", "plants"), ("📦 ของมือสอง/อื่นๆ", "other")]
-MKT_WORD_CAT = {**{label: c for label, c in MKT_CATS},
+            ("🫙 ของฝาก·แปรรูป", "preserved"), ("🎉 รับจัดเลี้ยง", "catering"),
+            ("🧶 งานฝีมือ", "handmade"), ("🪴 ต้นไม้", "plants"), ("👕 เสื้อผ้า", "clothes"), ("💄 ความงาม", "cosmetics"),
+            ("🦴 ของสัตว์เลี้ยง", "petgoods"), ("📦 ของมือสอง/อื่นๆ", "other")]
+# 17 Oct: the market's three shelves and the two directories, named exactly as on the site
+FOOD_LEND = ("homemade", "dessert", "drinks", "preserved", "catering", "food")
+SHELF_CATS = {"food": ["homemade", "dessert", "drinks", "preserved", "catering"],
+              "goods": ["handmade", "plants", "clothes", "cosmetics", "petgoods", "other"]}
+SHELF_TH = {"food": "🍲 ของกิน", "goods": "🧺 ของใช้", "service": "🙋 รับทำ"}
+SHELF_WORDS = {"ของกิน": "food", "🍲 ของกิน": "food", "ของใช้": "goods", "🧺 ของใช้": "goods",
+               "รับทำ": "service", "🙋 รับทำ": "service", "บริการ": "service", "รับจ้าง": "service", "รับทำ·บริการ": "service", "🆕 ใหม่ล่าสุด": "new"}
+SERVICE_GROUPS = [("💇 สวยงาม·สุขภาพ", ("beauty",)), ("📸 ถ่ายรูป·อีเวนต์", ("photo",)), ("📚 สอน·ติว", ("tutor",)),
+                  ("🏠 ช่วยงานบ้าน", ("homehelp", "cleaning")), ("🐾 สัตว์เลี้ยง", ("pets",)), ("🚗 รับส่ง·ขนย้าย", ("rental", "porter", "truck", "boat")),
+                  ("💻 ออนไลน์·เอกสาร", ("online",)), ("🙋 รับจ้างทั่วไป", ("errand", "other"))]
+REPAIR_GROUPS = [("⚡ ไฟฟ้า", ("electrician",)), ("🚿 ประปา·ปั๊ม", ("plumber",)), ("❄️ แอร์·เครื่องใช้", ("ac", "appliance", "repair")),
+                 ("🪚 ต่อเติม·ทาสี", ("carpenter", "painter", "roof", "doors")), ("📶 เน็ต·กล้อง", ("net",)), ("🔨 งานจุกจิก", ("handyman",)),
+                 ("🧹 ล้างบ้าน", ("cleaning",)), ("🚛 ขนขยะ", ("junk",)), ("🐜 ปลวก·แมลง", ("pest",)), ("🚗 ซ่อมรถ·ซักพรม", ("vehicle",))]
+SERVICE_CATS = [c for _, cs in SERVICE_GROUPS for c in cs]
+REPAIR_CATS = [c for _, cs in REPAIR_GROUPS for c in cs]
+REPAIR_WORDS = {"ช่าง", "หาช่าง", "🔧 ช่าง", "ช่างซ่อมบ้าน", "ซ่อม", "ซ่อมบ้าน", "ช่าง บริการ", "ช่าง·บริการ", "ช่างทั้งหมด"}
+# a word in what they typed → the ช่าง group ("หาช่างซ่อมเครื่องซักผ้า" → แอร์·เครื่องใช้)
+REPAIR_HINTS = [(r"ไฟ|ปลั๊ก|เบรก", 0), (r"ประปา|ปั๊ม|ท่อ|น้ำรั่ว|ส้วม|สุขภัณฑ์", 1), (r"แอร์|ซักผ้า|ตู้เย็น|ทีวี|ไมโครเวฟ|เครื่องใช้", 2),
+                (r"ไม้|ทาสี|หลังคา|รั่วซึม|ประตู|หน้าต่าง|มุ้ง|ต่อเติม|รีโนเวท|กระเบื้อง", 3), (r"เน็ต|wifi|กล้อง|จาน", 4),
+                (r"หลอด|จุกจิก|ประกอบ", 5), (r"ล้างบ้าน|ทำความสะอาด", 6), (r"ขยะ|ขนของพัง", 7), (r"ปลวก|แมลง|มด", 8), (r"รถ|มอไซ|พรม", 9)]
+SVC_CHOICES = {
+    "service": [("💇 ตัดผม·แต่งหน้า·นวด", "beauty"), ("📸 ถ่ายรูป·สตูดิโอ", "photo"), ("📚 สอน·ติว", "tutor"), ("🏠 แม่บ้าน·ซักรีด", "homehelp"),
+                ("🧹 ทำความสะอาด", "cleaning"), ("🐾 สัตว์เลี้ยง", "pets"), ("🚗 รับส่ง·รถเช่า", "rental"), ("💪 ขนของ·ย้ายบ้าน", "porter"),
+                ("💻 ออนไลน์·เอกสาร", "online"), ("🙋 รับจ้างทั่วไป", "errand")],
+    "repair": [("⚡ ช่างไฟ", "electrician"), ("🚿 ประปา·ปั๊ม", "plumber"), ("❄️ แอร์", "ac"), ("🧺 เครื่องซักผ้า·ตู้เย็น", "appliance"),
+               ("🪚 ไม้·ทาสี·หลังคา", "carpenter"), ("🔐 ประตู·หน้าต่าง", "doors"), ("📶 เน็ต·กล้อง", "net"), ("🔨 งานจุกจิก", "handyman"),
+               ("🐜 ปลวก·แมลง", "pest"), ("🚗 ซ่อมรถ", "vehicle"), ("🚛 ขนขยะ", "junk")],
+}
+SVC_LABEL = {c: label for choices in SVC_CHOICES.values() for label, c in choices}
+MKT_WORD_CAT = {**{label: c for label, c in MKT_CATS}, "ของฝาก": "preserved", "จัดเลี้ยง": "catering", "เสื้อผ้า": "clothes", "ความงาม": "cosmetics",
                 "อาหาร": "homemade", "อาหารทำเอง": "homemade", "กับข้าว": "homemade", "ของกิน": "homemade",
                 "ขนม": "dessert", "เบเกอรี่": "dessert", "ขนม·เบเกอรี่": "dessert", "เครื่องดื่ม": "drinks", "น้ำ": "drinks",
                 "งานฝีมือ": "handmade", "ต้นไม้": "plants", "มือสอง": "other", "ของมือสอง": "other", "อื่นๆ": "other", "ของมือสอง/อื่นๆ": "other"}
 MKT_TH = {"homemade": "อาหารทำเอง", "dessert": "ขนม·เบเกอรี่", "drinks": "เครื่องดื่ม", "handmade": "งานฝีมือ", "plants": "ต้นไม้",
+          "preserved": "ของฝาก·แปรรูป", "catering": "รับจัดเลี้ยง", "cosmetics": "ความงาม", "petgoods": "ของสัตว์เลี้ยง",
           "food": "ของกิน", "clothes": "เสื้อผ้า", "electronics": "เครื่องใช้ไฟฟ้า", "furniture": "ของใช้", "kids": "ของเด็ก", "other": "มือสอง·อื่นๆ"}
 MKT_ICON = {"homemade": "🍲", "dessert": "🧁", "drinks": "🧋", "handmade": "🧶", "plants": "🪴", "food": "🍱", "clothes": "👕", "kids": "🧸"}
 
@@ -137,7 +169,7 @@ def split_house(raw: str):
 # ---------- per-house rich menu: the village menu + a strip on top "🏠 4/917 · ซอย 16 · รถขยะ จ.·พฤ." ----------
 # Text pieces are pre-rendered (tools/line_menu_assets.py) because the server has no Thai font; we only paste them.
 MENU_DIR = Path(__file__).parent / "data" / "line_menu"
-MENU_VER = "v4"  # 17 Oct v4: menus open by default (selected True). Bump when base.png / the tiles change, so every house gets a freshly drawn menu
+MENU_VER = "v5"  # 17 Oct v4: menus open by default (selected True). Bump when base.png / the tiles change, so every house gets a freshly drawn menu
 DAY_ABBR = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]
 _glyphs = {}
 
@@ -228,7 +260,7 @@ def default_menu_image(photos: dict) -> bytes:
 
 
 def default_areas() -> list:
-    acts = [{"type": "message", "text": "เบอร์ฉุกเฉิน"}, {"type": "uri", "uri": f"{SITE}/#issues"}, {"type": "uri", "uri": f"{SITE}/#pros"},
+    acts = [{"type": "message", "text": "เบอร์ฉุกเฉิน"}, {"type": "uri", "uri": f"{SITE}/#issues"}, {"type": "message", "text": "ช่าง"},
             {"type": "message", "text": "หาย"}, {"type": "message", "text": "ขยะ"}, {"type": "message", "text": "ตลาด"}]
     out = []
     for i, a in enumerate(acts):
@@ -245,7 +277,7 @@ def home_url(house: str, hash_: str = "") -> str:
 def menu_areas(house: str) -> list:
     """Tap areas: the strip → บ้านฉัน; the 6 tiles as on the village menu (OA Manager menu 20408889); 15 Oct: tile 6 → ตลาด."""
     strip, w, h = 230, [833, 833, 834], (1686 - 230) // 2
-    acts = [{"type": "message", "text": "เบอร์ฉุกเฉิน"}, {"type": "uri", "uri": home_url(house, "issues")}, {"type": "uri", "uri": home_url(house, "pros")},
+    acts = [{"type": "message", "text": "เบอร์ฉุกเฉิน"}, {"type": "uri", "uri": home_url(house, "issues")}, {"type": "message", "text": "ช่าง"},
             {"type": "message", "text": "หาย"}, {"type": "message", "text": "ขยะ"}, {"type": "message", "text": "ตลาด"}]
     areas = [{"bounds": {"x": 0, "y": 0, "width": 2500, "height": strip}, "action": {"type": "message", "text": "บ้านฉัน"}}]
     for i, a in enumerate(acts):
@@ -803,6 +835,75 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body},
                 "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": foot}}
 
+    def service_card(d: dict) -> dict:
+        """17 Oct: one ช่าง / รับทำ listing — photo, what, name, price · area, a call button."""
+        cat = d.get("category")
+        grp = next((g for g, cs in REPAIR_GROUPS + SERVICE_GROUPS if cat in cs), "🙋 บริการ")
+        body = [{"type": "text", "text": grp, "size": "xs", "weight": "bold", "color": "#1F4F8A"},
+                {"type": "text", "text": d.get("name", "")[:80] or "-", "weight": "bold", "size": "md", "wrap": True, "maxLines": 2}]
+        if d.get("detail"):
+            body.append({"type": "text", "text": re.sub(r"\s+", " ", d["detail"])[:120], "size": "sm", "color": "#33403A", "wrap": True, "maxLines": 3})
+        if d.get("price") or d.get("area"):
+            body.append({"type": "text", "text": " · ".join(x for x in (d.get("price", ""), d.get("area", "")) if x)[:100], "size": "sm", "color": "#45504A", "wrap": True, "maxLines": 2})
+        good = (d.get("good") or 0) + (d.get("line_good") or 0)
+        if good:
+            body.append({"type": "text", "text": f"👍 เพื่อนบ้านใช้แล้ว {good} คน", "size": "xs", "weight": "bold", "color": "#1E6B47"})
+        tel = re.sub(r"[^\d+]", "", d.get("phone") or "")
+        foot = [{"type": "button", "style": "primary", "height": "sm", "color": "#15201A", "action": {"type": "uri", "label": "📞 โทร", "uri": f"tel:{tel}"}}] if len(tel) >= 9 else []
+        foot.append({"type": "button", "style": "secondary", "height": "sm", "action": {"type": "uri", "label": "ดูรายละเอียด·รูป", "uri": f"{SITE}/#shop-{d['id']}"}})
+        b = {"type": "bubble", "size": "kilo", "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body},
+             "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": foot}}
+        media = d.get("media") or []
+        if media:
+            b["hero"] = {"type": "image", "url": f"{SITE}/api/media/{media[0]['id']}/thumb", "size": "full", "aspectRatio": "4:3", "aspectMode": "cover",
+                         "action": {"type": "uri", "uri": f"{SITE}/#shop-{d['id']}"}}
+        else:
+            b["hero"] = {"type": "box", "layout": "vertical", "height": "80px", "backgroundColor": "#E3EDF9", "justifyContent": "center",
+                         "contents": [{"type": "text", "text": grp.split()[0], "size": "3xl", "align": "center"}]}
+        return b
+
+    def picker_bubble() -> dict:
+        """The first card of ตลาด: the three shelves as big buttons."""
+        btn = lambda label, color: {"type": "button", "style": "primary", "color": color, "action": {"type": "message", "label": label, "text": label}}  # noqa: E731
+        return {"type": "bubble", "size": "kilo", "body": {"type": "box", "layout": "vertical", "spacing": "md", "justifyContent": "center", "contents": [
+            {"type": "text", "text": "🛍️ ตลาดเพื่อนบ้าน", "weight": "bold", "size": "lg", "align": "center"},
+            {"type": "text", "text": "เลือกดูทีละชั้น", "size": "sm", "color": "#45504A", "align": "center"},
+            btn("🍲 ของกิน", "#B5541B"), btn("🧺 ของใช้", "#1E6B47"), btn("🙋 รับทำ", "#1F4F8A"),
+            {"type": "button", "style": "secondary", "action": {"type": "message", "label": "+ ลงขาย / รับทำ", "text": "ลงขาย"}}]}}
+
+    def carousel(alt: str, bubbles: list, chips: dict) -> dict:
+        return {"type": "flex", "altText": alt, "contents": {"type": "carousel", "contents": bubbles[:12]}, "quickReply": chips}
+
+    async def services_in(cats) -> list:
+        return await db.services.find({"category": {"$in": list(cats)}, "available": {"$ne": False}}, {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews": 0}
+                                      ).sort([("pinned", -1), ("verified", -1), ("good", -1), ("updated_at", -1)]).to_list(40)
+
+    async def pros_list(user: str, group: int | None = None, words: str = "") -> list:
+        """17 Oct: "ช่าง" → cards of the home-repair people (one group, or all), chips for the groups that have someone."""
+        cats = REPAIR_GROUPS[group][1] if group is not None else REPAIR_CATS
+        docs = await services_in(cats)
+        have = [(i, g) for i, (g, cs) in enumerate(REPAIR_GROUPS) if await db.services.count_documents({"category": {"$in": list(cs)}})]
+        chips = qr(*[(g, g) for i, g in have if i != group][:10], ("🛍️ ตลาด", "ตลาด"))
+        if not docs:
+            return [text(f"ยังไม่มีช่าง{REPAIR_GROUPS[group][0].split(' ', 1)[1] if group is not None else ''}ในหมู่บ้านครับ 🙏\nรู้จักช่างดีๆ แนะนำได้ที่ {SITE}/#pros"
+                         "\nหรือประกาศหาช่าง ให้ช่างในหมู่บ้านเห็น: " + f"{SITE}/#jobs", chips)]
+        head = (f"🔧 ช่าง{(' · ' + REPAIR_GROUPS[group][0]) if group is not None else 'ซ่อมบ้าน'} {len(docs)} ราย · คนแนะนำเยอะขึ้นก่อน ปัดดูได้ ➡️"
+                + ("\nเลือกหมวดด้านล่างได้" if group is None else ""))
+        more = {"type": "bubble", "size": "kilo", "body": {"type": "box", "layout": "vertical", "justifyContent": "center", "spacing": "md", "contents": [
+            {"type": "text", "text": "ดูทั้งหมด · ค้นหา · แนะนำช่าง", "weight": "bold", "wrap": True, "align": "center"},
+            {"type": "button", "style": "secondary", "action": {"type": "uri", "label": "เปิดหน้าช่าง", "uri": f"{SITE}/#pros"}}]}}
+        return [text(head), carousel("ช่างซ่อมบ้าน", [service_card(d) for d in docs[:11]] + [more], chips)]
+
+    async def search_all(words: str) -> list:
+        """17 Oct: a short word ("ตัดผม", "ซักผ้า", "บราวนี่") → whatever matches in ตลาด and ช่าง, as cards."""
+        rx = {"$regex": re.escape(words), "$options": "i"}
+        svc_cats = [c for c, label in SVC_LABEL.items() if words in label]  # "ตัดผม" → beauty, "แอร์" → ac
+        item_cats = [c for c, label in MKT_TH.items() if words in label]
+        svc = await db.services.find({"$or": [{"name": rx}, {"detail": rx}, {"category": {"$in": svc_cats}}], "available": {"$ne": False}}, {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews": 0}).to_list(10)
+        items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}, "$or": [{"title": rx}, {"detail": rx}, {"shop_name": rx}, {"tags": rx}, {"options.name": rx}, {"category": {"$in": item_cats}}]},
+                                         {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).to_list(10)
+        return [market_card(d) for d in items] + [service_card(d) for d in svc]
+
     async def market_news(user: str) -> int:
         """New things in ตลาด since this person last looked (or was told), not their own; 0 = nothing to say."""
         seen = await db.line_market_seen.find_one({"user": user}) or {}
@@ -812,9 +913,12 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         n += await db.services.count_documents({"category": {"$in": list(SHOP_CATS)}, "created_at": {"$gt": since}})
         return n
 
-    async def market_list(user: str = "") -> list:
+    async def market_list(user: str = "", shelf: str = "") -> list:
+        """ตลาด: "" = everything new (with the shelf buttons first) · food / goods / service = one shelf."""
         if user:
             await db.line_market_seen.update_one({"user": user}, {"$set": {"user": user, "looked": now()}}, upsert=True)
+        if shelf in ("food", "goods", "service"):
+            return await shelf_list(user, shelf)
         items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}}, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}
                                          ).sort("created_at", -1).to_list(10)
         seller = bool(user) and bool(await seller_items(user))  # 16 Oct: buyers tapped "ออเดอร์ของฉัน" — sellers only now
@@ -825,21 +929,43 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             items = []
         elif not items:
             return [text("ตอนนี้ยังไม่มีของขายในตลาดเพื่อนบ้านครับ 🙂\nทำขนม ทำกับข้าว หรือมีของเหลือใช้? กด 🛍️ ลงขายของ ด้านล่างได้เลย", qr(("🛍️ ลงขายของ", "ลงขาย")))]
-        bubbles = ([market_card(d) for d in items] + [shop_card(d) for d in shops])[:11]
+        n_svc = await db.services.count_documents({"category": {"$in": SERVICE_CATS}})
+        bubbles = [picker_bubble()] + ([market_card(d) for d in items] + [shop_card(d) for d in shops])[:10]
         bubbles.append({"type": "bubble", "size": "kilo", "body": {"type": "box", "layout": "vertical", "justifyContent": "center", "spacing": "md", "contents": [
             {"type": "text", "text": "ดูทั้งหมด + แยกตามหมวด + ร้านประจำ", "weight": "bold", "wrap": True, "align": "center"},
             {"type": "button", "style": "secondary", "action": {"type": "uri", "label": "ดูทั้งหมด", "uri": f"{SITE}/#market"}}]}})
-        head = (f"🛍️ ตลาดเพื่อนบ้าน · ของทำเอง {len(items)} · ร้านประจำ {len(shops)} · ปัดดูได้ ➡️\n"
+        head = (f"🛍️ ตลาดเพื่อนบ้าน · ของขาย {len(items)} · ร้าน {len(shops)} · รับทำ {n_svc} · ปัดดูได้ ➡️\n"
                 "ของทำเองกด 🛒 สั่ง/จองไว้ได้ · ร้านกดโทรได้เลย · ระบบไม่รับเงิน")
+        chips = qr(("🍲 ของกิน", "🍲 ของกิน"), ("🧺 ของใช้", "🧺 ของใช้"), ("🙋 รับทำ", "🙋 รับทำ"), *chips["items"] and [(i["action"]["label"], i["action"]["text"]) for i in chips["items"]])
         return [text(head), {"type": "flex", "altText": "ตลาดเพื่อนบ้าน", "contents": {"type": "carousel", "contents": bubbles}, "quickReply": chips}]
 
-    MSTEPS = ("m_category", "m_photos", "m_title", "m_price", "m_soi", "m_when", "m_contact", "m_confirm")
+    async def shelf_list(user: str, shelf: str) -> list:
+        chips = qr(*[(v, v) for k, v in SHELF_TH.items() if k != shelf], ("🛍️ ลงขาย / รับทำ", "ลงขาย"))
+        if shelf == "service":
+            docs = await services_in(SERVICE_CATS)
+            if not docs:
+                return [text("ยังไม่มีใครลง 🙋 รับทำ ครับ\nรับตัดผม ติว ถ่ายรูป ทำความสะอาด รับส่ง? พิมพ์ \"ลงขาย\" แล้วเลือก รับทำ·บริการ", chips)]
+            return [text(f"🙋 รับทำ · บริการจากเพื่อนบ้าน {len(docs)} ราย · ปัดดูได้ ➡️"), carousel("รับทำ·บริการ", [service_card(d) for d in docs[:12]], chips)]
+        cats = list(FOOD_LEND) if shelf == "food" else None
+        q = {"kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": cats} if cats else {"$nin": list(FOOD_LEND)}}
+        items = await db.lend_items.find(q, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).sort("created_at", -1).to_list(10)
+        shops = await db.services.find({"category": {"$in": ["food"] if shelf == "food" else ["shop", "supplies"]}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
+                                       ).sort([("pinned", -1), ("updated_at", -1)]).to_list(6)
+        bubbles = [market_card(d) for d in items] + [shop_card(d) for d in shops]
+        if not bubbles:
+            return [text(f"{SHELF_TH[shelf]} ยังว่างครับ · ทำขายเองไหม? พิมพ์ \"ลงขาย\" ได้เลย", chips)]
+        return [text(f"{SHELF_TH[shelf]} · {len(items)} รายการ + ร้าน {len(shops)} · ปัดดูได้ ➡️"), carousel(SHELF_TH[shelf], bubbles, chips)]
+
+    MSTEPS = ("m_shelf", "m_category", "m_photos", "m_title", "m_price", "m_soi", "m_when", "m_contact", "m_confirm")
     CANCEL = ("❌ ยกเลิก", "ยกเลิก")
 
     def mask(s: dict) -> dict:
         step = s["step"]
+        if step == "m_shelf":
+            return text("🛍️ ลงในตลาดเพื่อนบ้าน\nจะลงอะไรครับ?", qr(("🍲 ขายของกิน", "ขายของกิน"), ("🧺 ขายของใช้", "ขายของใช้"), ("🙋 รับทำ·บริการ", "รับทำงาน"), ("🔧 เป็นช่าง", "เป็นช่าง"), CANCEL))
         if step == "m_category":
-            return text("🛍️ ลงขายของในตลาดเพื่อนบ้าน\nขายอะไรครับ? เลือกหมวด", qr(*[(label, label) for label, _ in MKT_CATS], CANCEL))
+            mine = SHELF_CATS.get(s.get("shelf")) or [c for _, c in MKT_CATS]
+            return text("ขายอะไรครับ? เลือกหมวด", qr(*[(label, label) for label, c in MKT_CATS if c in mine], CANCEL))
         if step == "m_photos":
             n = len(s.get("media", []))
             if n:
@@ -874,7 +1000,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                     qr(("✅ ลงขาย", "postback:publish_market"), CANCEL))
 
     def ask_any(s: dict) -> dict:
-        return oask(s) if s.get("flow") == "order" else mask(s) if s.get("flow") == "market" else ask(s)
+        return oask(s) if s.get("flow") == "order" else mask(s) if s.get("flow") == "market" else sask(s) if s.get("flow") == "service" else ask(s)
 
     async def madvance(user: str, s: dict) -> list:
         s["step"] = MSTEPS[MSTEPS.index(s["step"]) + 1]
@@ -883,7 +1009,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
 
     async def market_start(user: str) -> list:
         had = await session(user) or {}
-        s = {"flow": "market", "kind": "sell", "step": "m_category", "media": [m for m in had.get("media", []) if m][:MAX_PHOTOS] if had.get("step") == "photo_what" else [],
+        s = {"flow": "market", "kind": "sell", "step": "m_shelf", "media": [m for m in had.get("media", []) if m][:MAX_PHOTOS] if had.get("step") == "photo_what" else [],
              "line_name": await display_name(user),
              "home_soi": ((await home_of(user)) or {}).get("soi")}
         await drop(user)
@@ -893,13 +1019,25 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
     async def market_step(user: str, s: dict, t: str, raw: str) -> list:
         step = s["step"]
         yt = YT_IN_TEXT.search(raw or "")
-        if yt and step != "m_category":  # 17 Oct: a YouTube link pasted anywhere in the flow belongs to this item
+        if yt and step not in ("m_shelf", "m_category"):  # 17 Oct: a YouTube link pasted anywhere in the flow belongs to this item
             s["youtube"] = yt.group(0)[:200]
             await save(user, s)
             rest = (raw[:yt.start()] + raw[yt.end():]).strip()
             if not rest:
                 return [text("▶ ได้คลิป YouTube แล้วครับ"), mask(s)]
             raw, t = rest, norm(rest)
+        if step == "m_shelf":
+            if "กิน" in t or "อาหาร" in t:
+                s["shelf"] = "food"
+            elif "ใช้" in t or "ของ" in t:
+                s["shelf"] = "goods"
+            elif "ช่าง" in t:
+                return await service_start(user, "repair", s.get("media", []))
+            elif "รับ" in t or "บริการ" in t:
+                return await service_start(user, "service", s.get("media", []))
+            else:
+                return [mask(s)]
+            return await madvance(user, s)
         if step == "m_category":
             cat = MKT_WORD_CAT.get(raw.strip()) or MKT_WORD_CAT.get(t)
             if not cat:
@@ -941,6 +1079,116 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             s["phone"], s["name"] = re.sub(r"\D", "", m.group(0))[:15], name[:60]
             return await madvance(user, s)
         return [mask(s)]  # m_confirm: the buttons are on screen
+
+    SSTEPS = ("s_cat", "s_photos", "s_name", "s_price", "s_soi", "s_contact", "s_confirm")
+
+    async def service_start(user: str, mode: str, media: list) -> list:
+        s = {"flow": "service", "mode": mode, "step": "s_cat", "media": [m for m in media if m][:MAX_PHOTOS], "line_name": await display_name(user),
+             "home_soi": ((await home_of(user)) or {}).get("soi")}
+        await drop(user)
+        await save(user, s)
+        return [sask(s)]
+
+    def sask(s: dict) -> dict:
+        step, repair = s["step"], s.get("mode") == "repair"
+        if step == "s_cat":
+            return text(("🔧 ลงช่างซ่อมบ้าน\nช่างอะไรครับ?" if repair else "🙋 ลงรับทำ·บริการ\nรับทำอะไรครับ?"), qr(*SVC_CHOICES["repair" if repair else "service"], CANCEL))
+        if step == "s_photos":
+            n = len(s.get("media", []))
+            if n:
+                return text(f"ได้รูปแล้ว {n} รูป 👍 ส่งเพิ่มได้อีก {MAX_PHOTOS - n} รูป หรือกด ต่อไป", qr(("➡️ ต่อไป", "ต่อไป"), CANCEL))
+            return text("ส่งรูปผลงาน หรือรูปร้าน ได้เลยครับ (ไม่บังคับ · ถึง 3 รูป) คนเห็นงานจริง เรียกใช้ง่ายขึ้น 📷", {"items": [
+                {"type": "action", "action": {"type": "cameraRoll", "label": "🖼️ เลือกรูป"}},
+                {"type": "action", "action": {"type": "message", "label": "ไม่มีรูป", "text": "ไม่มีรูป"}},
+                {"type": "action", "action": {"type": "message", "label": "❌ ยกเลิก", "text": "ยกเลิก"}}]})
+        if step == "s_name":
+            ex = "ช่างเอก ซ่อมแอร์ ล้างแอร์ ถึงบ้าน" if repair else "น้องมิ้นท์ ตัดผมชาย-หญิง ไปทำถึงบ้าน"
+            return text(f"ชื่อคุณหรือชื่อร้าน + ทำอะไร สั้นๆ ครับ\nเช่น \"{ex}\"\n(บรรทัดแรก = ชื่อ · บรรทัดต่อไป = รายละเอียด)", qr(CANCEL))
+        if step == "s_price":
+            return text("ราคาประมาณเท่าไหร่ครับ\nเช่น \"ตัดผม 150\" หรือ \"เริ่ม 500 บาท\"", qr(("ตามตกลง", "ตามตกลง"), CANCEL))
+        if step == "s_soi":
+            mine_soi = [(f"ซ.{s['home_soi']} (ซอยบ้านฉัน)", s["home_soi"])] if s.get("home_soi") else []
+            return text("อยู่ซอยไหนครับ (พิมพ์เลขซอย เช่น 16) · รับงานนอกหมู่บ้านกด ไม่บอกซอย\nกด 📍 ส่งตำแหน่ง ปักหมุดร้านได้ด้วย",
+                        with_loc(qr(*mine_soi, ("ไม่บอกซอย", "ไม่บอกซอย"), CANCEL)))
+        if step == "s_contact":
+            return text("เบอร์ให้คนโทรเรียกใช้ครับ เช่น \"0812345678\"\nเบอร์จะโชว์บนการ์ดให้กดโทรได้เลย", qr(CANCEL))
+        lines = [f"{SVC_LABEL.get(s.get('category'), '')} · {s.get('name', '')}",
+                 *([f"📝 {s['detail']}"] if s.get("detail") else []),
+                 f"💰 {s.get('price') or 'ตามตกลง'}",
+                 f"📍 {s.get('area') or 'ในหมู่บ้าน'}" + (" · มีหมุด" if s.get("lat") else ""),
+                 f"📷 รูป {len(s.get('media', []))} รูป",
+                 f"☎️ {s.get('phone', '')}"]
+        where = "หน้า 🔧 ช่าง" if repair else "ตลาด › 🙋 รับทำ"
+        return text(f"เช็กก่อนลงนะครับ\n\n" + "\n".join(lines) + f"\n\nจะขึ้นใน {where} ทั้งเว็บและ LINE · ระบบไม่รับเงิน คุยกันเอง",
+                    qr(("✅ ลงเลย", "postback:publish_service"), CANCEL))
+
+    async def sadvance(user: str, s: dict) -> list:
+        s["step"] = SSTEPS[SSTEPS.index(s["step"]) + 1]
+        await save(user, s)
+        return [sask(s)]
+
+    async def service_step(user: str, s: dict, t: str, raw: str) -> list:
+        step = s["step"]
+        if step == "s_cat":
+            cat = next((c for label, c in SVC_CHOICES["repair" if s.get("mode") == "repair" else "service"] if raw.strip() == label or t in norm(label)), None)
+            if not cat:
+                return [sask(s)]
+            s["category"] = cat
+            return await sadvance(user, s)
+        if step == "s_photos":
+            if t in ("ต่อไป", "ไม่มีรูป", "➡️ ต่อไป", "ไม่มี") or len(t) >= 4:
+                if len(t) >= 4 and t not in ("ไม่มีรูป",):
+                    s["step"] = "s_name"
+                    return await service_step(user, s, t, raw)
+                return await sadvance(user, s)
+            return [sask(s)]
+        if step == "s_name":
+            if len(t) < 2:
+                return [sask(s)]
+            first, _, rest = raw.strip().partition("\n")
+            s["name"] = first.strip()[:80]
+            s["detail"] = rest.strip()[:500]
+            return await sadvance(user, s)
+        if step == "s_price":
+            p = raw.strip()[:100]
+            s["price"] = "" if p == "ตามตกลง" else (f"{p} บาท" if re.fullmatch(r"\d[\d,.]*", p) else p)
+            return await sadvance(user, s)
+        if step == "s_soi":
+            m = re.search(r"\d{1,3}(?:/\d{1,2})?", t)
+            if not m and "ไม่" not in t and not s.get("lat"):
+                return [sask(s)]
+            s["area"] = f"ซ.{m.group(0)} ในหมู่บ้าน" if m else ("ในหมู่บ้าน" if s.get("lat") else "")
+            return await sadvance(user, s)
+        if step == "s_contact":
+            m = re.search(r"0[\d\s\-]{8,12}", raw)
+            if not m or len(re.sub(r"\D", "", m.group(0))) < 9:
+                return [text("ขอเบอร์โทรด้วยครับ เช่น \"0812345678\"", qr(CANCEL))]
+            s["phone"] = re.sub(r"\D", "", m.group(0))[:15]
+            return await sadvance(user, s)
+        return [sask(s)]
+
+    async def service_publish(user: str, s: dict) -> list:
+        """The same directory entry POST /api/services makes, plus via: line."""
+        since = now() - timedelta(days=1)
+        if await db.line_posts.count_documents({"user": user, "type": "service", "at": {"$gte": since}}) >= POSTS_PER_DAY:
+            await drop(user)
+            return [text(f"วันนี้ลงครบ {POSTS_PER_DAY} รายการแล้วครับ พรุ่งนี้ลงต่อได้")]
+        key, sid, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
+        try:
+            media = await claim_media(s.get("media", []), f"service:{sid}", {"image"})
+        except HTTPException:
+            media = []
+        doc = {"id": sid, "category": s.get("category") or "errand", "name": s.get("name", "")[:80] or s.get("line_name") or "เพื่อนบ้าน", "phone": s.get("phone", ""),
+               "line_id": "", "detail": s.get("detail", "")[:500], "pricing": "paid" if s.get("price") else "ask", "price": s.get("price", "")[:100],
+               "area": s.get("area", "")[:100], "lat": s.get("lat"), "lng": s.get("lng"), "media": media, "available": True, "verified": False, "pinned": False,
+               "reports": 0, "reporters": [], "via": "line", "created_at": t, "updated_at": t, "edit_key_hash": repair._hash(key)}
+        await db.services.insert_one(dict(doc))
+        await db.line_posts.insert_one({"user": user, "id": sid, "title": doc["name"], "at": t, "type": "service"})
+        push.fire(push.on_shop, doc)
+        await drop(user)
+        where = "🔧 ช่าง" if doc["category"] in REPAIR_CATS else "🛍️ ตลาด › 🙋 รับทำ"
+        return [text(f"✅ ลงแล้วครับ · อยู่ใน {where}\n{SITE}/#shop-{sid}\n\nเพื่อนบ้านกดโทรหาคุณได้จากการ์ดเลย · อยากแก้หรือปิด ทักแอดได้ครับ",
+                     qr(("🛍️ ดูตลาด", "ตลาด"), ("🔧 ดูช่าง", "ช่าง")))]
 
     async def market_publish(user: str, s: dict) -> list:
         """The same item POST /api/lend makes (kind sell), plus via: line; the LINE user closes it with "ขายหมดแล้ว"."""
@@ -1173,6 +1421,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 return [text("📍 แจ้งปัญหาในซอย ปักหมุดพร้อมรูปได้ที่นี่ครับ\nserithai57.com/#issues")]
             KIND[user] = "photo_note"
             return [text("ขอบคุณครับ 🙏 แอดได้รูปกับข้อความแล้ว เดี๋ยวแอดดูแล้วจัดการให้นะครับ" + ("\n(ถ้าเป็นประกาศหาย·เจอ แอดจะปิดเป็น 🎉 ได้คืนแล้ว ให้คนอื่นเห็นด้วย)" if "เจอ" in t else ""))]
+        if s and s["step"].startswith("s_"):
+            return await service_step(user, s, t, raw)
         if s and s["step"].startswith("m_"):
             return await market_step(user, s, t, raw)
         if s and s["step"].startswith("o_"):
@@ -1220,8 +1470,13 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         if t in LIST_WORDS:
             only = "cat" if "แมว" in t else "dog" if ("หมา" in t or "สุนัข" in t) else ""
             return await list_messages(only)
+        if t in SHELF_WORDS:
+            return await market_list(user, SHELF_WORDS[t])
         if t in MARKET_WORDS:
             return await market_list(user)
+        if t in REPAIR_WORDS or any(t == norm(g) for g, _ in REPAIR_GROUPS):
+            KIND[user] = "pros"
+            return await pros_list(user, next((i for i, (g, _) in enumerate(REPAIR_GROUPS) if t == norm(g)), None))
         if t in WASTE_WORDS:
             return await waste_reply(user)
         if t in OA_KEYWORDS:
@@ -1234,10 +1489,9 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return [text(f"ขอบคุณที่แจ้งนะครับ 🙏 แอดบันทึกไว้แล้ว{(' (ซ.' + soi + ')') if soi else ''}\nแอดกำลังรวบรวมวันรถจริงของแต่ละซอยไปเช็กกับสำนักงาน แล้วจะแก้ในระบบให้ตรงครับ"
                          + ("\n\nช่วยเล่าเพิ่มหน่อยครับ: ปกติรถมาวันไหนจริง เช่น \"รถขยะมาวันอังคาร ศุกร์\"" if t == "รถขยะไม่มา" else "")
                          + ("" if soi else "\nพิมพ์บ้านเลขที่ไว้ (เช่น 4/917) จะรู้ว่าเป็นซอยไหน"))]
-        if re.search(r"ช่าง|ซ่อม", t):
+        if re.search(r"ช่าง|ซ่อม", t):  # "หาช่างซ่อมเครื่องซักผ้า" → that group's cards
             KIND[user] = "pros"
-            return [text("🔧 ช่าง·บริการที่เพื่อนบ้านแนะนำ (ไฟ แอร์ ประปา ซ่อมบ้าน ฯลฯ)\nserithai57.com/#pros\n\nไม่เจอที่ต้องการ พิมพ์บอกแอดได้เลยครับ",
-                         qr(("☰ เมนู", "เมนู")))]
+            return await pros_list(user, next((i for rx, i in REPAIR_HINTS if re.search(rx, t)), None))
         if re.search(r"ร้านอาหาร|ร้านค้า|อยากซื้อ|ขายไหม|มีขาย", t):
             KIND[user] = "market"
             return await market_list(user)
@@ -1245,6 +1499,13 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         if len(t) <= 40 and SMALLTALK.match(t):
             KIND[user] = "smalltalk"
             return [text("ยินดีครับ 🙏 มีอะไรพิมพ์บอกแอดได้ตลอดนะครับ")]
+        # 17 Oct: a short word ("ตัดผม", "บราวนี่", "ติวเตอร์") → what matches in ตลาด and ช่าง
+        word = re.sub(r"^(หา|อยากได้|มี|ขอ)\s*", "", t).strip()
+        if 2 <= len(word) <= 24 and "\n" not in raw:
+            hits = await search_all(word)
+            if hits:
+                KIND[user] = "search"
+                return [text(f"🔎 \"{word}\" เจอ {len(hits)} รายการ · ปัดดูได้ ➡️"), carousel(f"ค้นหา {word}", hits, qr(("🛍️ ตลาด", "ตลาด"), ("🔧 ช่าง", "ช่าง")))]
         KIND[user] = "fallback"
         return [text(FALLBACK, qr(*([] if linked else [("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่")]), ("🐾 หาย·เจอ", "หาย"), ("🛍️ ตลาด", "ตลาด"), ("☎️ เบอร์ฉุกเฉิน", "เบอร์ฉุกเฉิน"), ("☰ เมนู", "เมนู")))]
 
@@ -1254,11 +1515,14 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)) or not in_area(lat, lng):
             return [text("ตำแหน่งนี้อยู่ไกลจากหมู่บ้านครับ ลองส่งใหม่ตรงจุดในหมู่บ้าน")]
         s = await session(user)
-        if s and (s.get("flow") == "market" or s.get("step") in STEPS):
+        if s and (s.get("flow") in ("market", "service") or s.get("step") in STEPS):
             s["lat"], s["lng"] = round(lat, 6), round(lng, 6)
-            if s.get("flow") == "market" and s["step"] == "m_soi" or s.get("flow") != "market" and s["step"] == "soi":
+            seq = MSTEPS if s.get("flow") == "market" else SSTEPS if s.get("flow") == "service" else STEPS
+            if s["step"] in ("m_soi", "s_soi", "soi"):
                 s["soi"] = s.get("soi", "")
-                s["step"] = (MSTEPS if s.get("flow") == "market" else STEPS)[(MSTEPS if s.get("flow") == "market" else STEPS).index(s["step"]) + 1]
+                if s["step"] == "s_soi":
+                    s["area"] = s.get("area") or "ในหมู่บ้าน"
+                s["step"] = seq[seq.index(s["step"]) + 1]
             await save(user, s)
             return [text("📍 ปักหมุดแล้วครับ" + (" (จุดรับของ)" if s.get("flow") == "market" else "")), ask_any(s)]
         return [text("📍 ได้ตำแหน่งแล้วครับ\nใช้ปักหมุดได้ตอน 🛍️ ลงขาย (จุดรับของ) หรือ แจ้งหาย·เจอ (จุดที่เห็น) — เริ่มแล้วกด 📍 ส่งตำแหน่ง ตอนบอทถามซอย\nแจ้งปัญหาในซอยพร้อมหมุด: serithai57.com/#issues",
@@ -1266,7 +1530,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
 
     async def on_image(user: str, message_id: str) -> list:
         s = await session(user)
-        if not s or s["step"] not in ("photos", "category", "m_photos", "m_category", "photo_what"):
+        if not s or s["step"] not in ("photos", "category", "m_photos", "m_category", "m_shelf", "s_cat", "s_photos", "photo_what"):
             # 16 Oct: people send a screenshot / a photo to tell us something ("ตัวนี้เจอแล้ว") — keep it, ask what it is
             mid = await save_photo(message_id)
             if not mid:
@@ -1279,13 +1543,13 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             await db.line_sessions.update_one({"user": user}, {"$push": {"media": {"$each": [await save_photo(message_id)]}}, "$set": {"updated_at": now()}})
             return []
         if len(s.get("media", [])) >= MAX_PHOTOS:
-            return [] if s["step"] not in ("photos", "m_photos") else [ask_any(s)]
+            return [] if s["step"] not in ("photos", "m_photos", "s_photos") else [ask_any(s)]
         mid = await save_photo(message_id)
         if not mid:
             return [text("รูปนี้เปิดไม่ได้ครับ ลองส่งใหม่อีกครั้ง")]
         # one atomic push: a person often sends 3 photos at once and they arrive as 3 events
         s = await db.line_sessions.find_one_and_update({"user": user}, {"$push": {"media": mid}, "$set": {"updated_at": now()}}, projection={"_id": 0}, return_document=True)
-        if s["step"] in ("category", "m_category"):
+        if s["step"] in ("category", "m_category", "m_shelf", "s_cat"):
             return []  # the kind question is still on screen; the photo is kept
         return [ask_any(s)]  # "ได้รูปแล้ว n รูป · ส่งเพิ่ม หรือ ต่อไป"
 
@@ -1332,12 +1596,14 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                             qr(("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่"), ("ไว้ก่อน", "ไว้ก่อน")))]
             elif ev["type"] == "postback":
                 data = (ev.get("postback") or {}).get("data", "")
-                if data in ("publish", "publish_market", "publish_order"):
+                if data in ("publish", "publish_market", "publish_order", "publish_service"):
                     s = await session(user)
                     if s and s["step"] == "confirm":
                         out = await publish(user, s)
                     elif s and s["step"] == "m_confirm":
                         out = await market_publish(user, s)
+                    elif s and s["step"] == "s_confirm":
+                        out = await service_publish(user, s)
                     elif s and s["step"] == "o_confirm":
                         out = await order_publish(user, s)
                     elif data == "publish_order":

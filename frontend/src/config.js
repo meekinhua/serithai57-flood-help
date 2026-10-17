@@ -134,10 +134,33 @@ export const PHASES = {
   standby: ["🟢", "ออนไลน์", "bg-emerald-100 text-emerald-900"],
 };
 
-// 16 Oct: shops you buy from (these directory categories) are listed in 🛍️ ตลาด with the homemade things;
-// ช่าง·บริการ keeps the rest. One place for things to eat and use.
-export const MARKET_SHOP_CATS = ["food", "shop", "supplies"];
+// 17 Oct (simple version, from real requests — "อยากให้เพิ่มหมวดบริการ", "หาช่างซ่อมเครื่องซักผ้า"):
+//   🛍️ ตลาด = three shelves anyone gets at a glance: 🍲 ของกิน · 🧺 ของใช้ · 🙋 รับทำ (neighbours' services)
+//   🔧 ช่าง = home repairs only.
+// Groups are what people see; the categories under them are what is stored (old listings keep their keys).
+// The LINE bot (backend/line_bot.py SHELVES / REPAIR) uses the same names and icons.
+export const SERVICE_GROUPS = [
+  { key: "beauty", label: "💇 สวยงาม·สุขภาพ", hint: "ตัดผม แต่งหน้า ทำเล็บ นวด ฟิตเนส", cats: ["beauty"] },
+  { key: "event", label: "📸 ถ่ายรูป·อีเวนต์", hint: "สตูดิโอ ช่างภาพ เช่าชุด จัดดอกไม้ MC", cats: ["photo"] },
+  { key: "tutor", label: "📚 สอน·ติว", hint: "ติวเตอร์ ภาษา ดนตรี ว่ายน้ำ คอมพิวเตอร์", cats: ["tutor"] },
+  { key: "home", label: "🏠 ช่วยงานบ้าน", hint: "แม่บ้าน ทำความสะอาด ซักรีด ทำสวน เลี้ยงเด็ก ดูแลผู้สูงอายุ", cats: ["homehelp", "cleaning"] },
+  { key: "pets", label: "🐾 สัตว์เลี้ยง", hint: "รับฝาก ให้อาหาร อาบน้ำ ตัดขน", cats: ["pets"] },
+  { key: "move", label: "🚗 รับส่ง·ขนย้าย", hint: "รับส่งคน/เด็ก รถเช่า ขนของ ย้ายบ้าน", cats: ["rental", "porter", "truck", "boat"] },
+  { key: "online", label: "💻 ออนไลน์·เอกสาร", hint: "ออกแบบ ไอที ซ่อมคอม บัญชี แปล", cats: ["online"] },
+  { key: "general", label: "🙋 รับจ้างทั่วไป", hint: "ฝากซื้อ ต่อคิว เฝ้าบ้าน งานอื่นๆ", cats: ["errand", "other"] },
+];
+export const SHOP_SHELF = { food: ["food"], goods: ["shop", "supplies"] }; // shops from the directory, by shelf
+export const FOOD_LEND = ["homemade", "dessert", "drinks", "preserved", "catering", "food"];
+export const SHELVES = [
+  { key: "food", label: "ของกิน", icon: "🍲", hint: "อาหารทำเอง ขนม เครื่องดื่ม ร้านอาหาร", sell: ["homemade", "dessert", "drinks", "preserved", "catering"] },
+  { key: "goods", label: "ของใช้", icon: "🧺", hint: "งานฝีมือ ต้นไม้ เสื้อผ้า มือสอง ร้านค้า", sell: ["handmade", "plants", "clothes", "cosmetics", "petgoods", "electronics", "furniture", "kids", "other"] },
+  { key: "service", label: "รับทำ", icon: "🙋", hint: "ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง" },
+];
+export const SERVICE_CATS = SERVICE_GROUPS.flatMap((g) => g.cats);
+export const MARKET_SHOP_CATS = [...SHOP_SHELF.food, ...SHOP_SHELF.goods, ...SERVICE_CATS];
 export const isMarketShop = (s) => MARKET_SHOP_CATS.includes(s.category);
+export const shelfOfShop = (s) => (SHOP_SHELF.food.includes(s.category) ? "food" : SHOP_SHELF.goods.includes(s.category) ? "goods" : "service");
+export const shelfOfItem = (x) => (FOOD_LEND.includes(x.category) ? "food" : "goods");
 
 // Contact board categories. Keys must match SERVICE_CATEGORIES in backend/services.py
 export const SERVICE_CATEGORIES = {
@@ -151,7 +174,7 @@ export const SERVICE_CATEGORIES = {
   repair: ["🛠️", "ช่างซ่อม (แอร์ รถ เครื่องใช้)"],
   food: ["🍜", "ร้านอาหาร / ส่งอาหาร"],
   supplies: ["🧱", "วัสดุ / ของใช้ / กระสอบทราย"],
-  pets: ["🐾", "รับฝากสัตว์เลี้ยง"],
+  pets: ["🐾", "สัตว์เลี้ยง · รับฝาก อาบน้ำ"],
   // after the flood (repair mode)
   ac: ["❄️", "ล้าง / ซ่อมแอร์"],
   appliance: ["🧺", "ซ่อมตู้เย็น เครื่องซักผ้า"],
@@ -163,32 +186,26 @@ export const SERVICE_CATEGORIES = {
   junk: ["🚛", "รับขนขยะ / ของพัง"],
   // the village marketplace after the flood (7 Oct)
   shop: ["🏪", "ร้านค้า / ร้านกาแฟ"],
-  beauty: ["💇", "ตัดผม / เสริมสวย / นวด"],
-  tutor: ["📚", "ติวเตอร์ / สอนพิเศษ"],
+  beauty: ["💇", "ตัดผม · แต่งหน้า · ทำเล็บ · นวด"],
+  tutor: ["📚", "ติวเตอร์ · สอนภาษา ดนตรี กีฬา"],
+  // 17 Oct: ตลาด › รับทำ and the new ช่าง groups
+  photo: ["📸", "ถ่ายรูป · สตูดิโอ · อีเวนต์"],
+  homehelp: ["🏠", "แม่บ้าน · ซักรีด · ทำสวน · เลี้ยงเด็ก"],
+  online: ["💻", "ออกแบบ · ไอที · บัญชี · เอกสาร"],
+  errand: ["🙋", "รับจ้างทั่วไป · ฝากซื้อ"],
+  doors: ["🔐", "ประตู · หน้าต่าง · มุ้งลวด · กุญแจ"],
+  net: ["📶", "เน็ต · กล้องวงจรปิด · จานดาวเทียม"],
+  handyman: ["🔨", "งานจุกจิก · เปลี่ยนหลอด ประกอบเฟอร์"],
   other: ["📞", "อื่นๆ"],
 };
 // Flood-era categories stay for old listings; the repair-mode form offers these first.
-export const REPAIR_SERVICE_ORDER = [
-  "electrician",
-  "plumber",
-  "ac",
-  "appliance",
-  "carpenter",
-  "painter",
-  "roof",
-  "pest",
-  "vehicle",
-  "cleaning",
-  "junk",
-  "repair",
-  "truck",
-  "porter",
-  "shop",
-  "food",
-  "beauty",
-  "tutor",
-  "other",
-];
+export const REPAIR_SERVICE_ORDER = ["electrician", "plumber", "ac", "appliance", "carpenter", "painter", "roof", "doors", "net", "handyman", "pest", "vehicle", "junk", "cleaning"];
+// 17 Oct: the form's choices by what is being listed (ช่าง · รับทำ · ร้าน)
+export const SERVICE_FORM_ORDER = {
+  repair: REPAIR_SERVICE_ORDER,
+  service: ["beauty", "photo", "tutor", "homehelp", "cleaning", "pets", "rental", "porter", "online", "errand"],
+  shop: ["food", "shop", "supplies"],
+};
 
 // ---------- repair mode (after the flood). Keys must match backend/repair.py ----------
 export const LEND_KINDS = {
@@ -219,11 +236,15 @@ export const LEND_CATEGORIES = {
   dessert: ["🧁", "ขนม · เบเกอรี่"],
   drinks: ["🧋", "เครื่องดื่ม"],
   handmade: ["🧶", "งานฝีมือ"],
+  preserved: ["🫙", "ของฝาก · แปรรูป"],
+  catering: ["🎉", "รับจัดเลี้ยง · สั่งงาน"],
+  cosmetics: ["💄", "ความงาม · สกินแคร์"],
+  petgoods: ["🦴", "ของสัตว์เลี้ยง"],
 };
 // 🛍️ ตลาดเพื่อนบ้าน (15 Oct): the lend items of kind "sell". The form offers these when selling (homemade first);
 // the four market ones are not offered for lend / give / want.
-export const MARKET_ONLY = ["homemade", "dessert", "drinks", "handmade"];
-export const MARKET_CATEGORIES = [...MARKET_ONLY, "plants", "clothes", "electronics", "furniture", "kids", "other"];
+export const MARKET_ONLY = ["homemade", "dessert", "drinks", "handmade", "preserved", "catering", "cosmetics", "petgoods"];
+export const MARKET_CATEGORIES = ["homemade", "dessert", "drinks", "preserved", "catering", "handmade", "plants", "clothes", "cosmetics", "petgoods", "electronics", "furniture", "kids", "other"];
 // the market's filter chips: [key, label, categories] — "used" takes everything not named before it
 export const MARKET_FILTERS = [
   ["homemade", "🍲 อาหารทำเอง", ["homemade", "food"]],

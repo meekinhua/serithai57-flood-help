@@ -14,7 +14,7 @@ import { lookOf, ordered } from "./components/Look";
 import { TextsContext } from "./components/Texts";
 import MyHome, { homeBadgeOf } from "./components/MyHome";
 import SurveyBoxes from "./components/SurveyBox";
-import { BottomNav, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PostedSheetBody, ProsList } from "./components/Community";
+import { BottomNav, IntentChoices, JoinSheetBody, NEED_CHOICES, OFFER_CHOICES, PostedSheetBody, PRO_CATS, ProsList } from "./components/Community";
 import { CleanupPlan } from "./components/CleanupPage";
 import Forum, { TopicForm } from "./components/Forum";
 import WatchPanel, { WaterPill, WaterView, waterStatus } from "./components/WatchPanel";
@@ -63,9 +63,9 @@ const GROUPS = [
   ["lost", "🐾", "หาย · เจอ"],
   ["help", "🤝", "ช่วยกัน"],
   ["talk", "💬", "คุยกัน"],
-  ["market", "🛍️", "ตลาด"], // 15 Oct: ตลาดเพื่อนบ้าน (the lend items for sale)
+  ["map", "📍", "แผนที่·แจ้งปัญหา"], // 17 Oct: ตลาด moved up to the top bar; the map (soi problems) sits with the neighbours
 ];
-const groupOf = (t) => (t === "jobs" || t === "lend" ? "help" : t === "forum" ? "talk" : t === "lost" ? "lost" : t === "market" ? "market" : null);
+const groupOf = (t) => (t === "jobs" || t === "lend" ? "help" : t === "forum" ? "talk" : t === "lost" ? "lost" : null);
 const MORE_TABS = {
   waste: ["♻️", "ขยะ · รถเก็บ"],
   guide: ["📋", "เช็กลิสต์หลังน้ำลด"],
@@ -73,7 +73,7 @@ const MORE_TABS = {
 };
 const TABS = { ...MAIN_TABS, ...MORE_TABS };
 // which bottom-bar page a link's #hash opens (old links keep working: #water → the map, #feed → เพื่อนบ้าน)
-const pageOf = (h) => (h === "pros" ? "pros" : h === "map" || h === "water" ? "map" : TABS[h] || h === "feed" ? "community" : "home");
+const pageOf = (h) => (h === "pros" ? "pros" : h === "market" ? "market" : h === "map" || h === "water" ? "map" : TABS[h] || h === "feed" ? "community" : "home");
 
 function PageTitle({ title, sub }) {
   return (
@@ -150,9 +150,11 @@ export default function RepairApp() {
     if (h != null && window.location.hash.slice(1) !== h) window.history.pushState({ page: p }, "", h ? `#${h}` : window.location.pathname + window.location.search);
     window.scrollTo({ top: 0 });
   };
-  const openPros = (group = "", focus = false) => {
+  const [prosQuery, setProsQuery] = useState("");
+  const openPros = (group = "", focus = false, query = "") => {
     setProsGroup(group);
     setProsFocus(focus);
+    setProsQuery(query);
     goPage("pros");
   };
   useEffect(() => {
@@ -173,7 +175,7 @@ export default function RepairApp() {
   const [home, setHome] = useState(() => load("homeBlocks", { watch_on: true, watch_title: "", hub: { on: false } }));
   const [services, setServices] = useState([]);
   // 16 Oct: shops you buy from (food / shop / supplies) live in ตลาด; ช่าง·บริการ lists the rest
-  const prosOnly = services.filter((s) => !isMarketShop(s));
+  const prosOnly = services.filter((s) => PRO_CATS.includes(s.category));
   const shops = services.filter(isMarketShop);
   const [announcements, setAnnouncements] = useState([]);
   const [updatedTick, setUpdatedTick] = useState(0); // +1 after every refresh
@@ -194,6 +196,7 @@ export default function RepairApp() {
   const navRef = useRef(null);
   const showTab = (t) => {
     if (t === "pros") return openPros("");
+    if (t === "market") return goPage("market", "market");
     setTab(t);
     save("repairTab3", t);
     goPage("community", t);
@@ -233,7 +236,7 @@ export default function RepairApp() {
         goPage("map");
         return setIssueGo(m[2]); // opened once the map's reports are loaded
       }
-      if (m[1] === "shop") return isMarketShop(services.find((x) => x.id === m[2]) || {}) ? showTab("market") : openPros("");
+      if (m[1] === "shop") return PRO_CATS.includes((services.find((x) => x.id === m[2]) || {}).category) ? openPros("") : showTab("market");
       if (m[1] === "forum") {
         forumGo.openId = m[2];
         forumGo.compose = false;
@@ -631,28 +634,32 @@ export default function RepairApp() {
         )}
       </>
     ),
+    // 17 Oct: shortcuts to what people come for (same words as the LINE menu); the flood archive + credits shrink to one line
     archive: (
       <>
-        <section className="mt-3 grid gap-2 sm:grid-cols-2">
-          <a href="/flood" className="flex min-h-[64px] items-center gap-3 rounded-xl border-2 border-neutral-400 bg-white px-3 py-2">
-            <span className="text-2xl" aria-hidden="true">
-              📦
-            </span>
-            <span>
-              <b>คลังภารกิจน้ำท่วม ก.ย.–ต.ค. 2569</b>
-              <span className="block text-sm text-neutral-600">แผนที่ คำขอ ระดับน้ำ ย้อนหลัง · ดูอย่างเดียว</span>
-            </span>
-          </a>
-          <a href="/credits.html" className="flex min-h-[64px] items-center gap-3 rounded-xl bg-[#0b1622] px-3 py-2 text-white">
-            <span className="text-2xl" aria-hidden="true">
-              🎬
-            </span>
-            <span>
-              <b>End credits ทีมอาสา</b>
-              <span className="block text-sm text-[#f2b872]">ขอบคุณทุกคน ทุกร้าน ทุกหน่วยงาน · เปิดเสียง</span>
-            </span>
-          </a>
+        <section className="mt-3 grid grid-cols-3 gap-2" aria-label="ทางลัด">
+          {[
+            ["🛍️", "ตลาด", "ของกิน ของใช้ รับทำ", () => showTab("market")],
+            ["🔧", "ช่าง", "ไฟ ประปา แอร์", () => openPros("")],
+            ["♻️", "ขยะ", "วันรถซอยคุณ", () => showTab("waste")],
+          ].map(([e, t, h, fn]) => (
+            <button key={t} onClick={fn} className="flex min-h-[84px] flex-col items-center justify-center rounded-2xl bg-white px-1 text-center shadow-sm active:bg-[#E4F0E9]">
+              <span className="text-3xl" aria-hidden="true">
+                {e}
+              </span>
+              <b className="text-[16px] leading-tight">{t}</b>
+              <span className="text-xs text-[#45504A]">{h}</span>
+            </button>
+          ))}
         </section>
+        <p className="mt-4 flex flex-wrap justify-center gap-x-4 text-sm text-neutral-500">
+          <a href="/flood" className="inline-flex min-h-[44px] items-center underline">
+            📦 คลังน้ำท่วม ก.ย.–ต.ค. 69
+          </a>
+          <a href="/credits.html" className="inline-flex min-h-[44px] items-center underline">
+            🎬 End credits ทีมอาสา
+          </a>
+        </p>
       </>
     ),
   };
@@ -663,7 +670,7 @@ export default function RepairApp() {
         {peek && (
           <div
             key={peek.key}
-            className={`peek fixed inset-x-3 top-[68px] z-40 mx-auto max-w-md rounded-2xl border-2 bg-white p-2 shadow-xl ${peek.leaving ? "peek-out" : "peek-in"} ${peek.kind === "home" ? "border-[#1E6B47]" : "border-[#E0A100]"}`}
+            className={`peek fixed inset-x-3 bottom-[76px] z-40 mx-auto max-w-md rounded-2xl border-2 bg-white p-2 shadow-xl ${peek.leaving ? "peek-out" : "peek-in"} ${peek.kind === "home" ? "border-[#1E6B47]" : "border-[#E0A100]"}`}
             role="status"
           >
             <div className="flex items-center gap-2">
@@ -750,7 +757,7 @@ export default function RepairApp() {
         <BottomNav
           page={page}
           badges={Object.fromEntries(Object.entries(notes).map(([k, b]) => [k, b && (ack[k] === b.sig ? "muted" : b.level)]))}
-          onGo={(p) => (p === "pros" ? openPros("") : p === "community" ? showTab("lost") : goPage(p))}
+          onGo={(p) => (p === "pros" ? openPros("") : p === "community" ? showTab("lost") : p === "market" ? showTab("market") : goPage(p))}
           onHotline={() => setSheet({ type: "hotlines" })}
         />
         <UrgentBar items={announcements} />
@@ -777,16 +784,17 @@ export default function RepairApp() {
 
           {page === "pros" && (
             <>
-              <PageTitle title="ช่าง · บริการ ในหมู่บ้าน" sub={`${prosOnly.length} ราย · คนแนะนำเยอะขึ้นก่อน${hires.length ? ` · มีคนกำลังหาช่าง ${hires.length} เรื่อง (ท้ายหน้า)` : ""}`} />
+              <PageTitle title="🔧 ช่างซ่อมบ้าน" sub={`${prosOnly.length} ราย · คนแนะนำเยอะขึ้นก่อน${hires.length ? ` · มีคนกำลังหาช่าง ${hires.length} เรื่อง (ท้ายหน้า)` : ""}`} />
               {/* 7 Oct: everyone (admins too) gets the same list; neighbours looking for a tradesman sit quietly at its end */}
               <ProsList
-                key={`${prosGroup}-${prosFocus}`}
+                key={`${prosGroup}-${prosFocus}-${prosQuery}`}
+                query={prosQuery}
                 services={prosOnly}
                 setServices={setServices}
                 group={prosGroup}
                 setGroup={setProsGroup}
                 autoFocus={prosFocus}
-                onAdd={() => setSheet({ type: "serviceForm" })}
+                onAdd={() => setSheet({ type: "serviceForm", mode: "repair" })}
                 onHire={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })}
               />
               {hires.length > 0 && (
@@ -818,7 +826,7 @@ export default function RepairApp() {
                     return (
                       <button
                         key={g}
-                        onClick={() => pick(g === "lost" ? "lost" : g === "talk" ? "forum" : g === "market" ? "market" : load("helpTab", "jobs"))}
+                        onClick={() => (g === "map" ? goPage("map") : pick(g === "lost" ? "lost" : g === "talk" ? "forum" : load("helpTab", "jobs")))}
                         aria-current={on ? "page" : undefined}
                         className={`relative flex min-h-[54px] flex-col items-center justify-center rounded-xl text-[15px] leading-tight transition-colors ${on ? "bg-[#15201A] font-bold text-white" : "text-[#33403A]"}`}
                       >
@@ -883,11 +891,7 @@ export default function RepairApp() {
                     </section>
                   </>
                 )}
-                {tab === "market" && (
-                  <section className="card p-3">
-                    <Market items={lend} setItems={setLend} admin={admin} onAdd={() => setSheet({ type: "lendForm", kind: "sell" })} shops={shops} onAddShop={() => setSheet({ type: "serviceForm", prefill: { category: "food" } })} />
-                  </section>
-                )}
+
                 {tab === "forum" && (
                   <>
                     <TalkHero
@@ -914,6 +918,26 @@ export default function RepairApp() {
               </div>
 
               {/* 16 Oct: the ขยะ / ปัญหาซอย cards under every tab are gone (clutter) — ขยะ is a บ้านฉัน tool, ปัญหาซอย is on the map + บ้านฉัน; #waste #issues still open */}
+            </>
+          )}
+
+          {page === "market" && (
+            <>
+              <PageTitle title="🛍️ ตลาดเพื่อนบ้าน" sub="ของกิน · ของใช้ · รับทำ · กดสั่งหรือโทรได้เลย" />
+              <section className="card p-3">
+                <Market
+                  items={lend}
+                  setItems={setLend}
+                  admin={admin}
+                  shops={shops}
+                  setServices={setServices}
+                  pros={prosOnly}
+                  onPros={(q) => openPros("", false, q)}
+                  onAdd={(shelf) => setSheet({ type: "lendForm", kind: "sell", shelf })}
+                  onAddShop={(mode) => setSheet({ type: "serviceForm", mode })}
+                  onAsk={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })}
+                />
+              </section>
             </>
           )}
 
@@ -1151,9 +1175,10 @@ export default function RepairApp() {
           </Sheet>
         )}
         {sheet?.type === "lendForm" && (
-          <Sheet title={sheet.kind === "sell" ? "🛍️ ลงขายของ" : "ยืม · ให้ · ขาย"} onClose={() => setSheet(null)}>
+          <Sheet title={sheet.kind === "sell" ? (sheet.shelf === "food" ? "🍲 ขายของกิน" : sheet.shelf === "goods" ? "🧺 ขายของใช้" : "🛍️ ลงขายของ") : "ยืม · ให้ · ขาย"} onClose={() => setSheet(null)}>
             <LendForm
               kind={sheet.kind}
+              shelf={sheet.shelf || ""}
               onDone={(x) => {
                 setLend((p) => [x, ...p]);
                 posted(x.kind === "sell" ? "market" : "lend", `${LEND_KIND_TEXT[x.kind] || "🧰"} ${x.title}${x.price ? ` ${x.price}` : ""}${x.soi ? ` (ซ.${x.soi})` : ""}`);
@@ -1333,13 +1358,17 @@ export default function RepairApp() {
           </Sheet>
         )}
         {sheet?.type === "serviceForm" && (
-          <Sheet title={sheet.prefill?.category ? "🏪 ลงร้านในตลาด" : "แนะนำช่าง / ร้าน"} onClose={() => setSheet(null)}>
+          <Sheet
+            title={{ service: "🙋 ลงรับทำ · บริการ", shop: "🏪 ลงร้านในตลาด", repair: "🔧 ลงช่าง / แนะนำช่าง" }[sheet.mode] || (sheet.prefill?.category ? "🏪 ลงร้านในตลาด" : "แนะนำช่าง / ร้าน")}
+            onClose={() => setSheet(null)}
+          >
             <ServiceForm
               repair
+              mode={sheet.mode || ""}
               prefill={sheet.prefill || {}}
               onDone={(s) => {
                 setServices((p) => [s, ...p]);
-                posted(isMarketShop(s) ? "market" : "pros", `⭐ แนะนำช่าง/ร้าน: ${s.name}${s.detail ? ` · ${s.detail}` : ""}`);
+                posted(PRO_CATS.includes(s.category) ? "pros" : "market", `⭐ ${PRO_CATS.includes(s.category) ? "แนะนำช่าง" : "ในตลาด"}: ${s.name}${s.detail ? ` · ${s.detail}` : ""}`);
               }}
             />
           </Sheet>

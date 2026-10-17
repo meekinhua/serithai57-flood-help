@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { api, load } from "../api";
-import { LEND_CATEGORIES, MARKET_FILTERS, SERVICE_CATEGORIES, timeAgo } from "../config";
+import { LEND_CATEGORIES, SERVICE_CATEGORIES, SERVICE_GROUPS, SHELVES, shelfOfItem, shelfOfShop, timeAgo } from "../config";
 import { mediaUrl } from "../media";
-import { rememberCall } from "./Community";
+import { ProsList, rememberCall } from "./Community";
 import { notify } from "../notify";
 import { openMedia } from "./MediaGallery";
 import { ContactButton, NameField, input, label, remember, savedContact, telHref, useKeys } from "./RepairBoards";
@@ -105,8 +105,6 @@ ${itemUrl(x)}`)}`, "_blank", "noopener");
 }
 
 const dial = (p) => (p || "").replace(/[^\d+]/g, "");
-// a shop from the directory: which market chips it shows under
-const shopIn = (s, f) => f === "all" || f === "shops" || (f === "homemade" && s.category === "food");
 
 function ShopCard({ s }) {
   const [emoji, catText] = SERVICE_CATEGORIES[s.category] || ["🏪", "ร้าน"];
@@ -114,7 +112,9 @@ function ShopCard({ s }) {
   return (
     <li className="card flex gap-3 p-3">
       {photo ? (
-        <img src={mediaUrl(photo.id, "thumb")} alt="" loading="lazy" className="h-20 w-20 shrink-0 rounded-xl object-cover" />
+        <button type="button" onClick={() => openMedia(s.media, s.media.indexOf(photo))} aria-label="ดูรูป" className="shrink-0">
+          <img src={mediaUrl(photo.id, "thumb")} alt="" loading="lazy" className="h-20 w-20 rounded-xl object-cover" />
+        </button>
       ) : (
         <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-[#E3EDF9] text-4xl" aria-hidden="true">
           {emoji}
@@ -144,13 +144,6 @@ function ShopCard({ s }) {
   );
 }
 
-const inFilter = (x, f) => {
-  if (f === "all") return true;
-  const row = MARKET_FILTERS.find(([k]) => k === f);
-  if (row?.[2]) return row[2].includes(x.category);
-  const named = MARKET_FILTERS.flatMap(([, , cats]) => cats || []);
-  return !named.includes(x.category); // มือสอง / อื่นๆ
-};
 
 function OrderForm({ item: x, preset = "", onDone, onCancel }) {
   const c = savedContact();
@@ -546,73 +539,197 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
   );
 }
 
-export default function Market({ items, setItems, admin, onAdd, shops = [], onAddShop }) {
-  const [f, setF] = useState("all");
+const norm = (t) => (t || "").toLowerCase();
+const itemText = (x) => norm(`${x.title} ${x.detail} ${x.shop_name || ""} ${(x.tags || []).join(" ")} ${(x.options || []).map((o) => o.name).join(" ")} ${LEND_CATEGORIES[x.category]?.[1] || ""} ${x.name}`);
+const shopText = (s) => norm(`${s.name} ${s.detail} ${s.area} ${SERVICE_CATEGORIES[s.category]?.[1] || ""} ${SERVICE_GROUPS.find((g) => g.cats.includes(s.category))?.hint || ""}`);
+
+// 17 Oct, simple: search first, three big shelves (ของกิน · ของใช้ · รับทำ), one "+ ลงขาย / รับทำ" that asks one question.
+// Sub-chips only show once a shelf has more than 6 things, and only for categories that have something in them.
+export default function Market({ items, setItems, admin, onAdd, shops = [], setServices, onAddShop, onAsk, pros = [], onPros }) {
+  const [shelf, setShelf] = useState(() => load("marketShelf", ""));
+  const [sub, setSub] = useState("");
+  const [q, setQ] = useState("");
+  const [choosing, setChoosing] = useState(false);
   const [keys] = useKeys("lendKeys");
+  const query = norm(q.trim());
+  const pick = (k) => {
+    const v = shelf === k ? "" : k;
+    setShelf(v);
+    setSub("");
+    try {
+      localStorage.setItem("marketShelf", JSON.stringify(v));
+    } catch {}
+  };
   const open = marketOpen(items).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  const shown = f === "shops" ? [] : open.filter((x) => inFilter(x, f));
-  const shownShops = shops.filter((s) => shopIn(s, f));
-  const count = (k) => (k === "shops" ? shops.length : open.filter((x) => inFilter(x, k)).length);
+  const services = shops.filter((s) => shelfOfShop(s) === "service");
+  const goodsShops = shops.filter((s) => shelfOfShop(s) !== "service");
+  const count = (k) => (k === "service" ? services.length : open.filter((x) => shelfOfItem(x) === k).length + goodsShops.filter((s) => shelfOfShop(s) === k).length);
+  const inShelf = shelf && shelf !== "service";
+  let list = open.filter((x) => (!inShelf || shelfOfItem(x) === shelf) && (!query || itemText(x).includes(query)));
+  let shopList = goodsShops.filter((s) => (!inShelf || shelfOfShop(s) === shelf) && (!query || shopText(s).includes(query)));
+  const subs = inShelf && list.length + shopList.length > 6 ? [...new Set(list.map((x) => x.category))].map((k) => [k, LEND_CATEGORIES[k] || ["📦", "อื่นๆ"]]) : [];
+  if (sub === "shops") list = [];
+  else if (sub) {
+    list = list.filter((x) => x.category === sub);
+    shopList = [];
+  }
+  const svcHits = query && !shelf ? services.filter((s) => shopText(s).includes(query)) : [];
+  const proHits = query ? pros.filter((s) => shopText(s).includes(query)).length : 0;
+  const nothing = shelf !== "service" && !list.length && !shopList.length && !svcHits.length;
   return (
     <div className="space-y-3">
-      <p className="px-1 text-[15px] text-[#45504A]">ของทำเองจากเพื่อนบ้าน · กดสั่ง/จองไว้ได้</p>
-      <MarketBell />
-      <div className="-mx-3 overflow-x-auto px-3 pb-1">
-        <div className="flex w-max gap-2">
-          {[["all", "ทั้งหมด"], ...MARKET_FILTERS, ...(shops.length ? [["shops", "🏪 ร้านประจำ"]] : [])].map(([k, t]) => {
-            const n = k === "all" ? open.length : count(k);
-            return (
-              <button
-                key={k}
-                onClick={() => setF(k)}
-                aria-pressed={f === k}
-                className={`min-h-[44px] whitespace-nowrap rounded-full px-3 text-[15px] ${f === k ? "bg-[#15201A] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}
-              >
-                {t}
-                {n > 0 && k !== "all" ? ` ${n}` : ""}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {shown.map((x) => (
-          <MarketCard key={x.id} item={x} editKey={keys[x.id]} admin={admin} onChanged={(y) => setItems((p) => p.map((z) => (z.id === y.id ? y : z)))} />
+      <label className="flex min-h-[50px] items-center gap-2 rounded-xl border border-[#C9D1CB] bg-white px-3">
+        <span className="sr-only">ค้นหาในตลาด</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#45504A" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="หาอะไร เช่น ขนม ตัดผม ติวเตอร์" className="min-w-0 flex-1 bg-transparent text-base outline-none" />
+        {q && (
+          <button onClick={() => setQ("")} aria-label="ล้างคำค้น" className="min-h-[40px] px-1 text-[#45504A]">
+            ✕
+          </button>
+        )}
+      </label>
+      <div className="grid grid-cols-3 gap-2">
+        {SHELVES.map((x) => (
+          <button
+            key={x.key}
+            onClick={() => pick(x.key)}
+            aria-pressed={shelf === x.key}
+            className={`flex min-h-[84px] flex-col items-center justify-center rounded-2xl px-1 text-center ${shelf === x.key ? "bg-[#15201A] text-white" : "bg-[#FFF4D6] text-[#15201A]"}`}
+          >
+            <span className="text-3xl" aria-hidden="true">
+              {x.icon}
+            </span>
+            <span className="text-[16px] font-bold leading-tight">{x.label}</span>
+            <span className={`text-xs ${shelf === x.key ? "text-white/80" : "text-[#45504A]"}`}>{count(x.key) ? `${count(x.key)} รายการ` : "ยังไม่มี"}</span>
+          </button>
         ))}
-      </ul>
-      {!shown.length && !shownShops.length && (
-        <p className="card p-4 text-center text-[15px] text-[#45504A]">
-          {open.length || shops.length ? "หมวดนี้ยังไม่มีของขาย" : "ยังไม่มีใครลงขาย · ทำขนม ทำกับข้าว หรือมีของเหลือใช้? ลงให้เพื่อนบ้านเห็นได้เลย"}
-        </p>
+      </div>
+      {shelf && <p className="px-1 text-sm text-[#45504A]">{SHELVES.find((x) => x.key === shelf)?.hint} · แตะอีกครั้งเพื่อดูทั้งหมด</p>}
+      <MarketBell />
+      {subs.length > 1 && (
+        <div className="-mx-3 overflow-x-auto px-3 pb-1">
+          <div className="flex w-max gap-2">
+            {[["", ["", "ทั้งหมด"]], ...subs, ...(shopList.length ? [["shops", ["🏪", "ร้านประจำ"]]] : [])].map(([k, [e, t]]) => (
+              <button
+                key={k || "all"}
+                onClick={() => setSub(k)}
+                aria-pressed={sub === k}
+                className={`min-h-[42px] whitespace-nowrap rounded-full px-3 text-[15px] ${sub === k ? "bg-[#15201A] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}
+              >
+                {e} {t}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
-      {shownShops.length > 0 && (
-        <section className="space-y-2 pt-1">
-          <h3 className="px-1 text-lg font-bold">🏪 ร้านประจำ ใกล้หมู่บ้าน ({shownShops.length})</h3>
-          <p className="px-1 text-sm text-[#45504A]">ร้านอาหาร ร้านค้า วัสดุ ที่เปิดเป็นเวลา · โทรสั่งได้เลย</p>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {shownShops.map((s) => (
-              <ShopCard key={s.id} s={s} />
+      {shelf === "service" ? (
+        <ProsList
+          embedded
+          services={services}
+          setServices={setServices}
+          groups={SERVICE_GROUPS}
+          group={sub}
+          setGroup={setSub}
+          query={q}
+          onAdd={() => onAddShop("service")}
+          onHire={onAsk}
+          hireText="📢 ประกาศหาคนรับทำ ให้เพื่อนบ้านที่ทำได้ติดต่อมา"
+        />
+      ) : (
+        <>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {list.map((x) => (
+              <MarketCard key={x.id} item={x} editKey={keys[x.id]} admin={admin} onChanged={(y) => setItems((p) => p.map((z) => (z.id === y.id ? y : z)))} />
             ))}
           </ul>
-        </section>
+          {shopList.length > 0 && (
+            <section className="space-y-2 pt-1">
+              <h3 className="px-1 text-lg font-bold">🏪 ร้านประจำ ({shopList.length})</h3>
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {shopList.map((s) => (
+                  <ShopCard key={s.id} s={s} />
+                ))}
+              </ul>
+            </section>
+          )}
+          {svcHits.length > 0 && (
+            <section className="space-y-2 pt-1">
+              <h3 className="px-1 text-lg font-bold">🙋 รับทำ ({svcHits.length})</h3>
+              <ProsList embedded services={svcHits} setServices={setServices} groups={SERVICE_GROUPS} group="" setGroup={() => {}} query="" onAdd={() => onAddShop("service")} />
+            </section>
+          )}
+          {!shelf && !query && services.length > 0 && (
+            <button onClick={() => pick("service")} className="card flex min-h-[56px] w-full items-center gap-3 p-3 text-left">
+              <span className="text-3xl" aria-hidden="true">
+                🙋
+              </span>
+              <span className="min-w-0 flex-1">
+                <b className="block">รับทำ · บริการจากเพื่อนบ้าน {services.length} ราย</b>
+                <span className="text-sm text-[#45504A]">ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง</span>
+              </span>
+              <span className="text-xl text-[#45504A]">›</span>
+            </button>
+          )}
+          {nothing && (
+            <div className="card space-y-2 p-4 text-center">
+              <p className="font-bold">{query ? `ยังไม่มี "${q.trim()}" ในตลาด` : shelf ? "ชั้นนี้ยังว่าง" : "ยังไม่มีใครลงขาย"}</p>
+              {proHits > 0 && (
+                <button onClick={() => onPros(q.trim())} className="min-h-[48px] w-full rounded-xl bg-[#1F4F8A] font-bold text-white">
+                  🔧 เจอในหน้า ช่าง {proHits} ราย ›
+                </button>
+              )}
+              {onAsk && (
+                <button onClick={onAsk} className="min-h-[48px] w-full rounded-xl border-2 border-[#15201A] font-bold">
+                  📢 ประกาศหา ให้เพื่อนบ้านที่มีติดต่อมา
+                </button>
+              )}
+            </div>
+          )}
+        </>
       )}
-      {/* for sellers, at the bottom: buyers come to look, so the list comes first (16 Oct) */}
+      {/* one button for sellers, at the bottom: buyers come to look, so the list comes first */}
       <div className="card space-y-2 p-3">
-        <p className="text-[15px] text-[#45504A]">
-          <b className="text-[#15201A]">ทำขายเองไหม? มีร้าน?</b> ลงให้เพื่อนบ้านเห็นได้ฟรี · ระบบไม่รับเงิน ตกลงกันเอง
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <button onClick={onAdd} className="min-h-[48px] rounded-xl border-2 border-[#1E6B47] font-bold text-[#1E6B47]">
-            + ลงขายของ
-          </button>
-          <a href={LINE_SELL} target="_blank" rel="noopener noreferrer" className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-[#06A045] font-bold text-[#06A045]">
-            💬 ลงผ่าน LINE
-          </a>
-        </div>
-        {onAddShop && (
-          <button onClick={onAddShop} className="min-h-[44px] w-full text-[15px] font-semibold text-[#1F4F8A] underline">
-            🏪 มีร้านที่เปิดประจำ? ลงร้าน (เบอร์ เวลาเปิด)
-          </button>
+        {!choosing ? (
+          <>
+            <p className="text-[15px] text-[#45504A]">
+              <b className="text-[#15201A]">ทำขาย หรือรับทำอะไร?</b> ลงให้เพื่อนบ้านเห็นได้ฟรี · ระบบไม่รับเงิน ตกลงกันเอง
+            </p>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <button onClick={() => setChoosing(true)} className="min-h-[52px] rounded-xl bg-[#1E6B47] text-lg font-bold text-white">
+                + ลงขาย / รับทำ
+              </button>
+              <a href={LINE_SELL} target="_blank" rel="noopener noreferrer" className="flex min-h-[52px] items-center justify-center rounded-xl border-2 border-[#06A045] px-3 font-bold text-[#06A045]">
+                ผ่าน LINE
+              </a>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-lg font-bold">จะลงอะไร?</p>
+            {[
+              ["🍲", "ขายของกิน", "อาหารทำเอง ขนม เครื่องดื่ม ของฝาก", () => onAdd("food")],
+              ["🧺", "ขายของใช้", "งานฝีมือ ต้นไม้ เสื้อผ้า ของมือสอง", () => onAdd("goods")],
+              ["🙋", "รับทำงาน · บริการ", "ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง", () => onAddShop("service")],
+              ["🏪", "มีร้านเปิดประจำ", "ร้านอาหาร ร้านค้า วัสดุ", () => onAddShop("shop")],
+              ["🔧", "เป็นช่างซ่อมบ้าน", "ไฟ ประปา แอร์ ต่อเติม · ลงที่หน้าช่าง", () => onAddShop("repair")],
+            ].map(([e, t, h, fn]) => (
+              <button key={t} onClick={fn} className="flex min-h-[60px] w-full items-center gap-3 rounded-xl border-2 border-[#DCE2DD] bg-white px-3 text-left active:bg-[#F2F4F1]">
+                <span className="text-3xl" aria-hidden="true">
+                  {e}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <b className="block text-[16px]">{t}</b>
+                  <span className="text-sm text-[#45504A]">{h}</span>
+                </span>
+              </button>
+            ))}
+            <button onClick={() => setChoosing(false)} className="min-h-[44px] w-full text-[15px] text-[#45504A] underline">
+              ยกเลิก
+            </button>
+          </>
         )}
       </div>
     </div>

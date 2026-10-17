@@ -14,16 +14,21 @@ import { mapLink } from "./PinField";
 const FEED_DAYS = 7; // requests, lends and sales drop off the feed after a week (they stay on their boards)
 
 // The groups shown on the home page, in the words people search with.
+// 17 Oct: ช่าง = home repairs only; services people hire neighbours for (ตัดผม ติว แม่บ้าน รับส่ง…) moved to ตลาด › รับทำ.
+// Keys stay (บ้านฉัน's repair plan links to them). ล้างบ้าน is in both: after a flood it is half repair work.
 export const PRO_GROUPS = [
-  { key: "electric", label: "ช่างไฟ", cats: ["electrician"] },
-  { key: "plumb", label: "ประปา ปั๊มน้ำ", cats: ["plumber"] },
-  { key: "fix", label: "ซ่อมแอร์ เครื่องใช้", cats: ["ac", "appliance", "repair"] },
-  { key: "clean", label: "ล้างบ้าน", cats: ["cleaning"] },
-  { key: "junk", label: "ขนขยะ", cats: ["junk", "porter", "truck"] },
-  { key: "build", label: "ช่างไม้ ทาสี", cats: ["carpenter", "painter", "roof", "pest"] },
-  { key: "car", label: "ซักพรม ซ่อมรถ", cats: ["vehicle", "rental", "boat"] },
-  { key: "more", label: "บริการอื่นๆ", cats: ["beauty", "tutor", "pets", "other"] }, // 16 Oct: shops moved to ตลาด
+  { key: "electric", label: "⚡ ไฟฟ้า", cats: ["electrician"] },
+  { key: "plumb", label: "🚿 ประปา·ปั๊ม", cats: ["plumber"] },
+  { key: "fix", label: "❄️ แอร์·เครื่องซักผ้า·ตู้เย็น", cats: ["ac", "appliance", "repair"] },
+  { key: "build", label: "🪚 ต่อเติม·ทาสี·หลังคา", cats: ["carpenter", "painter", "roof", "doors"] },
+  { key: "net", label: "📶 เน็ต·กล้อง", cats: ["net"] },
+  { key: "handy", label: "🔨 งานจุกจิก", cats: ["handyman"] },
+  { key: "clean", label: "🧹 ล้างบ้าน", cats: ["cleaning"] },
+  { key: "junk", label: "🚛 ขนขยะ", cats: ["junk"] },
+  { key: "pest", label: "🐜 ปลวก·แมลง", cats: ["pest"] },
+  { key: "car", label: "🚗 ซ่อมรถ·ซักพรม", cats: ["vehicle"] },
 ];
+export const PRO_CATS = PRO_GROUPS.flatMap((g) => g.cats);
 const groupOf = (cat) => PRO_GROUPS.find((g) => g.cats.includes(cat));
 // ร้านเพื่อนบ้าน: the team marks the ones run by neighbours or selling in the village regularly; the rest are outside shops (ช่าง·ร้าน only)
 export const isLocal = (s) => s.local === true;
@@ -378,13 +383,31 @@ function Trust({ s }) {
   );
 }
 
+// 17 Oct: long notes (flood-time copies from the LINE group) folded to 3 lines
+export function MoreText({ text, lines = 3 }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 140 || text.split("\n").length > lines;
+  return (
+    <div>
+      <p className={`whitespace-pre-line break-words text-[15px] leading-relaxed text-[#33403A] ${open || !long ? "" : "line-clamp-3"}`}>{text}</p>
+      {long && !open && (
+        <button onClick={() => setOpen(true)} className="min-h-[36px] text-sm font-semibold text-[#1F4F8A] underline">
+          ดูเพิ่ม
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ---------- the tradesmen & shops board: search, groups, a big call button, "เคยใช้ ดี" ----------
-export function ProsList({ services, setServices, group, setGroup, onAdd, query: q0, autoFocus, hires = [], onHire, onHires }) {
+// 17 Oct: also the list of ตลาด › รับทำ (groups = SERVICE_GROUPS, the market's own search box drives `query`)
+export function ProsList({ services, setServices, group, setGroup, onAdd, query: q0, autoFocus, hires = [], onHire, onHires, groups = PRO_GROUPS, embedded = false, hireText = "🙋 ประกาศหาช่าง ให้ช่างในหมู่บ้านเห็น" }) {
   const [q, setQ] = useState(q0 || "");
   const [msg, setMsg] = useState("");
   const [voted, setVoted] = useState(() => load("prosVoted", []));
-  const query = q.trim().toLowerCase();
-  const g = PRO_GROUPS.find((x) => x.key === group);
+  const query = (embedded ? q0 || "" : q).trim().toLowerCase();
+  const g = groups.find((x) => x.key === group);
+  const groupOf = (cat) => groups.find((x) => x.cats.includes(cat));
   const shown = services
     .filter(
       (s) =>
@@ -407,6 +430,8 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
   }
   return (
     <div className="space-y-3">
+      {!embedded && (
+      <>
       <div className="flex items-center gap-2">
         <p className="min-w-0 flex-1 text-[15px] text-[#45504A]">เบอร์ที่เพื่อนบ้านแชร์กันมา · ตกลงราคากันเอง</p>
         <button onClick={onAdd} className="min-h-[44px] shrink-0 rounded-xl bg-[#1E6B47] px-3 text-[15px] font-bold text-white">
@@ -427,8 +452,10 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
           className="min-w-0 flex-1 bg-transparent text-base outline-none"
         />
       </label>
+      </>
+      )}
       <div className="flex flex-wrap gap-2">
-        {[{ key: "", label: "ทั้งหมด" }, ...PRO_GROUPS.filter((x) => x.key === group || services.some((s) => x.cats.includes(s.category)))].map((x) => (
+        {[{ key: "", label: "ทั้งหมด" }, ...groups.filter((x) => x.key === group || services.some((s) => x.cats.includes(s.category)))].map((x) => (
           <button
             key={x.key || "all"}
             onClick={() => setGroup(x.key)}
@@ -456,7 +483,7 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
                 )}
               </b>
               <MediaStrip media={s.media || []} />
-              {s.detail && <p className="whitespace-pre-line break-words text-[15px] leading-relaxed text-[#33403A]">{s.detail}</p>}
+              {s.detail && <MoreText text={s.detail} />}
               {(s.price || s.area) && <p className="text-sm text-[#45504A]">{[s.price, s.area].filter(Boolean).join(" · ")}</p>}
               {mapLink(s) && (
                 <a href={mapLink(s)} target="_blank" rel="noreferrer" className="inline-block text-sm font-semibold text-[#1F4F8A] underline">
@@ -499,9 +526,9 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
       ) : (
         <div className="rounded-2xl bg-[#F2F4F1] p-4 text-center">
           <p className="font-bold">{query || g ? "ยังไม่มีในหมวดนี้" : "ยังไม่มีเบอร์"}</p>
-          <p className="mt-1 text-[15px] text-[#45504A]">ถ้ารู้จักช่างหรืองานบริการดีๆ แนะนำให้เพื่อนบ้านได้เลย</p>
+          <p className="mt-1 text-[15px] text-[#45504A]">{embedded ? "รับทำอยู่? ลงให้เพื่อนบ้านเห็นได้ฟรี" : "ถ้ารู้จักช่างหรืองานบริการดีๆ แนะนำให้เพื่อนบ้านได้เลย"}</p>
           <button onClick={onAdd} className="mt-2 min-h-[48px] rounded-xl bg-[#1E6B47] px-4 font-bold text-white">
-            แนะนำ
+            {embedded ? "+ ลงรับทำ" : "แนะนำ"}
           </button>
         </div>
       )}
@@ -510,7 +537,7 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
         <div className="mt-2 space-y-2 rounded-2xl border border-dashed border-[#A9B4AD] p-3">
           <p className="text-[15px] font-bold">หาไม่เจอ?</p>
           <button onClick={onHire} className="min-h-[48px] w-full rounded-xl border-2 border-[#15201A] bg-white text-[15px] font-bold">
-            🙋 ประกาศหาช่าง ให้ช่างในหมู่บ้านเห็น
+            {hireText}
           </button>
           {hires.length > 0 && (
             <button onClick={onHires} className="min-h-[44px] w-full text-left text-[15px] text-[#45504A] underline">
@@ -638,7 +665,16 @@ export function PostedSheetBody({ text, onClose }) {
 export function BottomNav({ page, badges = {}, onGo, onHotline }) {
   const items = [
     ["home", "บ้านฉัน", <path key="p" d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />],
-    ["pros", "ช่าง · บริการ", <path key="p" d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" />],
+    // 17 Oct: ตลาด in the top bar (people type "ตลาด" in LINE more than anything); the map moved into เพื่อนบ้าน
+    [
+      "market",
+      "ตลาด",
+      <g key="p">
+        <path d="M5 8h14l-1.2 11.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8z" />
+        <path d="M9 10V7a3 3 0 0 1 6 0v3" />
+      </g>,
+    ],
+    ["pros", "ช่าง", <path key="p" d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" />],
     [
       "community",
       "เพื่อนบ้าน",
@@ -647,14 +683,6 @@ export function BottomNav({ page, badges = {}, onGo, onHotline }) {
         <path d="M3 20a6 6 0 0 1 12 0" />
         <circle cx="17" cy="9" r="2.6" />
         <path d="M15.5 14.2A5 5 0 0 1 21 19" />
-      </g>,
-    ],
-    [
-      "map",
-      "แผนที่หมู่บ้าน",
-      <g key="p">
-        <path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z" />
-        <path d="M9 4v14M15 6v14" />
       </g>,
     ],
   ];

@@ -37,6 +37,7 @@ LEND_CATEGORIES = [
     "washer", "pump", "vacuum", "dryer", "ladder", "cleaning", "tools", "cart", "power", "furniture", "supplies",
     "food", "clothes", "electronics", "kids", "plants", "other",
     "homemade", "dessert", "drinks", "handmade",  # ตลาดเพื่อนบ้าน (sell): อาหารทำเอง · ขนม·เบเกอรี่ · เครื่องดื่ม · งานฝีมือ
+    "preserved", "catering", "cosmetics", "petgoods",  # 17 Oct: ของฝาก·แปรรูป · รับจัดเลี้ยง · ความงาม · ของสัตว์เลี้ยง
 ]
 LendStatus = Literal["available", "lent", "closed"]  # ว่าง · มีคนยืมอยู่ · ปิด (คืนเจ้าของ/ให้ไปแล้ว/หาได้แล้ว)
 JobKind = Literal["need", "offer"]  # ขอแรง · อาสาพร้อมไปช่วย
