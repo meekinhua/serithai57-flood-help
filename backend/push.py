@@ -40,7 +40,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 BKK = timezone(timedelta(hours=7))
-TOPICS = {"lost", "waste", "news", "help", "map", "shop", "forum"}
+TOPICS = {"lost", "waste", "news", "help", "map", "shop", "forum", "market"}  # market (17 Oct): new things in ตลาด, whole village
 DEFAULT_TOPICS = ["lost", "waste", "news"]
 PETS = {"dog", "cat", "pet"}
 SUBJECT = "https://serithai57.com"
@@ -222,7 +222,45 @@ async def on_issue(doc: dict):
     await send({"topics": "map", "soi": doc["soi"]}, f"{head} · ซ.{doc['soi']}", (doc.get("detail") or "มีคนแจ้งจุดปัญหาใหม่ในซอยคุณ") + " · แตะดูบนแผนที่", f"/#issue-{doc['id']}", tag=f"issue-{doc['id']}")
 
 
+MARKET_SHOPS = ("food", "shop", "supplies")  # directory shops that are listed in ตลาด (services.py categories)
+_market_pending: list = []  # (title, url) waiting for the next ตลาด notification
+_market_timer: list = []
+
+
+async def _market_flush():
+    items, _market_pending[:] = list(_market_pending), []
+    if not items:
+        return
+    if len(items) == 1:
+        await send({"topics": "market"}, "🛍️ ของใหม่ในตลาด", items[0][0], items[0][1], tag="market")
+    else:
+        await send({"topics": "market"}, f"🛍️ ของใหม่ในตลาด {len(items)} รายการ", " · ".join(t for t, _ in items[:3]) + (" …" if len(items) > 3 else ""), "/#market", tag="market")
+
+
+async def _market_later():
+    try:
+        await asyncio.sleep(max(60, 3 * 3600 - (time.time() - _quiet.get("market", 0))))
+        _quiet["market"] = time.time()
+        await _market_flush()
+    finally:
+        _market_timer.clear()
+
+
+async def market_news(title: str, url: str):
+    """17 Oct: something new to buy (a neighbour's item or a shop) → everyone who chose ตลาด, at most once in 3 hours;
+    whatever comes in between goes out together at the end of the window ("ของใหม่ในตลาด 3 รายการ")."""
+    _market_pending.append((title[:60], url))
+    if _quiet_ok("market"):
+        await _market_flush()
+    elif not _market_timer:
+        _market_timer.append(asyncio.create_task(_market_later()))
+
+
 async def on_lend(doc: dict):
+    if doc.get("kind") == "sell":  # ตลาด: the whole village (topic market) instead of the soi
+        name = f"{doc['shop_name']} · " if doc.get("shop_name") else ""
+        await market_news(f"{name}{doc.get('title', '')}" + (f" · {doc['price']}" if doc.get("price") else ""), f"/#market-{doc['id']}")
+        return
     if not doc.get("soi"):
         return
     word = {"want": "อยากยืม", "give": "แจกให้", "sell": "ขาย"}.get(doc.get("kind"), "ให้ยืม")
@@ -240,9 +278,12 @@ async def on_order(doc: dict, entry: dict):
 
 
 async def on_shop(doc: dict):
+    if doc.get("category") in MARKET_SHOPS:  # 17 Oct: ร้านอาหาร / ร้านค้า live in ตลาด now
+        await market_news(f"🏪 ร้านใหม่ · {doc.get('name', '')}", "/#market")
+        return
     if not _quiet_ok("shop"):
         return
-    await send({"topics": "shop"}, "🔧 ช่าง·ร้านใหม่ในหมู่บ้าน", doc.get("name", ""), f"/#shop-{doc['id']}", tag="shop")
+    await send({"topics": "shop"}, "🔧 ช่าง·บริการใหม่ในหมู่บ้าน", doc.get("name", ""), f"/#shop-{doc['id']}", tag="shop")
 
 
 async def on_forum(doc: dict):

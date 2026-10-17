@@ -96,6 +96,18 @@ SELL_WORDS = {"ลงขาย", "ขายของ", "🛍️ ลงขาย�
 SOLD_WORDS = {"ขายหมดแล้ว", "✅ ขายหมดแล้ว", "ขายหมด", "ปิดร้าน"}
 ORDER_WORDS = {"ออเดอร์", "ดูออเดอร์", "📋 ออเดอร์", "คำสั่งซื้อ", "ออเดอร์ของฉัน", "order", "orders"}
 PREORDER_HINT = ("สั่ง", "ล่วงหน้า", "พรี", "จอง", "pre")
+EDIT_WORDS = {"แก้ไข", "แก้โพสต์", "แต่งร้าน", "แก้ร้าน", "✏️ แก้ไข", "แก้ไขร้าน", "เพิ่มรูป", "ใส่เมนู"}  # 17 Oct: a LINE seller's edit link
+YT_IN_TEXT = re.compile(r"https?://(?:www\.|m\.)?(?:youtube\.com/(?:watch\?v=|shorts/|live/)|youtu\.be/)[\w-]{6,}\S*")
+LOC_CHIP = {"type": "action", "action": {"type": "location", "label": "📍 ส่งตำแหน่ง"}}
+
+
+def in_area(lat, lng) -> bool:
+    return 13.5 <= lat <= 14.1 and 100.4 <= lng <= 101.0
+
+
+def with_loc(q: dict) -> dict:
+    """A quick-reply set with LINE's own "send my location" button in front (17 Oct)."""
+    return {"items": [LOC_CHIP] + q.get("items", [])[:12]}
 MKT_CATS = [("🍲 อาหารทำเอง", "homemade"), ("🧁 ขนม·เบเกอรี่", "dessert"), ("🧋 เครื่องดื่ม", "drinks"),
             ("🧶 งานฝีมือ", "handmade"), ("🪴 ต้นไม้", "plants"), ("📦 ของมือสอง/อื่นๆ", "other")]
 MKT_WORD_CAT = {**{label: c for label, c in MKT_CATS},
@@ -653,7 +665,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return text(f"บอกลักษณะสั้นๆ ให้คนจำได้ครับ\n{ex}", qr(("❌ ยกเลิก", "ยกเลิก")))
         if step == "soi":
             mine_soi = [(f"ซ.{s['home_soi']} (ซอยบ้านฉัน)", s["home_soi"])] if s.get("home_soi") else []
-            return text(("หายแถวซอยไหนครับ" if lost else "เจอที่ซอยไหนครับ") + " (พิมพ์เลขซอย เช่น 16)", qr(*mine_soi, ("ไม่แน่ใจ", "ไม่แน่ใจ"), ("❌ ยกเลิก", "ยกเลิก")))
+            return text(("หายแถวซอยไหนครับ" if lost else "เจอที่ซอยไหนครับ") + " (พิมพ์เลขซอย เช่น 16)\nหรือกด 📍 ส่งตำแหน่ง ตรงจุดที่" + ("เห็นล่าสุด" if lost else "เจอ"),
+                        with_loc(qr(*mine_soi, ("ไม่แน่ใจ", "ไม่แน่ใจ"), ("❌ ยกเลิก", "ยกเลิก"))))
         if step == "when":
             return text(("หายตั้งแต่เมื่อไหร่ครับ" if lost else "เจอเมื่อไหร่ครับ") + " (พิมพ์เองได้ เช่น \"เมื่อคืน 2 ทุ่ม\")",
                         qr(("วันนี้", "วันนี้"), ("เมื่อวาน", "เมื่อวาน"), ("2–3 วันก่อน", "2–3 วันก่อน"), ("❌ ยกเลิก", "ยกเลิก")))
@@ -665,7 +678,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             ("😢 หาย" if lost else "🙌 เจอ") + f" · {CAT_TH.get(s.get('category'), '')}",
             f"📝 {s.get('desc', '')}",
             f"📍 {('ซ.' + s['soi']) if s.get('soi') else 'ไม่ระบุซอย'} · 🕒 {s.get('when') or '-'}",
-            f"📷 รูป {len(s.get('media', []))} รูป",
+            f"📷 รูป {len(s.get('media', []))} รูป" + (" · 📍 มีหมุด" if s.get("lat") else ""),
             f"☎️ {s.get('name', '')} {s.get('phone', '')}",
         ]
         return text("เช็กก่อนลงประกาศนะครับ\n\n" + "\n".join(lines) + "\n\nลงแล้วเพื่อนบ้านที่เปิดแจ้งเตือนหาย·เจอ จะได้รับแจ้งทันที",
@@ -691,7 +704,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return [text("วันนี้ลงประกาศครบ 5 รายการแล้วครับ ถ้าจำเป็นทักเพจ FB หมู่บ้านได้เลย")]
         key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
         body = {"kind": s["kind"], "category": s["category"], "title": s["desc"][:80], "detail": s["desc"] if len(s["desc"]) > 80 else "",
-                "soi": s.get("soi", ""), "when_seen": s.get("when", "")[:60], "name": s["name"], "phone": s["phone"], "lat": None, "lng": None}
+                "soi": s.get("soi", ""), "when_seen": s.get("when", "")[:60], "name": s["name"], "phone": s["phone"], "lat": s.get("lat"), "lng": s.get("lng")}
         try:
             media = await claim_media(s.get("media", []), f"lost:{item_id}", {"image"})
         except HTTPException:
@@ -735,10 +748,21 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         cat = d.get("category")
         where = " · ".join(x for x in (f"ซ.{d['soi']}" if d.get("soi") else "", d.get("when", "")) if x)
         url = f"{SITE}/#market-{d['id']}"
-        body = [{"type": "text", "text": f"🛍️ {MKT_TH.get(cat, 'ของขาย')}", "size": "xs", "weight": "bold", "color": "#8F2A1C"},
+        head = f"🛍️ {d['shop_name'][:40]}" if d.get("shop_name") else f"🛍️ {MKT_TH.get(cat, 'ของขาย')}"
+        body = [{"type": "text", "text": head, "size": "xs", "weight": "bold", "color": "#8F2A1C", "wrap": True, "maxLines": 1},
                 {"type": "text", "text": d.get("title", "")[:80] or "-", "weight": "bold", "size": "md", "wrap": True, "maxLines": 3}]
         if d.get("price"):
             body.append({"type": "text", "text": d["price"][:60], "weight": "bold", "size": "lg", "color": "#8F2A1C", "wrap": True})
+        if d.get("tags"):  # 17 Oct: selling points
+            body.append({"type": "text", "text": " · ".join(f"✓ {t}" for t in d["tags"][:3]), "size": "xs", "color": "#1E6B47", "weight": "bold", "wrap": True, "maxLines": 2})
+        if d.get("options"):  # 17 Oct: the menu, first 3 rows
+            rows = [{"type": "box", "layout": "baseline", "contents": [
+                {"type": "text", "text": o["name"][:30], "size": "sm", "flex": 4, "wrap": True, "maxLines": 1},
+                {"type": "text", "text": o.get("price", "")[:14] or " ", "size": "sm", "flex": 2, "align": "end", "weight": "bold", "color": "#8F2A1C"}]}
+                for o in d["options"][:3]]
+            if len(d["options"]) > 3:
+                rows.append({"type": "text", "text": f"+ อีก {len(d['options']) - 3} เมนู", "size": "xs", "color": "#45504A"})
+            body.append({"type": "box", "layout": "vertical", "spacing": "xs", "paddingAll": "8px", "cornerRadius": "8px", "backgroundColor": "#FFFBF0", "contents": rows})
         if where:
             body.append({"type": "text", "text": where[:100], "size": "sm", "color": "#45504A", "wrap": True, "maxLines": 3})
         if d.get("preorder"):
@@ -749,9 +773,12 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": [
                 {"type": "button", "style": "primary", "height": "sm", "color": "#1E6B47",
                  "action": {"type": "postback", "label": "🛒 สั่ง / จองไว้", "data": f"order:{d['id']}", "displayText": "🛒 สั่ง / จอง"}},
-                {"type": "button", "style": "secondary", "height": "sm", "action": {"type": "uri", "label": "ดูรายละเอียด·โทร", "uri": url}}]},
+                {"type": "button", "style": "secondary", "height": "sm", "action": {"type": "uri", "label": "ดูรายละเอียด·โทร", "uri": url}},
+                *([{"type": "button", "style": "link", "height": "sm", "action": {"type": "uri", "label": "▶ ดูคลิป YouTube", "uri": d["youtube"]}}] if d.get("youtube") else []),
+                *([{"type": "button", "style": "link", "height": "sm", "action": {"type": "uri", "label": "🗺️ แผนที่จุดรับของ", "uri": f"https://www.google.com/maps?q={d['lat']},{d['lng']}"}}]
+                  if d.get("lat") and d.get("lng") else [])]},
         }
-        media = [m for m in d.get("media") or [] if m.get("type") == "image"]
+        media = [m for m in d.get("media") or [] if m.get("type") in ("image", "video")]  # a clip shows its poster
         if media:
             b["hero"] = {"type": "image", "url": f"{SITE}/api/media/{media[0]['id']}/thumb", "size": "full",
                          "aspectRatio": "4:3", "aspectMode": "cover", "action": {"type": "uri", "uri": url}}
@@ -776,7 +803,18 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body},
                 "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": foot}}
 
+    async def market_news(user: str) -> int:
+        """New things in ตลาด since this person last looked (or was told), not their own; 0 = nothing to say."""
+        seen = await db.line_market_seen.find_one({"user": user}) or {}
+        since = max(x if x.tzinfo else x.replace(tzinfo=timezone.utc) for x in (seen.get("looked"), seen.get("told"), now() - timedelta(days=3)) if x)
+        mine = [p["id"] async for p in db.line_posts.find({"user": user, "type": "market"}, {"id": 1})]
+        n = await db.lend_items.count_documents({"kind": "sell", "status": {"$ne": "closed"}, "created_at": {"$gt": since}, "id": {"$nin": mine}})
+        n += await db.services.count_documents({"category": {"$in": list(SHOP_CATS)}, "created_at": {"$gt": since}})
+        return n
+
     async def market_list(user: str = "") -> list:
+        if user:
+            await db.line_market_seen.update_one({"user": user}, {"$set": {"user": user, "looked": now()}}, upsert=True)
         items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}}, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}
                                          ).sort("created_at", -1).to_list(10)
         seller = bool(user) and bool(await seller_items(user))  # 16 Oct: buyers tapped "ออเดอร์ของฉัน" — sellers only now
@@ -806,7 +844,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             n = len(s.get("media", []))
             if n:
                 return text(f"ได้รูปแล้ว {n} รูป 👍 ส่งเพิ่มได้อีก {MAX_PHOTOS - n} รูป หรือกด ต่อไป", qr(("➡️ ต่อไป", "ต่อไป"), CANCEL))
-            return text(f"ส่งรูปของที่ขายมาได้เลยครับ (1–{MAX_PHOTOS} รูป) รูปน่ากิน ขายง่าย 📷", {"items": [
+            return text(f"ส่งรูปของที่ขายมาได้เลยครับ (1–{MAX_PHOTOS} รูป) รูปน่ากิน ขายง่าย 📷\nมีคลิป YouTube วางลิงก์ได้เลย", {"items": [
                 {"type": "action", "action": {"type": "cameraRoll", "label": "🖼️ เลือกรูป"}},
                 {"type": "action", "action": {"type": "camera", "label": "📷 ถ่ายรูป"}},
                 {"type": "action", "action": {"type": "message", "label": "ไม่มีรูป", "text": "ไม่มีรูป"}},
@@ -817,7 +855,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return text("ราคาเท่าไหร่ครับ\nเช่น \"50 บาท\" หรือ \"กล่องละ 35\"", qr(("ต่อรองได้", "ต่อรองได้"), CANCEL))
         if step == "m_soi":
             mine_soi = [(f"ซ.{s['home_soi']} (ซอยบ้านฉัน)", s["home_soi"])] if s.get("home_soi") else []
-            return text("รับของที่ซอยไหนครับ (พิมพ์เลขซอย เช่น 16)", qr(*mine_soi, ("ไม่บอกซอย", "ไม่บอกซอย"), CANCEL))
+            return text("รับของที่ซอยไหนครับ (พิมพ์เลขซอย เช่น 16)\nกด 📍 ส่งตำแหน่ง ปักหมุดจุดรับของได้ด้วย", with_loc(qr(*mine_soi, ("ไม่บอกซอย", "ไม่บอกซอย"), CANCEL)))
         if step == "m_when":
             return text("มีขายเมื่อไหร่ / รับของยังไงครับ\nพิมพ์เองได้ เช่น \"ทุกเช้า 7–9 โมง รับที่บ้าน\"",
                         qr(("สั่งล่วงหน้า", "สั่งล่วงหน้า"), ("มีทุกวัน", "มีทุกวัน"), ("วันนี้เท่านั้น", "วันนี้เท่านั้น"), CANCEL))
@@ -829,7 +867,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             *([f"📝 {s['detail']}"] if s.get("detail") else []),
             f"💰 {s.get('price') or '-'}",
             f"📍 {('ซ.' + s['soi']) if s.get('soi') else 'ไม่ระบุซอย'} · 🕒 {s.get('when') or '-'}",
-            f"📷 รูป {len(s.get('media', []))} รูป",
+            f"📷 รูป {len(s.get('media', []))} รูป" + (" · ▶ YouTube" if s.get("youtube") else "") + (" · 📍 มีหมุด" if s.get("lat") else ""),
             f"☎️ {s.get('name', '')} {s.get('phone', '')}",
         ]
         return text("เช็กก่อนลงขายนะครับ\n\n" + "\n".join(lines) + "\n\nระบบไม่รับเงิน คนซื้อโทรตกลงกับคุณเอง",
@@ -854,6 +892,14 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
 
     async def market_step(user: str, s: dict, t: str, raw: str) -> list:
         step = s["step"]
+        yt = YT_IN_TEXT.search(raw or "")
+        if yt and step != "m_category":  # 17 Oct: a YouTube link pasted anywhere in the flow belongs to this item
+            s["youtube"] = yt.group(0)[:200]
+            await save(user, s)
+            rest = (raw[:yt.start()] + raw[yt.end():]).strip()
+            if not rest:
+                return [text("▶ ได้คลิป YouTube แล้วครับ"), mask(s)]
+            raw, t = rest, norm(rest)
         if step == "m_category":
             cat = MKT_WORD_CAT.get(raw.strip()) or MKT_WORD_CAT.get(t)
             if not cat:
@@ -880,8 +926,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return await madvance(user, s)
         if step == "m_soi":
             m = re.search(r"\d{1,3}(?:/\d{1,2})?", t)
-            if not m and "ไม่" not in t:
-                return [text("พิมพ์เลขซอยครับ เช่น 16 หรือ 48/2", qr(("ไม่บอกซอย", "ไม่บอกซอย"), CANCEL))]
+            if not m and "ไม่" not in t and not s.get("lat"):
+                return [text("พิมพ์เลขซอยครับ เช่น 16 หรือ 48/2", with_loc(qr(("ไม่บอกซอย", "ไม่บอกซอย"), CANCEL)))]
             s["soi"] = m.group(0) if m else ""
             return await madvance(user, s)
         if step == "m_when":
@@ -906,7 +952,9 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
         body = {"name": s["name"], "phone": s["phone"], "kind": "sell", "category": cat, "title": s.get("title", "")[:80] or "ของขาย",
                 "detail": s.get("detail", "")[:400], "soi": s.get("soi", "")[:12], "price": s.get("price", "")[:60], "pickup": "", "when": s.get("when", "")[:80],
-                "preorder": any(w in s.get("when", "").lower() for w in PREORDER_HINT), "notify_endpoint": ""}
+                "preorder": any(w in s.get("when", "").lower() for w in PREORDER_HINT), "notify_endpoint": "",
+                "youtube": s.get("youtube", "")[:200] if repair.YOUTUBE.match(s.get("youtube", "")) else "",
+                "lat": s.get("lat"), "lng": s.get("lng"), "shop_name": "", "tags": [], "options": []}
         try:
             media = await claim_media(s.get("media", []), f"lend:{item_id}", {"image"})
         except HTTPException:
@@ -921,8 +969,27 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         push.fire(push.on_lend, doc)
         await drop(user)
         return [text(f"✅ ลงขายแล้วครับ\n{SITE}/#market-{item_id}\n\nเพื่อนบ้านกด 🛒 สั่ง/จอง ไว้ได้ หรือโทรหาคุณเอง ระบบไม่รับเงิน\n"
-                     "• มีคนสั่ง บอทจะบอกตอนคุณทักแชทนี้ หรือพิมพ์ \"ออเดอร์\" ดูชื่อ·เบอร์·จำนวน\n• ขายหมดแล้ว พิมพ์ \"ขายหมดแล้ว\" เพื่อปิด",
-                     qr(("📋 ออเดอร์", "ออเดอร์"), ("🛍️ ดูตลาด", "ตลาด")))]
+                     "• มีคนสั่ง บอทจะบอกตอนคุณทักแชทนี้ หรือพิมพ์ \"ออเดอร์\" ดูชื่อ·เบอร์·จำนวน\n• ขายหมดแล้ว พิมพ์ \"ขายหมดแล้ว\" เพื่อปิด"),
+                text(edit_note(item_id, key), qr(("📋 ออเดอร์", "ออเดอร์"), ("🛍️ ดูตลาด", "ตลาด")))]
+
+    def edit_note(item_id: str, key: str) -> str:
+        return (f"✨ แต่งโพสต์ให้น่าซื้อ: ใส่ชื่อร้าน จุดเด่น เมนูหลายราคา เพิ่มรูป/คลิป\n{SITE}/#sell-{item_id}~{key}\n"
+                "(ลิงก์นี้ของคุณคนเดียว อย่าส่งต่อ · เปิดแล้วกด ✏️ แก้ไข ที่การ์ดของคุณ · พิมพ์ \"แก้ไข\" ขอลิงก์ใหม่ได้)")
+
+    async def market_edit_links(user: str, item_id: str = "") -> list:
+        """17 Oct: a LINE seller gets a fresh private edit link (a new edit key) for one of their items."""
+        ids = [p["id"] async for p in db.line_posts.find({"user": user, "type": "market"}, {"id": 1})]
+        open_ = await db.lend_items.find({"id": {"$in": ids}, "status": {"$ne": "closed"}}, {"_id": 0, "id": 1, "title": 1}).to_list(12)
+        if not open_:
+            return [text("ไม่พบของที่คุณลงขายผ่าน LINE ที่ยังเปิดอยู่ครับ\n(ลงผ่านเว็บ แก้ได้ที่การ์ดของคุณบนเว็บ จากเครื่องที่ลง)", qr(("🛍️ ดูตลาด", "ตลาด")))]
+        if not item_id and len(open_) > 1:
+            return [text("แก้รายการไหนครับ ✏️", qr(*[(f"✏️ {d['title'][:17]}", f"postback:editlink:{d['id']}") for d in open_], ("ไม่ใช่", "ยกเลิก")))]
+        item_id = item_id or open_[0]["id"]
+        if item_id not in {d["id"] for d in open_}:
+            return [text("รายการนี้ปิดไปแล้ว หรือไม่ใช่ของคุณครับ")]
+        key = secrets.token_urlsafe(18)
+        await db.lend_items.update_one({"id": item_id}, {"$set": {"edit_key_hash": repair._hash(key)}})
+        return [text(edit_note(item_id, key), qr(("🛍️ ดูตลาด", "ตลาด")))]
 
     async def market_mine(user: str) -> list:
         ids = [p["id"] async for p in db.line_posts.find({"user": user, "type": "market"}, {"id": 1})]
@@ -1058,6 +1125,9 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         if t in ORDER_WORDS:
             await drop(user)
             return await seller_orders(user)
+        if t in EDIT_WORDS:
+            await drop(user)
+            return await market_edit_links(user)
         if t in ("แจ้งหาย", "📢 แจ้งสัตว์หาย", "แจ้งสัตว์หาย", "แจ้งของหาย"):
             return await start(user, "lost")
         if t in ("แจ้งเจอ", "🙌 เจอสัตว์หลง", "เจอสัตว์หลง", "แจ้งเจอของ"):
@@ -1130,7 +1200,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 return await advance(user, s)
             if step == "soi":
                 m = re.search(r"\d{1,3}(?:/\d{1,2})?", t)
-                if not m and "ไม่" not in t:
+                if not m and "ไม่" not in t and not s.get("lat"):
                     return [text("พิมพ์เลขซอยครับ เช่น 16 หรือ 48/2", qr(("ไม่แน่ใจ", "ไม่แน่ใจ"), ("❌ ยกเลิก", "ยกเลิก")))]
                 s["soi"] = m.group(0) if m else ""
                 return await advance(user, s)
@@ -1177,6 +1247,22 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return [text("ยินดีครับ 🙏 มีอะไรพิมพ์บอกแอดได้ตลอดนะครับ")]
         KIND[user] = "fallback"
         return [text(FALLBACK, qr(*([] if linked else [("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่")]), ("🐾 หาย·เจอ", "หาย"), ("🛍️ ตลาด", "ตลาด"), ("☎️ เบอร์ฉุกเฉิน", "เบอร์ฉุกเฉิน"), ("☰ เมนู", "เมนู")))]
+
+    async def on_location(user: str, m: dict) -> list:
+        """17 Oct: LINE's "send location" — the pickup pin while selling, where it was seen while reporting หาย·เจอ."""
+        lat, lng = m.get("latitude"), m.get("longitude")
+        if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)) or not in_area(lat, lng):
+            return [text("ตำแหน่งนี้อยู่ไกลจากหมู่บ้านครับ ลองส่งใหม่ตรงจุดในหมู่บ้าน")]
+        s = await session(user)
+        if s and (s.get("flow") == "market" or s.get("step") in STEPS):
+            s["lat"], s["lng"] = round(lat, 6), round(lng, 6)
+            if s.get("flow") == "market" and s["step"] == "m_soi" or s.get("flow") != "market" and s["step"] == "soi":
+                s["soi"] = s.get("soi", "")
+                s["step"] = (MSTEPS if s.get("flow") == "market" else STEPS)[(MSTEPS if s.get("flow") == "market" else STEPS).index(s["step"]) + 1]
+            await save(user, s)
+            return [text("📍 ปักหมุดแล้วครับ" + (" (จุดรับของ)" if s.get("flow") == "market" else "")), ask_any(s)]
+        return [text("📍 ได้ตำแหน่งแล้วครับ\nใช้ปักหมุดได้ตอน 🛍️ ลงขาย (จุดรับของ) หรือ แจ้งหาย·เจอ (จุดที่เห็น) — เริ่มแล้วกด 📍 ส่งตำแหน่ง ตอนบอทถามซอย\nแจ้งปัญหาในซอยพร้อมหมุด: serithai57.com/#issues",
+                     qr(("🛍️ ลงขาย", "ลงขาย"), ("📢 แจ้งหาย", "แจ้งหาย"), ("🙌 แจ้งเจอ", "แจ้งเจอ")))]
 
     async def on_image(user: str, message_id: str) -> list:
         s = await session(user)
@@ -1237,6 +1323,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                     out = await on_text(user, m.get("text", ""))
                 elif m["type"] == "image":
                     out = await on_image(user, m["id"])
+                elif m["type"] == "location":
+                    out = await on_location(user, m)
                 await keep(user, m, out)
             elif ev["type"] == "follow" and not await home_of(user):
                 # the OA greeting has already said hello; this only asks for the house (a reply, so free)
@@ -1265,6 +1353,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                     out = await close(user, data[6:])
                 elif data.startswith("sold:"):
                     out = await market_close(user, data[5:])
+                elif data.startswith("editlink:"):
+                    out = await market_edit_links(user, data[9:])
         except Exception as e:  # never let one bad event break the webhook
             await db.line_log.insert_one({"at": now(), "error": f"{type(e).__name__}: {e}"[:400]})
             out = [text("ขอโทษครับ ระบบขัดข้องชั่วคราว ลองใหม่อีกครั้ง หรือแจ้งที่ serithai57.com/#lost")]
@@ -1273,6 +1363,17 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 n = 0 if out[0].get("text", "").startswith("📋 ออเดอร์") else await unseen_orders(user)
                 if n and len(out) < 5:
                     out.insert(0, text(f"🛎️ มีออเดอร์ใหม่ {n} รายการ · พิมพ์ \"ออเดอร์\" ดูชื่อ เบอร์ จำนวน"))
+            except Exception:
+                pass
+            try:  # 17 Oct: new things in ตลาด since they last looked — one line at the end, once
+                k = 0 if any(str(o.get("altText", "")).startswith("ตลาด") or str(o.get("text", "")).startswith("✅") for o in out) else await market_news(user)
+                if k:
+                    last = out[-1]
+                    if last.get("type") == "text" and len(last["text"]) < 4900:
+                        last["text"] += f"\n\n🆕 ตลาดมีของใหม่ {k} รายการ · พิมพ์ \"ตลาด\" ดูได้"
+                    elif len(out) < 5:
+                        out.append(text(f"🆕 ตลาดมีของใหม่ {k} รายการ · พิมพ์ \"ตลาด\" ดูได้"))
+                    await db.line_market_seen.update_one({"user": user}, {"$set": {"user": user, "told": now()}}, upsert=True)
             except Exception:
                 pass
             home = await home_of(user)

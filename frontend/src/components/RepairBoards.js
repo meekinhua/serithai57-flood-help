@@ -9,6 +9,7 @@ import LocationPicker from "./LocationPicker";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinFix from "./PinFix";
 import PinField from "./PinField";
+import { OptionsField, ShopNameField, TagsField, richBody } from "./SellFields";
 import { SPEAKER_RE, SpeakerHint } from "./QuickReport";
 
 // After the flood: lend & borrow, ask for hands, soi problems, and the after-flood checklist.
@@ -433,7 +434,7 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
 export function LendForm({ kind: initialKind = "lend", onDone }) {
   const c = savedContact();
   const [, addKey] = useKeys("lendKeys");
-  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", preorder: false, youtube: "", soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
+  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", preorder: false, youtube: "", shop_name: "", tags: [], options: [], soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
   const [preTouched, setPreTouched] = useState(false);
   const [pin, setPin] = useState(null); // ตลาด: optional pin where to pick it up
   const [media, setMedia] = useState([]);
@@ -447,7 +448,7 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
     setBusy(true);
     setErr("");
     try {
-      const body = form.kind === "sell" ? form : { ...form, pickup: "", when: "", preorder: false, youtube: "" };
+      const body = form.kind === "sell" ? { ...form, ...richBody(form) } : { ...form, pickup: "", when: "", preorder: false, youtube: "", shop_name: "", tags: [], options: [] };
       // a seller's own phone gets "🛎️ ออเดอร์ใหม่" when this item is ordered (only if notifications are already on here)
       const sub = form.kind === "sell" ? await currentSub().catch(() => null) : null;
       const x = await api("/lend", { method: "POST", body: JSON.stringify({ ...body, notify_endpoint: sub?.endpoint || "", media_ids: attached.ids, ...(sell && pin ? { lat: pin.lat, lng: pin.lng } : {}) }) });
@@ -554,6 +555,14 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
             <input id="lend-pickup" maxLength={80} value={form.pickup} onChange={(e) => set({ pickup: e.target.value })} className={input} placeholder="เช่น รับที่บ้าน ซ.16 / ส่งในหมู่บ้าน" />
           </div>
           <PinField value={pin} onChange={setPin} title="จุดรับของ" button="🗺️ ปักหมุดจุดรับของ (ไม่บังคับ)" />
+          <details className="rounded-xl border-2 border-[#C9D1CB] bg-white p-3" open={!!(form.shop_name || form.tags.length || form.options.length)}>
+            <summary className="min-h-[32px] cursor-pointer font-bold">✨ ทำให้น่าซื้อขึ้น · ชื่อร้าน จุดเด่น เมนูหลายราคา</summary>
+            <div className="mt-3 space-y-4">
+              <ShopNameField value={form.shop_name} onChange={(shop_name) => set({ shop_name })} />
+              <TagsField tags={form.tags} onChange={(tags) => set({ tags })} />
+              <OptionsField options={form.options} onChange={(options) => set({ options })} />
+            </div>
+          </details>
         </>
       )}
       <div>
