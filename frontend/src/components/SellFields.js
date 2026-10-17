@@ -102,16 +102,32 @@ export const richBody = (f) => ({ shop_name: (f.shop_name || "").trim(), tags: f
 // 60 s at 480p so it loads fast on phones. For หาย·เจอ either is fine — whatever is quickest to post.
 export const youtubeId = (u) => (u || "").match(/(?:youtu\.be\/|[?&]v=|shorts\/|live\/)([\w-]{6,})/)?.[1] || "";
 
+// 17 Oct: plays right in the card — thumbnail first (fast page), the player only loads on tap · Shorts stand up 9:16
 export function YouTubeThumb({ url, className = "" }) {
+  const [play, setPlay] = useState(false);
   const id = youtubeId(url);
   if (!id) return null;
+  const tall = /\/shorts\//.test(url);
+  const box = `relative mx-auto block w-full overflow-hidden rounded-xl bg-black ${tall ? "aspect-[9/16] max-w-[340px]" : "aspect-video"} ${className}`;
+  if (play)
+    return (
+      <div className={box}>
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&playsinline=1&rel=0`}
+          title="คลิป YouTube"
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          className="absolute inset-0 h-full w-full border-0"
+        />
+      </div>
+    );
   return (
-    <a href={url} target="_blank" rel="noreferrer" className={`relative block overflow-hidden rounded-xl ${className}`}>
-      <img src={`https://img.youtube.com/vi/${id}/hqdefault.jpg`} alt="คลิป YouTube" loading="lazy" className="aspect-video w-full object-cover" />
+    <button type="button" onClick={() => setPlay(true)} aria-label="เล่นคลิป YouTube" className={box}>
+      <img src={`https://img.youtube.com/vi/${id}/hqdefault.jpg`} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
       <span className="absolute inset-0 flex items-center justify-center">
-        <span className="rounded-xl bg-[#FF0000] px-4 py-2 text-xl font-bold text-white">▶ YouTube</span>
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#FF0000] text-3xl text-white shadow-lg">▶</span>
       </span>
-    </a>
+    </button>
   );
 }
 
