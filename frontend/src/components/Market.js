@@ -75,7 +75,7 @@ function Slide({ x, m, i, all }) {
 function Gallery({ x, media: photos, emoji, isNew }) {
   const ref = useRef(null);
   const yt = youtubeId(x.youtube);
-  const media = yt ? [...photos.slice(0, 1), { id: "yt", type: "youtube", yt }, ...photos.slice(1)] : photos;
+  const media = yt ? [...photos.slice(0, 1), { id: "yt", type: "youtube", yt, tall: /\/shorts\//.test(x.youtube) }, ...photos.slice(1)] : photos;
   const [at, setAt] = useState(0);
   const badge = isNew && <span className="absolute left-2 top-2 rounded-full bg-[#C8372D] px-2.5 py-1 text-sm font-bold text-white shadow">🆕 ใหม่</span>;
   if (!media.length)
@@ -91,7 +91,7 @@ function Gallery({ x, media: photos, emoji, isNew }) {
       <div ref={ref} onScroll={(e) => setAt(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth)))} className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none]">
         {media.map((m, i) => (
           <div key={m.id} className="w-full shrink-0 snap-center">
-            <Slide x={x} m={m} i={photos.indexOf(m)} all={photos} />
+            <Slide x={x} m={m} i={i} all={media} />
           </div>
         ))}
       </div>

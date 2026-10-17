@@ -79,6 +79,10 @@ function ZoomImage({ src, active, onZoom, onClose }) {
   );
 }
 
+// 17 Oct: a YouTube clip can ride along in the list ({ id, type: "youtube", yt, tall }) — ตลาด galleries
+const ytThumb = (m) => `https://img.youtube.com/vi/${m.yt}/hqdefault.jpg`;
+const thumbOf = (m) => (m.type === "youtube" ? ytThumb(m) : mediaUrl(m.id, "thumb"));
+
 function Viewer({ media, start, onClose }) {
   const ref = useRef(null);
   const [at, setAt] = useState(start);
@@ -130,7 +134,19 @@ function Viewer({ media, start, onClose }) {
       >
         {media.map((m, i) => (
           <div key={m.id} className="flex h-full w-full shrink-0 snap-center items-center justify-center overflow-hidden">
-            {m.type === "video" ? (
+            {m.type === "youtube" ? (
+              i === at ? (
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${m.yt}?autoplay=1&playsinline=1&rel=0`}
+                  title="คลิป YouTube"
+                  allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                  allowFullScreen
+                  className={`border-0 ${m.tall ? "aspect-[9/16] h-full max-w-full" : "aspect-video max-h-full w-full"}`}
+                />
+              ) : (
+                <img src={ytThumb(m)} alt="" className="max-h-full max-w-full object-contain opacity-60" />
+              )
+            ) : m.type === "video" ? (
               i === at ? (
                 <video controls autoPlay playsInline src={mediaUrl(m.id, "file")} poster={mediaUrl(m.id, "thumb")} className="max-h-full max-w-full" />
               ) : (
@@ -146,8 +162,8 @@ function Viewer({ media, start, onClose }) {
         <div className="flex shrink-0 justify-center gap-2 overflow-x-auto p-2">
           {media.map((m, i) => (
             <button key={m.id} onClick={() => go(i)} aria-label={`ไปที่ ${i + 1}`} className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-md ${i === at ? "ring-2 ring-white" : "opacity-50"}`}>
-              <img src={mediaUrl(m.id, "thumb")} alt="" className="h-full w-full object-cover" />
-              {m.type === "video" && <span className="absolute inset-0 flex items-center justify-center text-white drop-shadow">▶</span>}
+              <img src={thumbOf(m)} alt="" className="h-full w-full object-cover" />
+              {(m.type === "video" || m.type === "youtube") && <span className="absolute inset-0 flex items-center justify-center text-white drop-shadow">▶</span>}
             </button>
           ))}
         </div>
@@ -163,7 +179,7 @@ function Viewer({ media, start, onClose }) {
         </>
       )}
       <p className="shrink-0 pb-[max(8px,env(safe-area-inset-bottom))] text-center text-xs text-white/60">
-        {zoom ? "ลากเพื่อเลื่อนดู · แตะสองครั้งเพื่อย่อ" : `${media.length > 1 ? "ปัดซ้าย-ขวาดูรูปถัดไป · " : ""}สองนิ้วหรือแตะสองครั้งเพื่อขยาย · ปัดลงเพื่อปิด`}
+        {media[at]?.type === "youtube" ? "แตะรูปเล็กด้านล่างเพื่อไปดูรูปอื่น" : zoom ? "ลากเพื่อเลื่อนดู · แตะสองครั้งเพื่อย่อ" : `${media.length > 1 ? "ปัดซ้าย-ขวาดูรูปถัดไป · " : ""}สองนิ้วหรือแตะสองครั้งเพื่อขยาย · ปัดลงเพื่อปิด`}
       </p>
     </div>
   );
