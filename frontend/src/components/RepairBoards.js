@@ -436,7 +436,7 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
 export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
   const c = savedContact();
   const [, addKey] = useKeys("lendKeys");
-  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", preorder: false, youtube: "", shop_name: "", tags: [], options: [], soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
+  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", preorder: false, no_orders: false, youtube: "", shop_name: "", tags: [], options: [], soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
   const [preTouched, setPreTouched] = useState(false);
   const [pin, setPin] = useState(null); // ตลาด: optional pin where to pick it up
   const [media, setMedia] = useState([]);
@@ -530,6 +530,15 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
       )}
       {sell && (
         <>
+          {ORDERS_ON && (
+            <label className="flex min-h-[48px] items-start gap-3 rounded-xl border-2 border-[#C9D1CB] bg-white p-3">
+              <input type="checkbox" checked={!form.no_orders} onChange={(e) => set({ no_orders: !e.target.checked })} className="mt-1 h-5 w-5" />
+              <span>
+                <b>🛒 เปิดให้กดสั่ง/จองผ่านระบบ</b>
+                <span className="block text-sm text-neutral-600">ไม่ได้ดูออเดอร์ในเว็บ/LINE (เช่น แอดลงให้ร้าน) เอาติ๊กออก — คนซื้อจะโทร/ทักผู้ขายแทน</span>
+              </span>
+            </label>
+          )}
           <label className="flex min-h-[48px] items-start gap-3 rounded-xl border-2 border-[#C9D1CB] bg-white p-3">
             <input
               type="checkbox"
@@ -542,7 +551,7 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
             />
             <span>
               <b>📝 รับสั่งล่วงหน้า · ทำตามออเดอร์</b>
-              <span className="block text-sm text-neutral-600">{ORDERS_ON ? "เพื่อนบ้านกด 🛒 สั่ง/จอง ได้เสมอ ติ๊กนี้ให้รู้ว่าต้องสั่งก่อน · ออเดอร์ขึ้นที่การ์ดของคุณ (เครื่องนี้)" : "ติ๊กนี้ให้รู้ว่าต้องโทร/ทักสั่งก่อน"}</span>
+              <span className="block text-sm text-neutral-600">{ORDERS_ON && !form.no_orders ? "เพื่อนบ้านกด 🛒 สั่ง/จอง ได้เสมอ ติ๊กนี้ให้รู้ว่าต้องสั่งก่อน · ออเดอร์ขึ้นที่การ์ดของคุณ (เครื่องนี้)" : "ติ๊กนี้ให้รู้ว่าต้องโทร/ทักสั่งก่อน"}</span>
             </span>
           </label>
           <div>

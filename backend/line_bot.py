@@ -94,8 +94,9 @@ SHOP_CATS = ("food", "shop", "supplies")  # 16 Oct: shops from the directory are
 SHOP_TH = {"food": ("🍜", "ร้านอาหาร"), "shop": ("🏪", "ร้านค้า"), "supplies": ("🧱", "วัสดุ·ของใช้")}
 SELL_WORDS = {"ลงขาย", "ขายของ", "🛍️ ลงขายของ", "ลงขายของ"}
 SOLD_WORDS = {"ขายหมดแล้ว", "✅ ขายหมดแล้ว", "ขายหมด", "ปิดร้าน"}
-# 17 Oct: 🛒 สั่ง/จอง off for now (admin-posted shops don't read orders here) — same switch as ORDERS_ON in frontend config.js
-ORDERS_ON = False
+# 17 Oct: master switch for 🛒 สั่ง/จอง (same as ORDERS_ON in frontend config.js); a post can turn it off for itself
+# (no_orders — e.g. the admin posted it for a shop that won't read orders here)
+ORDERS_ON = True
 ORDER_WORDS = {"ออเดอร์", "ดูออเดอร์", "📋 ออเดอร์", "คำสั่งซื้อ", "ออเดอร์ของฉัน", "order", "orders"}
 PREORDER_HINT = ("สั่ง", "ล่วงหน้า", "พรี", "จอง", "pre")
 EDIT_WORDS = {"แก้ไข", "แก้โพสต์", "แต่งร้าน", "แก้ร้าน", "✏️ แก้ไข", "แก้ไขร้าน", "เพิ่มรูป", "ใส่เมนู"}  # 17 Oct: a LINE seller's edit link
@@ -861,6 +862,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             body.append({"type": "box", "layout": "vertical", "spacing": "xs", "paddingAll": "8px", "cornerRadius": "8px", "backgroundColor": "#FFFBF0", "contents": rows})
         if where:
             body.append({"type": "text", "text": where[:100], "size": "sm", "color": "#45504A", "wrap": True, "maxLines": 3})
+        orders = ORDERS_ON and not d.get("no_orders")
         if d.get("preorder"):
             body.append({"type": "text", "text": "📝 รับสั่งล่วงหน้า", "size": "sm", "weight": "bold", "color": "#1E6B47"})
         b = {
@@ -868,8 +870,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body},
             "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": [
                 *([{"type": "button", "style": "primary", "height": "sm", "color": "#1E6B47",
-                    "action": {"type": "postback", "label": "🛒 สั่ง / จองไว้", "data": f"order:{d['id']}", "displayText": "🛒 สั่ง / จอง"}}] if ORDERS_ON else []),
-                {"type": "button", "style": "secondary" if ORDERS_ON else "primary", "height": "sm", **({} if ORDERS_ON else {"color": "#1E6B47"}),
+                    "action": {"type": "postback", "label": "🛒 สั่ง / จองไว้", "data": f"order:{d['id']}", "displayText": "🛒 สั่ง / จอง"}}] if orders else []),
+                {"type": "button", "style": "secondary" if orders else "primary", "height": "sm", **({} if orders else {"color": "#1E6B47"}),
                  "action": {"type": "uri", "label": "ดูรายละเอียด·โทร", "uri": url}},
                 *([{"type": "button", "style": "link", "height": "sm", "action": {"type": "uri", "label": "▶ ดูคลิป YouTube", "uri": d["youtube"]}}] if d.get("youtube") else []),
                 *([{"type": "button", "style": "link", "height": "sm", "action": {"type": "uri", "label": "🗺️ แผนที่จุดรับของ", "uri": f"https://www.google.com/maps?q={d['lat']},{d['lng']}"}}]
@@ -1356,11 +1358,11 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                     qr(("✅ ส่งออเดอร์", "postback:publish_order"), CANCEL))
 
     async def order_start(user: str, item_id: str) -> list:
-        if not ORDERS_ON:  # an old card's 🛒 button
-            return [text("ตอนนี้ยังไม่เปิดสั่งผ่านระบบครับ 🙏 กด \"ดูรายละเอียด·โทร\" แล้วติดต่อผู้ขายได้เลย", qr(("🛍️ ดูตลาด", "ตลาด")))]
-        d = await db.lend_items.find_one({"id": item_id, "kind": "sell"}, {"_id": 0, "title": 1, "status": 1, "when": 1})
+        d = await db.lend_items.find_one({"id": item_id, "kind": "sell"}, {"_id": 0, "title": 1, "status": 1, "when": 1, "no_orders": 1})
         if not d or d.get("status") == "closed":
             return [text("รายการนี้ปิดไปแล้วครับ 🙏", qr(("🛍️ ดูตลาด", "ตลาด")))]
+        if not ORDERS_ON or d.get("no_orders"):  # an old card's 🛒 button, or a shop that takes no orders here
+            return [text("ร้านนี้ไม่รับสั่งผ่านระบบครับ 🙏 กด \"ดูรายละเอียด·โทร\" แล้วติดต่อผู้ขายได้เลย", qr(("🛍️ ดูตลาด", "ตลาด")))]
         last = await db.line_buyers.find_one({"user": user}, {"_id": 0}) or {}
         s = {"flow": "order", "step": "o_qty", "item": item_id, "title": d.get("title", ""), "when": d.get("when", ""),
              "line_name": await display_name(user), "last_name": last.get("buyer_name", ""), "last_phone": last.get("buyer_phone", "")}
