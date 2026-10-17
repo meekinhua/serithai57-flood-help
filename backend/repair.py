@@ -162,6 +162,30 @@ class Contact(BaseModel):
     phone: str = Field("", max_length=40)
 
 
+class MenuOption(BaseModel):
+    name: str = Field(..., min_length=1, max_length=40)  # "ขนมชั้น กล่องเล็ก"
+    price: str = Field("", max_length=24)  # "35 บาท"
+
+
+def baht(p: str) -> str:
+    """ "35" → "35 บาท" (a bare number on a menu row); anything else as typed."""
+    p = (p or "").strip()
+    return f"{p} บาท" if re.fullmatch(r"\d[\d,.]*", p) else p
+
+
+def clean_options(opts: list[dict]) -> list[dict]:
+    return [{"name": o["name"].strip(), "price": baht(o.get("price", ""))[:24]} for o in opts if o["name"].strip()]
+
+
+def clean_tags(tags: list[str]) -> list[str]:
+    out = []
+    for t in tags:
+        t = re.sub(r"\s+", " ", (t or "").strip().lstrip("#"))[:24]
+        if t and t not in out:
+            out.append(t)
+    return out[:5]
+
+
 class LendCreate(Contact):
     kind: LendKind = "lend"
     category: str
@@ -177,6 +201,10 @@ class LendCreate(Contact):
     lng: Optional[float] = Field(None, ge=100.4, le=101.0)
     youtube: str = Field("", max_length=200)  # for sale (16 Oct): a YouTube link (how it's made, a shop clip)
     media_ids: list[str] = Field(default_factory=list, max_length=8)  # for sale: up to 8 photos / clips; others 3
+    # for sale (17 Oct) — for sellers who put work into it: a shop name, a few selling points, a menu with prices
+    shop_name: str = Field("", max_length=60)  # "ครัวป้าแดง"
+    tags: list[str] = Field(default_factory=list, max_length=5)  # "ทำสดทุกวัน", "ไม่ใส่ผงชูรส"
+    options: list[MenuOption] = Field(default_factory=list, max_length=12)  # the menu / sizes, each with its price
 
 
 class LendUpdate(BaseModel):
@@ -184,6 +212,19 @@ class LendUpdate(BaseModel):
     lent_to: Optional[str] = Field(None, max_length=60)  # who has it now (name only)
     until: Optional[str] = Field(None, max_length=40)  # "คืนเสาร์ 4 ต.ค."
     detail: Optional[str] = Field(None, max_length=400)
+    # for sale (17 Oct): the seller edits the post from the phone that made it (edit key) — new photos, prices, menu
+    title: Optional[str] = Field(None, min_length=2, max_length=80)
+    price: Optional[str] = Field(None, max_length=60)
+    pickup: Optional[str] = Field(None, max_length=80)
+    when: Optional[str] = Field(None, max_length=80)
+    preorder: Optional[bool] = None
+    youtube: Optional[str] = Field(None, max_length=200)
+    shop_name: Optional[str] = Field(None, max_length=60)
+    tags: Optional[list[str]] = Field(None, max_length=5)
+    options: Optional[list[MenuOption]] = Field(None, max_length=12)
+    media_ids: Optional[list[str]] = Field(None, max_length=8)  # the full new list, in order (kept + newly uploaded)
+    lat: Optional[float] = Field(None, ge=13.5, le=14.1)
+    lng: Optional[float] = Field(None, ge=100.4, le=101.0)
 
 
 class QueueJoin(Contact):
@@ -448,6 +489,9 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         out.setdefault("when", "")
         out.setdefault("preorder", False)
         out.setdefault("youtube", "")
+        out.setdefault("shop_name", "")
+        out.setdefault("tags", [])
+        out.setdefault("options", [])
         return out
 
     def owner_queue(d: dict) -> list:
@@ -521,9 +565,10 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
         data = _clean(body.model_dump(exclude={"media_ids"}))
         sell = body.kind == "sell"
+        data["tags"] = clean_tags(data["tags"])
+        data["options"] = clean_options(data["options"])
         if not sell:
-            data["preorder"] = False
-            data["youtube"] = ""
+            data.update(preorder=False, youtube="", shop_name="", tags=[], options=[])
             if len(body.media_ids) > 3:
                 raise HTTPException(422, "ใส่รูปได้ไม่เกิน 3 รูป")
         if data["youtube"] and not YOUTUBE.match(data["youtube"]):
@@ -578,6 +623,24 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         changes = {k: v.strip() if isinstance(v, str) else v for k, v in body.model_dump().items() if v is not None}
         if not changes:
             raise HTTPException(422, "ไม่มีข้อมูลที่จะแก้ไข")
+        sell_only = {"title", "price", "pickup", "when", "preorder", "youtube", "shop_name", "tags", "options", "media_ids", "lat", "lng"}
+        if doc.get("kind") != "sell" and sell_only & changes.keys():
+            raise HTTPException(422, "แก้ได้เฉพาะรายการในตลาด")
+        if changes.get("youtube") and not YOUTUBE.match(changes["youtube"]):
+            raise HTTPException(422, "ลิงก์ YouTube ไม่ถูกต้อง (เช่น https://youtu.be/xxxx)")
+        if "tags" in changes:
+            changes["tags"] = clean_tags(changes["tags"])
+        if "options" in changes:
+            changes["options"] = clean_options(changes["options"])
+        if "media_ids" in changes:  # keep the ones still listed, attach the new uploads, delete the ones taken out
+            ids = changes.pop("media_ids")
+            have = {m["id"]: m for m in doc.get("media", [])}
+            new = await claim_media([i for i in ids if i not in have], f"lend:{item_id}", {"image", "video"})
+            got = {**have, **{m["id"]: m for m in new}}
+            changes["media"] = [got[i] for i in ids if i in got]
+            gone = [i for i in have if i not in ids]
+            if gone:
+                await delete_media(gone)
         if changes.get("status") == "available":
             changes.update(lent_to="", until="")
         text = {"available": "ว่างแล้ว / คืนแล้ว", "lent": f"ให้ยืมไป{(' · ' + changes.get('lent_to', '')) if changes.get('lent_to') else ''}", "closed": "ปิดรายการ"}.get(changes.get("status"), "แก้ไขรายละเอียด")

@@ -218,6 +218,14 @@ export default function RepairApp() {
   const [issueGo, setIssueGo] = useState("");
   useEffect(() => {
     const open = (hash) => {
+      // 17 Oct: the LINE bot sends a seller their own link #sell-<id>~<edit key>: this phone becomes the item's owner
+      // (edit it, add photos / a menu, see orders), then the key leaves the address bar
+      const k = (hash || "").match(/^#?sell-([\w-]{6,})~([\w-]{10,})$/);
+      if (k) {
+        save("lendKeys", { ...load("lendKeys", {}), [k[1]]: k[2] });
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        return goItem("market", k[1]);
+      }
       const m = (hash || "").match(/^#?(lost|jobs|lend|market|issue|shop|forum)-([\w-]{6,})$/);
       if (!m) return;
       window.history.replaceState(null, "", window.location.pathname + window.location.search);

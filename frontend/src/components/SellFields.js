@@ -1,0 +1,99 @@
+import { useState } from "react";
+
+// 🛍️ ตลาด (17 Oct): the extra fields for a seller who puts work into it — a shop name, a few selling points and a
+// menu with prices. Used by the new-item form (RepairBoards LendForm) and the seller's edit form (Market.js).
+// All optional: a quick "ขนมกล้วย 50 บาท" post stays as quick as before.
+
+const field = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
+export const TAG_PRESETS = ["ทำสดทุกวัน", "สูตรที่บ้าน", "ไม่ใส่ผงชูรส", "ไม่ใส่สารกันบูด", "ส่งในหมู่บ้าน", "มังสวิรัติ/เจได้", "หวานน้อยได้", "ของฝาก"];
+
+export function TagsField({ tags, onChange }) {
+  const [own, setOwn] = useState("");
+  const toggle = (t) => onChange(tags.includes(t) ? tags.filter((x) => x !== t) : tags.length < 5 ? [...tags, t] : tags);
+  const add = () => {
+    const t = own.trim().replace(/^#/, "").slice(0, 24);
+    if (t && !tags.includes(t) && tags.length < 5) onChange([...tags, t]);
+    setOwn("");
+  };
+  return (
+    <div>
+      <p className="mb-1 block font-medium">จุดเด่น (เลือกได้ 5 · ไม่บังคับ)</p>
+      <div className="flex flex-wrap gap-1.5">
+        {[...TAG_PRESETS, ...tags.filter((t) => !TAG_PRESETS.includes(t))].map((t) => (
+          <button
+            type="button"
+            key={t}
+            onClick={() => toggle(t)}
+            aria-pressed={tags.includes(t)}
+            className={`min-h-[40px] rounded-full px-3 text-sm ${tags.includes(t) ? "bg-[#1E6B47] font-bold text-white" : "border border-[#C9D1CB] bg-white"}`}
+          >
+            {tags.includes(t) ? "✓ " : ""}
+            {t}
+          </button>
+        ))}
+      </div>
+      {tags.length < 5 && (
+        <div className="mt-1.5 flex gap-2">
+          <input
+            maxLength={24}
+            value={own}
+            onChange={(e) => setOwn(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
+            className={field}
+            placeholder="พิมพ์จุดเด่นเอง เช่น ใช้เนยแท้"
+          />
+          <button type="button" onClick={add} className="min-h-[44px] shrink-0 rounded-lg border-2 border-[#15201A] px-3 font-semibold">
+            + เพิ่ม
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function OptionsField({ options, onChange }) {
+  const set = (i, p) => onChange(options.map((o, j) => (j === i ? { ...o, ...p } : o)));
+  return (
+    <div>
+      <p className="mb-1 block font-medium">เมนู · ขนาด · ราคา (ไม่บังคับ · ถึง 12 รายการ)</p>
+      <p className="mb-1.5 text-sm text-neutral-600">มีหลายอย่างหรือหลายขนาด ใส่แยกราคา คนสั่งกดเลือกจากเมนูได้เลย</p>
+      <div className="space-y-1.5">
+        {options.map((o, i) => (
+          <div key={i} className="space-y-1.5 rounded-lg bg-[#FFFBF0] p-2">
+            <input maxLength={40} value={o.name} onChange={(e) => set(i, { name: e.target.value })} className={field} placeholder={i ? "เช่น กล่องใหญ่" : "เช่น ขนมชั้น กล่องเล็ก"} aria-label={`เมนู ${i + 1}`} />
+            <div className="flex gap-1.5">
+              <input maxLength={24} inputMode="text" value={o.price} onChange={(e) => set(i, { price: e.target.value })} className={field} placeholder="ราคา เช่น 35" aria-label={`ราคา ${i + 1}`} />
+              <button type="button" onClick={() => onChange(options.filter((_, j) => j !== i))} aria-label="ลบรายการนี้" className="min-h-[44px] shrink-0 rounded-lg border border-neutral-300 px-3 text-sm">
+                ✕ ลบ
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {options.length < 12 && (
+        <button type="button" onClick={() => onChange([...options, { name: "", price: "" }])} className="mt-1.5 min-h-[44px] w-full rounded-lg border-2 border-dashed border-[#1E6B47] font-semibold text-[#1E6B47]">
+          + เพิ่มเมนู / ขนาด
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function ShopNameField({ value, onChange, id = "sell-shop" }) {
+  return (
+    <div>
+      <label className="mb-1 block font-medium" htmlFor={id}>
+        ชื่อร้าน / แบรนด์ (ไม่บังคับ)
+      </label>
+      <input id={id} maxLength={60} value={value} onChange={(e) => onChange(e.target.value)} className={field} placeholder="เช่น ครัวป้าแดง, ขนมบ้านน้องมิ้นท์" />
+    </div>
+  );
+}
+
+// the cleaned-up values to send (empty menu rows dropped)
+export const richBody = (f) => ({ shop_name: (f.shop_name || "").trim(), tags: f.tags || [], options: (f.options || []).filter((o) => o.name.trim()) });
