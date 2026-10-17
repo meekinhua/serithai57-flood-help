@@ -64,7 +64,7 @@ const GROUPS = [
   ["lost", "🐾", "หาย · เจอ"],
   ["help", "🤝", "ช่วยกัน"],
   ["talk", "💬", "คุยกัน"],
-  ["map", "📍", "แผนที่·แจ้งปัญหา"], // 17 Oct: ตลาด moved up to the top bar; the map (soi problems) sits with the neighbours
+  ["map", "📍", "แจ้งปัญหา"], // 17 Oct: ตลาด moved up to the top bar; the map (soi problems) sits with the neighbours
 ];
 const groupOf = (t) => (t === "jobs" || t === "lend" ? "help" : t === "forum" ? "talk" : t === "lost" ? "lost" : null);
 const MORE_TABS = {
@@ -161,8 +161,11 @@ export default function RepairApp() {
   useEffect(() => {
     const onPop = () => {
       const h = window.location.hash.slice(1);
-      setPage(pageOf(h));
-      window.scrollTo({ top: 0 });
+      // 17 Oct: a sheet or the photo viewer closing with the back button lands on the same page — stay where you were
+      setPage((cur) => {
+        if (cur !== pageOf(h)) window.scrollTo({ top: 0 });
+        return pageOf(h);
+      });
       if (TABS[h]) setTab(h);
     };
     window.addEventListener("popstate", onPop);
@@ -831,7 +834,7 @@ export default function RepairApp() {
 
           {page === "community" && (
             <>
-              <PageTitle title="เพื่อนบ้านช่วยกัน" sub="หาย·เจอ · ขอแรง ยืม ให้ · คุยกัน · ตลาด" />
+              <PageTitle title="เพื่อนบ้านช่วยกัน" sub="หาย·เจอ · ขอแรง ยืม ให้ · คุยกัน · แจ้งปัญหาบนแผนที่" />
               <nav className="sticky top-[64px] z-[40] -mx-3 mb-3 bg-[#F2F4F1]/95 px-3 py-2 backdrop-blur sm:-mx-4 sm:px-4" aria-label="เพื่อนบ้าน">
                 <div className="grid grid-cols-4 gap-1 rounded-2xl border border-[#E3E7E2] bg-white p-1 shadow-sm">
                   {GROUPS.map(([g, icon, name]) => {

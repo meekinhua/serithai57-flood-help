@@ -77,9 +77,11 @@ function Gallery({ x, media, emoji, isNew }) {
           <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-sm font-semibold text-white">
             {at + 1}/{media.length}
           </span>
-          <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
+          <div className="absolute inset-x-0 bottom-0 flex justify-center">
             {media.map((m, i) => (
-              <button key={m.id} type="button" onClick={() => go(i)} aria-label={`รูปที่ ${i + 1}`} className={`h-2.5 rounded-full shadow ${i === at ? "w-5 bg-white" : "w-2.5 bg-white/60"}`} />
+              <button key={m.id} type="button" onClick={() => go(i)} aria-label={`รูปที่ ${i + 1}`} className="flex h-8 items-center px-1">
+                <span className={`block h-2.5 rounded-full shadow ${i === at ? "w-5 bg-white" : "w-2.5 bg-white/60"}`} />
+              </button>
             ))}
           </div>
         </>
@@ -128,7 +130,7 @@ function ShopCard({ s }) {
         {s.detail && <p className="line-clamp-2 text-sm text-[#33403A]">{s.detail}</p>}
         {(s.area || s.price) && <p className="text-sm text-[#45504A]">{[s.price, s.area].filter(Boolean).join(" · ")}</p>}
         {mapLink(s) && (
-          <a href={mapLink(s)} target="_blank" rel="noreferrer" className="inline-block text-sm font-semibold text-[#1F4F8A] underline">
+          <a href={mapLink(s)} target="_blank" rel="noreferrer" className="inline-flex min-h-[44px] items-center text-sm font-semibold text-[#1F4F8A] underline">
             🗺️ ดูแผนที่ร้าน
           </a>
         )}
@@ -469,7 +471,7 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
         {(x.soi || x.when) && <p className="text-[15px]">{[x.soi && `📍 ซ.${x.soi}`, x.when && `🕒 ${x.when}`].filter(Boolean).join(" · ")}</p>}
         {x.pickup && <p className="text-[15px]">🛵 {x.pickup}</p>}
         {mapLink(x) && (
-          <a href={mapLink(x)} target="_blank" rel="noreferrer" className="inline-block text-[15px] font-semibold text-[#1F4F8A] underline">
+          <a href={mapLink(x)} target="_blank" rel="noreferrer" className="inline-flex min-h-[44px] items-center text-[15px] font-semibold text-[#1F4F8A] underline">
             🗺️ ดูแผนที่จุดรับของ
           </a>
         )}

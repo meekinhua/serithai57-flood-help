@@ -486,7 +486,7 @@ export function ProsList({ services, setServices, group, setGroup, onAdd, query:
               {s.detail && <MoreText text={s.detail} />}
               {(s.price || s.area) && <p className="text-sm text-[#45504A]">{[s.price, s.area].filter(Boolean).join(" · ")}</p>}
               {mapLink(s) && (
-                <a href={mapLink(s)} target="_blank" rel="noreferrer" className="inline-block text-sm font-semibold text-[#1F4F8A] underline">
+                <a href={mapLink(s)} target="_blank" rel="noreferrer" className="inline-flex min-h-[44px] items-center text-sm font-semibold text-[#1F4F8A] underline">
                   🗺️ ดูแผนที่
                 </a>
               )}
@@ -690,7 +690,7 @@ export function BottomNav({ page, badges = {}, onGo, onHotline }) {
     <nav aria-label="เมนูหลัก" className="sticky top-0 z-[950] border-b border-[#DCE2DD] bg-white pt-[env(safe-area-inset-top)] shadow-sm">
       <div className="mx-auto grid h-[64px] max-w-5xl grid-cols-5">
         {items.map(([key, label, icon]) => {
-          const on = page === key;
+          const on = page === key || (key === "community" && page === "map"); // 17 Oct: the map lives under เพื่อนบ้าน
           return (
             <button
               key={key}
