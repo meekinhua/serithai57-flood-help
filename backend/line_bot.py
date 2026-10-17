@@ -137,7 +137,7 @@ def split_house(raw: str):
 # ---------- per-house rich menu: the village menu + a strip on top "🏠 4/917 · ซอย 16 · รถขยะ จ.·พฤ." ----------
 # Text pieces are pre-rendered (tools/line_menu_assets.py) because the server has no Thai font; we only paste them.
 MENU_DIR = Path(__file__).parent / "data" / "line_menu"
-MENU_VER = "v3"  # bump when base.png / the tiles change, so every house gets a freshly drawn menu
+MENU_VER = "v4"  # 17 Oct v4: menus open by default (selected True). Bump when base.png / the tiles change, so every house gets a freshly drawn menu
 DAY_ABBR = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]
 _glyphs = {}
 
@@ -488,7 +488,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             Path(tempfile.gettempdir(), "line_menu_default.jpg").write_bytes(img)
             menu_id = "dry-" + uuid.uuid4().hex[:8]
         else:
-            body = {"size": {"width": 2500, "height": 1686}, "selected": False, "name": "village default", "chatBarText": "เมนูหมู่บ้าน", "areas": default_areas()}
+            body = {"size": {"width": 2500, "height": 1686}, "selected": True, "name": "village default", "chatBarText": "เมนูหมู่บ้าน", "areas": default_areas()}
             code, r = await asyncio.to_thread(call, "POST", f"{API}/richmenu", c["token"], body)
             if code != 200:
                 raise RuntimeError(f"default richmenu create {code} {r!r}"[:300])
@@ -534,7 +534,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                     async for old in db.line_menus.find({"menu_id": {"$nin": list(used)}}, {"menu_id": 1}):
                         await asyncio.to_thread(call, "DELETE", f"{API}/richmenu/{old['menu_id']}", c["token"])
                         await db.line_menus.delete_one({"menu_id": old["menu_id"]})
-                body = {"size": {"width": 2500, "height": 1686}, "selected": False, "name": f"home {house}"[:300], "chatBarText": "เมนูหมู่บ้าน", "areas": menu_areas(house)}
+                body = {"size": {"width": 2500, "height": 1686}, "selected": True, "name": f"home {house}"[:300], "chatBarText": "เมนูหมู่บ้าน", "areas": menu_areas(house)}
                 code, r = await asyncio.to_thread(call, "POST", f"{API}/richmenu", c["token"], body)
                 if code != 200:
                     raise RuntimeError(f"richmenu create {code} {r!r}"[:300])
