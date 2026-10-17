@@ -9,7 +9,7 @@ import { getPass, passLink, pushAll } from "../sellerSync";
 import { ContactButton, NameField, input, label, remember, savedContact, telHref, useKeys } from "./RepairBoards";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinField, { mapLink } from "./PinField";
-import { OptionsField, ShopNameField, TagsField, YouTubeField, YouTubeThumb, richBody } from "./SellFields";
+import { OptionsField, ShopNameField, TagsField, YouTubeField, richBody } from "./SellFields";
 import { defaultTopics, enablePush, pushStatus, updatePush } from "../push";
 
 // 🛍️ ตลาดเพื่อนบ้าน (15 Oct 2026): homemade food, sweets, drinks, handmade things and second-hand goods from
@@ -34,6 +34,26 @@ export const youtubeId = (u) => (u || "").match(/(?:youtu\.be\/|[?&]v=|shorts\/|
 
 function Slide({ x, m, i, all }) {
   const [play, setPlay] = useState(false);
+  if (m.type === "youtube")
+    return play ? (
+      <div className="aspect-[4/3] w-full bg-black">
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${m.yt}?autoplay=1&playsinline=1&rel=0`}
+          title="คลิป YouTube"
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          className="h-full w-full border-0"
+        />
+      </div>
+    ) : (
+      <button type="button" onClick={() => setPlay(true)} aria-label="เล่นคลิป YouTube" className="relative block w-full bg-black">
+        <img src={`https://img.youtube.com/vi/${m.yt}/hqdefault.jpg`} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover opacity-90" />
+        <span className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#FF0000] text-3xl text-white shadow-lg">▶</span>
+          <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">ดูคลิป</span>
+        </span>
+      </button>
+    );
   if (m.type === "video")
     return play ? (
       <video controls autoPlay playsInline src={mediaUrl(m.id, "file")} poster={mediaUrl(m.id, "thumb")} className="aspect-[4/3] w-full bg-black object-contain" />
@@ -51,8 +71,11 @@ function Slide({ x, m, i, all }) {
 }
 
 // 17 Oct: all the photos / clips, swipe sideways (was: a cover + small thumbnails)
-function Gallery({ x, media, emoji, isNew }) {
+// 17 Oct: the YouTube clip rides along as slide 2 (after the cover photo), plays in place
+function Gallery({ x, media: photos, emoji, isNew }) {
   const ref = useRef(null);
+  const yt = youtubeId(x.youtube);
+  const media = yt ? [...photos.slice(0, 1), { id: "yt", type: "youtube", yt }, ...photos.slice(1)] : photos;
   const [at, setAt] = useState(0);
   const badge = isNew && <span className="absolute left-2 top-2 rounded-full bg-[#C8372D] px-2.5 py-1 text-sm font-bold text-white shadow">🆕 ใหม่</span>;
   if (!media.length)
@@ -68,20 +91,27 @@ function Gallery({ x, media, emoji, isNew }) {
       <div ref={ref} onScroll={(e) => setAt(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth)))} className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none]">
         {media.map((m, i) => (
           <div key={m.id} className="w-full shrink-0 snap-center">
-            <Slide x={x} m={m} i={i} all={media} />
+            <Slide x={x} m={m} i={photos.indexOf(m)} all={photos} />
           </div>
         ))}
       </div>
-      {badge}
+      {media[at]?.type !== "youtube" && badge}
       {media.length > 1 && (
         <>
-          <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-sm font-semibold text-white">
-            {at + 1}/{media.length}
-          </span>
-          <div className="absolute inset-x-0 bottom-0 flex justify-center">
+          {media[at]?.type !== "youtube" && (
+            <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-sm font-semibold text-white">
+              {at + 1}/{media.length}
+            </span>
+          )}
+          {/* with a clip the dots sit under the picture: they'd cover YouTube's controls, and a playing clip can't be swiped */}
+          <div className={yt ? "flex justify-center bg-[#2B2B2B]" : "absolute inset-x-0 bottom-0 flex justify-center"}>
             {media.map((m, i) => (
-              <button key={m.id} type="button" onClick={() => go(i)} aria-label={`รูปที่ ${i + 1}`} className="flex h-8 items-center px-1">
-                <span className={`block h-2.5 rounded-full shadow ${i === at ? "w-5 bg-white" : "w-2.5 bg-white/60"}`} />
+              <button key={m.id} type="button" onClick={() => go(i)} aria-label={m.type === "youtube" ? "คลิป" : `รูปที่ ${i + 1}`} className="flex h-8 items-center px-1">
+                {m.type === "youtube" ? (
+                  <span className={`block rounded-full px-1 text-[10px] font-bold leading-[14px] text-white shadow ${i === at ? "bg-[#FF0000]" : "bg-[#FF0000]/70"}`}>▶</span>
+                ) : (
+                  <span className={`block h-2.5 rounded-full shadow ${i === at ? "w-5 bg-white" : "w-2.5 bg-white/60"}`} />
+                )}
               </button>
             ))}
           </div>
@@ -560,7 +590,6 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
             )}
           </div>
         )}
-        <YouTubeThumb url={x.youtube} />
         {(x.shop_name || (ORDERS_ON && x.queue_count > 0)) && (
           <p className="text-[15px] text-[#45504A]">
             {x.shop_name && `👤 ${x.name}`}
