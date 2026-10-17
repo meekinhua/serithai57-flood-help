@@ -222,7 +222,8 @@ async def on_issue(doc: dict):
     await send({"topics": "map", "soi": doc["soi"]}, f"{head} · ซ.{doc['soi']}", (doc.get("detail") or "มีคนแจ้งจุดปัญหาใหม่ในซอยคุณ") + " · แตะดูบนแผนที่", f"/#issue-{doc['id']}", tag=f"issue-{doc['id']}")
 
 
-MARKET_SHOPS = ("food", "shop", "supplies")  # directory shops that are listed in ตลาด (services.py categories)
+# 17 Oct: the directory is split — ช่าง (home repairs) vs everything else, which is listed in ตลาด (shops + รับทำ·บริการ)
+REPAIR_CATS = ("electrician", "plumber", "ac", "appliance", "repair", "carpenter", "painter", "roof", "doors", "net", "handyman", "pest", "vehicle", "junk")
 _market_pending: list = []  # (title, url) waiting for the next ตลาด notification
 _market_timer: list = []
 
@@ -278,12 +279,12 @@ async def on_order(doc: dict, entry: dict):
 
 
 async def on_shop(doc: dict):
-    if doc.get("category") in MARKET_SHOPS:  # 17 Oct: ร้านอาหาร / ร้านค้า live in ตลาด now
-        await market_news(f"🏪 ร้านใหม่ · {doc.get('name', '')}", "/#market")
+    if doc.get("category") not in REPAIR_CATS:  # 17 Oct: shops and รับทำ·บริการ live in ตลาด
+        await market_news(f"🆕 {doc.get('name', '')}", f"/#shop-{doc['id']}")
         return
     if not _quiet_ok("shop"):
         return
-    await send({"topics": "shop"}, "🔧 ช่าง·บริการใหม่ในหมู่บ้าน", doc.get("name", ""), f"/#shop-{doc['id']}", tag="shop")
+    await send({"topics": "shop"}, "🔧 ช่างใหม่ในหมู่บ้าน", doc.get("name", ""), f"/#shop-{doc['id']}", tag="shop")
 
 
 async def on_forum(doc: dict):

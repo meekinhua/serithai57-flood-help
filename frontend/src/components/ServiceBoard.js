@@ -2,10 +2,11 @@ import { useMemo, useState } from "react";
 import { api, load, save } from "../api";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinField from "./PinField";
-import { PRICING, REPAIR_SERVICE_ORDER, SERVICE_CATEGORIES, categoryOf, paymentBadge, timeAgo } from "../config";
+import { PRICING, REPAIR_SERVICE_ORDER, SERVICE_CATEGORIES, SERVICE_FORM_ORDER, categoryOf, paymentBadge, timeAgo } from "../config";
 
 // Repair mode lists the after-flood trades first and hides the flood-only ones (boats, food, pets...).
-const categoriesFor = (repair) => (repair ? REPAIR_SERVICE_ORDER.map((k) => [k, SERVICE_CATEGORIES[k]]) : Object.entries(SERVICE_CATEGORIES));
+const categoriesFor = (repair, mode) =>
+  mode ? SERVICE_FORM_ORDER[mode].map((k) => [k, SERVICE_CATEGORIES[k]]) : repair ? REPAIR_SERVICE_ORDER.map((k) => [k, SERVICE_CATEGORIES[k]]) : Object.entries(SERVICE_CATEGORIES);
 
 const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
 const label = "mb-1 block font-medium";
@@ -302,7 +303,9 @@ function PostRow({ post, onOpen }) {
 }
 
 // ---------- "List yourself" form ----------
-export function ServiceForm({ onDone, prefill = {}, repair = false }) {
+// 17 Oct: mode = "repair" (ช่าง, may be a tradesman you used) · "service" (รับทำ — you) · "shop" (a shop you run)
+export function ServiceForm({ onDone, prefill = {}, repair = false, mode = "" }) {
+  if (mode && mode !== "repair") repair = false;
   const saved = load("contact", { name: "", phone: "" });
   const [form, setForm] = useState({
     category: prefill.category || "",
@@ -366,9 +369,9 @@ export function ServiceForm({ onDone, prefill = {}, repair = false }) {
         </div>
       </div>
       <fieldset>
-        <legend className={label}>{repair ? "ทำอะไร / ขายอะไร *" : "ให้บริการอะไร *"}</legend>
+        <legend className={label}>{mode === "service" ? "รับทำอะไร *" : mode === "shop" ? "ร้านอะไร *" : repair ? "ช่างอะไร *" : "ให้บริการอะไร *"}</legend>
         <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
-          {categoriesFor(repair).map(([key, [emoji, text]]) => (
+          {categoriesFor(repair, mode).map(([key, [emoji, text]]) => (
             <button
               type="button"
               key={key}

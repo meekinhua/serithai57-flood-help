@@ -23,6 +23,8 @@ SERVICE_CATEGORIES = [
     "ac", "appliance", "carpenter", "painter", "roof", "pest", "vehicle", "junk",
     # the village marketplace after the flood (7 Oct)
     "shop", "beauty", "tutor",
+    # 17 Oct: ตลาด › รับทำ·บริการ and the new ช่าง groups (frontend config.js SERVICE_GROUPS / REPAIR_GROUPS)
+    "photo", "homehelp", "online", "errand", "doors", "net", "handyman",
 ]
 Pricing = Literal["paid", "free", "ask"]
 HIDDEN = {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews.who": 0}

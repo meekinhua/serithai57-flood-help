@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { api, load, save } from "../api";
-import { ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, JOB_VERBS, LEND_CATEGORIES, LEND_KINDS, LEND_STATUS, MARKET_CATEGORIES, MARKET_ONLY, timeAgo } from "../config";
+import { ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, JOB_VERBS, LEND_CATEGORIES, LEND_KINDS, LEND_STATUS, MARKET_CATEGORIES, SHELVES, MARKET_ONLY, timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import { openMedia } from "./MediaGallery";
 import { currentSub } from "../push";
@@ -432,7 +432,7 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
   );
 }
 
-export function LendForm({ kind: initialKind = "lend", onDone }) {
+export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
   const c = savedContact();
   const [, addKey] = useKeys("lendKeys");
   const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", preorder: false, youtube: "", shop_name: "", tags: [], options: [], soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
@@ -465,10 +465,10 @@ export function LendForm({ kind: initialKind = "lend", onDone }) {
   const want = form.kind === "want";
   const sell = form.kind === "sell";
   // selling: the market's choices (homemade first); lend / give / want: the old list without the market-only ones
-  const cats = sell ? MARKET_CATEGORIES.map((k) => [k, LEND_CATEGORIES[k]]) : Object.entries(LEND_CATEGORIES).filter(([k]) => !MARKET_ONLY.includes(k));
+  const cats = sell ? (SHELVES.find((x) => x.key === shelf)?.sell || MARKET_CATEGORIES).map((k) => [k, LEND_CATEGORIES[k]]) : Object.entries(LEND_CATEGORIES).filter(([k]) => !MARKET_ONLY.includes(k));
   return (
     <form onSubmit={submit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 min-[400px]:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 min-[400px]:grid-cols-4 ${shelf ? "hidden" : ""}`}>
         {Object.entries(LEND_KINDS).map(([k, v]) => (
           <button
             type="button"
