@@ -13,10 +13,13 @@ export function openMedia(media, index = 0) {
 // 17 Oct: a photo you handle with your fingers — two fingers zoom (to 4×), double-tap zooms in / out, one finger moves a
 // zoomed photo, a downward swipe on an unzoomed photo closes the viewer. A mouse click toggles 2.5× like before.
 const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-function ZoomImage({ src, onZoom, onClose }) {
+function ZoomImage({ src, active, onZoom, onClose }) {
   const [t, setT] = useState({ s: 1, x: 0, y: 0 });
   const [drop, setDrop] = useState(0); // the swipe-down distance, to fade and close
   const g = useRef({});
+  useEffect(() => {
+    if (!active) setT({ s: 1, x: 0, y: 0 }); // swiped away: the next time it shows whole
+  }, [active]);
   const set = (n) => {
     const s = Math.min(4, Math.max(1, n.s));
     const v = s === 1 ? { s: 1, x: 0, y: 0 } : { ...n, s };
@@ -86,13 +89,17 @@ function Viewer({ media, start, onClose }) {
     const n = Math.max(0, Math.min(k, media.length - 1));
     el.scrollTo({ left: n * el.clientWidth, behavior: "smooth" });
   };
+  const atRef = useRef(start);
+  atRef.current = at;
+  // once, when it opens: jump to the photo that was tapped. (17 Oct bug: this ran on every change of `at`, so each
+  // swipe was scrolled straight back to the first photo — it flickered and returned.)
   useEffect(() => {
     const el = ref.current;
     if (el) el.scrollLeft = start * el.clientWidth;
     const onKey = (e) => {
       if (e.key === "Escape") onClose();
-      if (e.key === "ArrowRight") go(at + 1);
-      if (e.key === "ArrowLeft") go(at - 1);
+      if (e.key === "ArrowRight") go(atRef.current + 1);
+      if (e.key === "ArrowLeft") go(atRef.current - 1);
     };
     document.addEventListener("keydown", onKey);
     const body = document.body.style.overflow;
@@ -101,7 +108,7 @@ function Viewer({ media, start, onClose }) {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = body;
     };
-  }, [at]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="fixed inset-0 z-[1200] flex flex-col bg-black" role="dialog" aria-modal="true" aria-label="ดูรูปและคลิป">
       <div className="flex shrink-0 items-center justify-between px-2 pb-1 pt-[max(6px,env(safe-area-inset-top))] text-white">
@@ -130,7 +137,7 @@ function Viewer({ media, start, onClose }) {
                 <img src={mediaUrl(m.id, "thumb")} alt="" className="max-h-full max-w-full object-contain opacity-60" />
               )
             ) : (
-              <ZoomImage key={i === at ? "on" : "off"} src={Math.abs(i - at) <= 1 ? mediaUrl(m.id, "file") : mediaUrl(m.id, "thumb")} onZoom={(z) => i === at && setZoom(z)} onClose={onClose} />
+              <ZoomImage active={i === at} src={Math.abs(i - at) <= 1 || i === start ? mediaUrl(m.id, "file") : mediaUrl(m.id, "thumb")} onZoom={(z) => i === at && setZoom(z)} onClose={onClose} />
             )}
           </div>
         ))}
