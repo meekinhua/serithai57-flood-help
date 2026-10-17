@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, load } from "../api";
-import { LEND_CATEGORIES, ORDERS_ON, SERVICE_CATEGORIES, SERVICE_GROUPS, SHELVES, shelfOfItem, shelfOfShop, timeAgo } from "../config";
+import { LEND_CATEGORIES, ORDERS_ON, takesOrders, SERVICE_CATEGORIES, SERVICE_GROUPS, SHELVES, shelfOfItem, shelfOfShop, timeAgo } from "../config";
 import { mediaUrl } from "../media";
 import { ProsList, rememberCall } from "./Community";
 import { notify } from "../notify";
@@ -391,6 +391,7 @@ function EditSell({ item: x, editKey, onSaved, onCancel }) {
     detail: x.detail || "",
     youtube: x.youtube || "",
     preorder: !!x.preorder,
+    no_orders: !!x.no_orders,
     shop_name: x.shop_name || "",
     tags: x.tags || [],
     options: x.options || [],
@@ -438,6 +439,15 @@ function EditSell({ item: x, editKey, onSaved, onCancel }) {
       <ShopNameField id={`e-shop-${x.id}`} value={form.shop_name} onChange={(shop_name) => set({ shop_name })} />
       <TagsField tags={form.tags} onChange={(tags) => set({ tags })} />
       <OptionsField options={form.options} onChange={(options) => set({ options })} />
+      {ORDERS_ON && (
+        <label className="flex min-h-[48px] items-start gap-3 rounded-xl border-2 border-[#C9D1CB] bg-white p-3">
+          <input type="checkbox" checked={!form.no_orders} onChange={(e) => set({ no_orders: !e.target.checked })} className="mt-1 h-5 w-5" />
+          <span>
+            <b>🛒 เปิดให้กดสั่ง/จองผ่านระบบ</b>
+            <span className="block text-sm text-neutral-600">ไม่ได้ดูออเดอร์ในเว็บ/LINE (เช่น แอดลงให้ร้าน) เอาติ๊กออก — คนซื้อจะโทร/ทักผู้ขายแทน</span>
+          </span>
+        </label>
+      )}
       <label className="flex min-h-[44px] items-center gap-3">
         <input type="checkbox" checked={form.preorder} onChange={(e) => set({ preorder: e.target.checked })} className="h-5 w-5" />
         <span className="font-semibold">📝 รับสั่งล่วงหน้า · ทำตามออเดอร์</span>
@@ -558,14 +568,14 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
         )}
         {(x.options || []).length > 0 && (
           <div className="overflow-hidden rounded-xl border border-[#E4E0D4] bg-[#FFFBF0]">
-            <p className="px-3 pt-2 text-sm font-bold text-[#8F2A1C]">📋 เมนู{ORDERS_ON && !editKey && " · แตะเพื่อสั่ง"}</p>
+            <p className="px-3 pt-2 text-sm font-bold text-[#8F2A1C]">📋 เมนู{takesOrders(x) && !editKey && " · แตะเพื่อสั่ง"}</p>
             <ul>
               {x.options.map((o) => (
                 <li key={o.name} className="border-t border-[#EFE9DA] first:border-t-0">
-                  <button type="button" disabled={!!editKey || !ORDERS_ON} onClick={() => setOrdering(`1 × ${o.name}`)} className="flex min-h-[44px] w-full items-center gap-2 px-3 text-left enabled:active:bg-[#FFF1C9]">
+                  <button type="button" disabled={!!editKey || !takesOrders(x)} onClick={() => setOrdering(`1 × ${o.name}`)} className="flex min-h-[44px] w-full items-center gap-2 px-3 text-left enabled:active:bg-[#FFF1C9]">
                     <span className="min-w-0 flex-1 break-words text-[15px]">{o.name}</span>
                     {o.price && <b className="shrink-0 text-[#8F2A1C]">{o.price}</b>}
-                    {ORDERS_ON && !editKey && <span className="shrink-0 rounded-full bg-[#1E6B47] px-2 text-sm font-bold text-white">+</span>}
+                    {takesOrders(x) && !editKey && <span className="shrink-0 rounded-full bg-[#1E6B47] px-2 text-sm font-bold text-white">+</span>}
                   </button>
                 </li>
               ))}
@@ -590,10 +600,10 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
             )}
           </div>
         )}
-        {(x.shop_name || (ORDERS_ON && x.queue_count > 0)) && (
+        {(x.shop_name || (takesOrders(x) && x.queue_count > 0)) && (
           <p className="text-[15px] text-[#45504A]">
             {x.shop_name && `👤 ${x.name}`}
-            {ORDERS_ON && x.queue_count > 0 && <span className="ml-1 font-semibold text-[#1E6B47]">· มีคนสั่งอยู่ {x.queue_count}</span>}
+            {takesOrders(x) && x.queue_count > 0 && <span className="ml-1 font-semibold text-[#1E6B47]">· มีคนสั่งอยู่ {x.queue_count}</span>}
           </p>
         )}
         {ordered && <p className="rounded-lg bg-emerald-50 p-2 text-[15px] font-semibold text-emerald-800">✅ ส่งออเดอร์แล้ว ผู้ขายจะโทรยืนยันกลับ</p>}
@@ -612,12 +622,12 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
         ) : (
           !editKey && (
             <div className="grid gap-2 pt-1">
-              {ORDERS_ON && (
+              {takesOrders(x) && (
                 <button onClick={() => setOrdering("")} className="min-h-[52px] rounded-xl bg-[#1E6B47] text-lg font-bold text-white">
                   🛒 สั่ง / จองไว้
                 </button>
               )}
-              <ContactButton path={`/lend/${x.id}/contact`} text={ORDERS_ON ? "📞 หรือโทรหาผู้ขาย" : "📞 ติดต่อผู้ขาย"} />
+              <ContactButton path={`/lend/${x.id}/contact`} text={takesOrders(x) ? "📞 หรือโทรหาผู้ขาย" : "📞 ติดต่อผู้ขาย"} />
             </div>
           )
         )}

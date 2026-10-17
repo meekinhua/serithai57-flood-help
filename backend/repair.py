@@ -197,6 +197,7 @@ class LendCreate(Contact):
     pickup: str = Field("", max_length=80)  # for sale: "รับที่บ้าน ซ.16 / ส่งในหมู่บ้าน"
     when: str = Field("", max_length=80)  # for sale: "ทุกเช้า 7–9 โมง · สั่งล่วงหน้า 1 วัน"
     preorder: bool = False  # for sale (16 Oct): made to order — neighbours press "สั่ง / จอง" and the seller cooks after
+    no_orders: bool = False  # for sale (17 Oct): no 🛒 สั่ง/จอง — e.g. the admin posted it for a shop that won't read orders here
     notify_endpoint: str = Field("", max_length=600)  # the seller's own push subscription: a new order pings that phone only
     lat: Optional[float] = Field(None, ge=13.5, le=14.1)  # for sale (16 Oct): optional pin where to pick it up
     lng: Optional[float] = Field(None, ge=100.4, le=101.0)
@@ -219,6 +220,7 @@ class LendUpdate(BaseModel):
     pickup: Optional[str] = Field(None, max_length=80)
     when: Optional[str] = Field(None, max_length=80)
     preorder: Optional[bool] = None
+    no_orders: Optional[bool] = None
     youtube: Optional[str] = Field(None, max_length=200)
     shop_name: Optional[str] = Field(None, max_length=60)
     tags: Optional[list[str]] = Field(None, max_length=5)
@@ -490,6 +492,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         out.setdefault("pickup", "")  # older items have no pickup / when
         out.setdefault("when", "")
         out.setdefault("preorder", False)
+        out.setdefault("no_orders", False)
         out.setdefault("youtube", "")
         out.setdefault("shop_name", "")
         out.setdefault("tags", [])
@@ -570,7 +573,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         data["tags"] = clean_tags(data["tags"])
         data["options"] = clean_options(data["options"])
         if not sell:
-            data.update(preorder=False, youtube="", shop_name="", tags=[], options=[])
+            data.update(preorder=False, no_orders=False, youtube="", shop_name="", tags=[], options=[])
             if len(body.media_ids) > 3:
                 raise HTTPException(422, "ใส่รูปได้ไม่เกิน 3 รูป")
         if data["youtube"] and not YOUTUBE.match(data["youtube"]):
@@ -607,6 +610,8 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         """'I'd like to borrow it': the owner sees who is waiting, in order, with phone numbers.
         For a thing for sale the same queue holds the orders / reservations (สั่ง · จอง): qty + when they want it."""
         rate_limit(request, "lend-queue", limit=20, window_s=600)
+        if await db.lend_items.find_one({"id": item_id, "no_orders": True}, {"_id": 1}):
+            raise HTTPException(422, "ร้านนี้ไม่รับสั่งผ่านระบบ โทรหรือทักผู้ขายได้เลย")
         doc = await add_to_queue(db, item_id, _clean(body.model_dump()))
         if not doc:
             raise HTTPException(404, "รายการนี้ปิดไปแล้ว")
@@ -625,7 +630,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         changes = {k: v.strip() if isinstance(v, str) else v for k, v in body.model_dump().items() if v is not None}
         if not changes:
             raise HTTPException(422, "ไม่มีข้อมูลที่จะแก้ไข")
-        sell_only = {"title", "price", "pickup", "when", "preorder", "youtube", "shop_name", "tags", "options", "media_ids", "lat", "lng"}
+        sell_only = {"title", "price", "pickup", "when", "preorder", "no_orders", "youtube", "shop_name", "tags", "options", "media_ids", "lat", "lng"}
         if doc.get("kind") != "sell" and sell_only & changes.keys():
             raise HTTPException(422, "แก้ได้เฉพาะรายการในตลาด")
         if changes.get("youtube") and not YOUTUBE.match(changes["youtube"]):

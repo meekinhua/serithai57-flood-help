@@ -151,9 +151,10 @@ export const SERVICE_GROUPS = [
 ];
 export const SHOP_SHELF = { food: ["food"], goods: ["shop", "supplies"] }; // shops from the directory, by shelf
 export const FOOD_LEND = ["homemade", "dessert", "drinks", "preserved", "catering", "food"];
-// 17 Oct: 🛒 สั่ง/จอง is off for now — many shops in ตลาด were posted by the admin and don't read orders here.
-// Buyers call / walk over instead. Flip to true (and ORDERS_ON in backend/line_bot.py) to bring it back.
-export const ORDERS_ON = false;
+// 17 Oct: master switch for 🛒 สั่ง/จอง (with ORDERS_ON in backend/line_bot.py). Each post can also turn it off for
+// itself (no_orders) — e.g. a shop the admin posted for, that won't read orders here.
+export const ORDERS_ON = true;
+export const takesOrders = (x) => ORDERS_ON && !x?.no_orders;
 
 export const SHELVES = [
   { key: "food", label: "ของกิน", icon: "🍲", hint: "อาหารทำเอง ขนม เครื่องดื่ม ร้านอาหาร", sell: ["homemade", "dessert", "drinks", "preserved", "catering"] },
