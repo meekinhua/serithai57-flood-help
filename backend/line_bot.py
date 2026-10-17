@@ -611,6 +611,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
 
     router.default_menu_loop = default_menu_loop
     router.refresh_default_menu = refresh_default_menu
+    router.on_text = lambda user, raw: on_text(user, raw)  # tools / tests: what the bot would answer (sends nothing)
 
     async def set_menu(user: str, house: str, soi: str):
         """Give this LINE user the menu with their house on it (shared by everyone linked to the same house + soi).
@@ -1004,7 +1005,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             {"type": "text", "text": "ดูทั้งหมด + แยกตามหมวด + ร้านประจำ", "weight": "bold", "wrap": True, "align": "center"},
             {"type": "button", "style": "secondary", "action": {"type": "uri", "label": "ดูทั้งหมด", "uri": f"{SITE}/#market"}}]}})
         head = (f"🛍️ ตลาดเพื่อนบ้าน · ของขาย {len(items)} · ร้าน {len(shops)} · รับทำ {n_svc} · ปัดดูได้ ➡️\n"
-                ("ของทำเองกด 🛒 สั่ง/จองไว้ได้ · ร้านกดโทรได้เลย · ระบบไม่รับเงิน" if ORDERS_ON else "กดดูรายละเอียด แล้วโทร/ทักผู้ขายได้เลย · ระบบไม่รับเงิน"))
+                + ("ของทำเองกด 🛒 สั่ง/จองไว้ได้ · ร้านกดโทรได้เลย · ระบบไม่รับเงิน" if ORDERS_ON else "กดดูรายละเอียด แล้วโทร/ทักผู้ขายได้เลย · ระบบไม่รับเงิน"))
         chips = qr(("🍲 ของกิน", "🍲 ของกิน"), ("🧺 ของใช้", "🧺 ของใช้"), ("🙋 รับทำ", "🙋 รับทำ"), *chips["items"] and [(i["action"]["label"], i["action"]["text"]) for i in chips["items"]])
         return [text(head), {"type": "flex", "altText": "ตลาดเพื่อนบ้าน", "contents": {"type": "carousel", "contents": bubbles}, "quickReply": chips}]
 
