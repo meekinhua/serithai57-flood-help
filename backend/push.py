@@ -419,9 +419,12 @@ def build_router(db, rate_limit, require_admin, audit, locate_house, norm_house,
                     mark = await db.settings.find_one({"id": "push_waste"}, {"_id": 0, "date": 1})
                     if (mark or {}).get("date") != today:
                         await db.settings.update_one({"id": "push_waste"}, {"$set": {"id": "push_waste", "date": today}}, upsert=True)
-                        rounds = {**waste_rounds, **((await db.settings.find_one({"id": "waste"}, {"_id": 0, "rounds": 1}) or {}).get("rounds") or {})}
+                        wset = await db.settings.find_one({"id": "waste"}, {"_id": 0, "rounds": 1, "irregular": 1}) or {}
+                        rounds = {**waste_rounds, **(wset.get("rounds") or {})}
                         day = thai_days[(t.date() + timedelta(days=1)).weekday()]
-                        from myhome import waste_days  # per soi (16 Oct), falling back to the soi parity
+                        from myhome import waste_days, waste_irregular  # per soi (16 Oct), falling back to the soi parity
+                        if waste_irregular(wset):  # 18 Oct: trucks off the rounds — a reminder would leave bags out for nothing
+                            continue
                         sois = [s for s in await db.push_subs.distinct("soi", {"topics": "waste"}) if s and day in (waste_days(s, rounds) or "")]
                         if sois:
                             await send({"topics": "waste", "soi": {"$in": sois}}, "🚛 พรุ่งนี้รถขยะเข้าซอยคุณ", f"วัน{day} · มัดถุงวางหน้าบ้านคืนนี้", "/", tag="waste", ttl=12 * 3600)

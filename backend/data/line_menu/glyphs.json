@@ -90,180 +90,184 @@
    "file": "g021.png",
    "w": 40
   },
-  "ก": {
+  "ไม่ตรงวัน": {
    "file": "g022.png",
+   "w": 403
+  },
+  "ก": {
+   "file": "g023.png",
    "w": 70
   },
   "ข": {
-   "file": "g023.png",
+   "file": "g024.png",
    "w": 63
   },
   "ค": {
-   "file": "g024.png",
+   "file": "g025.png",
    "w": 73
   },
   "ฆ": {
-   "file": "g025.png",
+   "file": "g026.png",
    "w": 71
   },
   "ง": {
-   "file": "g026.png",
+   "file": "g027.png",
    "w": 61
   },
   "จ": {
-   "file": "g027.png",
+   "file": "g028.png",
    "w": 63
   },
   "ฉ": {
-   "file": "g028.png",
+   "file": "g029.png",
    "w": 67
   },
   "ช": {
-   "file": "g029.png",
+   "file": "g030.png",
    "w": 63
   },
   "ซ": {
-   "file": "g030.png",
+   "file": "g031.png",
    "w": 66
   },
   "ฌ": {
-   "file": "g031.png",
+   "file": "g032.png",
    "w": 102
   },
   "ญ": {
-   "file": "g032.png",
+   "file": "g033.png",
    "w": 100
   },
   "ฎ": {
-   "file": "g033.png",
-   "w": 70
-  },
-  "ฏ": {
    "file": "g034.png",
    "w": 70
   },
-  "ฐ": {
+  "ฏ": {
    "file": "g035.png",
    "w": 70
   },
-  "ฑ": {
+  "ฐ": {
    "file": "g036.png",
+   "w": 70
+  },
+  "ฑ": {
+   "file": "g037.png",
    "w": 72
   },
   "ฒ": {
-   "file": "g037.png",
+   "file": "g038.png",
    "w": 104
   },
   "ณ": {
-   "file": "g038.png",
+   "file": "g039.png",
    "w": 102
   },
   "ด": {
-   "file": "g039.png",
+   "file": "g040.png",
    "w": 70
   },
   "ต": {
-   "file": "g040.png",
+   "file": "g041.png",
    "w": 74
   },
   "ถ": {
-   "file": "g041.png",
+   "file": "g042.png",
    "w": 70
   },
   "ท": {
-   "file": "g042.png",
+   "file": "g043.png",
    "w": 68
   },
   "ธ": {
-   "file": "g043.png",
+   "file": "g044.png",
    "w": 62
   },
   "น": {
-   "file": "g044.png",
+   "file": "g045.png",
    "w": 69
   },
   "บ": {
-   "file": "g045.png",
-   "w": 68
-  },
-  "ป": {
    "file": "g046.png",
    "w": 68
   },
-  "ผ": {
+  "ป": {
    "file": "g047.png",
-   "w": 76
+   "w": 68
   },
-  "ฝ": {
+  "ผ": {
    "file": "g048.png",
    "w": 76
   },
-  "พ": {
+  "ฝ": {
    "file": "g049.png",
-   "w": 81
+   "w": 76
   },
-  "ฟ": {
+  "พ": {
    "file": "g050.png",
    "w": 81
   },
-  "ภ": {
+  "ฟ": {
    "file": "g051.png",
+   "w": 81
+  },
+  "ภ": {
+   "file": "g052.png",
    "w": 70
   },
   "ม": {
-   "file": "g052.png",
+   "file": "g053.png",
    "w": 68
   },
   "ย": {
-   "file": "g053.png",
+   "file": "g054.png",
    "w": 67
   },
   "ร": {
-   "file": "g054.png",
+   "file": "g055.png",
    "w": 61
   },
   "ฤ": {
-   "file": "g055.png",
+   "file": "g056.png",
    "w": 69
   },
   "ล": {
-   "file": "g056.png",
+   "file": "g057.png",
    "w": 66
   },
   "ฦ": {
-   "file": "g057.png",
+   "file": "g058.png",
    "w": 69
   },
   "ว": {
-   "file": "g058.png",
+   "file": "g059.png",
    "w": 59
   },
   "ศ": {
-   "file": "g059.png",
+   "file": "g060.png",
    "w": 77
   },
   "ษ": {
-   "file": "g060.png",
+   "file": "g061.png",
    "w": 73
   },
   "ส": {
-   "file": "g061.png",
+   "file": "g062.png",
    "w": 70
   },
   "ห": {
-   "file": "g062.png",
+   "file": "g063.png",
    "w": 68
   },
   "ฬ": {
-   "file": "g063.png",
+   "file": "g064.png",
    "w": 74
   },
   "อ": {
-   "file": "g064.png",
+   "file": "g065.png",
    "w": 66
   },
   "ฮ": {
-   "file": "g065.png",
+   "file": "g066.png",
    "w": 72
   }
  }

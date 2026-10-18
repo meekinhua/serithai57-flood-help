@@ -1117,6 +1117,21 @@ export function homeBadgeOf(info) {
 
 // the rubbish days in the header: today's in big dark green with "วันนี้", tomorrow's marked too — stays even after รับทราบ
 const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์"]; // Date.getUTCDay() order
+// 18 Oct: trucks off the rounds while the flood rubbish is cleared (settings waste.irregular, until a date)
+function WasteOff({ off, days }) {
+  const [, m, d] = off.until.split("-").map(Number);
+  const months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+  return (
+    <span className="block">
+      <b className="text-[#8A4B00]">⚠️ ช่วงนี้ไม่ตรงวัน</b>
+      <span className="block text-sm text-[#5C3B00]">
+        {off.text} · คาดว่ากลับมาปกติราว {d} {months[m - 1]}
+      </span>
+      {days && <span className="block text-sm text-[#45504A]">ตารางปกติ: {days}</span>}
+    </span>
+  );
+}
+
 function WasteDays({ days }) {
   const bkk = new Date(Date.now() + 7 * 3600e3);
   const today = THAI_DAYS[bkk.getUTCDay()];
@@ -1566,7 +1581,7 @@ export default function MyHome({
           <button onClick={() => setInfoOpen((v) => !v)} aria-expanded={infoOpen} className="flex min-h-[44px] w-full items-center gap-1.5 rounded-xl pl-1.5 text-left text-[15px] text-[#33403A]">
             <span className="min-w-0 flex-1 truncate">
               {info.soi ? `ซ.${info.soi}` : "ยังไม่รู้ซอย"}
-              {info.waste && <span> · 🚛 {info.waste.days}</span>}
+              {info.waste && <span> · 🚛 {info.waste.irregular ? "ไม่ตรงวัน (ช่วงเคลียร์ขยะ)" : info.waste.days}</span>}
               {info.speaker?.answer && <span> · {info.speaker.answer === "yes" ? "🔇 ไม่ได้ยินเสียงตามสาย" : "📢 ได้ยิน"}</span>}
               {info.precision !== "house" && <span className="text-[#7A4104]"> · ยังไม่ปักหมุด</span>}
             </span>
@@ -1584,7 +1599,7 @@ export default function MyHome({
                   info.precision === "house" ? "ย้าย" : "ปักหมุด GPS",
                   () => setPinning({ pos: null, soi: info.soi || "", gps: true }),
                 ],
-                ["เก็บขยะ", info.waste ? <WasteDays key="w" days={info.waste.days} /> : "ยังไม่รู้ (ใส่ซอยก่อน)", null, null],
+                ["เก็บขยะ", info.waste ? (info.waste.irregular ? <WasteOff key="w" off={info.waste.irregular} days={info.waste.days} /> : <WasteDays key="w" days={info.waste.days} />) : "ยังไม่รู้ (ใส่ซอยก่อน)", null, null],
                 ["เสียงตามสาย", info.speaker?.answer ? (info.speaker.answer === "yes" ? "🔇 ไม่ได้ยิน / ไม่ชัด" : "📢 ได้ยินชัด") : "ยังไม่ได้ตอบ", "แก้", () => setSpkOpen(true)],
               ].map(([label, value, act, go]) => (
                 <div key={label} className="flex min-h-[52px] items-center gap-2 py-1.5">

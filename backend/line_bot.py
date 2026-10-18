@@ -76,6 +76,7 @@ SMALLTALK = re.compile(r"^(?:ขอบคุณ|ขอบใจ|thank|thx|ok|โ
 WASTE_REPORT = re.compile(r"ไม่มา|ไม่เข้า|ไม่ได้มา|ไม่เก็บ|ปกติ|มาวัน|เปลี่ยนวัน|เลยกำหนด")
 HOUSE_IN_TEXT = re.compile(r"^(?:บ้าน(?:เลขที่)?\s*)?(4\s*[/.\-]\s*\d{1,5}(?:/\d{1,3})?[ก-ฮ]?)$")
 BKK = timezone(timedelta(hours=7))
+THAI_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
 WASTE_MORE = ("• กองขยะค้าง / มีคนเอามาทิ้ง แจ้งพร้อมปักหมุด serithai57.com/#issues\n• แจ้ง กทม. 1555 หรือ Traffy Fondue\n"
               "• วิธีแยกขยะ serithai57.com/#waste")
 LIST_WORDS = {"หาย", "เจอ", "หายเจอ", "หาย·เจอ", "หาย เจอ", "สัตว์หาย", "ของหาย", "ดูประกาศ", "แมว", "หมา", "แมวหาย", "หมาหาย", "สุนัข", "สุนัขหาย"}
@@ -224,7 +225,9 @@ def menu_image(house: str, soi: str, days: str | None, thai_days: list, photos: 
     words = [list(house), ["·"], ["ซอย"], list(soi)]
     if days:
         abbr = [DAY_ABBR[i] for i, d in enumerate(thai_days) if d in days]
-        if abbr:
+        if days == "IRREGULAR":
+            words += [["·"], ["รถขยะ"], ["ไม่ตรงวัน"]]
+        elif abbr:
             words += [["·"], ["รถขยะ"], sum(([a, "dot_y"] for a in abbr), [])[:-1]]
     pieces, gap = [], 30
     for w in words:
@@ -525,6 +528,10 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
     async def home_of(user: str) -> dict | None:
         return await db.line_users.find_one({"user": user}, {"_id": 0})
 
+    async def waste_off() -> dict | None:
+        from myhome import waste_irregular
+        return waste_irregular(await db.settings.find_one({"id": "waste"}, {"_id": 0, "irregular": 1}))
+
     async def next_waste(soi: str):
         """(parity, "จันทร์ · พฤหัส", "พรุ่งนี้") for a soi, from the team's rounds (settings) or the defaults."""
         rounds = {**waste_rounds, **((await db.settings.find_one({"id": "waste"}, {"_id": 0, "rounds": 1}) or {}).get("rounds") or {})}
@@ -586,6 +593,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
 
     async def menu_key(house: str, soi: str):
         _, days, _ = await next_waste(soi)
+        if days and await waste_off():
+            days = "IRREGULAR"  # 18 Oct: the strip says รถขยะ ไม่ตรงวัน (and the key change redraws every menu)
         ids = await latest_photos()
         return f"{MENU_VER}|{house}|{soi}|{days or ''}|{ids['lost'] or ''}|{ids['market'] or ''}", days, ids
 
@@ -679,6 +688,16 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
 
     async def waste_reply(user: str) -> list:
         home = await home_of(user)
+        off = await waste_off()
+        if off:  # 18 Oct: trucks off the rounds while the flood rubbish is cleared
+            d = datetime.strptime(off["until"], "%Y-%m-%d")
+            normal = ""
+            if home and home.get("soi"):
+                _, days, _ = await next_waste(home["soi"])
+                normal = f"\nตารางปกติของ ซ.{home['soi']}: {days} (ใช้อีกครั้งเมื่อกลับมาตามปกติ)" if days else ""
+            return [text(f"🚛 ช่วงนี้รถขยะยังไม่เข้าตามวันในตาราง\n{off['text']}\nคาดว่ากลับมาตามปกติราว {d.day} {THAI_MONTHS[d.month - 1]}{normal}\n\n"
+                         "เก็บถุงไว้ในบ้านก่อน เห็นรถเข้าซอยค่อยเอาออก · ซอยไหนขยะค้างนานมาก กด 🚛 รถไม่มา แอดรวบรวมแจ้งเขต\n\n" + WASTE_MORE,
+                         qr(("🚛 รถไม่มา/ขยะค้าง", "รถขยะไม่มา"), ("🏠 บ้านฉัน", "บ้านฉัน")))]
         if home and home.get("soi"):
             parity, days, nxt = await next_waste(home["soi"])
             if days:

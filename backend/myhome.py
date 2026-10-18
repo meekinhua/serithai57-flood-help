@@ -48,6 +48,20 @@ def waste_days(soi: Optional[str], rounds: dict) -> Optional[str]:
     return rounds.get(p) if p else None
 
 
+IRREGULAR_TEXT = "ช่วงเคลียร์ขยะหลังน้ำท่วม รถไม่เข้าตามตาราง วิ่งเก็บไปเรื่อยๆ จนกว่ากองใหญ่จะหมด"
+
+
+def waste_irregular(setting: Optional[dict]) -> Optional[dict]:
+    """18 Oct: the district's trucks don't keep the rounds while they clear the flood rubbish (until about the end of
+    the month). settings waste.irregular = {"until": "2026-10-31", "text": "..."} (tools/site.py waste irregular …);
+    while today <= until every place says so, the normal days are shown only as "ตารางปกติ", and the evening push stops."""
+    ir = (setting or {}).get("irregular") or {}
+    until = ir.get("until") or ""
+    if not until or datetime.now(timezone(timedelta(hours=7))).date().isoformat() > until:
+        return None
+    return {"until": until, "text": ir.get("text") or IRREGULAR_TEXT}
+
+
 def metres(a, b):
     dy = (a[0] - b[0]) * 111_320
     dx = (a[1] - b[1]) * 111_320 * math.cos(math.radians(a[0]))
@@ -719,7 +733,8 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
         for q in qs:
             q["answer"] = mine.get(q["id"])
             q["soi_yes"] = await db.myhome_answers.count_documents({"qid": q["id"], "answer": "yes", "soi": soi, "house": {"$ne": h}}) if soi else 0
-        rounds = {**WASTE_ROUNDS, **((await db.settings.find_one({"id": "waste"}, {"_id": 0, "rounds": 1}) or {}).get("rounds") or {})}
+        wset = await db.settings.find_one({"id": "waste"}, {"_id": 0, "rounds": 1, "irregular": 1}) or {}
+        rounds = {**WASTE_ROUNDS, **(wset.get("rounds") or {})}
         more = await extras(h, soi) if extras else {}
         coming = sorted(await soon(soi, rounds) + more.pop("_soon", []), key=lambda x: x["date"])
         return {
@@ -739,7 +754,7 @@ def build_router(db, rate_limit, require_admin, locate_house, learn_address, nor
                 "soi_group": soi_group,  # … who want to hire one electrician together
                 "village_waiting": village_waiting,
             },
-            "waste": {"parity": parity, "days": waste_days(soi, rounds)} if parity else None,
+            "waste": {"parity": parity, "days": waste_days(soi, rounds), "irregular": waste_irregular(wset)} if parity else None,
             "issues_open": open_issues,
             "questions": qs,
             "soon": coming,
