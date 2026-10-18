@@ -336,6 +336,8 @@ class WasteBody(BaseModel):
     # 7 Oct: the regular rounds by soi parity for บ้านฉัน, e.g. {"even": "จันทร์ · พฤหัส", "odd": "พุธ · เสาร์"}
     # None = keep what is stored (the page's editor doesn't send it)
     rounds: Optional[Dict[str, str]] = None  # 16 Oct: also per soi, e.g. {"33": "อังคาร · ศุกร์"} (wins over the parity)
+    # 18 Oct: trucks off the rounds while clearing flood rubbish — {"until": "YYYY-MM-DD", "text": ""} · {} = back to normal · None = keep
+    irregular: Optional[Dict[str, str]] = None
 
 
 # How to sort flood waste until the district's own guidance arrives; admins edit it on the page.
@@ -966,6 +968,12 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             if bad:
                 raise HTTPException(422, f"คีย์รอบรถไม่ถูกต้อง {bad} · ใช้ even / odd หรือเลขซอย")
             data["rounds"] = {k: v.strip()[:60] for k, v in data["rounds"].items() if v.strip()}
+        if data["irregular"] is None:
+            data.pop("irregular")
+        elif data["irregular"]:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", data["irregular"].get("until", "")):
+                raise HTTPException(422, "irregular.until ต้องเป็นวันที่ YYYY-MM-DD")
+            data["irregular"] = {"until": data["irregular"]["until"], "text": (data["irregular"].get("text") or "").strip()[:200]}
         if data["media"] is None:
             data.pop("media")
         doc = {**data, "notice": data["notice"].strip(), "updated_at": now(), "by": admin["name"]}
