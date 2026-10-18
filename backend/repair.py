@@ -39,6 +39,14 @@ LEND_CATEGORIES = [
     "homemade", "dessert", "drinks", "handmade",  # ตลาดเพื่อนบ้าน (sell): อาหารทำเอง · ขนม·เบเกอรี่ · เครื่องดื่ม · งานฝีมือ
     "preserved", "catering", "cosmetics", "petgoods",  # 17 Oct: ของฝาก·แปรรูป · รับจัดเลี้ยง · ความงาม · ของสัตว์เลี้ยง
 ]
+import catalog  # noqa: E402  18 Oct: new market category keys come from the catalog (no deploy)
+
+
+@catalog.on_change
+def _lend_cats(doc):
+    LEND_CATEGORIES.extend(k for k in doc["lend_labels"] if k not in LEND_CATEGORIES)
+
+
 LendStatus = Literal["available", "lent", "closed"]  # ว่าง · มีคนยืมอยู่ · ปิด (คืนเจ้าของ/ให้ไปแล้ว/หาได้แล้ว)
 JobKind = Literal["need", "offer"]  # ขอแรง · อาสาพร้อมไปช่วย
 JOB_TYPES = ["clean", "move", "trash", "fix", "check", "elderly", "ride", "errand", "hire", "other"]

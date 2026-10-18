@@ -39,9 +39,27 @@ export const VILLAGE_BOUNDARY = [
 ];
 
 export const KINDS = {
-  need: { label: "ขอความช่วยเหลือ", short: "ขอช่วย", emoji: "🆘", color: "#000000", pin: "#000000" },
-  offer: { label: "ฉันช่วยได้", short: "ช่วยได้", emoji: "🤝", color: "#000000", pin: "#ffffff" },
-  info: { label: "แจ้งข้อมูล", short: "ข้อมูล", emoji: "📍", color: "#525252", pin: "#a3a3a3" },
+  need: {
+    label: "ขอความช่วยเหลือ",
+    short: "ขอช่วย",
+    emoji: "🆘",
+    color: "#000000",
+    pin: "#000000",
+  },
+  offer: {
+    label: "ฉันช่วยได้",
+    short: "ช่วยได้",
+    emoji: "🤝",
+    color: "#000000",
+    pin: "#ffffff",
+  },
+  info: {
+    label: "แจ้งข้อมูล",
+    short: "ข้อมูล",
+    emoji: "📍",
+    color: "#525252",
+    pin: "#a3a3a3",
+  },
 };
 
 // Keys must match CATEGORIES in backend/server.py
@@ -80,8 +98,18 @@ export const CATEGORIES = {
 
 // Paid help: the app only shows the offer; people arrange and pay each other directly.
 export const PAYMENT = {
-  need: { free: "ขอความช่วยเหลือ (ไม่มีค่าใช้จ่าย)", paid: "ยินดีจ่ายค่าตอบแทน", badge: "ยินดีจ่าย", pricePlaceholder: "เช่น 500 บาท / ตามตกลง" },
-  offer: { free: "ช่วยฟรี / จิตอาสา", paid: "มีค่าบริการ (รับจ้าง)", badge: "รับจ้าง", pricePlaceholder: "เช่น 100 บาท/เที่ยว, 300 บาท/ชม." },
+  need: {
+    free: "ขอความช่วยเหลือ (ไม่มีค่าใช้จ่าย)",
+    paid: "ยินดีจ่ายค่าตอบแทน",
+    badge: "ยินดีจ่าย",
+    pricePlaceholder: "เช่น 500 บาท / ตามตกลง",
+  },
+  offer: {
+    free: "ช่วยฟรี / จิตอาสา",
+    paid: "มีค่าบริการ (รับจ้าง)",
+    badge: "รับจ้าง",
+    pricePlaceholder: "เช่น 100 บาท/เที่ยว, 300 บาท/ชม.",
+  },
 };
 
 export function paymentBadge(post) {
@@ -102,9 +130,24 @@ export const WATER_LEVELS = [
 ];
 
 export const STATUS = {
-  open: { need: "รอความช่วยเหลือ", offer: "พร้อมช่วย", info: "ยังเป็นปัจจุบัน", cls: "bg-neutral-100 text-neutral-700" },
-  helping: { need: "มีคนกำลังไปช่วย", offer: "กำลังช่วยอยู่", info: "กำลังจัดการ", cls: "bg-black text-white" },
-  done: { need: "ช่วยเสร็จแล้ว", offer: "ปิดแล้ว", info: "ไม่เป็นปัจจุบันแล้ว", cls: "border border-neutral-300 text-neutral-500" },
+  open: {
+    need: "รอความช่วยเหลือ",
+    offer: "พร้อมช่วย",
+    info: "ยังเป็นปัจจุบัน",
+    cls: "bg-neutral-100 text-neutral-700",
+  },
+  helping: {
+    need: "มีคนกำลังไปช่วย",
+    offer: "กำลังช่วยอยู่",
+    info: "กำลังจัดการ",
+    cls: "bg-black text-white",
+  },
+  done: {
+    need: "ช่วยเสร็จแล้ว",
+    offer: "ปิดแล้ว",
+    info: "ไม่เป็นปัจจุบันแล้ว",
+    cls: "border border-neutral-300 text-neutral-500",
+  },
 };
 
 // Live staff trips (keys must match backend/trips.py)
@@ -140,32 +183,121 @@ export const PHASES = {
 // Groups are what people see; the categories under them are what is stored (old listings keep their keys).
 // The LINE bot (backend/line_bot.py SHELVES / REPAIR) uses the same names and icons.
 export const SERVICE_GROUPS = [
-  { key: "beauty", label: "💇 สวยงาม·สุขภาพ", hint: "ตัดผม แต่งหน้า ทำเล็บ นวด ฟิตเนส", cats: ["beauty"] },
-  { key: "event", label: "📸 ถ่ายรูป·อีเวนต์", hint: "สตูดิโอ ช่างภาพ เช่าชุด จัดดอกไม้ MC", cats: ["photo"] },
-  { key: "tutor", label: "📚 สอน·ติว", hint: "ติวเตอร์ ภาษา ดนตรี ว่ายน้ำ คอมพิวเตอร์", cats: ["tutor"] },
-  { key: "home", label: "🏠 ช่วยงานบ้าน", hint: "แม่บ้าน ทำความสะอาด ซักรีด ทำสวน เลี้ยงเด็ก ดูแลผู้สูงอายุ", cats: ["homehelp", "cleaning"] },
-  { key: "pets", label: "🐾 สัตว์เลี้ยง", hint: "รับฝาก ให้อาหาร อาบน้ำ ตัดขน", cats: ["pets"] },
-  { key: "move", label: "🚗 รับส่ง·ขนย้าย", hint: "รับส่งคน/เด็ก รถเช่า ขนของ ย้ายบ้าน", cats: ["rental", "porter", "truck", "boat"] },
-  { key: "online", label: "💻 ออนไลน์·เอกสาร", hint: "ออกแบบ ไอที ซ่อมคอม บัญชี แปล", cats: ["online"] },
-  { key: "general", label: "🙋 รับจ้างทั่วไป", hint: "ฝากซื้อ ต่อคิว เฝ้าบ้าน งานอื่นๆ", cats: ["errand", "other"] },
+  {
+    key: "beauty",
+    label: "💇 สวยงาม·สุขภาพ",
+    hint: "ตัดผม แต่งหน้า ทำเล็บ นวด ฟิตเนส",
+    cats: ["beauty"],
+  },
+  {
+    key: "event",
+    label: "📸 ถ่ายรูป·อีเวนต์",
+    hint: "สตูดิโอ ช่างภาพ เช่าชุด จัดดอกไม้ MC",
+    cats: ["photo"],
+  },
+  {
+    key: "tutor",
+    label: "📚 สอน·ติว",
+    hint: "ติวเตอร์ ภาษา ดนตรี ว่ายน้ำ คอมพิวเตอร์",
+    cats: ["tutor"],
+  },
+  {
+    key: "home",
+    label: "🏠 ช่วยงานบ้าน",
+    hint: "แม่บ้าน ทำความสะอาด ซักรีด ทำสวน เลี้ยงเด็ก ดูแลผู้สูงอายุ",
+    cats: ["homehelp", "cleaning"],
+  },
+  {
+    key: "pets",
+    label: "🐾 สัตว์เลี้ยง",
+    hint: "รับฝาก ให้อาหาร อาบน้ำ ตัดขน",
+    cats: ["pets"],
+  },
+  {
+    key: "move",
+    label: "🚗 รับส่ง·ขนย้าย",
+    hint: "รับส่งคน/เด็ก รถเช่า ขนของ ย้ายบ้าน",
+    cats: ["rental", "porter", "truck", "boat"],
+  },
+  {
+    key: "online",
+    label: "💻 ออนไลน์·เอกสาร",
+    hint: "ออกแบบ ไอที ซ่อมคอม บัญชี แปล",
+    cats: ["online"],
+  },
+  {
+    key: "general",
+    label: "🙋 รับจ้างทั่วไป",
+    hint: "ฝากซื้อ ต่อคิว เฝ้าบ้าน งานอื่นๆ",
+    cats: ["errand", "other"],
+  },
 ];
 export const SHOP_SHELF = { food: ["food"], goods: ["shop", "supplies"] }; // shops from the directory, by shelf
-export const FOOD_LEND = ["homemade", "dessert", "drinks", "preserved", "catering", "food"];
+export const FOOD_LEND = [
+  "homemade",
+  "dessert",
+  "drinks",
+  "preserved",
+  "catering",
+  "food",
+];
 // 17 Oct: master switch for 🛒 สั่ง/จอง (with ORDERS_ON in backend/line_bot.py). Each post can also turn it off for
 // itself (no_orders) — e.g. a shop the admin posted for, that won't read orders here.
 export const ORDERS_ON = true;
 export const takesOrders = (x) => ORDERS_ON && !x?.no_orders;
 
 export const SHELVES = [
-  { key: "food", label: "ของกิน", icon: "🍲", hint: "อาหารทำเอง ขนม เครื่องดื่ม ร้านอาหาร", sell: ["homemade", "dessert", "drinks", "preserved", "catering"] },
-  { key: "goods", label: "ของใช้", icon: "🧺", hint: "งานฝีมือ ต้นไม้ เสื้อผ้า มือสอง ร้านค้า", sell: ["handmade", "plants", "clothes", "cosmetics", "petgoods", "electronics", "furniture", "kids", "other"] },
-  { key: "service", label: "รับทำ", icon: "🙋", hint: "ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง" },
+  {
+    key: "food",
+    label: "ของกิน",
+    icon: "🍲",
+    hint: "อาหารทำเอง ขนม เครื่องดื่ม ร้านอาหาร",
+    sell: ["homemade", "dessert", "drinks", "preserved", "catering"],
+  },
+  {
+    key: "goods",
+    label: "ของใช้",
+    icon: "🧺",
+    hint: "งานฝีมือ ต้นไม้ เสื้อผ้า มือสอง ร้านค้า",
+    sell: [
+      "handmade",
+      "plants",
+      "clothes",
+      "cosmetics",
+      "petgoods",
+      "electronics",
+      "furniture",
+      "kids",
+      "other",
+    ],
+  },
+  {
+    key: "service",
+    label: "รับทำ",
+    icon: "🙋",
+    hint: "ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง",
+  },
 ];
 export const SERVICE_CATS = SERVICE_GROUPS.flatMap((g) => g.cats);
-export const MARKET_SHOP_CATS = [...SHOP_SHELF.food, ...SHOP_SHELF.goods, ...SERVICE_CATS];
+export const MARKET_SHOP_CATS = [
+  ...SHOP_SHELF.food,
+  ...SHOP_SHELF.goods,
+  ...SERVICE_CATS,
+];
 export const isMarketShop = (s) => MARKET_SHOP_CATS.includes(s.category);
-export const shelfOfShop = (s) => (SHOP_SHELF.food.includes(s.category) ? "food" : SHOP_SHELF.goods.includes(s.category) ? "goods" : "service");
-export const shelfOfItem = (x) => (FOOD_LEND.includes(x.category) ? "food" : "goods");
+export const shelfOfShop = (s) =>
+  SHOP_SHELF.food.includes(s.category)
+    ? "food"
+    : SHOP_SHELF.goods.includes(s.category)
+      ? "goods"
+      : "service";
+export const SERVICE_LEND = ["health"]; // market posts shown on the 🙋 รับทำ shelf (rich: gallery, clip, price list)
+export const shelfOfItem = (x) =>
+  FOOD_LEND.includes(x.category)
+    ? "food"
+    : SERVICE_LEND.includes(x.category)
+      ? "service"
+      : "goods";
 
 // Contact board categories. Keys must match SERVICE_CATEGORIES in backend/services.py
 export const SERVICE_CATEGORIES = {
@@ -195,6 +327,7 @@ export const SERVICE_CATEGORIES = {
   tutor: ["📚", "ติวเตอร์ · สอนภาษา ดนตรี กีฬา"],
   // 17 Oct: ตลาด › รับทำ and the new ช่าง groups
   photo: ["📸", "ถ่ายรูป · สตูดิโอ · อีเวนต์"],
+  health: ["🩺", "สุขภาพ · กายภาพ · ดูแลผู้ป่วย"],
   homehelp: ["🏠", "แม่บ้าน · ซักรีด · ทำสวน · เลี้ยงเด็ก"],
   online: ["💻", "ออกแบบ · ไอที · บัญชี · เอกสาร"],
   errand: ["🙋", "รับจ้างทั่วไป · ฝากซื้อ"],
@@ -204,11 +337,37 @@ export const SERVICE_CATEGORIES = {
   other: ["📞", "อื่นๆ"],
 };
 // Flood-era categories stay for old listings; the repair-mode form offers these first.
-export const REPAIR_SERVICE_ORDER = ["electrician", "plumber", "ac", "appliance", "carpenter", "painter", "roof", "doors", "net", "handyman", "pest", "vehicle", "junk", "cleaning"];
+export const REPAIR_SERVICE_ORDER = [
+  "electrician",
+  "plumber",
+  "ac",
+  "appliance",
+  "carpenter",
+  "painter",
+  "roof",
+  "doors",
+  "net",
+  "handyman",
+  "pest",
+  "vehicle",
+  "junk",
+  "cleaning",
+];
 // 17 Oct: the form's choices by what is being listed (ช่าง · รับทำ · ร้าน)
 export const SERVICE_FORM_ORDER = {
   repair: REPAIR_SERVICE_ORDER,
-  service: ["beauty", "photo", "tutor", "homehelp", "cleaning", "pets", "rental", "porter", "online", "errand"],
+  service: [
+    "beauty",
+    "photo",
+    "tutor",
+    "homehelp",
+    "cleaning",
+    "pets",
+    "rental",
+    "porter",
+    "online",
+    "errand",
+  ],
   shop: ["food", "shop", "supplies"],
 };
 
@@ -245,11 +404,36 @@ export const LEND_CATEGORIES = {
   catering: ["🎉", "รับจัดเลี้ยง · สั่งงาน"],
   cosmetics: ["💄", "ความงาม · สกินแคร์"],
   petgoods: ["🦴", "ของสัตว์เลี้ยง"],
+  health: ["🩺", "สุขภาพ · กายภาพ"],
 };
 // 🛍️ ตลาดเพื่อนบ้าน (15 Oct): the lend items of kind "sell". The form offers these when selling (homemade first);
 // the four market ones are not offered for lend / give / want.
-export const MARKET_ONLY = ["homemade", "dessert", "drinks", "handmade", "preserved", "catering", "cosmetics", "petgoods"];
-export const MARKET_CATEGORIES = ["homemade", "dessert", "drinks", "preserved", "catering", "handmade", "plants", "clothes", "cosmetics", "petgoods", "electronics", "furniture", "kids", "other"];
+export const MARKET_ONLY = [
+  "homemade",
+  "dessert",
+  "drinks",
+  "handmade",
+  "preserved",
+  "catering",
+  "cosmetics",
+  "petgoods",
+];
+export const MARKET_CATEGORIES = [
+  "homemade",
+  "dessert",
+  "drinks",
+  "preserved",
+  "catering",
+  "handmade",
+  "plants",
+  "clothes",
+  "cosmetics",
+  "petgoods",
+  "electronics",
+  "furniture",
+  "kids",
+  "other",
+];
 // the market's filter chips: [key, label, categories] — "used" takes everything not named before it
 export const MARKET_FILTERS = [
   ["homemade", "🍲 อาหารทำเอง", ["homemade", "food"]],
@@ -299,7 +483,10 @@ export const LOST_CATEGORIES = {
 };
 export const JOB_STATUS = {
   open: { label: "ยังต้องการคน", cls: "bg-red-100 text-red-800" },
-  scheduled: { label: "ได้คนแล้ว / นัดแล้ว", cls: "bg-amber-100 text-amber-900" },
+  scheduled: {
+    label: "ได้คนแล้ว / นัดแล้ว",
+    cls: "bg-amber-100 text-amber-900",
+  },
   done: { label: "เสร็จแล้ว", cls: "bg-emerald-100 text-emerald-800" },
 };
 export const ISSUE_TYPES = {
@@ -360,7 +547,8 @@ export const NEED_WORDS =
 
 // Best guess of the request category from free text, for the "file this as a request?" prompt.
 export function guessNeedCategory(text) {
-  if (/ติดเตียง|ผู้สูงอายุ|คนแก่|ยาย|พิการ|เด็กเล็ก|ทารก|ตั้งครรภ์/.test(text)) return "vulnerable";
+  if (/ติดเตียง|ผู้สูงอายุ|คนแก่|ยาย|พิการ|เด็กเล็ก|ทารก|ตั้งครรภ์/.test(text))
+    return "vulnerable";
   if (/ป่วย|เจ็บ|บาดเจ็บ|หายใจ|ไม่สบาย/.test(text)) return "medical";
   if (/อพยพ|ติดอยู่|ออกไม่ได้|เรือ/.test(text)) return "evacuate";
   if (/ไฟ|ชาร์จ|แบต/.test(text)) return "power";
@@ -403,9 +591,21 @@ export function waterOf(level) {
 }
 
 export const ANNOUNCEMENT_LEVELS = {
-  danger: { label: "ด่วนมาก / อันตราย", icon: "🚨", cls: "bg-red-600 text-white border-red-800" },
-  warning: { label: "เตือน", icon: "⚠️", cls: "bg-yellow-300 text-black border-black" },
-  info: { label: "แจ้งทั่วไป", icon: "📢", cls: "bg-black text-white border-black" },
+  danger: {
+    label: "ด่วนมาก / อันตราย",
+    icon: "🚨",
+    cls: "bg-red-600 text-white border-red-800",
+  },
+  warning: {
+    label: "เตือน",
+    icon: "⚠️",
+    cls: "bg-yellow-300 text-black border-black",
+  },
+  info: {
+    label: "แจ้งทั่วไป",
+    icon: "📢",
+    cls: "bg-black text-white border-black",
+  },
 };
 
 export function timeAgo(iso) {
@@ -413,9 +613,51 @@ export function timeAgo(iso) {
   if (s < 60) return "เมื่อสักครู่";
   if (s < 3600) return `${Math.floor(s / 60)} นาทีที่แล้ว`;
   if (s < 86400) return `${Math.floor(s / 3600)} ชม.ที่แล้ว`;
-  return new Date(iso).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleString("th-TH", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function osmLink(lat, lng) {
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=19/${lat}/${lng}`;
+}
+
+// 18 Oct: ตลาด categories as data — GET /api/catalog (admin edits them, no deploy; backend/catalog.py).
+// Updates the lists above *in place* so every component that imported them sees the new ones.
+function fill(arr, items) {
+  arr.splice(0, arr.length, ...items);
+}
+export function applyCatalog(c) {
+  if (!c || !c.service_groups) return;
+  Object.assign(SERVICE_CATEGORIES, c.service_labels || {});
+  Object.assign(LEND_CATEGORIES, c.lend_labels || {});
+  fill(SERVICE_GROUPS, c.service_groups);
+  fill(
+    SERVICE_CATS,
+    SERVICE_GROUPS.flatMap((g) => g.cats),
+  );
+  fill(MARKET_SHOP_CATS, [
+    ...SHOP_SHELF.food,
+    ...SHOP_SHELF.goods,
+    ...SERVICE_CATS,
+  ]);
+  if (c.service_form) SERVICE_FORM_ORDER.service = c.service_form;
+  const sh = c.shelves || {};
+  if (sh.food) {
+    fill(FOOD_LEND, [...sh.food, "food"]);
+    SHELVES[0].sell = sh.food;
+  }
+  if (sh.goods) SHELVES[1].sell = sh.goods;
+  fill(SERVICE_LEND, sh.service || []);
+  SHELVES[2].sell = sh.service || [];
+  fill(MARKET_CATEGORIES, [
+    ...(sh.food || []),
+    ...(sh.service || []),
+    ...(sh.goods || []),
+  ]);
+  for (const k of sh.service || [])
+    if (!MARKET_ONLY.includes(k)) MARKET_ONLY.push(k);
 }

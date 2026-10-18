@@ -40,6 +40,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import catalog
 import push
 import repair
 from myhome import waste_days
@@ -130,6 +131,7 @@ REPAIR_GROUPS = [("⚡ ไฟฟ้า", ("electrician",)), ("🚿 ประป�
                  ("🧹 ล้างบ้าน", ("cleaning",)), ("🚛 ขนขยะ", ("junk",)), ("🐜 ปลวก·แมลง", ("pest",)), ("🚗 ซ่อมรถ·ซักพรม", ("vehicle",))]
 SERVICE_CATS = [c for _, cs in SERVICE_GROUPS for c in cs]
 REPAIR_CATS = [c for _, cs in REPAIR_GROUPS for c in cs]
+SERVICE_LEND = ["health"]  # market posts shown on the 🙋 รับทำ shelf (catalog "shelves.service")
 REPAIR_WORDS = {"ช่าง", "หาช่าง", "🔧 ช่าง", "ช่างซ่อมบ้าน", "ซ่อม", "ซ่อมบ้าน", "ช่าง บริการ", "ช่าง·บริการ", "ช่างทั้งหมด"}
 # a word in what they typed → the ช่าง group ("หาช่างซ่อมเครื่องซักผ้า" → แอร์·เครื่องใช้)
 REPAIR_HINTS = [(r"ไฟ|ปลั๊ก|เบรก", 0), (r"ประปา|ปั๊ม|ท่อ|น้ำรั่ว|ส้วม|สุขภัณฑ์", 1), (r"แอร์|ซักผ้า|ตู้เย็น|ทีวี|ไมโครเวฟ|เครื่องใช้", 2),
@@ -151,6 +153,24 @@ MKT_WORD_CAT = {**{label: c for label, c in MKT_CATS}, "ของฝาก": "pr
 MKT_TH = {"homemade": "อาหารทำเอง", "dessert": "ขนม·เบเกอรี่", "drinks": "เครื่องดื่ม", "handmade": "งานฝีมือ", "plants": "ต้นไม้",
           "preserved": "ของฝาก·แปรรูป", "catering": "รับจัดเลี้ยง", "cosmetics": "ความงาม", "petgoods": "ของสัตว์เลี้ยง",
           "food": "ของกิน", "clothes": "เสื้อผ้า", "electronics": "เครื่องใช้ไฟฟ้า", "furniture": "ของใช้", "kids": "ของเด็ก", "other": "มือสอง·อื่นๆ"}
+
+@catalog.on_change
+def _catalog(doc):
+    """18 Oct: groups / buttons / shelves from the catalog (admin edits them, no deploy) — lists updated in place."""
+    SERVICE_GROUPS[:] = [(g["label"], tuple(g["cats"])) for g in doc["service_groups"]]
+    SERVICE_CATS[:] = [c for _, cs in SERVICE_GROUPS for c in cs]
+    SVC_CHOICES["service"] = [tuple(x) for x in doc["line_service"]]
+    SVC_LABEL.clear()
+    SVC_LABEL.update({c: label for choices in SVC_CHOICES.values() for label, c in choices})
+    MKT_CATS[:] = [tuple(x) for x in doc["line_sell"]]
+    SHELF_CATS["food"] = list(doc["shelves"]["food"])
+    SHELF_CATS["goods"] = [c for c in doc["shelves"]["goods"] if c in {k for _, k in MKT_CATS}] or SHELF_CATS["goods"]
+    SERVICE_LEND[:] = list(doc["shelves"].get("service", []))
+    for k, (e, name) in doc["lend_labels"].items():
+        MKT_TH[k] = name
+    MKT_WORD_CAT.update({label: c for label, c in MKT_CATS})
+
+
 MKT_ICON = {"homemade": "🍲", "dessert": "🧁", "drinks": "🧋", "handmade": "🧶", "plants": "🪴", "food": "🍱", "clothes": "👕", "kids": "🧸"}
 
 
@@ -1013,11 +1033,16 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         chips = qr(*[(v, v) for k, v in SHELF_TH.items() if k != shelf], ("🛍️ ลงขาย / รับทำ", "ลงขาย"))
         if shelf == "service":
             docs = await services_in(SERVICE_CATS)
+            posts = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": list(SERVICE_LEND)}},
+                                             {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).sort("created_at", -1).to_list(4)
+            if posts:
+                return [text(f"🙋 รับทำ · บริการจากเพื่อนบ้าน {len(posts) + len(docs)} ราย · ปัดดูได้ ➡️"),
+                        carousel("รับทำ·บริการ", ([market_card(d) for d in posts] + [service_card(d) for d in docs])[:12], chips)]
             if not docs:
                 return [text("ยังไม่มีใครลง 🙋 รับทำ ครับ\nรับตัดผม ติว ถ่ายรูป ทำความสะอาด รับส่ง? พิมพ์ \"ลงขาย\" แล้วเลือก รับทำ·บริการ", chips)]
             return [text(f"🙋 รับทำ · บริการจากเพื่อนบ้าน {len(docs)} ราย · ปัดดูได้ ➡️"), carousel("รับทำ·บริการ", [service_card(d) for d in docs[:12]], chips)]
         cats = list(FOOD_LEND) if shelf == "food" else None
-        q = {"kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": cats} if cats else {"$nin": list(FOOD_LEND)}}
+        q = {"kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": cats} if cats else {"$nin": list(FOOD_LEND) + list(SERVICE_LEND)}}
         items = await db.lend_items.find(q, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).sort("created_at", -1).to_list(10)
         shops = await db.services.find({"category": {"$in": ["food"] if shelf == "food" else ["shop", "supplies"]}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
                                        ).sort([("pinned", -1), ("updated_at", -1)]).to_list(6)
@@ -1106,12 +1131,19 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             elif "รับ" in t or "บริการ" in t:
                 return await service_start(user, "service", s.get("media", []))
             else:
-                return [mask(s)]
+                k = catalog.word_key(raw) or MKT_WORD_CAT.get(raw.strip())
+                if k in SHELF_CATS["food"] or k in SHELF_CATS["goods"]:
+                    s["shelf"], s["category"] = ("food" if k in SHELF_CATS["food"] else "goods"), k
+                    s["step"] = "m_category"
+                    return await madvance(user, s)
+                if k in {c for _, c in SVC_CHOICES["service"]}:
+                    return await service_start(user, "service", s.get("media", []))
+                return [text(f"ยังไม่แน่ใจว่า \"{raw.strip()[:30]}\" คืออะไรครับ 🙏 แตะปุ่มด้านล่างได้เลย"), mask(s)]
             return await madvance(user, s)
         if step == "m_category":
-            cat = MKT_WORD_CAT.get(raw.strip()) or MKT_WORD_CAT.get(t)
+            cat = MKT_WORD_CAT.get(raw.strip()) or MKT_WORD_CAT.get(t) or catalog.word_key(raw, SHELF_CATS.get(s.get("shelf")))
             if not cat:
-                return [mask(s)]
+                return [text(f"ยังไม่เจอหมวด \"{raw.strip()[:30]}\" ครับ แตะปุ่มด้านล่างได้เลย (ไม่มีที่ตรง เลือก 📦 อื่นๆ)"), mask(s)]
             s["category"] = cat
             return await madvance(user, s)
         if step == "m_photos":
@@ -1208,9 +1240,11 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 return [text("▶ ได้คลิป YouTube แล้วครับ"), sask(s)]
             raw, t = rest, norm(rest)
         if step == "s_cat":
-            cat = next((c for label, c in SVC_CHOICES["repair" if s.get("mode") == "repair" else "service"] if raw.strip() == label or t in norm(label)), None)
+            choices = SVC_CHOICES["repair" if s.get("mode") == "repair" else "service"]
+            cat = next((c for label, c in choices if raw.strip() == label or t in norm(label)), None) or catalog.word_key(raw, {c for _, c in choices})
             if not cat:
-                return [sask(s)]
+                last = "🙋 รับจ้างทั่วไป" if s.get("mode") != "repair" else "🔨 งานจุกจิก"
+                return [text(f"ยังไม่เจอหมวด \"{raw.strip()[:30]}\" ครับ แตะปุ่มด้านล่างได้เลย (ไม่มีที่ตรง เลือก {last})"), sask(s)]
             s["category"] = cat
             return await sadvance(user, s)
         if step == "s_photos":

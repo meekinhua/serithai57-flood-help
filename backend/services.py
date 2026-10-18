@@ -27,6 +27,14 @@ SERVICE_CATEGORIES = [
     # 17 Oct: ตลาด › รับทำ·บริการ and the new ช่าง groups (frontend config.js SERVICE_GROUPS / REPAIR_GROUPS)
     "photo", "homehelp", "online", "errand", "doors", "net", "handyman",
 ]
+import catalog  # noqa: E402  18 Oct: new category keys come from the catalog (no deploy)
+
+
+@catalog.on_change
+def _cats(doc):
+    SERVICE_CATEGORIES.extend(k for k in doc["service_labels"] if k not in SERVICE_CATEGORIES)
+
+
 Pricing = Literal["paid", "free", "ask"]
 HIDDEN = {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews.who": 0}
 
