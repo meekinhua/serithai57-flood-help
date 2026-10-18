@@ -120,9 +120,9 @@ MKT_CATS = [("🍲 อาหารทำเอง", "homemade"), ("🧁 ขน�
 FOOD_LEND = ("homemade", "dessert", "drinks", "preserved", "catering", "food")
 SHELF_CATS = {"food": ["homemade", "dessert", "drinks", "preserved", "catering"],
               "goods": ["handmade", "plants", "clothes", "cosmetics", "petgoods", "other"]}
-SHELF_TH = {"food": "🍲 ของกิน", "goods": "🧺 ของใช้", "service": "🙋 รับทำ"}
+SHELF_TH = {"food": "🍲 ของกิน", "goods": "🧺 ของใช้", "service": "🙋 บริการ"}  # 18 Oct: รับทำ → บริการ (catalog shelf_labels)
 SHELF_WORDS = {"ของกิน": "food", "🍲 ของกิน": "food", "ของใช้": "goods", "🧺 ของใช้": "goods",
-               "รับทำ": "service", "🙋 รับทำ": "service", "บริการ": "service", "รับจ้าง": "service", "รับทำ·บริการ": "service", "🆕 ใหม่ล่าสุด": "new"}
+               "รับทำ": "service", "🙋 รับทำ": "service", "🙋 บริการ": "service", "บริการ": "service", "รับจ้าง": "service", "รับทำ·บริการ": "service", "🆕 ใหม่ล่าสุด": "new"}
 SERVICE_GROUPS = [("💇 สวยงาม·สุขภาพ", ("beauty",)), ("📸 ถ่ายรูป·อีเวนต์", ("photo",)), ("📚 สอน·ติว", ("tutor",)),
                   ("🏠 ช่วยงานบ้าน", ("homehelp", "cleaning")), ("🐾 สัตว์เลี้ยง", ("pets",)), ("🚗 รับส่ง·ขนย้าย", ("rental", "porter", "truck", "boat")),
                   ("💻 ออนไลน์·เอกสาร", ("online",)), ("🙋 รับจ้างทั่วไป", ("errand", "other"))]
@@ -169,6 +169,10 @@ def _catalog(doc):
     for k, (e, name) in doc["lend_labels"].items():
         MKT_TH[k] = name
     MKT_WORD_CAT.update({label: c for label, c in MKT_CATS})
+    for k, (e, name) in doc.get("shelf_labels", {}).items():
+        if k in SHELF_TH:
+            SHELF_TH[k] = f"{e} {name}"
+            SHELF_WORDS[name] = SHELF_WORDS[f"{e} {name}"] = k
 
 
 MKT_ICON = {"homemade": "🍲", "dessert": "🧁", "drinks": "🧋", "handmade": "🧶", "plants": "🪴", "food": "🍱", "clothes": "👕", "kids": "🧸"}
@@ -192,7 +196,7 @@ def split_house(raw: str):
 # ---------- per-house rich menu: the village menu + a strip on top "🏠 4/917 · ซอย 16 · รถขยะ จ.·พฤ." ----------
 # Text pieces are pre-rendered (tools/line_menu_assets.py) because the server has no Thai font; we only paste them.
 MENU_DIR = Path(__file__).parent / "data" / "line_menu"
-MENU_VER = "v5"  # 17 Oct v4: menus open by default (selected True). Bump when base.png / the tiles change, so every house gets a freshly drawn menu
+MENU_VER = "v6"  # 18 Oct v6: ตลาด tile says บริการ (was รับทำ) · 17 Oct v4: menus open by default (selected True). Bump when base.png / the tiles change, so every house gets a freshly drawn menu
 DAY_ABBR = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]
 _glyphs = {}
 
@@ -958,8 +962,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         return {"type": "bubble", "size": "kilo", "body": {"type": "box", "layout": "vertical", "spacing": "md", "justifyContent": "center", "contents": [
             {"type": "text", "text": "🛍️ ตลาดเพื่อนบ้าน", "weight": "bold", "size": "lg", "align": "center"},
             {"type": "text", "text": "เลือกดูทีละชั้น", "size": "sm", "color": "#45504A", "align": "center"},
-            btn("🍲 ของกิน", "#B5541B"), btn("🧺 ของใช้", "#1E6B47"), btn("🙋 รับทำ", "#1F4F8A"),
-            {"type": "button", "style": "secondary", "action": {"type": "message", "label": "+ ลงขาย / รับทำ", "text": "ลงขาย"}}]}}
+            btn("🍲 ของกิน", "#B5541B"), btn("🧺 ของใช้", "#1E6B47"), btn("🙋 บริการ", "#1F4F8A"),
+            {"type": "button", "style": "secondary", "action": {"type": "message", "label": "+ ลงขาย / บริการ", "text": "ลงขาย"}}]}}
 
     def carousel(alt: str, bubbles: list, chips: dict) -> dict:
         return {"type": "flex", "altText": alt, "contents": {"type": "carousel", "contents": bubbles[:12]}, "quickReply": chips}
@@ -1024,23 +1028,23 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         bubbles.append({"type": "bubble", "size": "kilo", "body": {"type": "box", "layout": "vertical", "justifyContent": "center", "spacing": "md", "contents": [
             {"type": "text", "text": "ดูทั้งหมด + แยกตามหมวด + ร้านประจำ", "weight": "bold", "wrap": True, "align": "center"},
             {"type": "button", "style": "secondary", "action": {"type": "uri", "label": "ดูทั้งหมด", "uri": f"{SITE}/#market"}}]}})
-        head = (f"🛍️ ตลาดเพื่อนบ้าน · ของขาย {len(items)} · ร้าน {len(shops)} · รับทำ {n_svc} · ปัดดูได้ ➡️\n"
+        head = (f"🛍️ ตลาดเพื่อนบ้าน · ของขาย {len(items)} · ร้าน {len(shops)} · บริการ {n_svc} · ปัดดูได้ ➡️\n"
                 + ("ของทำเองกด 🛒 สั่ง/จองไว้ได้ · ร้านกดโทรได้เลย · ระบบไม่รับเงิน" if ORDERS_ON else "กดดูรายละเอียด แล้วโทร/ทักผู้ขายได้เลย · ระบบไม่รับเงิน"))
-        chips = qr(("🍲 ของกิน", "🍲 ของกิน"), ("🧺 ของใช้", "🧺 ของใช้"), ("🙋 รับทำ", "🙋 รับทำ"), *chips["items"] and [(i["action"]["label"], i["action"]["text"]) for i in chips["items"]])
+        chips = qr(("🍲 ของกิน", "🍲 ของกิน"), ("🧺 ของใช้", "🧺 ของใช้"), ("🙋 บริการ", "🙋 บริการ"), *chips["items"] and [(i["action"]["label"], i["action"]["text"]) for i in chips["items"]])
         return [text(head), {"type": "flex", "altText": "ตลาดเพื่อนบ้าน", "contents": {"type": "carousel", "contents": bubbles}, "quickReply": chips}]
 
     async def shelf_list(user: str, shelf: str) -> list:
-        chips = qr(*[(v, v) for k, v in SHELF_TH.items() if k != shelf], ("🛍️ ลงขาย / รับทำ", "ลงขาย"))
+        chips = qr(*[(v, v) for k, v in SHELF_TH.items() if k != shelf], ("🛍️ ลงขาย / บริการ", "ลงขาย"))
         if shelf == "service":
             docs = await services_in(SERVICE_CATS)
             posts = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": list(SERVICE_LEND)}},
                                              {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).sort("created_at", -1).to_list(4)
             if posts:
-                return [text(f"🙋 รับทำ · บริการจากเพื่อนบ้าน {len(posts) + len(docs)} ราย · ปัดดูได้ ➡️"),
-                        carousel("รับทำ·บริการ", ([market_card(d) for d in posts] + [service_card(d) for d in docs])[:12], chips)]
+                return [text(f"🙋 บริการจากเพื่อนบ้าน {len(posts) + len(docs)} ราย · ปัดดูได้ ➡️"),
+                        carousel("บริการ", ([market_card(d) for d in posts] + [service_card(d) for d in docs])[:12], chips)]
             if not docs:
-                return [text("ยังไม่มีใครลง 🙋 รับทำ ครับ\nรับตัดผม ติว ถ่ายรูป ทำความสะอาด รับส่ง? พิมพ์ \"ลงขาย\" แล้วเลือก รับทำ·บริการ", chips)]
-            return [text(f"🙋 รับทำ · บริการจากเพื่อนบ้าน {len(docs)} ราย · ปัดดูได้ ➡️"), carousel("รับทำ·บริการ", [service_card(d) for d in docs[:12]], chips)]
+                return [text("ยังไม่มีใครลง 🙋 บริการ ครับ\nรับตัดผม ติว ถ่ายรูป ทำความสะอาด รับส่ง? พิมพ์ \"ลงขาย\" แล้วเลือก 🙋 บริการ", chips)]
+            return [text(f"🙋 บริการจากเพื่อนบ้าน {len(docs)} ราย · ปัดดูได้ ➡️"), carousel("บริการ", [service_card(d) for d in docs[:12]], chips)]
         cats = list(FOOD_LEND) if shelf == "food" else None
         q = {"kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": cats} if cats else {"$nin": list(FOOD_LEND) + list(SERVICE_LEND)}}
         items = await db.lend_items.find(q, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).sort("created_at", -1).to_list(10)
@@ -1057,7 +1061,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
     def mask(s: dict) -> dict:
         step = s["step"]
         if step == "m_shelf":
-            return text("🛍️ ลงในตลาดเพื่อนบ้าน\nจะลงอะไรครับ?", qr(("🍲 ขายของกิน", "ขายของกิน"), ("🧺 ขายของใช้", "ขายของใช้"), ("🙋 รับทำ·บริการ", "รับทำงาน"), ("🔧 เป็นช่าง", "เป็นช่าง"), CANCEL))
+            return text("🛍️ ลงในตลาดเพื่อนบ้าน\nจะลงอะไรครับ?", qr(("🍲 ขายของกิน", "ขายของกิน"), ("🧺 ขายของใช้", "ขายของใช้"), ("🙋 บริการ", "บริการ"), ("🔧 เป็นช่าง", "เป็นช่าง"), CANCEL))
         if step == "m_category":
             mine = SHELF_CATS.get(s.get("shelf")) or [c for _, c in MKT_CATS]
             return text("ขายอะไรครับ? เลือกหมวด", qr(*[(label, label) for label, c in MKT_CATS if c in mine], CANCEL))
@@ -1194,7 +1198,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
     def sask(s: dict) -> dict:
         step, repair = s["step"], s.get("mode") == "repair"
         if step == "s_cat":
-            return text(("🔧 ลงช่างซ่อมบ้าน\nช่างอะไรครับ?" if repair else "🙋 ลงรับทำ·บริการ\nรับทำอะไรครับ?"), qr(*SVC_CHOICES["repair" if repair else "service"], CANCEL))
+            return text(("🔧 ลงช่างซ่อมบ้าน\nช่างอะไรครับ?" if repair else "🙋 ลงบริการ\nบริการอะไรครับ?"), qr(*SVC_CHOICES["repair" if repair else "service"], CANCEL))
         if step == "s_photos":
             n = len(s.get("media", []))
             if n:
@@ -1220,7 +1224,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                  f"📍 {s.get('area') or 'ในหมู่บ้าน'}" + (" · มีหมุด" if s.get("lat") else ""),
                  f"📷 รูป {len(s.get('media', []))} รูป",
                  f"☎️ {s.get('phone', '')}"]
-        where = "หน้า 🔧 ช่าง" if repair else "ตลาด › 🙋 รับทำ"
+        where = "หน้า 🔧 ช่าง" if repair else "ตลาด › 🙋 บริการ"
         return text(f"เช็กก่อนลงนะครับ\n\n" + "\n".join(lines) + f"\n\nจะขึ้นใน {where} ทั้งเว็บและ LINE · ระบบไม่รับเงิน คุยกันเอง",
                     qr(("✅ ลงเลย", "postback:publish_service"), CANCEL))
 
@@ -1299,7 +1303,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         await db.line_posts.insert_one({"user": user, "id": sid, "title": doc["name"], "at": t, "type": "service"})
         push.fire(push.on_shop, doc)
         await drop(user)
-        where = "🔧 ช่าง" if doc["category"] in REPAIR_CATS else "🛍️ ตลาด › 🙋 รับทำ"
+        where = "🔧 ช่าง" if doc["category"] in REPAIR_CATS else "🛍️ ตลาด › 🙋 บริการ"
         return [text(f"✅ ลงแล้วครับ · อยู่ใน {where}\n{SITE}/#shop-{sid}\n\nเพื่อนบ้านกดโทรหาคุณได้จากการ์ดเลย · อยากแก้หรือปิด ทักแอดได้ครับ",
                      qr(("🛍️ ดูตลาด", "ตลาด"), ("🔧 ดูช่าง", "ช่าง")))]
 

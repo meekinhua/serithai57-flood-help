@@ -667,7 +667,7 @@ export default function RepairApp() {
       <>
         <section className="mt-3 grid grid-cols-3 gap-2" aria-label="ทางลัด">
           {[
-            ["🛍️", "ตลาด", "ของกิน ของใช้ รับทำ", () => showTab("market")],
+            ["🛍️", "ตลาด", "ของกิน ของใช้ บริการ", () => showTab("market")],
             ["🔧", "ช่าง", "ไฟ ประปา แอร์", () => openPros("")],
             ["♻️", "ขยะ", "วันรถซอยคุณ", () => showTab("waste")],
           ].map(([e, t, h, fn]) => (
@@ -951,7 +951,7 @@ export default function RepairApp() {
 
           {page === "market" && (
             <>
-              <PageTitle title="🛍️ ตลาดเพื่อนบ้าน" sub="ของกิน · ของใช้ · รับทำ · กดดูแล้วโทร·ทักผู้ขายได้เลย" />
+              <PageTitle title="🛍️ ตลาดเพื่อนบ้าน" sub="ของกิน · ของใช้ · บริการ · กดดูแล้วโทร·ทักผู้ขายได้เลย" />
               <section className="card p-3">
                 <Market
                   items={lend}
@@ -1387,7 +1387,7 @@ export default function RepairApp() {
         )}
         {sheet?.type === "serviceForm" && (
           <Sheet
-            title={{ service: "🙋 ลงรับทำ · บริการ", shop: "🏪 ลงร้านในตลาด", repair: "🔧 ลงช่าง / แนะนำช่าง" }[sheet.mode] || (sheet.prefill?.category ? "🏪 ลงร้านในตลาด" : "แนะนำช่าง / ร้าน")}
+            title={{ service: "🙋 ลงบริการ", shop: "🏪 ลงร้านในตลาด", repair: "🔧 ลงช่าง / แนะนำช่าง" }[sheet.mode] || (sheet.prefill?.category ? "🏪 ลงร้านในตลาด" : "แนะนำช่าง / ร้าน")}
             onClose={() => setSheet(null)}
           >
             <ServiceForm

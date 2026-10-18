@@ -24,7 +24,9 @@ DEFAULT = {
     # label of every category key: [emoji, Thai name]. Merged over the code's own labels.
     "service_labels": {"health": ["🩺", "สุขภาพ · กายภาพ · ดูแลผู้ป่วย"]},
     "lend_labels": {"health": ["🩺", "สุขภาพ · กายภาพ"]},
-    # 🙋 รับทำ shelf: the groups people see (cats = service directory keys)
+    # the market's three shelves: [emoji, name] (18 Oct: รับทำ → บริการ)
+    "shelf_labels": {"food": ["🍲", "ของกิน"], "goods": ["🧺", "ของใช้"], "service": ["🙋", "บริการ"]},
+    # 🙋 บริการ shelf: the groups people see (cats = service directory keys)
     "service_groups": [
         {"key": "health", "label": "🩺 สุขภาพ·กายภาพ", "hint": "กายภาพบำบัด คลินิก นวดบำบัด ดูแลผู้ป่วย·ผู้สูงอายุ", "cats": ["health"]},
         {"key": "beauty", "label": "💇 สวยงาม", "hint": "ตัดผม แต่งหน้า ทำเล็บ นวด สปา ฟิตเนส", "cats": ["beauty"]},
@@ -97,7 +99,7 @@ def on_change(fn):
 def merge(stored: dict) -> dict:
     out = copy.deepcopy(DEFAULT)
     for k, v in (stored or {}).items():
-        if k in ("service_labels", "lend_labels", "words", "shelves") and isinstance(v, dict):
+        if k in ("service_labels", "lend_labels", "words", "shelves", "shelf_labels") and isinstance(v, dict):
             out[k] = {**out[k], **v}
         elif k in DEFAULT:
             out[k] = v

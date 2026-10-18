@@ -1138,7 +1138,7 @@ const shopText = (s) =>
     `${s.name} ${s.detail} ${s.area} ${SERVICE_CATEGORIES[s.category]?.[1] || ""} ${SERVICE_GROUPS.find((g) => g.cats.includes(s.category))?.hint || ""}`,
   );
 
-// 17 Oct, simple: search first, three big shelves (ของกิน · ของใช้ · รับทำ), one "+ ลงขาย / รับทำ" that asks one question.
+// 17 Oct, simple: search first, three big shelves (ของกิน · ของใช้ · รับทำ), one "+ ลงขาย / บริการ" that asks one question.
 // Sub-chips only show once a shelf has more than 6 things, and only for categories that have something in them.
 export default function Market({
   items,
@@ -1320,7 +1320,7 @@ export default function Market({
             query={q}
             onAdd={() => onAddShop("service")}
             onHire={onAsk}
-            hireText="📢 ประกาศหาคนรับทำ ให้เพื่อนบ้านที่ทำได้ติดต่อมา"
+            hireText="📢 ประกาศหาคนให้บริการ ให้เพื่อนบ้านที่ทำได้ติดต่อมา"
           />
         </>
       ) : (
@@ -1353,7 +1353,7 @@ export default function Market({
           {svcHits.length > 0 && (
             <section className="space-y-2 pt-1">
               <h3 className="px-1 text-lg font-bold">
-                🙋 รับทำ ({svcHits.length})
+                🙋 บริการ ({svcHits.length})
               </h3>
               <ProsList
                 embedded
@@ -1377,7 +1377,7 @@ export default function Market({
               </span>
               <span className="min-w-0 flex-1">
                 <b className="block">
-                  รับทำ · บริการจากเพื่อนบ้าน {services.length} ราย
+                  บริการจากเพื่อนบ้าน {services.length} ราย
                 </b>
                 <span className="text-sm text-[#45504A]">
                   ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง
@@ -1424,7 +1424,7 @@ export default function Market({
         {!choosing ? (
           <>
             <p className="text-[15px] text-[#45504A]">
-              <b className="text-[#15201A]">ทำขาย หรือรับทำอะไร?</b>{" "}
+              <b className="text-[#15201A]">ขายอะไร หรือมีบริการอะไร?</b>{" "}
               ลงให้เพื่อนบ้านเห็นได้ฟรี · ระบบไม่รับเงิน ตกลงกันเอง
             </p>
             <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -1432,7 +1432,7 @@ export default function Market({
                 onClick={() => setChoosing(true)}
                 className="min-h-[52px] rounded-xl bg-[#1E6B47] text-lg font-bold text-white"
               >
-                + ลงขาย / รับทำ
+                + ลงขาย / บริการ
               </button>
               <a
                 href={LINE_SELL}
@@ -1462,7 +1462,7 @@ export default function Market({
               ],
               [
                 "🙋",
-                "รับทำงาน · บริการ",
+                "บริการ · รับจ้าง",
                 "ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง",
                 () => onAddShop("service"),
               ],
