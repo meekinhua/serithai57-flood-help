@@ -273,7 +273,7 @@ export const SHELVES = [
   },
   {
     key: "service",
-    label: "รับทำ",
+    label: "บริการ",
     icon: "🙋",
     hint: "ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง",
   },
@@ -651,6 +651,10 @@ export function applyCatalog(c) {
     SHELVES[0].sell = sh.food;
   }
   if (sh.goods) SHELVES[1].sell = sh.goods;
+  for (const x of SHELVES) {
+    const l = (c.shelf_labels || {})[x.key];
+    if (l) [x.icon, x.label] = l;
+  }
   fill(SERVICE_LEND, sh.service || []);
   SHELVES[2].sell = sh.service || [];
   fill(MARKET_CATEGORIES, [
