@@ -951,7 +951,7 @@ export default function RepairApp() {
 
           {page === "market" && (
             <>
-              <PageTitle title="🛍️ ตลาดเพื่อนบ้าน" sub="ของกิน · ของใช้ · บริการ · กดดูแล้วโทร·ทักผู้ขายได้เลย" />
+              <PageTitle title="🛍️ ตลาดเพื่อนบ้าน" sub="ของกิน · ของใช้ · บริการ · เช่า·ขาย · กดดูแล้วโทร·ทักผู้ขายได้เลย" />
               <section className="card p-3">
                 <Market
                   items={lend}
@@ -961,9 +961,9 @@ export default function RepairApp() {
                   setServices={setServices}
                   pros={prosOnly}
                   onPros={(q) => openPros("", false, q)}
-                  onAdd={(shelf) => setSheet({ type: "lendForm", kind: "sell", shelf })}
+                  onAdd={(shelf, cat) => setSheet({ type: "lendForm", kind: "sell", shelf, cat })}
                   onAddShop={(mode) => setSheet({ type: "serviceForm", mode })}
-                  onAsk={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })}
+                  onAsk={() => setSheet({ type: "lendForm", kind: "sell", shelf: "service", cat: "hire" })}
                 />
               </section>
             </>
@@ -1203,10 +1203,11 @@ export default function RepairApp() {
           </Sheet>
         )}
         {sheet?.type === "lendForm" && (
-          <Sheet title={sheet.kind === "sell" ? (sheet.shelf === "food" ? "🍲 ขายของกิน" : sheet.shelf === "goods" ? "🧺 ขายของใช้" : "🛍️ ลงขายของ") : "ยืม · ให้ · ขาย"} onClose={() => setSheet(null)}>
+          <Sheet title={sheet.kind === "sell" ? (sheet.shelf === "food" ? "🍲 ขายของกิน" : sheet.shelf === "goods" ? "🧺 ขายของใช้" : sheet.cat === "realestate" ? "🏠 บ้านเช่า · บ้านขาย" : sheet.cat === "hire" ? "📢 จ้างงาน · หาคนช่วย" : sheet.shelf === "service" ? "🙋 ลงในชั้นบริการ" : "🛍️ ลงขายของ") : "ยืม · ให้ · ขาย"} onClose={() => setSheet(null)}>
             <LendForm
               kind={sheet.kind}
               shelf={sheet.shelf || ""}
+              category={sheet.cat || ""}
               onDone={(x) => {
                 setLend((p) => [x, ...p]);
                 posted(x.kind === "sell" ? "market" : "lend", `${LEND_KIND_TEXT[x.kind] || "🧰"} ${x.title}${x.price ? ` ${x.price}` : ""}${x.soi ? ` (ซ.${x.soi})` : ""}`);
