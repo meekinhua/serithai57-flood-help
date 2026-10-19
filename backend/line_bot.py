@@ -1914,8 +1914,43 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 same[0]["action"]["label"] = chip[0][:20]  # e.g. "🏠 บ้านฉัน" → "🏠 4/917 · ซ.16"
             else:
                 last["quickReply"] = {"items": (qr(chip)["items"] + items)[:13]}
+        try:  # 20 Oct: an answer the admin approved in the dashboard ("ฝากตอบ") rides on this reply — free, no push
+            note = await db.line_pending.find_one_and_delete({"user": user}, sort=[("at", 1)])
+            if note:
+                out = [text(ADMIN_HEAD + note["text"])] + (out or [])[:4]
+                await db.reply_drafts.update_one({"id": note.get("draft")}, {"$set": {"status": "sent", "delivered_at": now()}})
+        except Exception:
+            pass
         if out:
             await reply(tok, out)
+
+    ADMIN_HEAD = "💬 แอดตอบครับ" + chr(10)
+
+    async def admin_send(user: str, body: str, mode: str, draft: str = "") -> tuple[bool, str]:
+        """The dashboard's ส่ง: 'later' waits for the person's next message (free), 'push' sends now (uses the monthly quota)."""
+        if mode == "later":
+            await db.line_pending.insert_one({"at": now(), "user": user, "text": body[:4000], "draft": draft})
+            return True, "ฝากไว้แล้ว · จะส่งตอนเขาทักมาครั้งหน้า"
+        c = await creds()
+        if not c:
+            return False, "ยังไม่ได้ตั้งค่า LINE bot"
+        if c.get("dry"):
+            await db.line_replies.insert_one({"at": now(), "push": user, "messages": [text(ADMIN_HEAD + body)]})
+            return True, "ส่งแล้ว (sim)"
+        code, r = await asyncio.to_thread(call, "POST", f"{API}/message/push", c["token"], {"to": user, "messages": [text(ADMIN_HEAD + body[:4900])]})
+        return code == 200, "ส่งแล้ว" if code == 200 else f"LINE {code} {r!r}"[:200]
+
+    async def push_quota() -> dict:
+        c = await creds()
+        if not c or c.get("dry"):
+            return {"limit": 300, "used": 0}
+        q1, a = await asyncio.to_thread(call, "GET", f"{API}/message/quota", c["token"])
+        q2, b = await asyncio.to_thread(call, "GET", f"{API}/message/quota/consumption", c["token"])
+        return {"limit": a.get("value") if q1 == 200 and isinstance(a, dict) else None, "used": b.get("totalUsage") if q2 == 200 and isinstance(b, dict) else None}
+
+    router.admin_send = admin_send
+    router.handle = handle  # tests: one webhook event
+    router.push_quota = push_quota
 
     @router.post("/line/webhook")
     async def webhook(request: Request):
