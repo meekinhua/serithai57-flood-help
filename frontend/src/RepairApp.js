@@ -29,6 +29,7 @@ import { WaterForm } from "./components/Forms";
 import { CanalForm, LeakForm, LeakList, LeakSheet, PumpForm, PumpList } from "./components/Canal";
 import { AfterFloodGuide, HireList, IssueBoard, IssueCard, IssueForm, JobBoard, JobForm, LendBoard, LendForm } from "./components/RepairBoards";
 import Market, { marketOpen } from "./components/Market";
+import { WantForm, WantStrip } from "./components/Wants";
 // 15 Oct: links from the LINE bot carry ?home=4/917 — that house becomes this phone's บ้านฉัน (no typing it twice)
 (() => {
   try {
@@ -257,9 +258,22 @@ export default function RepairApp() {
           });
         return showTab("market");
       }
-      const m = (hash || "").match(/^#?(lost|jobs|lend|market|issue|shop|forum)-([\w-]{6,})$/);
+      const m = (hash || "").match(/^#?(lost|jobs|lend|market|issue|shop|forum|want)-([\w-]{6,})$/);
       if (!m) return;
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      if (m[1] === "want") {
+        // 20 Oct: a ประกาศหา — on the ช่าง page when it is a repair job, else in ตลาด
+        const w = lend.find((x) => x.id === m[2]);
+        if (w && PRO_CATS.includes(w.category)) openPros("");
+        else showTab("market");
+        let n = 0;
+        const find = () => {
+          const el = document.getElementById(`want-${m[2]}`);
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+          else if (n++ < 15) setTimeout(find, 200);
+        };
+        return setTimeout(find, 300);
+      }
       if (m[1] === "issue") {
         goPage("map");
         return setIssueGo(m[2]); // opened once the map's reports are loaded
@@ -823,11 +837,14 @@ export default function RepairApp() {
                 setGroup={setProsGroup}
                 autoFocus={prosFocus}
                 onAdd={() => setSheet({ type: "serviceForm", mode: "repair" })}
-                onHire={() => setSheet({ type: "jobForm", kind: "need", jobType: "hire" })}
+                onHire={() => setSheet({ type: "wantForm", hint: "เช่น หาช่างเทพื้นปูนทั้งบ้าน ซ.23 · หาช่างซ่อมเครื่องซักผ้า" })}
               />
+              <div className="mt-3">
+                <WantStrip items={lend} shelf="pros" title="📢 มีคนกำลังหาช่าง" onPost={() => setSheet({ type: "wantForm", hint: "เช่น หาช่างเทพื้นปูนทั้งบ้าน ซ.23" })} />
+              </div>
               {hires.length > 0 && (
                 <section className="mt-4 space-y-2">
-                  <h3 className="text-lg font-bold">🧑‍🔧 เพื่อนบ้านกำลังหาช่าง ({hires.length})</h3>
+                  <h3 className="text-lg font-bold">🗂️ งานช่างจากกระดานขอแรง (เดิม · {hires.length})</h3>
                   <p className="text-[15px] text-[#45504A]">มีค่าจ้าง · เป็นช่าง? กดดูเบอร์ แล้วโทรตกลงราคากันเอง</p>
                   <HireList jobs={hires} setJobs={setJobs} admin={admin} />
                 </section>
@@ -963,7 +980,8 @@ export default function RepairApp() {
                   onPros={(q) => openPros("", false, q)}
                   onAdd={(shelf, cat) => setSheet({ type: "lendForm", kind: "sell", shelf, cat })}
                   onAddShop={(mode) => setSheet({ type: "serviceForm", mode })}
-                  onAsk={() => setSheet({ type: "lendForm", kind: "sell", shelf: "service", cat: "hire" })}
+                  onAsk={() => setSheet({ type: "wantForm" })}
+                  onWant={() => setSheet({ type: "wantForm" })}
                 />
               </section>
             </>
@@ -1198,6 +1216,18 @@ export default function RepairApp() {
                 pick("forum");
                 setToast("ตั้งกระทู้แล้ว · เพื่อนบ้านจะเข้ามาตอบ");
                 setTimeout(() => document.getElementById("forum-board")?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+              }}
+            />
+          </Sheet>
+        )}
+        {sheet?.type === "wantForm" && (
+          <Sheet title="📢 ประกาศหา" onClose={() => setSheet(null)}>
+            <WantForm
+              hint={sheet.hint || ""}
+              onDone={(x) => {
+                setLend((p) => [x, ...p]);
+                setSheet(null);
+                posted("market", `📢 ประกาศหา: ${x.title}`);
               }}
             />
           </Sheet>

@@ -55,6 +55,9 @@ DATA_API = "https://api-data.line.me/v2/bot"
 SESSION_TTL = timedelta(minutes=30)
 MAX_PHOTOS = 3
 POSTS_PER_DAY = 5
+# 20 Oct: a typed request ("ต้องการคนมายกเปียโน", "หาช่างเทพื้นปูน") → cards that match + "📢 ประกาศหา" for those who can do it
+WANT_RX = re.compile(r"อยากได้|อยากจ้าง|ต้องการ|ใครรับ|หาคน|หาช่าง|ขอคน|มีใคร.*(รับ|ช่วย)|ช่วย.*หน่อย|รับจ้าง.*(ไหม|มั้ย)")
+WANT_WORDS = {"ประกาศหา", "📢 ประกาศหา", "ประกาศหาช่าง", "หาคนช่วย"}
 # words the OA Manager already answers (keyword auto-replies) — the bot stays quiet on them
 OA_KEYWORDS = {  # exactly the OA Manager's keyword lists as set on 14 Oct (keep in sync if they change)
     "เบอร์ฉุกเฉิน", "เบอร์โทร", "รปภ", "ฉุกเฉิน",  # เบอร์ฉุกเฉิน
@@ -646,7 +649,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
 
     router.default_menu_loop = default_menu_loop
     router.refresh_default_menu = refresh_default_menu
-    router.on_text = lambda user, raw: on_text(user, raw)  # tools / tests: what the bot would answer (sends nothing)
+    router.on_text = lambda user, raw: on_text(user, raw)
+    router.want_publish = lambda user, s: want_publish(user, s)  # tests  # tools / tests: what the bot would answer (sends nothing)
 
     async def set_menu(user: str, house: str, soi: str):
         """Give this LINE user the menu with their house on it (shared by everyone linked to the same house + soi).
@@ -987,7 +991,10 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             {"type": "button", "style": "secondary", "action": {"type": "message", "label": "+ ลงขาย / บริการ", "text": "ลงขาย"}}]}}
 
     def carousel(alt: str, bubbles: list, chips: dict) -> dict:
-        return {"type": "flex", "altText": alt, "contents": {"type": "carousel", "contents": bubbles[:12]}, "quickReply": chips}
+        out = {"type": "flex", "altText": alt, "contents": {"type": "carousel", "contents": bubbles[:12]}}
+        if chips:  # LINE rejects "quickReply": null
+            out["quickReply"] = chips
+        return out
 
     async def services_in(cats) -> list:
         return await db.services.find({"category": {"$in": list(cats)}, "available": {"$ne": False}}, {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews": 0}
@@ -998,7 +1005,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         cats = REPAIR_GROUPS[group][1] if group is not None else REPAIR_CATS
         docs = await services_in(cats)
         have = [(i, g) for i, (g, cs) in enumerate(REPAIR_GROUPS) if await db.services.count_documents({"category": {"$in": list(cs)}})]
-        chips = qr(*[(g, g) for i, g in have if i != group][:10], ("🛍️ ตลาด", "ตลาด"))
+        chips = qr(*[(g, g) for i, g in have if i != group][:9], ("📢 ประกาศหาช่าง", "ประกาศหาช่าง"), ("🛍️ ตลาด", "ตลาด"))
         if not docs:
             return [text(f"ยังไม่มีช่าง{REPAIR_GROUPS[group][0].split(' ', 1)[1] if group is not None else ''}ในหมู่บ้านครับ 🙏\nรู้จักช่างดีๆ แนะนำได้ที่ {SITE}/#pros"
                          "\nหรือประกาศหาช่าง ให้ช่างในหมู่บ้านเห็น: " + f"{SITE}/#jobs", chips)]
@@ -1051,7 +1058,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             {"type": "button", "style": "secondary", "action": {"type": "uri", "label": "ดูทั้งหมด", "uri": f"{SITE}/#market"}}]}})
         head = (f"🛍️ ตลาดเพื่อนบ้าน · ของขาย {len(items)} · ร้าน {len(shops)} · บริการ {n_svc} · ปัดดูได้ ➡️\n"
                 + ("ของทำเองกด 🛒 สั่ง/จองไว้ได้ · ร้านกดโทรได้เลย · ระบบไม่รับเงิน" if ORDERS_ON else "กดดูรายละเอียด แล้วโทร/ทักผู้ขายได้เลย · ระบบไม่รับเงิน"))
-        chips = qr(("🍲 ของกิน", "🍲 ของกิน"), ("🧺 ของใช้", "🧺 ของใช้"), ("🙋 บริการ", "🙋 บริการ"), ("🏠 เช่า·ขาย", "🏠 เช่า·ขาย"), *chips["items"] and [(i["action"]["label"], i["action"]["text"]) for i in chips["items"]])
+        chips = qr(("🍲 ของกิน", "🍲 ของกิน"), ("🧺 ของใช้", "🧺 ของใช้"), ("🙋 บริการ", "🙋 บริการ"), ("🏠 เช่า·ขาย", "🏠 เช่า·ขาย"), ("📢 ประกาศหา", "ประกาศหา"), *chips["items"] and [(i["action"]["label"], i["action"]["text"]) for i in chips["items"]])
         return [text(head), {"type": "flex", "altText": "ตลาดเพื่อนบ้าน", "contents": {"type": "carousel", "contents": bubbles}, "quickReply": chips}]
 
     async def shelf_list(user: str, shelf: str) -> list:
@@ -1311,6 +1318,77 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return await sadvance(user, s)
         return [sask(s)]
 
+    # ---------- 📢 ประกาศหา (20 Oct): a typed request → a "want" post in the same category as the sellers / ช่าง ----------
+    def want_core(t: str) -> str:
+        """The thing itself, for the search: drop "ต้องการคนมา", "อยากได้", "หน่อย"…"""
+        w = re.sub(r"^(ขอ|รบกวน)?\s*(ต้องการ|อยากได้|อยากจ้าง|หา|ใครรับ|มีใครรับ|มีใคร)\s*(คน|ช่าง)?\s*(มา|ช่วย|รับ)?\s*", "", t)
+        w = re.sub(r"(หน่อย|ครับ|ค่ะ|คะ|ด้วย|ไหม|มั้ย|ได้ไหม)+$", "", w).strip()
+        return w[:24] or t[:24]
+
+    def want_cat(raw: str) -> str:
+        k = catalog.word_key(raw)
+        if k:
+            return k
+        i = next((i for rx, i in REPAIR_HINTS if re.search(rx, raw)), None)
+        return REPAIR_GROUPS[i][1][0] if i is not None else "errand"
+
+    def cat_label(k: str) -> str:
+        return SVC_LABEL.get(k) or next((g for g, cs in REPAIR_GROUPS if k in cs), None) or MKT_TH.get(k) or "อื่นๆ"
+
+    async def want_offer(user: str, raw: str, found: bool = True) -> dict:
+        cat = want_cat(raw)
+        await save(user, {"flow": "want", "step": "w_offer", "text": raw.strip()[:300], "category": cat, "line_name": await display_name(user)})
+        lead = "ยังไม่เจอคนที่ลงไว้ตรงกับที่หาครับ" if not found else "ถ้ายังไม่ถูกใจ"
+        return text(f"{lead} · 📢 ให้แอดลงประกาศหาให้เพื่อนบ้านที่รับงานได้เห็นเลยไหมครับ?\nหมวด: {cat_label(cat)}",
+                    qr(("📢 ประกาศหาเลย", "postback:want_go"), ("ไม่ต้อง", "ยกเลิก")))
+
+    async def want_step(user: str, s: dict, t: str, raw: str) -> list:
+        step = s["step"]
+        if step == "w_text":
+            if len(t) < 4:
+                return [text("พิมพ์สิ่งที่อยากได้ หรืออยากจ้าง ในข้อความเดียวครับ", qr(("❌ ยกเลิก", "ยกเลิก")))]
+            s.update(text=raw.strip()[:300], category=want_cat(raw))
+            step = "w_offer"
+        if step == "w_offer":
+            s["step"] = "w_contact"
+            await save(user, s)
+            last = await db.line_buyers.find_one({"user": user}, {"_id": 0}) or {}
+            chips = [(f"ใช้ {last['buyer_name'][:10]} {last['buyer_phone']}", f"{last['buyer_name']} {last['buyer_phone']}")] if last.get("buyer_phone") else []
+            return [text("ขอชื่อกับเบอร์ให้คนที่รับงานได้โทรกลับครับ เช่น \"ฝน 0812345678\"\nเบอร์จะโชว์เฉพาะตอนคนกด \"ฉันช่วยได้\" บนเว็บ", qr(*chips, ("❌ ยกเลิก", "ยกเลิก")))]
+        if step == "w_contact":
+            m = re.search(r"0\d[\d\- ]{7,12}\d", raw or "")
+            if not m or len(re.sub(r"\D", "", m.group(0))) < 9:
+                return [text("ขอเบอร์โทรด้วยครับ เช่น \"ฝน 0812345678\"", qr(("❌ ยกเลิก", "ยกเลิก")))]
+            s["phone"] = re.sub(r"\D", "", m.group(0))[:15]
+            s["name"] = (re.sub(r"\s+", " ", raw.replace(m.group(0), " ")).strip(" ,:-") or s.get("line_name") or "เพื่อนบ้าน")[:60]
+            home = await home_of(user)
+            said = re.search(r"(?:ซ\.?|ซอย|แยก)\s*(\d{1,3}(?:/\d{1,2})?)", s.get("text", ""))
+            s["soi"] = said.group(1) if said else (home or {}).get("soi", "")
+            s["step"] = "w_confirm"
+            await save(user, s)
+            return [text(f"📢 ประกาศหา\n\"{s['text'][:200]}\"\nหมวด: {cat_label(s['category'])}{' · ซ.' + s['soi'] if s['soi'] else ''}\nติดต่อ: {s['name']}\n\nลงเลยไหมครับ?",
+                         qr(("✅ ลงประกาศ", "postback:publish_want"), ("❌ ยกเลิก", "ยกเลิก")))]
+        return [text("กด ✅ ลงประกาศ หรือ ❌ ยกเลิก ครับ", qr(("✅ ลงประกาศ", "postback:publish_want"), ("❌ ยกเลิก", "ยกเลิก")))]
+
+    async def want_publish(user: str, s: dict) -> list:
+        """The same kind-"want" item POST /api/lend makes, via: line."""
+        since = now() - timedelta(days=1)
+        if await db.line_posts.count_documents({"user": user, "type": "want", "at": {"$gte": since}}) >= POSTS_PER_DAY:
+            await drop(user)
+            return [text(f"วันนี้ประกาศครบ {POSTS_PER_DAY} รายการแล้วครับ พรุ่งนี้ลงต่อได้")]
+        key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
+        words = s.get("text", "")
+        doc = {"id": item_id, "name": s.get("name", "เพื่อนบ้าน"), "phone": s.get("phone", ""), "kind": "want", "category": s.get("category") or "errand",
+               "title": words[:80], "detail": words[80:400], "soi": s.get("soi", "")[:12], "price": "", "pickup": "", "when": "", "preorder": False, "no_orders": False,
+               "notify_endpoint": "", "youtube": "", "lat": None, "lng": None, "shop_name": "", "tags": [], "options": [], "media": [],
+               "status": "available", "lent_to": "", "until": "", "queue": [], "history": [{"at": t, "by": s.get("name", ""), "text": "ประกาศหาผ่าน LINE"}],
+               "via": "line", "created_at": t, "updated_at": t, "edit_key_hash": repair._hash(key)}
+        await db.lend_items.insert_one(dict(doc))
+        await db.line_posts.insert_one({"user": user, "id": item_id, "title": doc["title"], "at": t, "type": "want"})
+        await drop(user)
+        return [text(f"✅ ลงประกาศหาแล้วครับ · {cat_label(doc['category'])}\nเพื่อนบ้านที่รับงานนี้ได้ จะเห็นใน \"📢 มีคนกำลังหา\" แล้วโทรหาคุณเอง\n{SITE}/#want-{item_id}\n\nได้คนแล้ว พิมพ์ \"ได้แล้ว\" หรือทักแอด ปิดให้ครับ",
+                     qr(("🛍️ ดูตลาด", "ตลาด"), ("🔧 ดูช่าง", "ช่าง")))]
+
     async def service_publish(user: str, s: dict) -> list:
         """The same directory entry POST /api/services makes, plus via: line."""
         since = now() - timedelta(days=1)
@@ -1517,6 +1595,11 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return [text("ยกเลิกแล้วครับ 👌" if had else "โอเคครับ", qr(chip))]
         if t in SELL_WORDS:
             return await market_start(user)
+        if t in {"ได้แล้ว", "ได้คนแล้ว", "เจอคนแล้ว", "ได้ช่างแล้ว"}:  # 20 Oct: close my latest ประกาศหา
+            mine = [p["id"] async for p in db.line_posts.find({"user": user, "type": "want"}, {"id": 1}).sort("at", -1)]
+            d = await db.lend_items.find_one_and_update({"id": {"$in": mine}, "status": {"$ne": "closed"}}, {"$set": {"status": "closed", "updated_at": now()}}, sort=[("created_at", -1)])
+            if d:
+                return [text(f"🎉 ดีใจด้วยครับ ปิดประกาศหา \"{d['title'][:40]}\" แล้ว")]
         if t in SOLD_WORDS:
             await drop(user)
             return await market_mine(user)
@@ -1577,6 +1660,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return await market_step(user, s, t, raw)
         if s and s["step"].startswith("o_"):
             return await order_step(user, s, t, raw)
+        if s and s["step"].startswith("w_"):
+            return await want_step(user, s, t, raw)
         if s and s.get("step") in STEPS and s["step"] not in ("category", "confirm") and YT_IN_TEXT.search(raw or ""):
             yt = YT_IN_TEXT.search(raw)
             s["youtube"] = yt.group(0)[:200]
@@ -1625,6 +1710,9 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 return await advance(user, s)
             if step == "confirm":
                 return [ask(s)]
+        if t in WANT_WORDS:
+            await save(user, {"flow": "want", "step": "w_text", "line_name": await display_name(user)})
+            return [text("📢 ประกาศหา · พิมพ์สิ่งที่อยากได้ หรืออยากจ้าง ในข้อความเดียวครับ\nเช่น \"หาคนช่วยยกเปียโน ซ.55 เสาร์นี้\" หรือ \"หาช่างเทพื้นปูนทั้งบ้าน ซ.23\"", qr(("❌ ยกเลิก", "ยกเลิก")))]
         if t in LIST_WORDS:
             only = "cat" if "แมว" in t else "dog" if ("หมา" in t or "สุนัข" in t) else ""
             return await list_messages(only)
@@ -1649,7 +1737,15 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                          + ("" if soi else "\nพิมพ์บ้านเลขที่ไว้ (เช่น 4/917) จะรู้ว่าเป็นซอยไหน"))]
         if re.search(r"ช่าง|ซ่อม", t):  # "หาช่างซ่อมเครื่องซักผ้า" → that group's cards
             KIND[user] = "pros"
-            return await pros_list(user, next((i for rx, i in REPAIR_HINTS if re.search(rx, t)), None))
+            out = await pros_list(user, next((i for rx, i in REPAIR_HINTS if re.search(rx, t)), None))
+            if len(t) >= 8:  # a real request, not just "ช่าง": offer to post it for the ช่าง to see
+                out.append(await want_offer(user, raw))
+            return out
+        if len(t) >= 8 and "\n" not in raw.strip() and WANT_RX.search(t):  # 20 Oct: "ต้องการคนมายกเปียโน"
+            KIND[user] = "want"
+            hits = await search_all(want_core(t))
+            out = [carousel("ที่ตรงกับที่หา", hits[:10], None)] if hits else []
+            return out + [await want_offer(user, raw, bool(hits))]
         if re.search(r"ร้านอาหาร|ร้านค้า|อยากซื้อ|ขายไหม|มีขาย", t):
             KIND[user] = "market"
             return await market_list(user)
@@ -1757,7 +1853,13 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                             qr(("🏠 ใส่บ้านเลขที่", "ใส่บ้านเลขที่"), ("ไว้ก่อน", "ไว้ก่อน")))]
             elif ev["type"] == "postback":
                 data = (ev.get("postback") or {}).get("data", "")
-                if data in ("publish", "publish_market", "publish_order", "publish_service"):
+                if data == "want_go":
+                    s = await session(user)
+                    out = await want_step(user, s, "", "") if s and s.get("step") == "w_offer" else [text("หมดเวลาแล้วครับ พิมพ์ \"ประกาศหา\" เริ่มใหม่ได้")]
+                elif data == "publish_want":
+                    s = await session(user)
+                    out = await want_publish(user, s) if s and s.get("step") == "w_confirm" else [text("หมดเวลาแล้วครับ พิมพ์ \"ประกาศหา\" เริ่มใหม่ได้")]
+                elif data in ("publish", "publish_market", "publish_order", "publish_service"):
                     s = await session(user)
                     if s and s["step"] == "confirm":
                         out = await publish(user, s)
