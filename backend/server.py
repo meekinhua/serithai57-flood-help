@@ -33,6 +33,7 @@ import canal  # noqa: E402
 import media  # noqa: E402
 import seller  # noqa: E402
 import catalog  # noqa: E402
+import digest as digest_mod  # noqa: E402
 import services  # noqa: E402
 import staff  # noqa: E402
 import trips  # noqa: E402
@@ -671,6 +672,7 @@ app.include_router(nearby.build_router(db, rate_limit, client_ip, require_admin,
 app.include_router(canal.build_router(db, rate_limit, current_admin, require_admin, claim_media, delete_media, staff.SOIS, staff.ZONES["main_road"]))
 line_router = line_bot.build_router(db, require_admin, audit, claim_media, locate_house, survey.norm_house, myhome.HOUSE_RE, myhome.soi_parity, myhome.WASTE_ROUNDS, myhome.THAI_DAYS, learn_address)
 app.include_router(line_router)  # LINE OA @004forpb: หาย·เจอ by chat (replies only = free)
+app.include_router(digest_mod.build_router(db, require_admin, audit, line_router))  # 20 Oct: 🧠 สรุปรายวัน (written by a Claude Desktop scheduled task)
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 @app.middleware("http")
 async def flood_archive_guard(request: Request, call_next):
