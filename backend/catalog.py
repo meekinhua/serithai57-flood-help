@@ -23,9 +23,9 @@ log = logging.getLogger("catalog")
 DEFAULT = {
     # label of every category key: [emoji, Thai name]. Merged over the code's own labels.
     "service_labels": {"health": ["🩺", "สุขภาพ · กายภาพ · ดูแลผู้ป่วย"]},
-    "lend_labels": {"health": ["🩺", "สุขภาพ · กายภาพ"]},
+    "lend_labels": {"health": ["🩺", "สุขภาพ · กายภาพ"], "realestate": ["🏠", "บ้านเช่า · บ้านขาย"], "hire": ["📢", "จ้างงาน · หาคนช่วย"]},
     # the market's three shelves: [emoji, name] (18 Oct: รับทำ → บริการ)
-    "shelf_labels": {"food": ["🍲", "ของกิน"], "goods": ["🧺", "ของใช้"], "service": ["🙋", "บริการ"]},
+    "shelf_labels": {"food": ["🍲", "ของกิน"], "goods": ["🧺", "ของใช้"], "service": ["🙋", "บริการ"], "home": ["🏠", "เช่า·ขาย"]},
     # 🙋 บริการ shelf: the groups people see (cats = service directory keys)
     "service_groups": [
         {"key": "health", "label": "🩺 สุขภาพ·กายภาพ", "hint": "กายภาพบำบัด คลินิก นวดบำบัด ดูแลผู้ป่วย·ผู้สูงอายุ", "cats": ["health"]},
@@ -44,7 +44,8 @@ DEFAULT = {
     "shelves": {
         "food": ["homemade", "dessert", "drinks", "preserved", "catering"],
         "goods": ["handmade", "plants", "clothes", "cosmetics", "petgoods", "electronics", "furniture", "kids", "other"],
-        "service": ["health"],
+        "service": ["health", "hire"],
+        "home": ["realestate"],  # 19 Oct: 🏠 เช่า·ขาย, its own shelf
     },
     # LINE: buttons when listing (ลงขาย) — [label, key]
     "line_sell": [["🍲 อาหารทำเอง", "homemade"], ["🧁 ขนม·เบเกอรี่", "dessert"], ["🧋 เครื่องดื่ม", "drinks"],

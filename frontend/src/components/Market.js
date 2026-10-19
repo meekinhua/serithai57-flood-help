@@ -948,7 +948,7 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1E6B47] text-base font-bold text-white"
             aria-hidden="true"
           >
-            {(who || "?").trim().charAt(0)}
+            {Array.from((who || "?").replace(/[^\p{L}\p{N}]/gu, "") || "?")[0]}
           </span>
           <div className="min-w-0 flex-1 leading-tight">
             <b className="block truncate">{who}</b>
@@ -1094,7 +1094,13 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
               )}
               <ContactButton
                 path={`/lend/${x.id}/contact`}
-                text={takesOrders(x) ? "📞 หรือโทรหาผู้ขาย" : "📞 ติดต่อผู้ขาย"}
+                text={
+                  takesOrders(x)
+                    ? "📞 หรือโทรหาผู้ขาย"
+                    : shelfOfItem(x) === "service"
+                      ? "📞 ติดต่อ"
+                      : "📞 ติดต่อผู้ขาย"
+                }
               />
             </div>
           )
@@ -1244,7 +1250,7 @@ export default function Market({
           </button>
         )}
       </label>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-1.5">
         {SHELVES.map((x) => (
           <button
             key={x.key}
@@ -1465,6 +1471,18 @@ export default function Market({
                 "บริการ · รับจ้าง",
                 "ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง",
                 () => onAddShop("service"),
+              ],
+              [
+                "🏠",
+                "บ้านเช่า · บ้านขาย",
+                "ให้เช่า ขาย หรือหาเช่า ในหมู่บ้าน",
+                () => onAdd("home", "realestate"),
+              ],
+              [
+                "📢",
+                "จ้างงาน · หาคนช่วย",
+                "อยากจ้างคนยกของ ทำความสะอาด ซ่อมเล็กน้อย",
+                () => onAdd("service", "hire"),
               ],
               [
                 "🏪",

@@ -277,6 +277,13 @@ export const SHELVES = [
     icon: "🙋",
     hint: "ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง",
   },
+  {
+    key: "home",
+    label: "เช่า·ขาย",
+    icon: "🏠",
+    hint: "บ้าน ทาวน์เฮาส์ ห้อง ที่ดิน · ให้เช่า ขาย หาเช่า", // 19 Oct: members asked (a house to rent while renovating)
+    sell: ["realestate"],
+  },
 ];
 export const SERVICE_CATS = SERVICE_GROUPS.flatMap((g) => g.cats);
 export const MARKET_SHOP_CATS = [
@@ -292,12 +299,15 @@ export const shelfOfShop = (s) =>
       ? "goods"
       : "service";
 export const SERVICE_LEND = ["health"]; // market posts shown on the 🙋 รับทำ shelf (rich: gallery, clip, price list)
+export const HOME_LEND = ["realestate"]; // 🏠 เช่า·ขาย shelf (19 Oct)
 export const shelfOfItem = (x) =>
   FOOD_LEND.includes(x.category)
     ? "food"
     : SERVICE_LEND.includes(x.category)
       ? "service"
-      : "goods";
+      : HOME_LEND.includes(x.category)
+        ? "home"
+        : "goods";
 
 // Contact board categories. Keys must match SERVICE_CATEGORIES in backend/services.py
 export const SERVICE_CATEGORIES = {
@@ -650,18 +660,19 @@ export function applyCatalog(c) {
     fill(FOOD_LEND, [...sh.food, "food"]);
     SHELVES[0].sell = sh.food;
   }
-  if (sh.goods) SHELVES[1].sell = sh.goods;
   for (const x of SHELVES) {
+    if (sh[x.key]) x.sell = sh[x.key];
     const l = (c.shelf_labels || {})[x.key];
     if (l) [x.icon, x.label] = l;
   }
   fill(SERVICE_LEND, sh.service || []);
-  SHELVES[2].sell = sh.service || [];
+  if (sh.home) fill(HOME_LEND, sh.home);
   fill(MARKET_CATEGORIES, [
     ...(sh.food || []),
     ...(sh.service || []),
+    ...(sh.home || HOME_LEND),
     ...(sh.goods || []),
   ]);
-  for (const k of sh.service || [])
+  for (const k of [...(sh.service || []), ...(sh.home || HOME_LEND)])
     if (!MARKET_ONLY.includes(k)) MARKET_ONLY.push(k);
 }

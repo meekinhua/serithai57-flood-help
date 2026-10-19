@@ -121,8 +121,8 @@ MKT_CATS = [("🍲 อาหารทำเอง", "homemade"), ("🧁 ขน�
 FOOD_LEND = ("homemade", "dessert", "drinks", "preserved", "catering", "food")
 SHELF_CATS = {"food": ["homemade", "dessert", "drinks", "preserved", "catering"],
               "goods": ["handmade", "plants", "clothes", "cosmetics", "petgoods", "other"]}
-SHELF_TH = {"food": "🍲 ของกิน", "goods": "🧺 ของใช้", "service": "🙋 บริการ"}  # 18 Oct: รับทำ → บริการ (catalog shelf_labels)
-SHELF_WORDS = {"ของกิน": "food", "🍲 ของกิน": "food", "ของใช้": "goods", "🧺 ของใช้": "goods",
+SHELF_TH = {"food": "🍲 ของกิน", "goods": "🧺 ของใช้", "service": "🙋 บริการ", "home": "🏠 เช่า·ขาย"}  # 18 Oct: รับทำ → บริการ (catalog shelf_labels)
+SHELF_WORDS = {"เช่า·ขาย": "home", "🏠 เช่า·ขาย": "home", "บ้านเช่า": "home", "บ้านขาย": "home", "ของกิน": "food", "🍲 ของกิน": "food", "ของใช้": "goods", "🧺 ของใช้": "goods",
                "รับทำ": "service", "🙋 รับทำ": "service", "🙋 บริการ": "service", "บริการ": "service", "รับจ้าง": "service", "รับทำ·บริการ": "service", "🆕 ใหม่ล่าสุด": "new"}
 SERVICE_GROUPS = [("💇 สวยงาม·สุขภาพ", ("beauty",)), ("📸 ถ่ายรูป·อีเวนต์", ("photo",)), ("📚 สอน·ติว", ("tutor",)),
                   ("🏠 ช่วยงานบ้าน", ("homehelp", "cleaning")), ("🐾 สัตว์เลี้ยง", ("pets",)), ("🚗 รับส่ง·ขนย้าย", ("rental", "porter", "truck", "boat")),
@@ -132,7 +132,8 @@ REPAIR_GROUPS = [("⚡ ไฟฟ้า", ("electrician",)), ("🚿 ประป�
                  ("🧹 ล้างบ้าน", ("cleaning",)), ("🚛 ขนขยะ", ("junk",)), ("🐜 ปลวก·แมลง", ("pest",)), ("🚗 ซ่อมรถ·ซักพรม", ("vehicle",))]
 SERVICE_CATS = [c for _, cs in SERVICE_GROUPS for c in cs]
 REPAIR_CATS = [c for _, cs in REPAIR_GROUPS for c in cs]
-SERVICE_LEND = ["health"]  # market posts shown on the 🙋 รับทำ shelf (catalog "shelves.service")
+SERVICE_LEND = ["health"]  # market posts shown on the 🙋 บริการ shelf (catalog "shelves.service")
+HOME_LEND = ["realestate"]  # 🏠 เช่า·ขาย shelf (catalog "shelves.home", 19 Oct)
 REPAIR_WORDS = {"ช่าง", "หาช่าง", "🔧 ช่าง", "ช่างซ่อมบ้าน", "ซ่อม", "ซ่อมบ้าน", "ช่าง บริการ", "ช่าง·บริการ", "ช่างทั้งหมด"}
 # a word in what they typed → the ช่าง group ("หาช่างซ่อมเครื่องซักผ้า" → แอร์·เครื่องใช้)
 REPAIR_HINTS = [(r"ไฟ|ปลั๊ก|เบรก", 0), (r"ประปา|ปั๊ม|ท่อ|น้ำรั่ว|ส้วม|สุขภัณฑ์", 1), (r"แอร์|ซักผ้า|ตู้เย็น|ทีวี|ไมโครเวฟ|เครื่องใช้", 2),
@@ -167,6 +168,7 @@ def _catalog(doc):
     SHELF_CATS["food"] = list(doc["shelves"]["food"])
     SHELF_CATS["goods"] = [c for c in doc["shelves"]["goods"] if c in {k for _, k in MKT_CATS}] or SHELF_CATS["goods"]
     SERVICE_LEND[:] = list(doc["shelves"].get("service", []))
+    HOME_LEND[:] = list(doc["shelves"].get("home", HOME_LEND))
     for k, (e, name) in doc["lend_labels"].items():
         MKT_TH[k] = name
     MKT_WORD_CAT.update({label: c for label, c in MKT_CATS})
@@ -1030,7 +1032,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         """ตลาด: "" = everything new (with the shelf buttons first) · food / goods / service = one shelf."""
         if user:
             await db.line_market_seen.update_one({"user": user}, {"$set": {"user": user, "looked": now()}}, upsert=True)
-        if shelf in ("food", "goods", "service"):
+        if shelf in ("food", "goods", "service", "home"):
             return await shelf_list(user, shelf)
         items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}}, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}
                                          ).sort("created_at", -1).to_list(10)
@@ -1049,7 +1051,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             {"type": "button", "style": "secondary", "action": {"type": "uri", "label": "ดูทั้งหมด", "uri": f"{SITE}/#market"}}]}})
         head = (f"🛍️ ตลาดเพื่อนบ้าน · ของขาย {len(items)} · ร้าน {len(shops)} · บริการ {n_svc} · ปัดดูได้ ➡️\n"
                 + ("ของทำเองกด 🛒 สั่ง/จองไว้ได้ · ร้านกดโทรได้เลย · ระบบไม่รับเงิน" if ORDERS_ON else "กดดูรายละเอียด แล้วโทร/ทักผู้ขายได้เลย · ระบบไม่รับเงิน"))
-        chips = qr(("🍲 ของกิน", "🍲 ของกิน"), ("🧺 ของใช้", "🧺 ของใช้"), ("🙋 บริการ", "🙋 บริการ"), *chips["items"] and [(i["action"]["label"], i["action"]["text"]) for i in chips["items"]])
+        chips = qr(("🍲 ของกิน", "🍲 ของกิน"), ("🧺 ของใช้", "🧺 ของใช้"), ("🙋 บริการ", "🙋 บริการ"), ("🏠 เช่า·ขาย", "🏠 เช่า·ขาย"), *chips["items"] and [(i["action"]["label"], i["action"]["text"]) for i in chips["items"]])
         return [text(head), {"type": "flex", "altText": "ตลาดเพื่อนบ้าน", "contents": {"type": "carousel", "contents": bubbles}, "quickReply": chips}]
 
     async def shelf_list(user: str, shelf: str) -> list:
@@ -1064,13 +1066,15 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             if not docs:
                 return [text("ยังไม่มีใครลง 🙋 บริการ ครับ\nรับตัดผม ติว ถ่ายรูป ทำความสะอาด รับส่ง? พิมพ์ \"ลงขาย\" แล้วเลือก 🙋 บริการ", chips)]
             return [text(f"🙋 บริการจากเพื่อนบ้าน {len(docs)} ราย · ปัดดูได้ ➡️"), carousel("บริการ", [service_card(d) for d in docs[:12]], chips)]
-        cats = list(FOOD_LEND) if shelf == "food" else None
-        q = {"kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": cats} if cats else {"$nin": list(FOOD_LEND) + list(SERVICE_LEND)}}
+        cats = list(FOOD_LEND) if shelf == "food" else list(HOME_LEND) if shelf == "home" else None
+        q = {"kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": cats} if cats else {"$nin": list(FOOD_LEND) + list(SERVICE_LEND) + list(HOME_LEND)}}
         items = await db.lend_items.find(q, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).sort("created_at", -1).to_list(10)
-        shops = await db.services.find({"category": {"$in": ["food"] if shelf == "food" else ["shop", "supplies"]}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
+        shops = [] if shelf == "home" else await db.services.find({"category": {"$in": ["food"] if shelf == "food" else ["shop", "supplies"]}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
                                        ).sort([("pinned", -1), ("updated_at", -1)]).to_list(6)
         bubbles = [market_card(d) for d in items] + [shop_card(d) for d in shops]
         if not bubbles:
+            if shelf == "home":
+                return [text(f"🏠 เช่า·ขาย ยังว่างครับ\nมีบ้าน/ห้องให้เช่า ขาย หรือกำลังหาเช่า? ลงที่ {SITE}/#market → + ลงขาย / บริการ → บ้านเช่า · บ้านขาย\nหรือส่งรายละเอียด + รูปมาในแชทนี้ แอดลงให้ครับ", chips)]
             return [text(f"{SHELF_TH[shelf]} ยังว่างครับ · ทำขายเองไหม? พิมพ์ \"ลงขาย\" ได้เลย", chips)]
         return [text(f"{SHELF_TH[shelf]} · {len(items)} รายการ + ร้าน {len(shops)} · ปัดดูได้ ➡️"), carousel(SHELF_TH[shelf], bubbles, chips)]
 
@@ -1161,6 +1165,11 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                     return await madvance(user, s)
                 if k in {c for _, c in SVC_CHOICES["service"]}:
                     return await service_start(user, "service", s.get("media", []))
+                if k in SERVICE_LEND or k in HOME_LEND:  # 19 Oct: บ้านเช่า·ขาย / จ้างงาน — posted on the web (rich card, photos)
+                    await drop(user)
+                    what = MKT_TH.get(k, "ประกาศ")
+                    return [text(f"🏠 ลง \"{what}\" ได้ที่เว็บครับ (ใส่รูปได้หลายรูป)\n{SITE}/#market → + ลงขาย / บริการ → {what}\n\nหรือส่งรายละเอียด + รูปมาในแชทนี้ แอดลงให้ได้ครับ",
+                                 qr(("🛍️ ดูตลาด", "ตลาด")))]
                 return [text(f"ยังไม่แน่ใจว่า \"{raw.strip()[:30]}\" คืออะไรครับ 🙏 แตะปุ่มด้านล่างได้เลย"), mask(s)]
             return await madvance(user, s)
         if step == "m_category":

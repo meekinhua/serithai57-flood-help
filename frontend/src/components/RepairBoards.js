@@ -1,7 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { api, load, save } from "../api";
-import { ORDERS_ON, ISSUE_STATUS, ISSUE_TYPES, JOB_STATUS, JOB_TYPES, JOB_VERBS, LEND_CATEGORIES, LEND_KINDS, LEND_STATUS, MARKET_CATEGORIES, SHELVES, MARKET_ONLY, timeAgo } from "../config";
+import {
+  ORDERS_ON,
+  ISSUE_STATUS,
+  ISSUE_TYPES,
+  JOB_STATUS,
+  JOB_TYPES,
+  JOB_VERBS,
+  LEND_CATEGORIES,
+  LEND_KINDS,
+  LEND_STATUS,
+  MARKET_CATEGORIES,
+  SHELVES,
+  MARKET_ONLY,
+  timeAgo,
+} from "../config";
 import { mediaUrl } from "../media";
 import { openMedia } from "./MediaGallery";
 import { currentSub } from "../push";
@@ -11,13 +25,20 @@ import LocationPicker from "./LocationPicker";
 import MediaPicker, { mediaState } from "./MediaPicker";
 import PinFix from "./PinFix";
 import PinField from "./PinField";
-import { OptionsField, ShopNameField, TagsField, YouTubeField, richBody } from "./SellFields";
+import {
+  OptionsField,
+  ShopNameField,
+  TagsField,
+  YouTubeField,
+  richBody,
+} from "./SellFields";
 import { SPEAKER_RE, SpeakerHint } from "./QuickReport";
 
 // After the flood: lend & borrow, ask for hands, soi problems, and the after-flood checklist.
 // Same rules as the flood board: no accounts, an edit key in this browser, phones shown one item at a time.
 
-export const input = "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
+export const input =
+  "min-h-[44px] w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base focus:border-black focus:outline-none";
 export const label = "mb-1 block font-medium";
 const MADE_TO_ORDER = ["homemade", "dessert", "drinks", "food"]; // ตลาด: these start with "รับสั่งล่วงหน้า" ticked
 export const telHref = (phone) => `tel:${phone.replace(/[^\d+]/g, "")}`;
@@ -44,31 +65,47 @@ export function savedContact() {
 }
 
 export function remember(name, phone) {
-  save("contact", { ...savedContact(), ...(name ? { name } : {}), ...(phone ? { phone } : {}) });
+  save("contact", {
+    ...savedContact(),
+    ...(name ? { name } : {}),
+    ...(phone ? { phone } : {}),
+  });
 }
 
 function Chips({ options, value, onChange, all = "ทั้งหมด", counts = {} }) {
   return (
     <div className="-mx-3 overflow-x-auto px-3 pb-1">
       <div className="flex w-max gap-2">
-        {[["all", ["", all]], ...Object.entries(options)].map(([key, [emoji, text]]) => (
-          <button
-            key={key}
-            onClick={() => onChange(key)}
-            aria-pressed={value === key}
-            className={`flex min-h-[40px] items-center gap-1 whitespace-nowrap rounded-full px-3 text-sm ${value === key ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}
-          >
-            {emoji} {text}
-            {key !== "all" && counts[key] > 0 && <span className={`rounded-full px-1.5 text-xs ${value === key ? "bg-white text-black" : "bg-black text-white"}`}>{counts[key]}</span>}
-          </button>
-        ))}
+        {[["all", ["", all]], ...Object.entries(options)].map(
+          ([key, [emoji, text]]) => (
+            <button
+              key={key}
+              onClick={() => onChange(key)}
+              aria-pressed={value === key}
+              className={`flex min-h-[40px] items-center gap-1 whitespace-nowrap rounded-full px-3 text-sm ${value === key ? "bg-black font-semibold text-white" : "border border-neutral-300 bg-white"}`}
+            >
+              {emoji} {text}
+              {key !== "all" && counts[key] > 0 && (
+                <span
+                  className={`rounded-full px-1.5 text-xs ${value === key ? "bg-white text-black" : "bg-black text-white"}`}
+                >
+                  {counts[key]}
+                </span>
+              )}
+            </button>
+          ),
+        )}
       </div>
     </div>
   );
 }
 
 function Badge({ cls, children }) {
-  return <span className={`rounded px-1.5 text-sm font-semibold ${cls}`}>{children}</span>;
+  return (
+    <span className={`rounded px-1.5 text-sm font-semibold ${cls}`}>
+      {children}
+    </span>
+  );
 }
 
 // Tap to show the phone (one item at a time, like the flood board)
@@ -79,11 +116,16 @@ export function ContactButton({ path, text = "📞 ดูเบอร์ติ�
     return (
       <div className="space-y-1">
         {c.phone ? (
-          <a href={telHref(c.phone)} className="flex min-h-[52px] items-center justify-center rounded-xl bg-[#1E6B47] px-3 text-lg font-bold text-white">
+          <a
+            href={telHref(c.phone)}
+            className="flex min-h-[52px] items-center justify-center rounded-xl bg-[#1E6B47] px-3 text-lg font-bold text-white"
+          >
             📞 {c.phone}
           </a>
         ) : (
-          <p className="rounded-lg bg-neutral-100 p-2 text-sm">ไม่ได้ใส่เบอร์ไว้</p>
+          <p className="rounded-lg bg-neutral-100 p-2 text-sm">
+            ไม่ได้ใส่เบอร์ไว้
+          </p>
         )}
         {c.house && <p className="text-sm">🏠 บ้านเลขที่ {c.house}</p>}
       </div>
@@ -110,8 +152,20 @@ function Photos({ media }) {
   return (
     <div className="mt-2 flex gap-2">
       {media.map((m, i) => (
-        <a key={m.id} href={mediaUrl(m.id)} onClick={(e) => { e.preventDefault(); openMedia(media, i); }}>
-          <img src={mediaUrl(m.id, "thumb")} alt="" loading="lazy" className="h-20 w-20 rounded-lg object-cover" />
+        <a
+          key={m.id}
+          href={mediaUrl(m.id)}
+          onClick={(e) => {
+            e.preventDefault();
+            openMedia(media, i);
+          }}
+        >
+          <img
+            src={mediaUrl(m.id, "thumb")}
+            alt=""
+            loading="lazy"
+            className="h-20 w-20 rounded-lg object-cover"
+          />
         </a>
       ))}
     </div>
@@ -122,7 +176,9 @@ function History({ items }) {
   if (!items?.length) return null;
   return (
     <details className="mt-1 text-sm text-neutral-600">
-      <summary className="min-h-[36px] cursor-pointer">ประวัติ ({items.length})</summary>
+      <summary className="min-h-[36px] cursor-pointer">
+        ประวัติ ({items.length})
+      </summary>
       <ul className="mt-1 space-y-0.5">
         {[...items].reverse().map((h, i) => (
           <li key={i}>
@@ -140,7 +196,14 @@ export function NameField({ value, onChange, id, labelText = "ชื่อเล
       <label className={label} htmlFor={id}>
         {labelText}
       </label>
-      <input id={id} required maxLength={60} value={value} onChange={(e) => onChange(e.target.value)} className={input} />
+      <input
+        id={id}
+        required
+        maxLength={60}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={input}
+      />
     </div>
   );
 }
@@ -151,7 +214,14 @@ function SoiField({ value, onChange, id }) {
       <label className={label} htmlFor={id}>
         ซอย / แยก
       </label>
-      <input id={id} maxLength={12} value={value} onChange={(e) => onChange(e.target.value)} className={input} placeholder="เช่น 15, 34/5" />
+      <input
+        id={id}
+        maxLength={12}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={input}
+        placeholder="เช่น 15, 34/5"
+      />
     </div>
   );
 }
@@ -164,24 +234,50 @@ export function LendBoard({ items, setItems, admin, onAdd, noAdd = false }) {
   const [cat, setCat] = useState("all");
   const [q, setQ] = useState("");
   const [keys, , dropKey] = useKeys("lendKeys");
-  const counts = useMemo(() => items.reduce((c, x) => ({ ...c, [x.category]: (c[x.category] || 0) + 1 }), {}), [items]);
+  const counts = useMemo(
+    () =>
+      items.reduce(
+        (c, x) => ({ ...c, [x.category]: (c[x.category] || 0) + 1 }),
+        {},
+      ),
+    [items],
+  );
   const query = q.trim().toLowerCase();
   const shown = items.filter(
-    (x) => (kind === "all" || x.kind === kind) && (cat === "all" || x.category === cat) && (!query || `${x.title} ${x.detail} ${x.soi} ${x.name}`.toLowerCase().includes(query)),
+    (x) =>
+      (kind === "all" || x.kind === kind) &&
+      (cat === "all" || x.category === cat) &&
+      (!query ||
+        `${x.title} ${x.detail} ${x.soi} ${x.name}`
+          .toLowerCase()
+          .includes(query)),
   );
-  const upsert = (x) => setItems((prev) => prev.map((y) => (y.id === x.id ? x : y)));
+  const upsert = (x) =>
+    setItems((prev) => prev.map((y) => (y.id === x.id ? x : y)));
 
   return (
     <div className="space-y-3">
-      <div className={noAdd ? "hidden" : "grid grid-cols-2 gap-2 sm:grid-cols-4"}>
+      <div
+        className={noAdd ? "hidden" : "grid grid-cols-2 gap-2 sm:grid-cols-4"}
+      >
         {Object.entries(LEND_KINDS).map(([k, v]) => (
-          <button key={k} onClick={() => onAdd(k)} className="min-h-[56px] rounded-xl border-2 border-black bg-white px-1 text-sm font-bold leading-tight active:bg-neutral-100">
+          <button
+            key={k}
+            onClick={() => onAdd(k)}
+            className="min-h-[56px] rounded-xl border-2 border-black bg-white px-1 text-sm font-bold leading-tight active:bg-neutral-100"
+          >
             {v.emoji} {v.verb}
           </button>
         ))}
       </div>
       <div className="grid grid-cols-5 gap-1 rounded-xl bg-neutral-200 p-1">
-        {[["all", "ทั้งหมด"], ...Object.entries(LEND_KINDS).map(([k, v]) => [k, `${v.emoji} ${v.label}`])].map(([k, t]) => (
+        {[
+          ["all", "ทั้งหมด"],
+          ...Object.entries(LEND_KINDS).map(([k, v]) => [
+            k,
+            `${v.emoji} ${v.label}`,
+          ]),
+        ].map(([k, t]) => (
           <button
             key={k}
             onClick={() => setKind(k)}
@@ -192,8 +288,18 @@ export function LendBoard({ items, setItems, admin, onAdd, noAdd = false }) {
           </button>
         ))}
       </div>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 ค้นหา เช่น ฉีดน้ำ, บันได, ซอย 15" className={input} />
-      <Chips options={LEND_CATEGORIES} value={cat} onChange={setCat} counts={counts} />
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="🔍 ค้นหา เช่น ฉีดน้ำ, บันได, ซอย 15"
+        className={input}
+      />
+      <Chips
+        options={LEND_CATEGORIES}
+        value={cat}
+        onChange={setCat}
+        counts={counts}
+      />
       <ul className="space-y-2">
         {shown.map((x) => (
           <LendCard
@@ -211,10 +317,15 @@ export function LendBoard({ items, setItems, admin, onAdd, noAdd = false }) {
       </ul>
       {!shown.length && (
         <p className="rounded-xl bg-white p-4 text-center text-neutral-600">
-          {items.length ? "ไม่พบในหมวด/คำค้นนี้" : "ยังไม่มีใครลงของ · มีเครื่องฉีดน้ำ บันได ปั๊ม อยู่บ้าน? ลงให้เพื่อนบ้านยืมได้เลย"}
+          {items.length
+            ? "ไม่พบในหมวด/คำค้นนี้"
+            : "ยังไม่มีใครลงของ · มีเครื่องฉีดน้ำ บันได ปั๊ม อยู่บ้าน? ลงให้เพื่อนบ้านยืมได้เลย"}
         </p>
       )}
-      <p className="text-xs text-neutral-500">ตกลงเรื่องมัดจำ / ค่าน้ำมัน / วันคืน กันเอง · ถ่ายรูปสภาพของก่อนให้ยืม · ระบบไม่รับเงิน</p>
+      <p className="text-xs text-neutral-500">
+        ตกลงเรื่องมัดจำ / ค่าน้ำมัน / วันคืน กันเอง · ถ่ายรูปสภาพของก่อนให้ยืม ·
+        ระบบไม่รับเงิน
+      </p>
     </div>
   );
 }
@@ -226,9 +337,17 @@ function LendCard({ item: x, editKey, admin, onChanged, onDeleted }) {
   const [open, setOpen] = useState(false);
   const mine = !!editKey;
   return (
-    <li className={`anim-row rounded-xl border bg-white p-3 shadow-sm ${x.status === "closed" ? "opacity-60" : ""}`}>
-      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-start gap-3 text-left">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl" aria-hidden="true">
+    <li
+      className={`anim-row rounded-xl border bg-white p-3 shadow-sm ${x.status === "closed" ? "opacity-60" : ""}`}
+    >
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-start gap-3 text-left"
+      >
+        <span
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl"
+          aria-hidden="true"
+        >
           {emoji}
         </span>
         <span className="min-w-0 flex-1">
@@ -242,11 +361,19 @@ function LendCard({ item: x, editKey, admin, onChanged, onDeleted }) {
                 {x.status === "lent" && x.until ? ` · ${x.until}` : ""}
               </Badge>
             )}
-            {x.queue_count > 0 && <Badge cls="bg-sky-100 text-sky-800">รอคิว {x.queue_count}</Badge>}
+            {x.queue_count > 0 && (
+              <Badge cls="bg-sky-100 text-sky-800">รอคิว {x.queue_count}</Badge>
+            )}
             {mine && <Badge cls="bg-yellow-200">ของฉัน</Badge>}
           </span>
-          <span className="mt-0.5 block break-words text-lg font-bold leading-snug">{x.title}</span>
-          {x.price && <span className="block text-lg font-bold text-[#8F2A1C]">{x.price}</span>}
+          <span className="mt-0.5 block break-words text-lg font-bold leading-snug">
+            {x.title}
+          </span>
+          {x.price && (
+            <span className="block text-lg font-bold text-[#8F2A1C]">
+              {x.price}
+            </span>
+          )}
           <span className="block text-sm text-neutral-600">
             {catText} · {x.name}
             {x.soi && ` · ซ.${x.soi}`} · {timeAgo(x.created_at)}
@@ -256,11 +383,22 @@ function LendCard({ item: x, editKey, admin, onChanged, onDeleted }) {
       </button>
       {open && (
         <div className="mt-2 space-y-2">
-          {x.detail && <p className="whitespace-pre-wrap break-words">{x.detail}</p>}
+          {x.detail && (
+            <p className="whitespace-pre-wrap break-words">{x.detail}</p>
+          )}
           {x.when && <p className="text-[15px]">🕒 {x.when}</p>}
           {x.pickup && <p className="text-[15px]">🛵 {x.pickup}</p>}
           <Photos media={x.media} />
-          {mine || admin ? <LendOwner item={x} editKey={editKey} onChanged={onChanged} onDeleted={onDeleted} /> : <LendVisitor item={x} onChanged={onChanged} />}
+          {mine || admin ? (
+            <LendOwner
+              item={x}
+              editKey={editKey}
+              onChanged={onChanged}
+              onDeleted={onDeleted}
+            />
+          ) : (
+            <LendVisitor item={x} onChanged={onChanged} />
+          )}
           <History items={x.history} />
         </div>
       )}
@@ -273,13 +411,31 @@ function LendVisitor({ item: x, onChanged }) {
   const [form, setForm] = useState(null);
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
-  if (x.status === "closed") return <p className="text-sm text-neutral-500">รายการนี้ปิดแล้ว</p>;
-  if (x.kind !== "lend") return <ContactButton path={`/lend/${x.id}/contact`} text={x.kind === "give" ? "📞 ติดต่อขอรับ" : x.kind === "sell" ? "📞 ติดต่อผู้ขาย" : "📞 ฉันมี · ติดต่อคนตามหา"} />;
+  if (x.status === "closed")
+    return <p className="text-sm text-neutral-500">รายการนี้ปิดแล้ว</p>;
+  if (x.kind !== "lend")
+    return (
+      <ContactButton
+        path={`/lend/${x.id}/contact`}
+        text={
+          x.kind === "give"
+            ? "📞 ติดต่อขอรับ"
+            : x.kind === "sell"
+              ? "📞 ติดต่อผู้ขาย"
+              : "📞 ฉันมี · ติดต่อคนตามหา"
+        }
+      />
+    );
   async function join(e) {
     e.preventDefault();
     setErr("");
     try {
-      onChanged(await api(`/lend/${x.id}/queue`, { method: "POST", body: JSON.stringify(form) }));
+      onChanged(
+        await api(`/lend/${x.id}/queue`, {
+          method: "POST",
+          body: JSON.stringify(form),
+        }),
+      );
       remember(form.name, form.phone);
       setDone(true);
       setForm(null);
@@ -289,35 +445,77 @@ function LendVisitor({ item: x, onChanged }) {
   }
   return (
     <div className="space-y-2">
-      {done && <p className="rounded-lg bg-emerald-50 p-2 text-sm font-semibold text-emerald-800">✅ ต่อคิวแล้ว เจ้าของจะเห็นชื่อและเบอร์คุณ แล้วโทรกลับ</p>}
+      {done && (
+        <p className="rounded-lg bg-emerald-50 p-2 text-sm font-semibold text-emerald-800">
+          ✅ ต่อคิวแล้ว เจ้าของจะเห็นชื่อและเบอร์คุณ แล้วโทรกลับ
+        </p>
+      )}
       {form ? (
-        <form onSubmit={join} className="space-y-2 rounded-xl border-2 border-black p-3">
+        <form
+          onSubmit={join}
+          className="space-y-2 rounded-xl border-2 border-black p-3"
+        >
           <div className="grid gap-2 sm:grid-cols-2">
-            <NameField id={`q-name-${x.id}`} value={form.name} onChange={(name) => setForm({ ...form, name })} />
+            <NameField
+              id={`q-name-${x.id}`}
+              value={form.name}
+              onChange={(name) => setForm({ ...form, name })}
+            />
             <div>
               <label className={label} htmlFor={`q-phone-${x.id}`}>
                 เบอร์โทร *
               </label>
-              <input id={`q-phone-${x.id}`} required type="tel" inputMode="tel" maxLength={40} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={input} />
+              <input
+                id={`q-phone-${x.id}`}
+                required
+                type="tel"
+                inputMode="tel"
+                maxLength={40}
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className={input}
+              />
             </div>
           </div>
-          <input maxLength={160} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className={input} placeholder="ใช้เมื่อไหร่ นานแค่ไหน เช่น เสาร์เช้า ครึ่งวัน" />
-          <p className="text-xs text-neutral-500">ชื่อ/เบอร์ เห็นเฉพาะเจ้าของของชิ้นนี้</p>
+          <input
+            maxLength={160}
+            value={form.note}
+            onChange={(e) => setForm({ ...form, note: e.target.value })}
+            className={input}
+            placeholder="ใช้เมื่อไหร่ นานแค่ไหน เช่น เสาร์เช้า ครึ่งวัน"
+          />
+          <p className="text-xs text-neutral-500">
+            ชื่อ/เบอร์ เห็นเฉพาะเจ้าของของชิ้นนี้
+          </p>
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setForm(null)} className="min-h-[48px] rounded-xl border-2 border-black font-semibold">
+            <button
+              type="button"
+              onClick={() => setForm(null)}
+              className="min-h-[48px] rounded-xl border-2 border-black font-semibold"
+            >
               ยกเลิก
             </button>
-            <button className="min-h-[48px] rounded-xl bg-[#1E6B47] font-bold text-white">ต่อคิว</button>
+            <button className="min-h-[48px] rounded-xl bg-[#1E6B47] font-bold text-white">
+              ต่อคิว
+            </button>
           </div>
         </form>
       ) : (
         !done && (
-          <button onClick={() => setForm({ name: c.name || "", phone: c.phone || "", note: "" })} className="min-h-[48px] w-full rounded-xl bg-[#1E6B47] px-3 font-bold text-white">
+          <button
+            onClick={() =>
+              setForm({ name: c.name || "", phone: c.phone || "", note: "" })
+            }
+            className="min-h-[48px] w-full rounded-xl bg-[#1E6B47] px-3 font-bold text-white"
+          >
             🙋 ขอยืม (ต่อคิว){x.queue_count ? ` · รออยู่ ${x.queue_count}` : ""}
           </button>
         )
       )}
-      <ContactButton path={`/lend/${x.id}/contact`} text="📞 หรือโทรหาเจ้าของ" />
+      <ContactButton
+        path={`/lend/${x.id}/contact`}
+        text="📞 หรือโทรหาเจ้าของ"
+      />
       {err && <p className="text-sm text-red-700">{err}</p>}
     </div>
   );
@@ -341,7 +539,16 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
       setErr(e.message);
     }
   };
-  const patch = (body) => run(async () => onChanged(await api(`/lend/${x.id}`, { method: "PATCH", headers, body: JSON.stringify(body) })));
+  const patch = (body) =>
+    run(async () =>
+      onChanged(
+        await api(`/lend/${x.id}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(body),
+        }),
+      ),
+    );
   const queue = (full?.queue || []).filter((q) => !q.done);
   return (
     <div className="space-y-2 rounded-xl bg-yellow-50 p-3">
@@ -351,30 +558,71 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
           <p className="text-sm font-semibold">คิวขอยืม ({queue.length})</p>
           <ul className="space-y-1">
             {queue.map((q, i) => (
-              <li key={q.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-white p-2 text-sm">
+              <li
+                key={q.id}
+                className="flex flex-wrap items-center gap-2 rounded-lg bg-white p-2 text-sm"
+              >
                 <b>
                   {i + 1}. {q.name}
                 </b>
                 <a href={telHref(q.phone)} className="font-semibold underline">
                   📞 {q.phone}
                 </a>
-                {q.note && <span className="w-full text-neutral-600">{q.note}</span>}
-                <button onClick={() => setLendTo({ lent_to: q.name, until: "" })} className="min-h-[40px] rounded-lg bg-[#1E6B47] px-2 text-white">
+                {q.note && (
+                  <span className="w-full text-neutral-600">{q.note}</span>
+                )}
+                <button
+                  onClick={() => setLendTo({ lent_to: q.name, until: "" })}
+                  className="min-h-[40px] rounded-lg bg-[#1E6B47] px-2 text-white"
+                >
                   ให้คนนี้ยืม
                 </button>
-                <button onClick={() => run(async () => setFull(await api(`/lend/${x.id}/queue/${q.id}/done`, { method: "POST", headers })))} className="min-h-[40px] px-2 underline">
+                <button
+                  onClick={() =>
+                    run(async () =>
+                      setFull(
+                        await api(`/lend/${x.id}/queue/${q.id}/done`, {
+                          method: "POST",
+                          headers,
+                        }),
+                      ),
+                    )
+                  }
+                  className="min-h-[40px] px-2 underline"
+                >
                   เอาออกจากคิว
                 </button>
               </li>
             ))}
-            {!queue.length && <li className="text-sm text-neutral-500">ยังไม่มีคนขอคิว</li>}
+            {!queue.length && (
+              <li className="text-sm text-neutral-500">ยังไม่มีคนขอคิว</li>
+            )}
           </ul>
           {lendTo ? (
             <div className="space-y-2 rounded-lg border-2 border-black bg-white p-2">
-              <input maxLength={60} value={lendTo.lent_to} onChange={(e) => setLendTo({ ...lendTo, lent_to: e.target.value })} className={input} placeholder="ให้ใครยืม" />
-              <input maxLength={40} value={lendTo.until} onChange={(e) => setLendTo({ ...lendTo, until: e.target.value })} className={input} placeholder="คืนเมื่อไหร่ เช่น คืนเสาร์ 4 ต.ค." />
+              <input
+                maxLength={60}
+                value={lendTo.lent_to}
+                onChange={(e) =>
+                  setLendTo({ ...lendTo, lent_to: e.target.value })
+                }
+                className={input}
+                placeholder="ให้ใครยืม"
+              />
+              <input
+                maxLength={40}
+                value={lendTo.until}
+                onChange={(e) =>
+                  setLendTo({ ...lendTo, until: e.target.value })
+                }
+                className={input}
+                placeholder="คืนเมื่อไหร่ เช่น คืนเสาร์ 4 ต.ค."
+              />
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => setLendTo(null)} className="min-h-[44px] rounded-lg border-2 border-black">
+                <button
+                  onClick={() => setLendTo(null)}
+                  className="min-h-[44px] rounded-lg border-2 border-black"
+                >
                   ยกเลิก
                 </button>
                 <button
@@ -391,15 +639,26 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
           ) : (
             <div className="grid grid-cols-2 gap-2">
               {x.status !== "lent" ? (
-                <button onClick={() => setLendTo({ lent_to: queue[0]?.name || "", until: "" })} className="min-h-[44px] rounded-lg bg-[#1E6B47] font-semibold text-white">
+                <button
+                  onClick={() =>
+                    setLendTo({ lent_to: queue[0]?.name || "", until: "" })
+                  }
+                  className="min-h-[44px] rounded-lg bg-[#1E6B47] font-semibold text-white"
+                >
                   📤 ให้ยืมไปแล้ว
                 </button>
               ) : (
-                <button onClick={() => patch({ status: "available" })} className="min-h-[44px] rounded-lg bg-[#1E6B47] font-semibold text-white">
+                <button
+                  onClick={() => patch({ status: "available" })}
+                  className="min-h-[44px] rounded-lg bg-[#1E6B47] font-semibold text-white"
+                >
                   📥 ได้คืนแล้ว · ว่าง
                 </button>
               )}
-              <button onClick={() => patch({ status: "closed" })} className="min-h-[44px] rounded-lg border-2 border-black font-semibold">
+              <button
+                onClick={() => patch({ status: "closed" })}
+                className="min-h-[44px] rounded-lg border-2 border-black font-semibold"
+              >
                 ปิดรายการ
               </button>
             </div>
@@ -407,12 +666,22 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
         </>
       )}
       {x.kind !== "lend" && x.status !== "closed" && (
-        <button onClick={() => patch({ status: "closed" })} className="min-h-[44px] w-full rounded-lg bg-[#1E6B47] font-semibold text-white">
-          {x.kind === "give" ? "✅ มีคนรับไปแล้ว · ปิด" : x.kind === "sell" ? "✅ ขายแล้ว · ปิด" : "✅ หาได้แล้ว · ปิด"}
+        <button
+          onClick={() => patch({ status: "closed" })}
+          className="min-h-[44px] w-full rounded-lg bg-[#1E6B47] font-semibold text-white"
+        >
+          {x.kind === "give"
+            ? "✅ มีคนรับไปแล้ว · ปิด"
+            : x.kind === "sell"
+              ? "✅ ขายแล้ว · ปิด"
+              : "✅ หาได้แล้ว · ปิด"}
         </button>
       )}
       {x.status === "closed" && (
-        <button onClick={() => patch({ status: "available" })} className="min-h-[44px] w-full rounded-lg border-2 border-black font-semibold">
+        <button
+          onClick={() => patch({ status: "available" })}
+          className="min-h-[44px] w-full rounded-lg border-2 border-black font-semibold"
+        >
           เปิดรายการอีกครั้ง
         </button>
       )}
@@ -433,10 +702,33 @@ function LendOwner({ item: x, editKey, onChanged, onDeleted }) {
   );
 }
 
-export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
+export function LendForm({
+  kind: initialKind = "lend",
+  shelf = "",
+  category: initialCat = "",
+  onDone,
+}) {
   const c = savedContact();
   const [, addKey] = useKeys("lendKeys");
-  const [form, setForm] = useState({ kind: initialKind, category: "", title: "", detail: "", price: "", pickup: "", when: "", preorder: false, no_orders: false, youtube: "", shop_name: "", tags: [], options: [], soi: load("mySoi", ""), name: c.name || "", phone: c.phone || "" });
+  // 19 Oct: shelf "service" = market posts on the บริการ shelf (บ้านเช่า·ขาย, จ้างงาน, คลินิก) — no 🛒 orders there
+  const [form, setForm] = useState({
+    kind: initialKind,
+    category: initialCat,
+    title: "",
+    detail: "",
+    price: "",
+    pickup: "",
+    when: "",
+    preorder: false,
+    no_orders: shelf === "service" || shelf === "home",
+    youtube: "",
+    shop_name: "",
+    tags: [],
+    options: [],
+    soi: load("mySoi", ""),
+    name: c.name || "",
+    phone: c.phone || "",
+  });
   const [preTouched, setPreTouched] = useState(false);
   const [pin, setPin] = useState(null); // ตลาด: optional pin where to pick it up
   const [media, setMedia] = useState([]);
@@ -450,10 +742,31 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
     setBusy(true);
     setErr("");
     try {
-      const body = form.kind === "sell" ? { ...form, ...richBody(form) } : { ...form, pickup: "", when: "", preorder: false, youtube: "", shop_name: "", tags: [], options: [] };
+      const body =
+        form.kind === "sell"
+          ? { ...form, ...richBody(form) }
+          : {
+              ...form,
+              pickup: "",
+              when: "",
+              preorder: false,
+              youtube: "",
+              shop_name: "",
+              tags: [],
+              options: [],
+            };
       // a seller's own phone gets "🛎️ ออเดอร์ใหม่" when this item is ordered (only if notifications are already on here)
-      const sub = form.kind === "sell" ? await currentSub().catch(() => null) : null;
-      const x = await api("/lend", { method: "POST", body: JSON.stringify({ ...body, notify_endpoint: sub?.endpoint || "", media_ids: attached.ids, ...(sell && pin ? { lat: pin.lat, lng: pin.lng } : {}) }) });
+      const sub =
+        form.kind === "sell" ? await currentSub().catch(() => null) : null;
+      const x = await api("/lend", {
+        method: "POST",
+        body: JSON.stringify({
+          ...body,
+          notify_endpoint: sub?.endpoint || "",
+          media_ids: attached.ids,
+          ...(sell && pin ? { lat: pin.lat, lng: pin.lng } : {}),
+        }),
+      });
       addKey(x.id, x.edit_key);
       pushKey("lend", x.id, x.edit_key); // 17 Oct: other phones with this seller's shop link see it too
       remember(form.name, form.phone);
@@ -466,16 +779,33 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
   }
   const want = form.kind === "want";
   const sell = form.kind === "sell";
+  const svc = sell && (shelf === "service" || shelf === "home"); // 19 Oct: บ้านเช่า·ขาย / จ้างงาน / คลินิก — not food: no orders, no pre-order, own wording
   // selling: the market's choices (homemade first); lend / give / want: the old list without the market-only ones
-  const cats = sell ? (SHELVES.find((x) => x.key === shelf)?.sell || MARKET_CATEGORIES).map((k) => [k, LEND_CATEGORIES[k]]) : Object.entries(LEND_CATEGORIES).filter(([k]) => !MARKET_ONLY.includes(k));
+  const cats = sell
+    ? (SHELVES.find((x) => x.key === shelf)?.sell || MARKET_CATEGORIES).map(
+        (k) => [k, LEND_CATEGORIES[k]],
+      )
+    : Object.entries(LEND_CATEGORIES).filter(([k]) => !MARKET_ONLY.includes(k));
   return (
     <form onSubmit={submit} className="space-y-4">
-      <div className={`grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 min-[400px]:grid-cols-4 ${shelf ? "hidden" : ""}`}>
+      <div
+        className={`grid grid-cols-2 gap-1 rounded-xl bg-neutral-200 p-1 min-[400px]:grid-cols-4 ${shelf ? "hidden" : ""}`}
+      >
         {Object.entries(LEND_KINDS).map(([k, v]) => (
           <button
             type="button"
             key={k}
-            onClick={() => set({ kind: k, ...(form.category && (k === "sell" ? !MARKET_CATEGORIES.includes(form.category) : MARKET_ONLY.includes(form.category)) ? { category: "" } : {}) })}
+            onClick={() =>
+              set({
+                kind: k,
+                ...(form.category &&
+                (k === "sell"
+                  ? !MARKET_CATEGORIES.includes(form.category)
+                  : MARKET_ONLY.includes(form.category))
+                  ? { category: "" }
+                  : {}),
+              })
+            }
             aria-pressed={form.kind === k}
             className={`min-h-[44px] rounded-lg text-sm font-semibold ${form.kind === k ? "bg-white shadow" : "text-neutral-600"}`}
           >
@@ -483,9 +813,10 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
           </button>
         ))}
       </div>
-      {sell && (
+      {sell && !["service", "home"].includes(shelf) && (
         <p className="rounded-lg bg-[#FFF4D6] p-2.5 text-sm text-[#45504A]">
-          🛍️ ลงของทำเอง·ทำตามสั่ง·ของเหลือใช้ · มีร้านที่เปิดประจำ? ใช้ปุ่ม <b>“ลงร้าน”</b> ท้ายหน้าตลาด
+          🛍️ ลงของทำเอง·ทำตามสั่ง·ของเหลือใช้ · มีร้านที่เปิดประจำ? ใช้ปุ่ม{" "}
+          <b>“ลงร้าน”</b> ท้ายหน้าตลาด
         </p>
       )}
       <fieldset>
@@ -495,7 +826,14 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
             <button
               type="button"
               key={k}
-              onClick={() => set({ category: k, ...(sell && !preTouched ? { preorder: MADE_TO_ORDER.includes(k) } : {}) })}
+              onClick={() =>
+                set({
+                  category: k,
+                  ...(sell && !preTouched
+                    ? { preorder: MADE_TO_ORDER.includes(k) }
+                    : {}),
+                })
+              }
               aria-pressed={form.category === k}
               className={`flex min-h-[48px] items-center gap-2 rounded-lg border-2 px-2 text-left text-sm ${form.category === k ? "border-black bg-black text-white" : "border-neutral-200 bg-white"}`}
             >
@@ -507,7 +845,13 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
       </fieldset>
       <div>
         <label className={label} htmlFor="lend-title">
-          {want ? "ตามหาอะไร *" : form.kind === "sell" ? "ขายอะไร *" : "ของอะไร *"}
+          {want
+            ? "ตามหาอะไร *"
+            : svc
+              ? "ประกาศอะไร *"
+              : form.kind === "sell"
+                ? "ขายอะไร *"
+                : "ของอะไร *"}
         </label>
         <input
           id="lend-title"
@@ -517,62 +861,148 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
           value={form.title}
           onChange={(e) => set({ title: e.target.value })}
           className={input}
-          placeholder={want ? "เช่น บันไดสูง 3 เมตร ขอยืมครึ่งวัน" : sell ? "เช่น ขนมกล้วยทำเอง, แกงเขียวหวานไก่" : "เช่น เครื่องฉีดน้ำแรงดันสูง Karcher K3"}
+          placeholder={
+            want
+              ? "เช่น บันไดสูง 3 เมตร ขอยืมครึ่งวัน"
+              : form.category === "realestate"
+                ? "เช่น ให้เช่าทาวน์เฮาส์ 2 ชั้น ซ.16 · หาเช่าบ้านระหว่างรีโนเวท"
+                : form.category === "hire"
+                  ? "เช่น หาคนช่วยยกเปียโนไปอีกห้อง ซ.55"
+                  : sell
+                    ? "เช่น ขนมกล้วยทำเอง, แกงเขียวหวานไก่"
+                    : "เช่น เครื่องฉีดน้ำแรงดันสูง Karcher K3"
+          }
         />
       </div>
       {form.kind === "sell" && (
         <div>
           <label className={label} htmlFor="lend-price">
-            ราคา *
+            {form.category === "hire"
+              ? "ค่าจ้าง (ไม่บังคับ)"
+              : form.category === "realestate"
+                ? "ค่าเช่า / ราคาขาย *"
+                : "ราคา *"}
           </label>
-          <input id="lend-price" required maxLength={60} value={form.price} onChange={(e) => set({ price: e.target.value })} className={input} placeholder="เช่น 50 บาท, กล่องละ 35" />
+          <input
+            id="lend-price"
+            required={form.category !== "hire"}
+            maxLength={60}
+            value={form.price}
+            onChange={(e) => set({ price: e.target.value })}
+            className={input}
+            placeholder={
+              form.category === "hire"
+                ? "เช่น ตกลงกันได้, 500 บาท"
+                : form.category === "realestate"
+                  ? "เช่น เดือนละ 6,000 · ขาย 2.5 ล้าน"
+                  : "เช่น 50 บาท, กล่องละ 35"
+            }
+          />
         </div>
       )}
       {sell && (
         <>
-          {ORDERS_ON && (
+          {ORDERS_ON && !svc && (
             <label className="flex min-h-[48px] items-start gap-3 rounded-xl border-2 border-[#C9D1CB] bg-white p-3">
-              <input type="checkbox" checked={!form.no_orders} onChange={(e) => set({ no_orders: !e.target.checked })} className="mt-1 h-5 w-5" />
+              <input
+                type="checkbox"
+                checked={!form.no_orders}
+                onChange={(e) => set({ no_orders: !e.target.checked })}
+                className="mt-1 h-5 w-5"
+              />
               <span>
                 <b>🛒 เปิดให้กดสั่ง/จองผ่านระบบ</b>
-                <span className="block text-sm text-neutral-600">ไม่ได้ดูออเดอร์ในเว็บ/LINE (เช่น แอดลงให้ร้าน) เอาติ๊กออก — คนซื้อจะโทร/ทักผู้ขายแทน</span>
+                <span className="block text-sm text-neutral-600">
+                  ไม่ได้ดูออเดอร์ในเว็บ/LINE (เช่น แอดลงให้ร้าน) เอาติ๊กออก —
+                  คนซื้อจะโทร/ทักผู้ขายแทน
+                </span>
               </span>
             </label>
           )}
-          <label className="flex min-h-[48px] items-start gap-3 rounded-xl border-2 border-[#C9D1CB] bg-white p-3">
-            <input
-              type="checkbox"
-              checked={form.preorder}
-              onChange={(e) => {
-                setPreTouched(true);
-                set({ preorder: e.target.checked });
-              }}
-              className="mt-1 h-5 w-5"
-            />
-            <span>
-              <b>📝 รับสั่งล่วงหน้า · ทำตามออเดอร์</b>
-              <span className="block text-sm text-neutral-600">{ORDERS_ON && !form.no_orders ? "เพื่อนบ้านกด 🛒 สั่ง/จอง ได้เสมอ ติ๊กนี้ให้รู้ว่าต้องสั่งก่อน · ออเดอร์ขึ้นที่การ์ดของคุณ (เครื่องนี้)" : "ติ๊กนี้ให้รู้ว่าต้องโทร/ทักสั่งก่อน"}</span>
-            </span>
-          </label>
+          {!svc && (
+            <label className="flex min-h-[48px] items-start gap-3 rounded-xl border-2 border-[#C9D1CB] bg-white p-3">
+              <input
+                type="checkbox"
+                checked={form.preorder}
+                onChange={(e) => {
+                  setPreTouched(true);
+                  set({ preorder: e.target.checked });
+                }}
+                className="mt-1 h-5 w-5"
+              />
+              <span>
+                <b>📝 รับสั่งล่วงหน้า · ทำตามออเดอร์</b>
+                <span className="block text-sm text-neutral-600">
+                  {ORDERS_ON && !form.no_orders
+                    ? "เพื่อนบ้านกด 🛒 สั่ง/จอง ได้เสมอ ติ๊กนี้ให้รู้ว่าต้องสั่งก่อน · ออเดอร์ขึ้นที่การ์ดของคุณ (เครื่องนี้)"
+                    : "ติ๊กนี้ให้รู้ว่าต้องโทร/ทักสั่งก่อน"}
+                </span>
+              </span>
+            </label>
+          )}
           <div>
             <label className={label} htmlFor="lend-when">
-              มีขายเมื่อไหร่
+              {form.category === "realestate"
+                ? "ว่าง / ต้องการเมื่อไหร่"
+                : form.category === "hire"
+                  ? "ต้องการวันไหน เวลาไหน"
+                  : svc
+                    ? "เปิดวันไหน เวลาไหน"
+                    : "มีขายเมื่อไหร่"}
             </label>
-            <input id="lend-when" maxLength={80} value={form.when} onChange={(e) => set({ when: e.target.value })} className={input} placeholder="เช่น ทุกเช้า 7–9 โมง · สั่งล่วงหน้า 1 วัน" />
+            <input
+              id="lend-when"
+              maxLength={80}
+              value={form.when}
+              onChange={(e) => set({ when: e.target.value })}
+              className={input}
+              placeholder={
+                svc
+                  ? "เช่น ว่างตั้งแต่ 1 พ.ย. · เสาร์นี้ช่วงเช้า"
+                  : "เช่น ทุกเช้า 7–9 โมง · สั่งล่วงหน้า 1 วัน"
+              }
+            />
           </div>
           <div>
             <label className={label} htmlFor="lend-pickup">
-              รับของที่ไหน
+              {svc ? "อยู่ที่ไหน" : "รับของที่ไหน"}
             </label>
-            <input id="lend-pickup" maxLength={80} value={form.pickup} onChange={(e) => set({ pickup: e.target.value })} className={input} placeholder="เช่น รับที่บ้าน ซ.16 / ส่งในหมู่บ้าน" />
+            <input
+              id="lend-pickup"
+              maxLength={80}
+              value={form.pickup}
+              onChange={(e) => set({ pickup: e.target.value })}
+              className={input}
+              placeholder={
+                svc
+                  ? "เช่น ซ.16 ใกล้ทางออกหลัง"
+                  : "เช่น รับที่บ้าน ซ.16 / ส่งในหมู่บ้าน"
+              }
+            />
           </div>
-          <PinField value={pin} onChange={setPin} title="จุดรับของ" button="🗺️ ปักหมุดจุดรับของ (ไม่บังคับ)" />
-          <details className="rounded-xl border-2 border-[#C9D1CB] bg-white p-3" open={!!(form.shop_name || form.tags.length || form.options.length)}>
-            <summary className="min-h-[32px] cursor-pointer font-bold">✨ ทำให้น่าซื้อขึ้น · ชื่อร้าน จุดเด่น เมนูหลายราคา</summary>
+          <PinField
+            value={pin}
+            onChange={setPin}
+            title="จุดรับของ"
+            button="🗺️ ปักหมุดจุดรับของ (ไม่บังคับ)"
+          />
+          <details
+            className="rounded-xl border-2 border-[#C9D1CB] bg-white p-3"
+            open={!!(form.shop_name || form.tags.length || form.options.length)}
+          >
+            <summary className="min-h-[32px] cursor-pointer font-bold">
+              ✨ ทำให้น่าซื้อขึ้น · ชื่อร้าน จุดเด่น เมนูหลายราคา
+            </summary>
             <div className="mt-3 space-y-4">
-              <ShopNameField value={form.shop_name} onChange={(shop_name) => set({ shop_name })} />
+              <ShopNameField
+                value={form.shop_name}
+                onChange={(shop_name) => set({ shop_name })}
+              />
               <TagsField tags={form.tags} onChange={(tags) => set({ tags })} />
-              <OptionsField options={form.options} onChange={(options) => set({ options })} />
+              <OptionsField
+                options={form.options}
+                onChange={(options) => set({ options })}
+              />
             </div>
           </details>
         </>
@@ -588,30 +1018,79 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
           value={form.detail}
           onChange={(e) => set({ detail: e.target.value })}
           className={input}
-          placeholder={want ? "ใช้ทำอะไร ใช้เมื่อไหร่" : sell ? "รสชาติ ขนาด จำนวน สภาพของ" : "สภาพ / ยืมได้นานเท่าไหร่ / มัดจำไหม / มารับที่ไหน / ต้องใช้ปลั๊กหรือน้ำมัน"}
+          placeholder={
+            want
+              ? "ใช้ทำอะไร ใช้เมื่อไหร่"
+              : sell
+                ? "รสชาติ ขนาด จำนวน สภาพของ"
+                : "สภาพ / ยืมได้นานเท่าไหร่ / มัดจำไหม / มารับที่ไหน / ต้องใช้ปลั๊กหรือน้ำมัน"
+          }
         />
       </div>
       {!want && (
         <div>
-          <p className={label}>{sell ? "รูป · คลิปสั้น (ไม่บังคับ · ใส่ได้ 8 · รูปแรกเป็นหน้าปก)" : "รูป (ไม่บังคับ)"}</p>
-          <MediaPicker items={media} setItems={setMedia} max={sell ? 8 : 3} allowVideo={sell} />
+          <p className={label}>
+            {sell
+              ? "รูป · คลิปสั้น (ไม่บังคับ · ใส่ได้ 8 · รูปแรกเป็นหน้าปก)"
+              : "รูป (ไม่บังคับ)"}
+          </p>
+          <MediaPicker
+            items={media}
+            setItems={setMedia}
+            max={sell ? 8 : 3}
+            allowVideo={sell}
+          />
         </div>
       )}
-      {sell && <YouTubeField id="lend-youtube" strong value={form.youtube} onChange={(youtube) => set({ youtube })} />}
+      {sell && (
+        <YouTubeField
+          id="lend-youtube"
+          strong
+          value={form.youtube}
+          onChange={(youtube) => set({ youtube })}
+        />
+      )}
       <div className="grid gap-3 sm:grid-cols-3">
-        <NameField id="lend-name" value={form.name} onChange={(name) => set({ name })} />
+        <NameField
+          id="lend-name"
+          value={form.name}
+          onChange={(name) => set({ name })}
+        />
         <div>
           <label className={label} htmlFor="lend-phone">
             เบอร์โทร {want ? "" : "*"}
           </label>
-          <input id="lend-phone" required={!want} type="tel" inputMode="tel" maxLength={40} value={form.phone} onChange={(e) => set({ phone: e.target.value })} className={input} />
+          <input
+            id="lend-phone"
+            required={!want}
+            type="tel"
+            inputMode="tel"
+            maxLength={40}
+            value={form.phone}
+            onChange={(e) => set({ phone: e.target.value })}
+            className={input}
+          />
         </div>
-        <SoiField id="lend-soi" value={form.soi} onChange={(soi) => set({ soi })} />
+        <SoiField
+          id="lend-soi"
+          value={form.soi}
+          onChange={(soi) => set({ soi })}
+        />
       </div>
-      <p className="text-sm text-neutral-500">เบอร์จะแสดงเมื่อมีคนกดดูทีละรายการ · คนขอยืมต่อคิวไว้ คุณเห็นชื่อและเบอร์เขา · จัดการ/ปิดรายการได้จากเครื่องนี้</p>
+      <p className="text-sm text-neutral-500">
+        เบอร์จะแสดงเมื่อมีคนกดดูทีละรายการ · คนขอยืมต่อคิวไว้
+        คุณเห็นชื่อและเบอร์เขา · จัดการ/ปิดรายการได้จากเครื่องนี้
+      </p>
       {err && <p className="rounded-lg bg-red-50 p-3 text-red-700">{err}</p>}
-      <button disabled={busy || attached.busy} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60">
-        {busy ? "กำลังส่ง…" : attached.busy ? "รอรูปอัปโหลด…" : `${LEND_KINDS[form.kind].emoji} ลงรายการ`}
+      <button
+        disabled={busy || attached.busy}
+        className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60"
+      >
+        {busy
+          ? "กำลังส่ง…"
+          : attached.busy
+            ? "รอรูปอัปโหลด…"
+            : `${LEND_KINDS[form.kind].emoji} ลงรายการ`}
       </button>
     </form>
   );
@@ -620,24 +1099,48 @@ export function LendForm({ kind: initialKind = "lend", shelf = "", onDone }) {
 // =====================================================================
 // 🙋 ขอแรง / อาสาไปช่วย
 // =====================================================================
-const FREE_TYPES = Object.fromEntries(Object.entries(JOB_TYPES).filter(([k]) => k !== "hire"));
-export function JobBoard({ jobs: all, setJobs, admin, onAdd, onPaid, noAdd = false }) {
+const FREE_TYPES = Object.fromEntries(
+  Object.entries(JOB_TYPES).filter(([k]) => k !== "hire"),
+);
+export function JobBoard({
+  jobs: all,
+  setJobs,
+  admin,
+  onAdd,
+  onPaid,
+  noAdd = false,
+}) {
   const [kind, setKind] = useState("need");
   const [type, setType] = useState("all");
   const [keys, , dropKey] = useKeys("jobKeys");
   const jobs = all.filter((j) => j.type !== "hire"); // paid "หาช่าง" posts are listed on ช่าง·ร้าน
-  const list = jobs.filter((j) => j.kind === kind && (type === "all" || j.type === type));
-  const counts = useMemo(() => jobs.filter((j) => j.kind === kind).reduce((c, x) => ({ ...c, [x.type]: (c[x.type] || 0) + 1 }), {}), [jobs, kind]);
-  const upsert = (j) => setJobs((prev) => prev.map((y) => (y.id === j.id ? j : y)));
+  const list = jobs.filter(
+    (j) => j.kind === kind && (type === "all" || j.type === type),
+  );
+  const counts = useMemo(
+    () =>
+      jobs
+        .filter((j) => j.kind === kind)
+        .reduce((c, x) => ({ ...c, [x.type]: (c[x.type] || 0) + 1 }), {}),
+    [jobs, kind],
+  );
+  const upsert = (j) =>
+    setJobs((prev) => prev.map((y) => (y.id === j.id ? j : y)));
   const needs = jobs.filter((j) => j.kind === "need").length;
   const offers = jobs.filter((j) => j.kind === "offer").length;
   return (
     <div className="space-y-3">
       <div className={noAdd ? "hidden" : "grid grid-cols-2 gap-2"}>
-        <button onClick={() => onAdd("need")} className="min-h-[56px] rounded-xl bg-[#1E6B47] px-2 font-bold text-white">
+        <button
+          onClick={() => onAdd("need")}
+          className="min-h-[56px] rounded-xl bg-[#1E6B47] px-2 font-bold text-white"
+        >
           🙋 ขอแรง / ขอติดรถ / ฝากซื้อ
         </button>
-        <button onClick={() => onAdd("offer")} className="min-h-[56px] rounded-xl border-2 border-black bg-white px-2 font-bold">
+        <button
+          onClick={() => onAdd("offer")}
+          className="min-h-[56px] rounded-xl border-2 border-black bg-white px-2 font-bold"
+        >
           💪 ฉันช่วยได้ / มีรถออกไป
         </button>
       </div>
@@ -646,17 +1149,31 @@ export function JobBoard({ jobs: all, setJobs, admin, onAdd, onPaid, noAdd = fal
           ["need", `ขอความช่วยเหลือ (${needs})`],
           ["offer", `พร้อมช่วย / มีรถ (${offers})`],
         ].map(([k, t]) => (
-          <button key={k} onClick={() => setKind(k)} aria-pressed={kind === k} className={`min-h-[44px] rounded-lg text-sm font-semibold ${kind === k ? "bg-white shadow" : "text-neutral-600"}`}>
+          <button
+            key={k}
+            onClick={() => setKind(k)}
+            aria-pressed={kind === k}
+            className={`min-h-[44px] rounded-lg text-sm font-semibold ${kind === k ? "bg-white shadow" : "text-neutral-600"}`}
+          >
             {t}
           </button>
         ))}
       </div>
       {onPaid && (
-        <button onClick={onPaid} className="min-h-[44px] w-full rounded-xl bg-[#F2F4F1] px-3 text-left text-[15px]">
-          ช่วยกันด้วยน้ำใจ ไม่มีค่าจ้าง · <b>จะจ้างช่าง หรือรับจ้าง → ช่าง·บริการ ›</b>
+        <button
+          onClick={onPaid}
+          className="min-h-[44px] w-full rounded-xl bg-[#F2F4F1] px-3 text-left text-[15px]"
+        >
+          ช่วยกันด้วยน้ำใจ ไม่มีค่าจ้าง ·{" "}
+          <b>จะจ้างช่าง หรือรับจ้าง → ช่าง·บริการ ›</b>
         </button>
       )}
-      <Chips options={FREE_TYPES} value={type} onChange={setType} counts={counts} />
+      <Chips
+        options={FREE_TYPES}
+        value={type}
+        onChange={setType}
+        counts={counts}
+      />
       <ul className="space-y-2">
         {list.map((j) => (
           <JobCard
@@ -675,7 +1192,9 @@ export function JobBoard({ jobs: all, setJobs, admin, onAdd, onPaid, noAdd = fal
       </ul>
       {!list.length && (
         <p className="rounded-xl bg-white p-4 text-center text-neutral-600">
-          {kind === "need" ? "ตอนนี้ยังไม่มีบ้านไหนขอแรง · บ้านผู้สูงอายุ / อยู่คนเดียว ลงไว้ได้เลย อาสาจะเห็น" : "ยังไม่มีอาสาลงชื่อ · ว่างวันไหน ลงไว้ให้บ้านที่ต้องการแรงเห็น"}
+          {kind === "need"
+            ? "ตอนนี้ยังไม่มีบ้านไหนขอแรง · บ้านผู้สูงอายุ / อยู่คนเดียว ลงไว้ได้เลย อาสาจะเห็น"
+            : "ยังไม่มีอาสาลงชื่อ · ว่างวันไหน ลงไว้ให้บ้านที่ต้องการแรงเห็น"}
         </p>
       )}
     </div>
@@ -685,7 +1204,8 @@ export function JobBoard({ jobs: all, setJobs, admin, onAdd, onPaid, noAdd = fal
 // the paid "หาช่าง" posts, shown on ช่าง·ร้าน for the tradesmen
 export function HireList({ jobs, setJobs, admin }) {
   const [keys, , dropKey] = useKeys("jobKeys");
-  const upsert = (j) => setJobs((prev) => prev.map((y) => (y.id === j.id ? j : y)));
+  const upsert = (j) =>
+    setJobs((prev) => prev.map((y) => (y.id === j.id ? j : y)));
   return (
     <ul className="space-y-2">
       {jobs.map((j) => (
@@ -724,29 +1244,58 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
   const join = () =>
     run(async () => {
       if (!name.trim()) throw new Error("ใส่ชื่อก่อน");
-      onChanged(await api(`/jobs/${j.id}/join`, { method: "POST", body: JSON.stringify({ name }) }));
+      onChanged(
+        await api(`/jobs/${j.id}/join`, {
+          method: "POST",
+          body: JSON.stringify({ name }),
+        }),
+      );
       remember(name.trim());
       save("jobsJoined", [...load("jobsJoined", []), j.id]);
     });
-  const setStatus = (status) => run(async () => onChanged(await api(`/jobs/${j.id}/status`, { method: "POST", body: JSON.stringify({ status, name: name || j.name }) })));
+  const setStatus = (status) =>
+    run(async () =>
+      onChanged(
+        await api(`/jobs/${j.id}/status`, {
+          method: "POST",
+          body: JSON.stringify({ status, name: name || j.name }),
+        }),
+      ),
+    );
   return (
-    <li data-item={j.id} className={`anim-row scroll-mt-28 rounded-xl border bg-white p-3 shadow-sm ${j.status === "done" ? "opacity-60" : ""}`}>
-      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-start gap-3 text-left">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl" aria-hidden="true">
+    <li
+      data-item={j.id}
+      className={`anim-row scroll-mt-28 rounded-xl border bg-white p-3 shadow-sm ${j.status === "done" ? "opacity-60" : ""}`}
+    >
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-start gap-3 text-left"
+      >
+        <span
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl"
+          aria-hidden="true"
+        >
           {emoji}
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
-            <Badge cls={st.cls}>{j.kind === "offer" && j.status === "open" ? "ว่าง พร้อมช่วย" : st.label}</Badge>
+            <Badge cls={st.cls}>
+              {j.kind === "offer" && j.status === "open"
+                ? "ว่าง พร้อมช่วย"
+                : st.label}
+            </Badge>
             {(j.kind === "need" || j.type === "ride") && (
               <Badge cls="bg-neutral-100">
-                {j.type === "ride" ? "🚗" : "👥"} {j.helpers.length}/{j.people} {j.type === "ride" && j.kind === "offer" ? "ที่นั่ง" : "คน"}
+                {j.type === "ride" ? "🚗" : "👥"} {j.helpers.length}/{j.people}{" "}
+                {j.type === "ride" && j.kind === "offer" ? "ที่นั่ง" : "คน"}
               </Badge>
             )}
             {mine && <Badge cls="bg-yellow-200">ของฉัน</Badge>}
           </span>
           <span className="mt-0.5 block font-bold">{typeText}</span>
-          <span className="line-clamp-2 block break-words text-sm text-neutral-700">{j.detail}</span>
+          <span className="line-clamp-2 block break-words text-sm text-neutral-700">
+            {j.detail}
+          </span>
           <span className="block text-xs text-neutral-500">
             {j.name}
             {j.soi && ` · ซ.${j.soi}`}
@@ -759,31 +1308,65 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
           <p className="whitespace-pre-wrap break-words">{j.detail}</p>
           {j.helpers.length > 0 && (
             <p className="text-sm">
-              {j.kind === "need" ? "💪 ไปช่วย:" : "🏠 ขอให้มาช่วย:"} {j.helpers.map((h) => h.name).join(" · ")}
+              {j.kind === "need" ? "💪 ไปช่วย:" : "🏠 ขอให้มาช่วย:"}{" "}
+              {j.helpers.map((h) => h.name).join(" · ")}
             </p>
           )}
           {j.status !== "done" && !mine && (
             <div className="flex gap-2">
-              <input aria-label="ชื่อของคุณ" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} className={input} placeholder="ชื่อเล่นของคุณ" />
-              <button onClick={join} disabled={joined} className="min-h-[44px] shrink-0 rounded-xl border border-[#1E6B47] bg-white px-3 font-bold text-[#1E6B47] disabled:opacity-50">
-                {joined ? "✓ ลงชื่อแล้ว" : JOB_VERBS[j.type] ? JOB_VERBS[j.type][j.kind === "need" ? 0 : 1] : j.kind === "need" ? "🙋 ฉันจะไปช่วย" : "🏠 ขอให้มาช่วยบ้านฉัน"}
+              <input
+                aria-label="ชื่อของคุณ"
+                maxLength={60}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={input}
+                placeholder="ชื่อเล่นของคุณ"
+              />
+              <button
+                onClick={join}
+                disabled={joined}
+                className="min-h-[44px] shrink-0 rounded-xl border border-[#1E6B47] bg-white px-3 font-bold text-[#1E6B47] disabled:opacity-50"
+              >
+                {joined
+                  ? "✓ ลงชื่อแล้ว"
+                  : JOB_VERBS[j.type]
+                    ? JOB_VERBS[j.type][j.kind === "need" ? 0 : 1]
+                    : j.kind === "need"
+                      ? "🙋 ฉันจะไปช่วย"
+                      : "🏠 ขอให้มาช่วยบ้านฉัน"}
               </button>
             </div>
           )}
-          <ContactButton path={`/jobs/${j.id}/contact`} text={j.kind === "need" ? "📞 ดูเบอร์ / บ้านเลขที่ เพื่อนัดเวลา" : "📞 ดูเบอร์อาสา"} />
+          <ContactButton
+            path={`/jobs/${j.id}/contact`}
+            text={
+              j.kind === "need"
+                ? "📞 ดูเบอร์ / บ้านเลขที่ เพื่อนัดเวลา"
+                : "📞 ดูเบอร์อาสา"
+            }
+          />
           <div className="flex flex-wrap gap-2 text-sm">
             {j.status !== "scheduled" && j.status !== "done" && (
-              <button onClick={() => setStatus("scheduled")} className="min-h-[40px] rounded-lg border border-black px-2">
+              <button
+                onClick={() => setStatus("scheduled")}
+                className="min-h-[40px] rounded-lg border border-black px-2"
+              >
                 🗓️ นัดกันแล้ว
               </button>
             )}
             {j.status !== "done" && (
-              <button onClick={() => setStatus("done")} className="min-h-[40px] rounded-lg border border-black px-2">
+              <button
+                onClick={() => setStatus("done")}
+                className="min-h-[40px] rounded-lg border border-black px-2"
+              >
                 ✅ เสร็จแล้ว
               </button>
             )}
             {j.status !== "open" && (
-              <button onClick={() => setStatus("open")} className="min-h-[40px] rounded-lg border border-black px-2">
+              <button
+                onClick={() => setStatus("open")}
+                className="min-h-[40px] rounded-lg border border-black px-2"
+              >
                 ↩️ ยังต้องการคน
               </button>
             )}
@@ -792,7 +1375,10 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
                 onClick={() =>
                   window.confirm("ลบประกาศนี้?") &&
                   run(async () => {
-                    await api(`/jobs/${j.id}`, { method: "DELETE", headers: { "X-Edit-Key": editKey || "" } });
+                    await api(`/jobs/${j.id}`, {
+                      method: "DELETE",
+                      headers: { "X-Edit-Key": editKey || "" },
+                    });
                     onDeleted(j.id);
                   })
                 }
@@ -813,18 +1399,32 @@ function JobCard({ job: j, mine, editKey, admin, onChanged, onDeleted }) {
 export function JobForm({ kind = "need", jobType = "", onDone }) {
   const c = savedContact();
   const [, addKey] = useKeys("jobKeys");
-  const [form, setForm] = useState({ kind, type: jobType, detail: "", soi: load("mySoi", ""), house: "", when: "", people: kind === "need" ? 2 : 1, name: c.name || "", phone: c.phone || "" });
+  const [form, setForm] = useState({
+    kind,
+    type: jobType,
+    detail: "",
+    soi: load("mySoi", ""),
+    house: "",
+    when: "",
+    people: kind === "need" ? 2 : 1,
+    name: c.name || "",
+    phone: c.phone || "",
+  });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const set = (p) => setForm((f) => ({ ...f, ...p }));
   const need = form.kind === "need";
   async function submit(e) {
     e.preventDefault();
-    if (!form.type) return setErr(need ? "เลือกงานที่ต้องการให้ช่วย" : "เลือกงานที่ช่วยได้");
+    if (!form.type)
+      return setErr(need ? "เลือกงานที่ต้องการให้ช่วย" : "เลือกงานที่ช่วยได้");
     setBusy(true);
     setErr("");
     try {
-      const j = await api("/jobs", { method: "POST", body: JSON.stringify({ ...form, people: Number(form.people) || 1 }) });
+      const j = await api("/jobs", {
+        method: "POST",
+        body: JSON.stringify({ ...form, people: Number(form.people) || 1 }),
+      });
       addKey(j.id, j.edit_key);
       remember(form.name, form.phone);
       save("mySoi", form.soi);
@@ -837,10 +1437,21 @@ export function JobForm({ kind = "need", jobType = "", onDone }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       <fieldset>
-        <legend className={label}>{need ? "ต้องการอะไร *" : "ช่วยอะไรได้ *"}</legend>
-        {jobType !== "hire" && <p className="mb-2 text-sm text-neutral-600">{need ? "ขอแรงเพื่อนบ้าน ช่วยกันด้วยน้ำใจ" : "ช่วยเพื่อนบ้านด้วยน้ำใจ"} · ถ้าคิดค่าจ้าง ลงที่ ช่าง·บริการ</p>}
+        <legend className={label}>
+          {need ? "ต้องการอะไร *" : "ช่วยอะไรได้ *"}
+        </legend>
+        {jobType !== "hire" && (
+          <p className="mb-2 text-sm text-neutral-600">
+            {need
+              ? "ขอแรงเพื่อนบ้าน ช่วยกันด้วยน้ำใจ"
+              : "ช่วยเพื่อนบ้านด้วยน้ำใจ"}{" "}
+            · ถ้าคิดค่าจ้าง ลงที่ ช่าง·บริการ
+          </p>
+        )}
         <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
-          {Object.entries(jobType === "hire" ? { hire: JOB_TYPES.hire } : FREE_TYPES).map(([k, [emoji, text]]) => (
+          {Object.entries(
+            jobType === "hire" ? { hire: JOB_TYPES.hire } : FREE_TYPES,
+          ).map(([k, [emoji, text]]) => (
             <button
               type="button"
               key={k}
@@ -889,38 +1500,86 @@ export function JobForm({ kind = "need", jobType = "", onDone }) {
           <label className={label} htmlFor="job-when">
             {need ? "สะดวกวันไหน" : "ว่างวันไหน"}
           </label>
-          <input id="job-when" maxLength={60} value={form.when} onChange={(e) => set({ when: e.target.value })} className={input} placeholder="เช่น เสาร์ 4 ต.ค. 9 โมง" />
+          <input
+            id="job-when"
+            maxLength={60}
+            value={form.when}
+            onChange={(e) => set({ when: e.target.value })}
+            className={input}
+            placeholder="เช่น เสาร์ 4 ต.ค. 9 โมง"
+          />
         </div>
         {(need || form.type === "ride") && (
           <div>
             <label className={label} htmlFor="job-people">
-              {form.type === "ride" ? (need ? "กี่คนจะไป" : "ว่างกี่ที่นั่ง") : "ต้องการกี่คน"}
+              {form.type === "ride"
+                ? need
+                  ? "กี่คนจะไป"
+                  : "ว่างกี่ที่นั่ง"
+                : "ต้องการกี่คน"}
             </label>
-            <input id="job-people" type="number" min={1} max={30} value={form.people} onChange={(e) => set({ people: e.target.value })} className={input} />
+            <input
+              id="job-people"
+              type="number"
+              min={1}
+              max={30}
+              value={form.people}
+              onChange={(e) => set({ people: e.target.value })}
+              className={input}
+            />
           </div>
         )}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <NameField id="job-name" value={form.name} onChange={(name) => set({ name })} />
+        <NameField
+          id="job-name"
+          value={form.name}
+          onChange={(name) => set({ name })}
+        />
         <div>
           <label className={label} htmlFor="job-phone">
             เบอร์โทร *
           </label>
-          <input id="job-phone" required type="tel" inputMode="tel" maxLength={40} value={form.phone} onChange={(e) => set({ phone: e.target.value })} className={input} />
+          <input
+            id="job-phone"
+            required
+            type="tel"
+            inputMode="tel"
+            maxLength={40}
+            value={form.phone}
+            onChange={(e) => set({ phone: e.target.value })}
+            className={input}
+          />
         </div>
-        <SoiField id="job-soi" value={form.soi} onChange={(soi) => set({ soi })} />
+        <SoiField
+          id="job-soi"
+          value={form.soi}
+          onChange={(soi) => set({ soi })}
+        />
         {need && (
           <div>
             <label className={label} htmlFor="job-house">
               บ้านเลขที่ (ไม่บังคับ)
             </label>
-            <input id="job-house" maxLength={20} value={form.house} onChange={(e) => set({ house: e.target.value })} className={input} placeholder="4/xxx" />
+            <input
+              id="job-house"
+              maxLength={20}
+              value={form.house}
+              onChange={(e) => set({ house: e.target.value })}
+              className={input}
+              placeholder="4/xxx"
+            />
           </div>
         )}
       </div>
-      <p className="text-sm text-neutral-500">เบอร์และบ้านเลขที่ แสดงเฉพาะคนที่กดดูทีละรายการ</p>
+      <p className="text-sm text-neutral-500">
+        เบอร์และบ้านเลขที่ แสดงเฉพาะคนที่กดดูทีละรายการ
+      </p>
       {err && <p className="rounded-lg bg-red-50 p-3 text-red-700">{err}</p>}
-      <button disabled={busy} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60">
+      <button
+        disabled={busy}
+        className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60"
+      >
         {busy ? "กำลังส่ง…" : need ? "🙋 ลงประกาศขอแรง" : "💪 ลงชื่ออาสา"}
       </button>
     </form>
@@ -934,11 +1593,15 @@ export function JobForm({ kind = "need", jobType = "", onDone }) {
 // soi by soi with how many neighbours confirmed each, to the office's LINE; the office sets the status here.
 function OfficeSummary({ issues }) {
   const bySoi = {};
-  for (const x of issues) (bySoi[x.soi || "ไม่ระบุซอย"] = bySoi[x.soi || "ไม่ระบุซอย"] || []).push(x);
-  const sois = Object.keys(bySoi).sort((a, b) => (parseInt(a, 10) || 999) - (parseInt(b, 10) || 999));
+  for (const x of issues)
+    (bySoi[x.soi || "ไม่ระบุซอย"] = bySoi[x.soi || "ไม่ระบุซอย"] || []).push(x);
+  const sois = Object.keys(bySoi).sort(
+    (a, b) => (parseInt(a, 10) || 999) - (parseInt(b, 10) || 999),
+  );
   const lines = sois.flatMap((soi) =>
     bySoi[soi].map(
-      (x) => `• ซ.${soi} ${ISSUE_TYPES[x.type]?.[1] || ""}${x.detail ? ` · ${x.detail}` : ""}${x.votes > 1 ? ` (เพื่อนบ้านยืนยัน ${x.votes})` : ""}${x.status === "reported" ? " · ส่งต่อแล้ว" : ""}`,
+      (x) =>
+        `• ซ.${soi} ${ISSUE_TYPES[x.type]?.[1] || ""}${x.detail ? ` · ${x.detail}` : ""}${x.votes > 1 ? ` (เพื่อนบ้านยืนยัน ${x.votes})` : ""}${x.status === "reported" ? " · ส่งต่อแล้ว" : ""}`,
     ),
   );
   const text = `เรื่องที่ลูกบ้านแจ้งไว้ ยังไม่เสร็จ ${issues.length} เรื่อง
@@ -968,35 +1631,75 @@ export function IssueBoard({ issues, setIssues, admin, onAdd }) {
   }, [showFixed, issues]);
   const source = showFixed && all ? all : issues;
   const list = source.filter((x) => type === "all" || x.type === type);
-  const counts = useMemo(() => issues.reduce((c, x) => ({ ...c, [x.type]: (c[x.type] || 0) + 1 }), {}), [issues]);
+  const counts = useMemo(
+    () =>
+      issues.reduce((c, x) => ({ ...c, [x.type]: (c[x.type] || 0) + 1 }), {}),
+    [issues],
+  );
   const upsert = (x) => {
-    setIssues((prev) => (x.status === "fixed" && !showFixed ? prev.filter((y) => y.id !== x.id) : prev.map((y) => (y.id === x.id ? x : y))));
+    setIssues((prev) =>
+      x.status === "fixed" && !showFixed
+        ? prev.filter((y) => y.id !== x.id)
+        : prev.map((y) => (y.id === x.id ? x : y)),
+    );
     setAll((prev) => prev && prev.map((y) => (y.id === x.id ? x : y)));
   };
   return (
     <div className="space-y-3">
-      <button onClick={onAdd} className="min-h-[56px] w-full rounded-xl bg-[#1E6B47] px-2 text-lg font-bold text-white">
+      <button
+        onClick={onAdd}
+        className="min-h-[56px] w-full rounded-xl bg-[#1E6B47] px-2 text-lg font-bold text-white"
+      >
         📍 แจ้งปัญหาในซอย
       </button>
       {issues.length > 0 && <OfficeSummary issues={issues} />}
       <IssueMap issues={list} />
-      <Chips options={ISSUE_TYPES} value={type} onChange={setType} counts={counts} />
+      <Chips
+        options={ISSUE_TYPES}
+        value={type}
+        onChange={setType}
+        counts={counts}
+      />
       <label className="flex min-h-[44px] items-center gap-2 text-sm">
-        <input type="checkbox" checked={showFixed} onChange={(e) => setShowFixed(e.target.checked)} className="h-5 w-5" /> แสดงที่แก้แล้วด้วย
+        <input
+          type="checkbox"
+          checked={showFixed}
+          onChange={(e) => setShowFixed(e.target.checked)}
+          className="h-5 w-5"
+        />{" "}
+        แสดงที่แก้แล้วด้วย
       </label>
       <ul className="space-y-2">
         {list.map((x) => (
-          <IssueCard key={x.id} issue={x} admin={admin} onChanged={upsert} onDeleted={(id) => setIssues((p) => p.filter((y) => y.id !== id))} />
+          <IssueCard
+            key={x.id}
+            issue={x}
+            admin={admin}
+            onChanged={upsert}
+            onDeleted={(id) => setIssues((p) => p.filter((y) => y.id !== id))}
+          />
         ))}
       </ul>
-      {!list.length && <p className="rounded-xl bg-white p-4 text-center text-neutral-600">ยังไม่มีปัญหาที่ค้างอยู่ 🎉</p>}
+      {!list.length && (
+        <p className="rounded-xl bg-white p-4 text-center text-neutral-600">
+          ยังไม่มีปัญหาที่ค้างอยู่ 🎉
+        </p>
+      )}
       <div className="rounded-xl border-2 border-black bg-white p-3 text-sm">
         <b>ส่งต่อให้เขตแก้:</b> แจ้งผ่าน{" "}
-        <a href="https://citydata.traffy.in.th/" target="_blank" rel="noreferrer" className="font-semibold underline">
+        <a
+          href="https://citydata.traffy.in.th/"
+          target="_blank"
+          rel="noreferrer"
+          className="font-semibold underline"
+        >
           Traffy Fondue
         </a>{" "}
-        หรือโทร <b>1555</b> (กทม.) · สำนักงานเขตบึงกุ่ม · ไฟฟ้า/สายไฟ แจ้งการไฟฟ้ามีนบุรี
-        <span className="block text-neutral-600">แจ้งแล้วกด “แจ้งเขตแล้ว” พร้อมเลขเรื่อง เพื่อนบ้านจะได้ไม่แจ้งซ้ำ</span>
+        หรือโทร <b>1555</b> (กทม.) · สำนักงานเขตบึงกุ่ม · ไฟฟ้า/สายไฟ
+        แจ้งการไฟฟ้ามีนบุรี
+        <span className="block text-neutral-600">
+          แจ้งแล้วกด “แจ้งเขตแล้ว” พร้อมเลขเรื่อง เพื่อนบ้านจะได้ไม่แจ้งซ้ำ
+        </span>
       </div>
     </div>
   );
@@ -1004,7 +1707,12 @@ export function IssueBoard({ issues, setIssues, admin, onAdd }) {
 
 function issueIcon(x) {
   const [emoji] = ISSUE_TYPES[x.type] || ["📍"];
-  const ring = x.status === "fixed" ? "#16a34a" : x.status === "reported" ? "#d97706" : "#dc2626";
+  const ring =
+    x.status === "fixed"
+      ? "#16a34a"
+      : x.status === "reported"
+        ? "#d97706"
+        : "#dc2626";
   return L.divIcon({
     className: "",
     iconSize: [34, 34],
@@ -1028,19 +1736,34 @@ function IssueMap({ issues }) {
       if (x.lat == null) continue;
       const [, text] = ISSUE_TYPES[x.type] || ["", ""];
       L.marker([x.lat, x.lng], { icon: issueIcon(x) })
-        .bindTooltip(`${text}${x.soi ? ` · ซ.${x.soi}` : ""} · ${ISSUE_STATUS[x.status].label}`, { direction: "top", offset: [0, -14] })
+        .bindTooltip(
+          `${text}${x.soi ? ` · ซ.${x.soi}` : ""} · ${ISSUE_STATUS[x.status].label}`,
+          { direction: "top", offset: [0, -14] },
+        )
         .addTo(layer.current);
     }
   }, [issues]);
-  return <div ref={el} className="isolate h-64 overflow-hidden rounded-xl border border-neutral-300 sm:h-80" aria-label="แผนที่ปัญหาในซอย" />;
+  return (
+    <div
+      ref={el}
+      className="isolate h-64 overflow-hidden rounded-xl border border-neutral-300 sm:h-80"
+      aria-label="แผนที่ปัญหาในซอย"
+    />
+  );
 }
 
 // 9 Oct: what "done" means for each kind (anyone who sees it fixed can say so; "ยังไม่หาย" puts it back)
-const DONE_WORD = { trash: "✅ เก็บแล้ว", cover: "✅ ซ่อมแล้ว", danger: "✅ เคลียร์แล้ว" };
+const DONE_WORD = {
+  trash: "✅ เก็บแล้ว",
+  cover: "✅ ซ่อมแล้ว",
+  danger: "✅ เคลียร์แล้ว",
+};
 export function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
   const [emoji, text] = ISSUE_TYPES[x.type] || ["📍", x.type];
   const st = ISSUE_STATUS[x.status];
-  const [voted, setVoted] = useState(() => load("issueVotes", []).includes(x.id));
+  const [voted, setVoted] = useState(() =>
+    load("issueVotes", []).includes(x.id),
+  );
   const [note, setNote] = useState(null); // status form: {status, note}
   const [moving, setMoving] = useState(false);
   const [err, setErr] = useState("");
@@ -1060,19 +1783,29 @@ export function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
     });
   const send = () =>
     run(async () => {
-      onChanged(await api(`/issues/${x.id}/status`, { method: "POST", body: JSON.stringify({ ...note, name: savedContact().name || "" }) }));
+      onChanged(
+        await api(`/issues/${x.id}/status`, {
+          method: "POST",
+          body: JSON.stringify({ ...note, name: savedContact().name || "" }),
+        }),
+      );
       setNote(null);
     });
   return (
     <li className="anim-row rounded-xl border bg-white p-3 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl" aria-hidden="true">
+        <span
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-2xl"
+          aria-hidden="true"
+        >
           {emoji}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge cls={st.cls}>{st.label}</Badge>
-            <span className="text-sm text-neutral-600">👀 เจอ {x.votes} คน</span>
+            <span className="text-sm text-neutral-600">
+              👀 เจอ {x.votes} คน
+            </span>
           </div>
           <p className="font-bold">
             {text}
@@ -1092,13 +1825,25 @@ export function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
             value={note.note}
             onChange={(e) => setNote({ ...note, note: e.target.value })}
             className={input}
-            placeholder={note.status === "reported" ? "แจ้งที่ไหน เลขเรื่อง เช่น Traffy #2026-XXXX" : note.status === "fixed" ? "ไม่บังคับ เช่น รถเขตมาเก็บแล้ว เช้านี้" : "หมายเหตุ"}
+            placeholder={
+              note.status === "reported"
+                ? "แจ้งที่ไหน เลขเรื่อง เช่น Traffy #2026-XXXX"
+                : note.status === "fixed"
+                  ? "ไม่บังคับ เช่น รถเขตมาเก็บแล้ว เช้านี้"
+                  : "หมายเหตุ"
+            }
           />
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setNote(null)} className="min-h-[44px] rounded-lg border-2 border-black">
+            <button
+              onClick={() => setNote(null)}
+              className="min-h-[44px] rounded-lg border-2 border-black"
+            >
               ยกเลิก
             </button>
-            <button onClick={send} className="min-h-[44px] rounded-lg bg-[#1E6B47] font-bold text-white">
+            <button
+              onClick={send}
+              className="min-h-[44px] rounded-lg bg-[#1E6B47] font-bold text-white"
+            >
               บันทึก
             </button>
           </div>
@@ -1106,27 +1851,43 @@ export function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
       ) : (
         <div className="mt-2 flex flex-wrap gap-2 text-sm">
           {x.status !== "fixed" && (
-            <button onClick={vote} disabled={voted} className="min-h-[40px] rounded-lg border border-black px-2 disabled:opacity-50">
+            <button
+              onClick={vote}
+              disabled={voted}
+              className="min-h-[40px] rounded-lg border border-black px-2 disabled:opacity-50"
+            >
               {voted ? "✓ เจอด้วย" : "👀 ฉันก็เจอ"}
             </button>
           )}
           {x.status === "open" && (
-            <button onClick={() => setNote({ status: "reported", note: "" })} className="min-h-[40px] rounded-lg border border-black px-2">
+            <button
+              onClick={() => setNote({ status: "reported", note: "" })}
+              className="min-h-[40px] rounded-lg border border-black px-2"
+            >
               📨 แจ้งเขตแล้ว
             </button>
           )}
           {x.status !== "fixed" && (
-            <button onClick={() => setNote({ status: "fixed", note: "" })} className="min-h-[44px] rounded-lg bg-[#1E6B47] px-3 font-bold text-white">
+            <button
+              onClick={() => setNote({ status: "fixed", note: "" })}
+              className="min-h-[44px] rounded-lg bg-[#1E6B47] px-3 font-bold text-white"
+            >
               {DONE_WORD[x.type] || "✅ แก้แล้ว"}
             </button>
           )}
           {x.status === "fixed" && (
-            <button onClick={() => setNote({ status: "open", note: "" })} className="min-h-[40px] rounded-lg border border-black px-2">
+            <button
+              onClick={() => setNote({ status: "open", note: "" })}
+              className="min-h-[40px] rounded-lg border border-black px-2"
+            >
               ↩️ ยังไม่หาย
             </button>
           )}
           {admin && (
-            <button onClick={() => setMoving((v) => !v)} className="min-h-[40px] px-2 font-bold underline">
+            <button
+              onClick={() => setMoving((v) => !v)}
+              className="min-h-[40px] px-2 font-bold underline"
+            >
               📍 ย้ายหมุด
             </button>
           )}
@@ -1164,7 +1925,12 @@ export function IssueCard({ issue: x, admin, onChanged, onDeleted }) {
 }
 
 export function IssueForm({ onDone }) {
-  const [form, setForm] = useState({ type: "", detail: "", soi: load("mySoi", ""), name: savedContact().name || "" });
+  const [form, setForm] = useState({
+    type: "",
+    detail: "",
+    soi: load("mySoi", ""),
+    name: savedContact().name || "",
+  });
   const [loc, setLoc] = useState(null);
   const [pinned, setPinned] = useState(false);
   const [soiTyped, setSoiTyped] = useState(false);
@@ -1187,12 +1953,23 @@ export function IssueForm({ onDone }) {
   async function submit(e) {
     e.preventDefault();
     if (!form.type) return setErr("เลือกประเภทปัญหา");
-    if (!pinned && !form.soi.trim()) return setErr("บอกซอย หรือเลื่อนแผนที่ปักหมุดตรงจุด");
-    if (SPEAKER_RE.test(form.detail)) return setErr("📢 เรื่องเสียงตามสาย กด “ไปตอบในบ้านฉัน” ในกล่องสีเหลืองแทนนะครับ");
+    if (!pinned && !form.soi.trim())
+      return setErr("บอกซอย หรือเลื่อนแผนที่ปักหมุดตรงจุด");
+    if (SPEAKER_RE.test(form.detail))
+      return setErr(
+        "📢 เรื่องเสียงตามสาย กด “ไปตอบในบ้านฉัน” ในกล่องสีเหลืองแทนนะครับ",
+      );
     setBusy(true);
     setErr("");
     try {
-      const x = await api("/issues", { method: "POST", body: JSON.stringify({ ...form, ...(pinned && loc ? loc : {}), media_ids: attached.ids }) });
+      const x = await api("/issues", {
+        method: "POST",
+        body: JSON.stringify({
+          ...form,
+          ...(pinned && loc ? loc : {}),
+          media_ids: attached.ids,
+        }),
+      });
       save("issueVotes", [...load("issueVotes", []), x.id]);
       if (form.name) remember(form.name);
       onDone(x);
@@ -1222,9 +1999,17 @@ export function IssueForm({ onDone }) {
       </fieldset>
       <div>
         <p className={label}>ตรงไหน (เลื่อนแผนที่ให้หมุดอยู่ตรงจุด)</p>
-        <LocationPicker value={loc} onChange={setLoc} onTouched={() => setPinned(true)} />
-        <p className={`mt-1 text-sm ${pinned ? "font-bold text-[#1E6B47]" : "text-neutral-500"}`}>
-          {pinned ? `✓ ปักหมุดแล้ว${form.soi ? ` · ซ.${form.soi}` : ""} · ซอยเปลี่ยนตามหมุด (แก้เองได้)` : "ยังไม่ได้ปักหมุด · ใส่แค่ซอยก็ได้"}
+        <LocationPicker
+          value={loc}
+          onChange={setLoc}
+          onTouched={() => setPinned(true)}
+        />
+        <p
+          className={`mt-1 text-sm ${pinned ? "font-bold text-[#1E6B47]" : "text-neutral-500"}`}
+        >
+          {pinned
+            ? `✓ ปักหมุดแล้ว${form.soi ? ` · ซ.${form.soi}` : ""} · ซอยเปลี่ยนตามหมุด (แก้เองได้)`
+            : "ยังไม่ได้ปักหมุด · ใส่แค่ซอยก็ได้"}
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -1236,7 +2021,12 @@ export function IssueForm({ onDone }) {
             set({ soi });
           }}
         />
-        <NameField id="issue-name" labelText="ชื่อ (ไม่บังคับ)" value={form.name} onChange={(name) => set({ name })} />
+        <NameField
+          id="issue-name"
+          labelText="ชื่อ (ไม่บังคับ)"
+          value={form.name}
+          onChange={(name) => set({ name })}
+        />
       </div>
       <div>
         <label className={label} htmlFor="issue-detail">
@@ -1255,10 +2045,18 @@ export function IssueForm({ onDone }) {
       </div>
       <div>
         <p className={label}>รูป (ไม่บังคับ)</p>
-        <MediaPicker items={media} setItems={setMedia} max={2} allowVideo={false} />
+        <MediaPicker
+          items={media}
+          setItems={setMedia}
+          max={2}
+          allowVideo={false}
+        />
       </div>
       {err && <p className="rounded-lg bg-red-50 p-3 text-red-700">{err}</p>}
-      <button disabled={busy || attached.busy} className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60">
+      <button
+        disabled={busy || attached.busy}
+        className="min-h-[52px] w-full rounded-xl bg-[#1E6B47] text-lg font-semibold text-white disabled:opacity-60"
+      >
         {busy ? "กำลังส่ง…" : attached.busy ? "รอรูปอัปโหลด…" : "📍 แจ้งปัญหา"}
       </button>
     </form>
@@ -1290,7 +2088,12 @@ const AFTER_FLOOD = [
   },
   {
     title: "📸 ถ่ายรูปก่อนล้าง (ใช้ขอเยียวยา / เคลมประกัน)",
-    items: ["ภาพรวมแต่ละห้อง และคราบระดับน้ำบนผนัง", "ของเสียหายทีละชิ้น ก่อนยกไปทิ้ง", "รถ / มอเตอร์ไซค์ที่จมน้ำ (อย่าสตาร์ทจนช่างตรวจ)", "แจ้งบริษัทประกันบ้าน/รถ เร็วที่สุด"],
+    items: [
+      "ภาพรวมแต่ละห้อง และคราบระดับน้ำบนผนัง",
+      "ของเสียหายทีละชิ้น ก่อนยกไปทิ้ง",
+      "รถ / มอเตอร์ไซค์ที่จมน้ำ (อย่าสตาร์ทจนช่างตรวจ)",
+      "แจ้งบริษัทประกันบ้าน/รถ เร็วที่สุด",
+    ],
   },
   {
     title: "🧽 ล้างบ้าน",
@@ -1304,7 +2107,11 @@ const AFTER_FLOOD = [
   },
   {
     title: "🔌 เครื่องใช้ไฟฟ้า",
-    items: ["เครื่องใช้ที่จมน้ำ อย่าเสียบปลั๊กลองจนแห้งสนิทและช่างตรวจ", "แอร์ (คอยล์ร้อนที่วางพื้น) ตู้เย็น เครื่องซักผ้า ให้ช่างดูก่อนเปิด", "ปั๊มน้ำ / ถังเก็บน้ำ ล้างและตรวจก่อนใช้น้ำ"],
+    items: [
+      "เครื่องใช้ที่จมน้ำ อย่าเสียบปลั๊กลองจนแห้งสนิทและช่างตรวจ",
+      "แอร์ (คอยล์ร้อนที่วางพื้น) ตู้เย็น เครื่องซักผ้า ให้ช่างดูก่อนเปิด",
+      "ปั๊มน้ำ / ถังเก็บน้ำ ล้างและตรวจก่อนใช้น้ำ",
+    ],
   },
   {
     title: "🚗 รถจมน้ำ",
@@ -1344,7 +2151,10 @@ const AFTER_FLOOD = [
   },
   {
     title: "🗑️ ขยะน้ำท่วม",
-    items: ["แยกของพังชิ้นใหญ่ / ขยะทั่วไป / ของมีคม กองหน้าบ้านไม่ขวางทาง", "กองรอเก็บนาน แจ้งในแท็บ “ปัญหาซอย” เพื่อนบ้านจะช่วยกดว่าเจอด้วย"],
+    items: [
+      "แยกของพังชิ้นใหญ่ / ขยะทั่วไป / ของมีคม กองหน้าบ้านไม่ขวางทาง",
+      "กองรอเก็บนาน แจ้งในแท็บ “ปัญหาซอย” เพื่อนบ้านจะช่วยกดว่าเจอด้วย",
+    ],
   },
 ];
 
@@ -1364,9 +2174,14 @@ export function AfterFloodGuide() {
           เช็กลิสต์บ้านของฉัน · ทำแล้ว {count}/{total}
         </p>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-neutral-200">
-          <div className="h-full rounded-full bg-emerald-600 transition-all" style={{ width: `${(count / total) * 100}%` }} />
+          <div
+            className="h-full rounded-full bg-emerald-600 transition-all"
+            style={{ width: `${(count / total) * 100}%` }}
+          />
         </div>
-        <p className="mt-1 text-xs text-neutral-500">ติ๊กเก็บไว้ในเครื่องนี้เท่านั้น</p>
+        <p className="mt-1 text-xs text-neutral-500">
+          ติ๊กเก็บไว้ในเครื่องนี้เท่านั้น
+        </p>
       </div>
       {AFTER_FLOOD.map((s, si) => (
         <section key={s.title} className="rounded-xl bg-white p-3">
@@ -1377,8 +2192,19 @@ export function AfterFloodGuide() {
               return (
                 <li key={id}>
                   <label className="flex min-h-[44px] cursor-pointer items-start gap-3 py-1">
-                    <input type="checkbox" checked={!!done[id]} onChange={() => toggle(id)} className="mt-0.5 h-6 w-6 shrink-0" />
-                    <span className={done[id] ? "text-neutral-400 line-through" : ""}>{t}</span>
+                    <input
+                      type="checkbox"
+                      checked={!!done[id]}
+                      onChange={() => toggle(id)}
+                      className="mt-0.5 h-6 w-6 shrink-0"
+                    />
+                    <span
+                      className={
+                        done[id] ? "text-neutral-400 line-through" : ""
+                      }
+                    >
+                      {t}
+                    </span>
                   </label>
                 </li>
               );

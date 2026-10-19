@@ -726,24 +726,18 @@ export default function RepairApp() {
         ? {
             level: "general",
             reasons: [
-              ...homePets
-                .slice(0, 2)
-                .map((x) => ({
-                  text: `🎉 เจอแล้ว: ${x.title}`,
-                  go: ["lost", x.id],
-                })),
-              ...lostPets
-                .slice(0, 4)
-                .map((x) => ({
-                  text: `🐾 ยังตามหา: ${x.title}${x.soi ? ` (ซ.${x.soi})` : ""}`,
-                  go: ["lost", x.id],
-                })),
-              ...needs
-                .slice(0, 4)
-                .map((j) => ({
-                  text: `🙋 ${j.name} ขอแรง: ${j.detail.length > 70 ? `${j.detail.slice(0, 70)}…` : j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`,
-                  go: ["jobs", j.id],
-                })),
+              ...homePets.slice(0, 2).map((x) => ({
+                text: `🎉 เจอแล้ว: ${x.title}`,
+                go: ["lost", x.id],
+              })),
+              ...lostPets.slice(0, 4).map((x) => ({
+                text: `🐾 ยังตามหา: ${x.title}${x.soi ? ` (ซ.${x.soi})` : ""}`,
+                go: ["lost", x.id],
+              })),
+              ...needs.slice(0, 4).map((j) => ({
+                text: `🙋 ${j.name} ขอแรง: ${j.detail.length > 70 ? `${j.detail.slice(0, 70)}…` : j.detail}${j.soi ? ` (ซ.${j.soi})` : ""}`,
+                go: ["jobs", j.id],
+              })),
               ...(newest > seenAt && !needs.length
                 ? ["👥 มีโพสต์ใหม่จากเพื่อนบ้าน"]
                 : []),
@@ -1283,12 +1277,10 @@ export default function RepairApp() {
                       reunited={reunited}
                       onOpen={(id) => goItem("lost", id)}
                       onAll={() =>
-                        document
-                          .getElementById("lost-board")
-                          ?.scrollIntoView({
-                            behavior: "smooth",
-                            block: "start",
-                          })
+                        document.getElementById("lost-board")?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        })
                       }
                       onAdd={(kind) => setSheet({ type: "lostForm", kind })}
                       onPets={() => {
@@ -1421,7 +1413,7 @@ export default function RepairApp() {
             <>
               <PageTitle
                 title="🛍️ ตลาดเพื่อนบ้าน"
-                sub="ของกิน · ของใช้ · บริการ · กดดูแล้วโทร·ทักผู้ขายได้เลย"
+                sub="ของกิน · ของใช้ · บริการ · เช่า·ขาย · กดดูแล้วโทร·ทักผู้ขายได้เลย"
               />
               <section className="card p-3">
                 <Market
@@ -1432,12 +1424,17 @@ export default function RepairApp() {
                   setServices={setServices}
                   pros={prosOnly}
                   onPros={(q) => openPros("", false, q)}
-                  onAdd={(shelf) =>
-                    setSheet({ type: "lendForm", kind: "sell", shelf })
+                  onAdd={(shelf, cat) =>
+                    setSheet({ type: "lendForm", kind: "sell", shelf, cat })
                   }
                   onAddShop={(mode) => setSheet({ type: "serviceForm", mode })}
                   onAsk={() =>
-                    setSheet({ type: "jobForm", kind: "need", jobType: "hire" })
+                    setSheet({
+                      type: "lendForm",
+                      kind: "sell",
+                      shelf: "service",
+                      cat: "hire",
+                    })
                   }
                 />
               </section>
@@ -1878,7 +1875,13 @@ export default function RepairApp() {
                   ? "🍲 ขายของกิน"
                   : sheet.shelf === "goods"
                     ? "🧺 ขายของใช้"
-                    : "🛍️ ลงขายของ"
+                    : sheet.cat === "realestate"
+                      ? "🏠 บ้านเช่า · บ้านขาย"
+                      : sheet.cat === "hire"
+                        ? "📢 จ้างงาน · หาคนช่วย"
+                        : sheet.shelf === "service"
+                          ? "🙋 ลงในชั้นบริการ"
+                          : "🛍️ ลงขายของ"
                 : "ยืม · ให้ · ขาย"
             }
             onClose={() => setSheet(null)}
@@ -1886,6 +1889,7 @@ export default function RepairApp() {
             <LendForm
               kind={sheet.kind}
               shelf={sheet.shelf || ""}
+              category={sheet.cat || ""}
               onDone={(x) => {
                 setLend((p) => [x, ...p]);
                 posted(
