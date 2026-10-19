@@ -15,6 +15,7 @@ import { mediaUrl } from "../media";
 import { ProsList, rememberCall } from "./Community";
 import { notify } from "../notify";
 import { openMedia } from "./MediaGallery";
+import { WantStrip } from "./Wants";
 import { getPass, passLink, pushAll } from "../sellerSync";
 import {
   ContactButton,
@@ -1155,6 +1156,7 @@ export default function Market({
   setServices,
   onAddShop,
   onAsk,
+  onWant,
   pros = [],
   onPros,
 }) {
@@ -1250,6 +1252,36 @@ export default function Market({
           </button>
         )}
       </label>
+      {/* 20 Oct: two doors — the menus were laid out for sellers only, so people looking for something had no way in */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={onWant}
+          className="min-h-[52px] rounded-xl border-2 border-[#C97A12] bg-[#FFF8EC] text-[16px] font-bold text-[#7A4300]"
+        >
+          📢 ประกาศหา
+          <span className="block text-xs font-semibold text-[#8A5A20]">
+            อยากได้ · อยากจ้าง
+          </span>
+        </button>
+        <button
+          onClick={() => {
+            setChoosing(true);
+            setTimeout(
+              () =>
+                document
+                  .getElementById("sell-chooser")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+              50,
+            );
+          }}
+          className="min-h-[52px] rounded-xl bg-[#1E6B47] text-[16px] font-bold text-white"
+        >
+          + ลงขาย / รับงาน
+          <span className="block text-xs font-semibold text-white/80">
+            ขายของ · รับจ้าง · ให้เช่า
+          </span>
+        </button>
+      </div>
       <div className="grid grid-cols-4 gap-1.5">
         {SHELVES.map((x) => (
           <button
@@ -1278,6 +1310,7 @@ export default function Market({
           แตะอีกครั้งเพื่อดูทั้งหมด
         </p>
       )}
+      <WantStrip items={items} shelf={shelf || ""} onPost={onWant} />
       <MarketBell />
       {subs.length > 1 && (
         <div className="-mx-3 overflow-x-auto px-3 pb-1">
@@ -1426,7 +1459,7 @@ export default function Market({
         open.some((x) => keys[x.id]) ||
         shops.some((s) => load("serviceKeys", {})[s.id])) && <SellerSyncBox />}
       {/* one button for sellers, at the bottom: buyers come to look, so the list comes first */}
-      <div className="card space-y-2 p-3">
+      <div id="sell-chooser" className="card scroll-mt-28 space-y-2 p-3">
         {!choosing ? (
           <>
             <p className="text-[15px] text-[#45504A]">
@@ -1480,9 +1513,9 @@ export default function Market({
               ],
               [
                 "📢",
-                "จ้างงาน · หาคนช่วย",
-                "อยากจ้างคนยกของ ทำความสะอาด ซ่อมเล็กน้อย",
-                () => onAdd("service", "hire"),
+                "ประกาศหา (อยากได้ · อยากจ้าง)",
+                "หาคนยกของ หาช่าง หาบ้านเช่า หาของ",
+                () => onWant && onWant(),
               ],
               [
                 "🏪",

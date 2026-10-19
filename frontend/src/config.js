@@ -640,8 +640,12 @@ export function osmLink(lat, lng) {
 function fill(arr, items) {
   arr.splice(0, arr.length, ...items);
 }
+// 20 Oct: {category key: regex} — a typed request ("หาคนยกเปียโน") → its category (components/Wants.js)
+export const CATALOG_WORDS = {};
 export function applyCatalog(c) {
   if (!c || !c.service_groups) return;
+  for (const k of Object.keys(CATALOG_WORDS)) delete CATALOG_WORDS[k];
+  Object.assign(CATALOG_WORDS, c.words || {});
   Object.assign(SERVICE_CATEGORIES, c.service_labels || {});
   Object.assign(LEND_CATEGORIES, c.lend_labels || {});
   fill(SERVICE_GROUPS, c.service_groups);

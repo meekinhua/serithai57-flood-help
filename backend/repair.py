@@ -573,10 +573,12 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
     @router.post("/lend", status_code=201)
     async def create_lend(body: LendCreate, request: Request):
         rate_limit(request, "lend", limit=15, window_s=600)
-        if body.category not in LEND_CATEGORIES:
+        import services  # 20 Oct: ประกาศหา uses the same categories as the sellers and ช่าง (one taxonomy, both sides)
+        want_svc = body.kind == "want" and body.category in services.SERVICE_CATEGORIES
+        if body.category not in LEND_CATEGORIES and not want_svc:
             raise HTTPException(422, "หมวดหมู่ไม่ถูกต้อง")
-        if body.kind != "want" and len(body.phone.strip()) < 3:
-            raise HTTPException(422, "ใส่เบอร์โทรให้คนยืมติดต่อได้")
+        if len(body.phone.strip()) < 3:
+            raise HTTPException(422, "ใส่เบอร์โทรหรือ LINE ให้คนที่ช่วยได้ติดต่อกลับ" if body.kind == "want" else "ใส่เบอร์โทรให้คนยืมติดต่อได้")
         key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
         data = _clean(body.model_dump(exclude={"media_ids"}))
         sell = body.kind == "sell"
