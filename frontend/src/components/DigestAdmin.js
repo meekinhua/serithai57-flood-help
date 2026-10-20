@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { notify } from "../notify";
+import CommandBox from "./CommandBox";
 
 // 🧠 สรุปรายวัน (20 Oct 2026): a Claude Desktop scheduled task on the admin's computer reads the FB page, LINE OA,
 // the village LINE export and the site's new posts twice a day, and sends this digest (backend/digest.py,
@@ -238,12 +239,15 @@ export default function DigestAdmin() {
   if (!list) return <p className="p-3 text-[#45504A]">กำลังโหลด…</p>;
   if (!list.length)
     return (
-      <div className="card space-y-2 p-4">
-        <p className="font-bold">ยังไม่มีสรุป</p>
-        <p className="text-sm text-[#45504A]">
-          สรุปมาจาก Claude Desktop บนคอมแอด (scheduled task เช้า–เย็น) · ดู
-          docs/digest_brain.md
-        </p>
+      <div className="space-y-5">
+        <CommandBox />
+        <div className="card space-y-2 p-4">
+          <p className="font-bold">ยังไม่มีสรุป</p>
+          <p className="text-sm text-[#45504A]">
+            สรุปมาจาก Claude Desktop บนคอมแอด (scheduled task เช้า–เย็น) · ดู
+            docs/digest_brain.md
+          </p>
+        </div>
       </div>
     );
   const d = list[at];
@@ -303,6 +307,7 @@ export default function DigestAdmin() {
         </div>
       </div>
 
+      <CommandBox />
       <Outbox />
 
       <div className="card space-y-2 p-4">

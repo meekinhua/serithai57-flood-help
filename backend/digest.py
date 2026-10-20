@@ -17,6 +17,14 @@ The admin edits and taps ส่ง on the page — nothing goes out without that
   POST /api/admin/replies/{id}/skip                                      (admin)
   PUT  /api/admin/fb-page            {id, token}                         (admin) — tools/fb_setup.py; the token is never sent back
 Phone numbers are masked again on the way in; the digest keeps first names only (the brain is told so too).
+
+🖥️ สั่ง serithai57 (20 Oct): the admin page queues a command; tools/cmd_runner.py on the admin's computer claims it,
+checks its signature against a PIN that exists ONLY on that computer (sha256(pin|kind|text|nonce), so a leaked admin
+link or DB can't run anything), runs Claude Code there (`claude -p`, the admin's own account) and posts the answer back.
+  POST /api/admin/commands               {kind: update|ask, text, thread, nonce, sig}   (admin)
+  GET  /api/admin/commands               (admin) — last 30 + whether the computer is online
+  POST /api/admin/commands/claim         (admin, the runner) — oldest queued → running; also a heartbeat
+  POST /api/admin/commands/{id}/result   {ok, text, session}                            (admin, the runner)
 """
 import asyncio
 import hashlib
@@ -80,6 +88,20 @@ class SendBody(BaseModel):
 class FbPage(BaseModel):
     id: str = Field(..., min_length=5, max_length=40)
     token: str = Field(..., min_length=20, max_length=1000)
+
+
+class CommandBody(BaseModel):
+    kind: Literal["update", "ask"]
+    text: str = Field("", max_length=4000)
+    thread: str = Field("", max_length=80)
+    nonce: str = Field(..., min_length=8, max_length=64)
+    sig: str = Field(..., min_length=64, max_length=64)
+
+
+class ResultBody(BaseModel):
+    ok: bool = True
+    text: str = Field("", max_length=40_000)
+    session: str = Field("", max_length=80)
 
 
 GRAPH = "https://graph.facebook.com/v23.0"
@@ -202,6 +224,48 @@ def build_router(db, require_admin, audit, line=None) -> APIRouter:
         r = await db.reply_drafts.update_one({"id": rid, "status": {"$in": ["open", "failed"]}}, {"$set": {"status": "skipped", "sent_at": datetime.now(timezone.utc)}})
         if not r.matched_count:
             raise HTTPException(404, "ไม่พบร่าง")
+        return {"ok": True}
+
+    # ---------- 🖥️ สั่ง serithai57 ----------
+    @router.post("/commands")
+    async def queue_command(body: CommandBody, admin: dict = Depends(require_admin)):
+        if body.kind == "ask" and not body.text.strip():
+            raise HTTPException(400, "พิมพ์คำสั่งก่อน")
+        if await db.commands.count_documents({"status": {"$in": ["queued", "running"]}}) >= 5:
+            raise HTTPException(429, "คิวเต็ม รอคำสั่งก่อนหน้าเสร็จก่อน")
+        now = datetime.now(timezone.utc)
+        doc = {"id": str(uuid.uuid4()), **body.model_dump(), "status": "queued", "created_at": now, "by": admin.get("name")}
+        await db.commands.insert_one(doc)
+        await audit(admin, "command", doc["id"], f"{body.kind} {body.text[:80]}")
+        doc.pop("_id", None)
+        return doc
+
+    @router.get("/commands")
+    async def list_commands(admin: dict = Depends(require_admin)):
+        items = await db.commands.find({}, {"_id": 0, "sig": 0, "nonce": 0}).sort("created_at", -1).to_list(30)
+        hb = await db.settings.find_one({"id": "cmd_runner"}, {"_id": 0}) or {}
+        at = hb.get("at")
+        online = bool(at and (datetime.now(timezone.utc) - (at if at.tzinfo else at.replace(tzinfo=timezone.utc))).total_seconds() < 120)
+        return {"items": items, "online": online, "seen_at": at}
+
+    @router.post("/commands/claim")
+    async def claim_command(admin: dict = Depends(require_admin)):
+        now = datetime.now(timezone.utc)
+        await db.settings.update_one({"id": "cmd_runner"}, {"$set": {"id": "cmd_runner", "at": now}}, upsert=True)
+        # a run that died with the computer: give it back after 30 min
+        await db.commands.update_many({"status": "running", "started_at": {"$lt": now - timedelta(minutes=30)}},
+                                      {"$set": {"status": "failed", "result": "หมดเวลา (คอมดับ/หลุดระหว่างทำ)"}})
+        doc = await db.commands.find_one_and_update({"status": "queued"}, {"$set": {"status": "running", "started_at": now}},
+                                                    sort=[("created_at", 1)], projection={"_id": 0})
+        return {"command": doc}
+
+    @router.post("/commands/{cid}/result")
+    async def command_result(cid: str, body: ResultBody, admin: dict = Depends(require_admin)):
+        r = await db.commands.update_one({"id": cid, "status": "running"},
+                                         {"$set": {"status": "done" if body.ok else "failed", "result": _mask(body.text), "session": body.session,
+                                                   "done_at": datetime.now(timezone.utc)}, "$unset": {"sig": "", "nonce": ""}})
+        if not r.matched_count:
+            raise HTTPException(404, "ไม่พบคำสั่งที่กำลังทำ")
         return {"ok": True}
 
     @router.put("/fb-page")
