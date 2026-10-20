@@ -16,6 +16,7 @@ import { ProsList, rememberCall } from "./Community";
 import { notify } from "../notify";
 import { openMedia } from "./MediaGallery";
 import { WantStrip } from "./Wants";
+import { Awning, SHELF_TONE, TileDots } from "./MarketDecor";
 import { getPass, passLink, pushAll } from "../sellerSync";
 import {
   ContactButton,
@@ -1253,26 +1254,37 @@ export default function Market({
         )}
       </label>
       <div className="grid grid-cols-4 gap-1.5">
-        {SHELVES.map((x) => (
-          <button
-            key={x.key}
-            onClick={() => pick(x.key)}
-            aria-pressed={shelf === x.key}
-            className={`flex min-h-[84px] flex-col items-center justify-center rounded-2xl px-1 text-center ${shelf === x.key ? "bg-[#15201A] text-white" : "bg-[#FFF4D6] text-[#15201A]"}`}
-          >
-            <span className="text-3xl" aria-hidden="true">
-              {x.icon}
-            </span>
-            <span className="text-[16px] font-bold leading-tight">
-              {x.label}
-            </span>
-            <span
-              className={`text-xs ${shelf === x.key ? "text-white/80" : "text-[#45504A]"}`}
+        {SHELVES.map((x) => {
+          const t = SHELF_TONE[x.key] || SHELF_TONE.goods;
+          const on = shelf === x.key;
+          return (
+            <button
+              key={x.key}
+              onClick={() => pick(x.key)}
+              aria-pressed={on}
+              style={{ background: on ? t.deep : t.bg }}
+              className={`relative flex min-h-[92px] flex-col items-center justify-center overflow-hidden rounded-2xl px-1 text-center shadow-sm transition-transform active:scale-95 ${on ? "text-white ring-2 ring-[#15201A] ring-offset-1" : "text-[#15201A]"}`}
             >
-              {count(x.key) ? `${count(x.key)} รายการ` : "ยังไม่มี"}
-            </span>
-          </button>
-        ))}
+              <TileDots color={on ? "#FFFFFF" : t.deep} />
+              <span
+                className="mb-0.5 flex h-12 w-12 items-center justify-center rounded-full text-3xl"
+                style={{ background: on ? "rgba(255,255,255,.22)" : t.blob }}
+                aria-hidden="true"
+              >
+                {x.icon}
+              </span>
+              <span className="text-[16px] font-bold leading-tight">
+                {x.label}
+              </span>
+              <span
+                className="text-xs font-semibold"
+                style={{ color: on ? "rgba(255,255,255,.85)" : t.deep }}
+              >
+                {count(x.key) ? `${count(x.key)} รายการ` : "ยังไม่มี"}
+              </span>
+            </button>
+          );
+        })}
       </div>
       {shelf && (
         <p className="px-1 text-sm text-[#45504A]">
@@ -1458,109 +1470,115 @@ export default function Market({
         open.some((x) => keys[x.id]) ||
         shops.some((s) => load("serviceKeys", {})[s.id])) && <SellerSyncBox />}
       {/* one button for sellers, at the bottom: buyers come to look, so the list comes first */}
-      <div id="sell-chooser" className="card scroll-mt-28 space-y-2 p-3">
-        {!choosing ? (
-          <>
-            <p className="text-[15px] text-[#45504A]">
-              <b className="text-[#15201A]">
-                ขายอะไร มีบริการอะไร หรืออยากได้อะไร?
-              </b>{" "}
-              ลงให้เพื่อนบ้านเห็นได้ฟรี · ระบบไม่รับเงิน ตกลงกันเอง
-            </p>
-            <div className="grid grid-cols-[1fr_auto] gap-2">
+      <div
+        id="sell-chooser"
+        className="scroll-mt-28 overflow-hidden rounded-2xl border border-[#CFE3D7] bg-[#F2FAF5]"
+      >
+        <Awning />
+        <div className="space-y-2 p-3">
+          {!choosing ? (
+            <>
+              <p className="text-[15px] text-[#45504A]">
+                <b className="text-[#15201A]">
+                  ขายอะไร มีบริการอะไร หรืออยากได้อะไร?
+                </b>{" "}
+                ลงให้เพื่อนบ้านเห็นได้ฟรี · ระบบไม่รับเงิน ตกลงกันเอง
+              </p>
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                <button
+                  onClick={() => setChoosing(true)}
+                  className="min-h-[52px] rounded-xl bg-[#1E6B47] text-lg font-bold text-white"
+                >
+                  + ลงขาย / บริการ
+                </button>
+                <a
+                  href={LINE_SELL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex min-h-[52px] items-center justify-center rounded-xl border-2 border-[#06A045] px-3 font-bold text-[#06A045]"
+                >
+                  ผ่าน LINE
+                </a>
+              </div>
+              {onWant && (
+                <button
+                  onClick={onWant}
+                  className="min-h-[48px] w-full rounded-xl border-2 border-[#C97A12] bg-[#FFF8EC] font-bold text-[#7A4300]"
+                >
+                  📢 ประกาศหา · อยากได้ · อยากจ้าง
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-bold">จะลงอะไร?</p>
+              {[
+                [
+                  "🍲",
+                  "ขายของกิน",
+                  "อาหารทำเอง ขนม เครื่องดื่ม ของฝาก",
+                  () => onAdd("food"),
+                ],
+                [
+                  "🧺",
+                  "ขายของใช้",
+                  "งานฝีมือ ต้นไม้ เสื้อผ้า ของมือสอง",
+                  () => onAdd("goods"),
+                ],
+                [
+                  "🙋",
+                  "บริการ · รับจ้าง",
+                  "ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง",
+                  () => onAddShop("service"),
+                ],
+                [
+                  "🏠",
+                  "บ้านเช่า · บ้านขาย",
+                  "ให้เช่า ขาย หรือหาเช่า ในหมู่บ้าน",
+                  () => onAdd("home", "realestate"),
+                ],
+                [
+                  "📢",
+                  "ประกาศหา (อยากได้ · อยากจ้าง)",
+                  "หาคนยกของ หาช่าง หาบ้านเช่า หาของ",
+                  () => onWant && onWant(),
+                ],
+                [
+                  "🏪",
+                  "มีร้านเปิดประจำ",
+                  "ร้านอาหาร ร้านค้า วัสดุ",
+                  () => onAddShop("shop"),
+                ],
+                [
+                  "🔧",
+                  "เป็นช่างซ่อมบ้าน",
+                  "ไฟ ประปา แอร์ ต่อเติม · ลงที่หน้าช่าง",
+                  () => onAddShop("repair"),
+                ],
+              ].map(([e, t, h, fn]) => (
+                <button
+                  key={t}
+                  onClick={fn}
+                  className="flex min-h-[60px] w-full items-center gap-3 rounded-xl border-2 border-[#DCE2DD] bg-white px-3 text-left active:bg-[#F2F4F1]"
+                >
+                  <span className="text-3xl" aria-hidden="true">
+                    {e}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <b className="block text-[16px]">{t}</b>
+                    <span className="text-sm text-[#45504A]">{h}</span>
+                  </span>
+                </button>
+              ))}
               <button
-                onClick={() => setChoosing(true)}
-                className="min-h-[52px] rounded-xl bg-[#1E6B47] text-lg font-bold text-white"
+                onClick={() => setChoosing(false)}
+                className="min-h-[44px] w-full text-[15px] text-[#45504A] underline"
               >
-                + ลงขาย / บริการ
+                ยกเลิก
               </button>
-              <a
-                href={LINE_SELL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex min-h-[52px] items-center justify-center rounded-xl border-2 border-[#06A045] px-3 font-bold text-[#06A045]"
-              >
-                ผ่าน LINE
-              </a>
-            </div>
-            {onWant && (
-              <button
-                onClick={onWant}
-                className="min-h-[48px] w-full rounded-xl border-2 border-[#C97A12] bg-[#FFF8EC] font-bold text-[#7A4300]"
-              >
-                📢 ประกาศหา · อยากได้ · อยากจ้าง
-              </button>
-            )}
-          </>
-        ) : (
-          <>
-            <p className="text-lg font-bold">จะลงอะไร?</p>
-            {[
-              [
-                "🍲",
-                "ขายของกิน",
-                "อาหารทำเอง ขนม เครื่องดื่ม ของฝาก",
-                () => onAdd("food"),
-              ],
-              [
-                "🧺",
-                "ขายของใช้",
-                "งานฝีมือ ต้นไม้ เสื้อผ้า ของมือสอง",
-                () => onAdd("goods"),
-              ],
-              [
-                "🙋",
-                "บริการ · รับจ้าง",
-                "ตัดผม ติว ถ่ายรูป แม่บ้าน รับส่ง",
-                () => onAddShop("service"),
-              ],
-              [
-                "🏠",
-                "บ้านเช่า · บ้านขาย",
-                "ให้เช่า ขาย หรือหาเช่า ในหมู่บ้าน",
-                () => onAdd("home", "realestate"),
-              ],
-              [
-                "📢",
-                "ประกาศหา (อยากได้ · อยากจ้าง)",
-                "หาคนยกของ หาช่าง หาบ้านเช่า หาของ",
-                () => onWant && onWant(),
-              ],
-              [
-                "🏪",
-                "มีร้านเปิดประจำ",
-                "ร้านอาหาร ร้านค้า วัสดุ",
-                () => onAddShop("shop"),
-              ],
-              [
-                "🔧",
-                "เป็นช่างซ่อมบ้าน",
-                "ไฟ ประปา แอร์ ต่อเติม · ลงที่หน้าช่าง",
-                () => onAddShop("repair"),
-              ],
-            ].map(([e, t, h, fn]) => (
-              <button
-                key={t}
-                onClick={fn}
-                className="flex min-h-[60px] w-full items-center gap-3 rounded-xl border-2 border-[#DCE2DD] bg-white px-3 text-left active:bg-[#F2F4F1]"
-              >
-                <span className="text-3xl" aria-hidden="true">
-                  {e}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <b className="block text-[16px]">{t}</b>
-                  <span className="text-sm text-[#45504A]">{h}</span>
-                </span>
-              </button>
-            ))}
-            <button
-              onClick={() => setChoosing(false)}
-              className="min-h-[44px] w-full text-[15px] text-[#45504A] underline"
-            >
-              ยกเลิก
-            </button>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
