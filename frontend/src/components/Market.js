@@ -1252,36 +1252,6 @@ export default function Market({
           </button>
         )}
       </label>
-      {/* 20 Oct: two doors — the menus were laid out for sellers only, so people looking for something had no way in */}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          onClick={onWant}
-          className="min-h-[52px] rounded-xl border-2 border-[#C97A12] bg-[#FFF8EC] text-[16px] font-bold text-[#7A4300]"
-        >
-          📢 ประกาศหา
-          <span className="block text-xs font-semibold text-[#8A5A20]">
-            อยากได้ · อยากจ้าง
-          </span>
-        </button>
-        <button
-          onClick={() => {
-            setChoosing(true);
-            setTimeout(
-              () =>
-                document
-                  .getElementById("sell-chooser")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" }),
-              50,
-            );
-          }}
-          className="min-h-[52px] rounded-xl bg-[#1E6B47] text-[16px] font-bold text-white"
-        >
-          + ลงขาย / รับงาน
-          <span className="block text-xs font-semibold text-white/80">
-            ขายของ · รับจ้าง · ให้เช่า
-          </span>
-        </button>
-      </div>
       <div className="grid grid-cols-4 gap-1.5">
         {SHELVES.map((x) => (
           <button
@@ -1310,7 +1280,33 @@ export default function Market({
           แตะอีกครั้งเพื่อดูทั้งหมด
         </p>
       )}
-      <WantStrip items={items} shelf={shelf || ""} onPost={onWant} />
+      {/* 20 Oct: the post / ประกาศหา doors sit on top only for เช่า·ขาย (where both sides post);
+          other shelves are for browsing — their doors are in the box at the bottom */}
+      {shelf === "home" && (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={onWant}
+              className="min-h-[52px] rounded-xl border-2 border-[#C97A12] bg-[#FFF8EC] text-[16px] font-bold text-[#7A4300]"
+            >
+              📢 ประกาศหาเช่า·ซื้อ
+              <span className="block text-xs font-semibold text-[#8A5A20]">
+                กำลังหาบ้าน / ห้อง
+              </span>
+            </button>
+            <button
+              onClick={() => onAdd("home", "realestate")}
+              className="min-h-[52px] rounded-xl bg-[#1E6B47] text-[16px] font-bold text-white"
+            >
+              + ลงให้เช่า / ขาย
+              <span className="block text-xs font-semibold text-white/80">
+                บ้าน · ทาวน์เฮาส์ · ห้อง
+              </span>
+            </button>
+          </div>
+          <WantStrip items={items} shelf="home" onPost={onWant} />
+        </>
+      )}
       <MarketBell />
       {subs.length > 1 && (
         <div className="-mx-3 overflow-x-auto px-3 pb-1">
@@ -1454,6 +1450,9 @@ export default function Market({
           )}
         </>
       )}
+      {shelf !== "home" && (
+        <WantStrip items={items} shelf={shelf || ""} onPost={onWant} />
+      )}
       {/* the seller's shop link — only once this browser owns something in ตลาด, or already has a pass */}
       {(getPass() ||
         open.some((x) => keys[x.id]) ||
@@ -1463,7 +1462,9 @@ export default function Market({
         {!choosing ? (
           <>
             <p className="text-[15px] text-[#45504A]">
-              <b className="text-[#15201A]">ขายอะไร หรือมีบริการอะไร?</b>{" "}
+              <b className="text-[#15201A]">
+                ขายอะไร มีบริการอะไร หรืออยากได้อะไร?
+              </b>{" "}
               ลงให้เพื่อนบ้านเห็นได้ฟรี · ระบบไม่รับเงิน ตกลงกันเอง
             </p>
             <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -1482,6 +1483,14 @@ export default function Market({
                 ผ่าน LINE
               </a>
             </div>
+            {onWant && (
+              <button
+                onClick={onWant}
+                className="min-h-[48px] w-full rounded-xl border-2 border-[#C97A12] bg-[#FFF8EC] font-bold text-[#7A4300]"
+              >
+                📢 ประกาศหา · อยากได้ · อยากจ้าง
+              </button>
+            )}
           </>
         ) : (
           <>
