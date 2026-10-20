@@ -81,6 +81,7 @@ import {
   LendForm,
 } from "./components/RepairBoards";
 import Market, { marketOpen } from "./components/Market";
+import { MarketBanner } from "./components/MarketDecor";
 import { WantForm, WantStrip } from "./components/Wants";
 // 15 Oct: links from the LINE bot carry ?home=4/917 — that house becomes this phone's บ้านฉัน (no typing it twice)
 (() => {
@@ -1446,10 +1447,7 @@ export default function RepairApp() {
 
           {page === "market" && (
             <>
-              <PageTitle
-                title="🛍️ ตลาดเพื่อนบ้าน"
-                sub="ของกิน · ของใช้ · บริการ · เช่า·ขาย · กดดูแล้วโทร·ทักผู้ขายได้เลย"
-              />
+              <MarketBanner sub="ของกิน ของใช้ บริการ เช่า·ขาย จากเพื่อนบ้าน · กดดูแล้วทักได้เลย" />
               <section className="card p-3">
                 <Market
                   items={lend}
