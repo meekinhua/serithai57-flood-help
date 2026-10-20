@@ -675,10 +675,11 @@ export default function RepairApp() {
   const [view3d, setView3d] = useState(false);
   const [edit3d, setEdit3d] = useState(false); // 🛠️ admin: the building editor over the map page
   const [map3dKey, setMap3dKey] = useState(0);
-  const [mapMode, setMapMode] = useState(() => load("mapMode", "3d")); // 13 Oct: the village map opens in 3D
+  // 20 Oct: the map opens in 2D again (3D is one tap away); a new key so everyone who had 3D saved starts in 2D too
+  const [mapMode, setMapMode] = useState(() => load("mapMode2", "2d"));
   const pickMap = (v) => {
     setMapMode(v);
-    save("mapMode", v);
+    save("mapMode2", v);
   };
   const [speakerPts, setSpeakerPts] = useState(null);
   useEffect(() => {
