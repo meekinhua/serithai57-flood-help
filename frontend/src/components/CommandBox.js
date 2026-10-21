@@ -3,7 +3,7 @@ import { api } from "../api";
 import { notify } from "../notify";
 
 // 🖥️ สั่ง serithai57 (20 Oct 2026): the admin types an instruction (or taps อัปเดตแหล่งข้อมูล) on the phone; it waits
-// in a queue until tools/cmd_runner.py on the admin's computer picks it up and runs Claude Code there. Each command is
+// in a queue until a Claude Desktop scheduled task on the admin's computer (every 15 min) picks it up via tools/cmd_queue.py. Each command is
 // signed in the browser with a PIN that only that computer knows (sha256(pin|kind|text|nonce)) — the server never sees
 // the PIN, so a leaked admin link alone can't make the computer do anything. Answers come back here.
 
@@ -34,7 +34,7 @@ async function sha256(s) {
   ).join("");
 }
 const STATUS = {
-  queued: ["⏳ รอคอมรับ", "bg-[#FFF8EC] text-[#7A4300]"],
+  queued: ["⏳ รอคิว (≤15 นาที)", "bg-[#FFF8EC] text-[#7A4300]"],
   running: ["⚙️ กำลังทำ", "bg-[#E8F0FB] text-[#1F4F8A]"],
   done: ["✅ เสร็จ", "bg-[#E7F4EC] text-[#17603E]"],
   failed: ["❌ ไม่สำเร็จ", "bg-[#FDECEC] text-[#B42318]"],
@@ -88,9 +88,7 @@ export default function CommandBox() {
     if (kind === "ask" && !body) return;
     let pin = ss.get("cmdPin");
     if (!pin) {
-      pin = (
-        window.prompt("PIN ของคอมแอด (ตั้งไว้ใน cmd_runner.py)") || ""
-      ).trim();
+      pin = (window.prompt("PIN ของคอมแอด") || "").trim();
       if (!pin) return;
     }
     setBusy(true);
@@ -138,7 +136,9 @@ export default function CommandBox() {
         <span
           className={`rounded-full px-2.5 py-1 text-xs font-bold ${st?.online ? "bg-[#E7F4EC] text-[#17603E]" : "bg-[#EEF0EE] text-[#45504A]"}`}
         >
-          {st?.online ? "● คอมแอดออนไลน์" : "○ คอมแอดออฟไลน์"}
+          {st?.online
+            ? "● คอมแอดพร้อม · เช็กทุก 15 นาที"
+            : "○ คอมแอดยังไม่เช็กคำสั่ง"}
         </span>
       </div>
       <button

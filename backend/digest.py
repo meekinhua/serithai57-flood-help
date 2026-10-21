@@ -18,13 +18,14 @@ The admin edits and taps ส่ง on the page — nothing goes out without that
   PUT  /api/admin/fb-page            {id, token}                         (admin) — tools/fb_setup.py; the token is never sent back
 Phone numbers are masked again on the way in; the digest keeps first names only (the brain is told so too).
 
-🖥️ สั่ง serithai57 (20 Oct): the admin page queues a command; tools/cmd_runner.py on the admin's computer claims it,
-checks its signature against a PIN that exists ONLY on that computer (sha256(pin|kind|text|nonce), so a leaked admin
-link or DB can't run anything), runs Claude Code there (`claude -p`, the admin's own account) and posts the answer back.
+🖥️ สั่ง serithai57 (20 Oct): the admin page queues a command; a Claude Desktop scheduled task on the admin's computer
+(every 15 min, no API / no CLI account) runs tools/cmd_queue.py, which claims it and checks its signature against a PIN
+that exists ONLY on that computer (sha256(pin|kind|text|nonce), so a leaked admin link or DB can't run anything);
+Claude does the work there and posts the answer back.
   POST /api/admin/commands               {kind: update|ask, text, thread, nonce, sig}   (admin)
   GET  /api/admin/commands               (admin) — last 30 + whether the computer is online
-  POST /api/admin/commands/claim         (admin, the runner) — oldest queued → running; also a heartbeat
-  POST /api/admin/commands/{id}/result   {ok, text, session}                            (admin, the runner)
+  POST /api/admin/commands/claim         (admin, cmd_queue.py) — oldest queued → running; also a heartbeat
+  POST /api/admin/commands/{id}/result   {ok, text, session}                            (admin, cmd_queue.py)
 """
 import asyncio
 import hashlib
@@ -245,7 +246,7 @@ def build_router(db, require_admin, audit, line=None) -> APIRouter:
         items = await db.commands.find({}, {"_id": 0, "sig": 0, "nonce": 0}).sort("created_at", -1).to_list(30)
         hb = await db.settings.find_one({"id": "cmd_runner"}, {"_id": 0}) or {}
         at = hb.get("at")
-        online = bool(at and (datetime.now(timezone.utc) - (at if at.tzinfo else at.replace(tzinfo=timezone.utc))).total_seconds() < 120)
+        online = bool(at and (datetime.now(timezone.utc) - (at if at.tzinfo else at.replace(tzinfo=timezone.utc))).total_seconds() < 20 * 60)  # it checks every 15 min
         return {"items": items, "online": online, "seen_at": at}
 
     @router.post("/commands/claim")
