@@ -245,6 +245,7 @@ class LendUpdate(BaseModel):
     lng: Optional[float] = Field(None, ge=100.4, le=101.0)
     external: Optional[bool] = None  # admin only (27 Oct): false = the owner confirmed it, now a normal post
     checked: Optional[str] = Field(None, max_length=20)  # admin only: seen again on the source site
+    source_url: Optional[str] = Field(None, pattern=r"^https://", max_length=500)  # admin only: a better link to the original listing
 
 
 class QueueJoin(Contact):
@@ -681,7 +682,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         sell_only = {"title", "price", "pickup", "when", "preorder", "no_orders", "youtube", "shop_name", "tags", "options", "media_ids", "lat", "lng"}
         if doc.get("kind") != "sell" and sell_only & changes.keys():
             raise HTTPException(422, "แก้ได้เฉพาะรายการในตลาด")
-        if {"external", "checked"} & changes.keys():
+        if {"external", "checked", "source_url"} & changes.keys():
             admin = await current_admin(request)
             if not (admin and admin.get("role", "admin") == "admin"):
                 raise HTTPException(403, "เฉพาะแอดมิน")
