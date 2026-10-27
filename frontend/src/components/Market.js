@@ -57,6 +57,10 @@ export const marketOpen = (lend) =>
   lend.filter((x) => x.kind === "sell" && x.status !== "closed");
 
 // 27 Oct: เช่า·ขาย — "ขาย 3.9 ล้าน · เช่า 15,000/เดือน" → which deal and its price (to filter and sort the shelf)
+// 27 Oct: a listing the admin found was posted long ago (tag "ประกาศนานแล้ว") sorts after the fresh ones
+export const OLD_TAG = "ประกาศนานแล้ว";
+const isOld = (x) => (x.tags || []).includes(OLD_TAG);
+
 export const homeDeal = (x) => {
   const t = `${x.price || ""} ${x.title || ""}`;
   const sale = t.match(/ขาย\D{0,6}([\d.,]+)\s*(ล้าน)?/);
@@ -998,14 +1002,23 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
         )}
         {(x.tags || []).length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {x.tags.map((t) => (
-              <span
-                key={t}
-                className="rounded-full bg-[#E6F4EA] px-2.5 py-1 text-sm font-semibold text-[#1E6B47]"
-              >
-                ✓ {t}
-              </span>
-            ))}
+            {x.tags.map((t) =>
+              t === OLD_TAG ? (
+                <span
+                  key={t}
+                  className="rounded-full bg-[#FFE7B3] px-2.5 py-1 text-sm font-bold text-[#7A4300]"
+                >
+                  🕰️ {t} · อาจขาย/เช่าไปแล้ว
+                </span>
+              ) : (
+                <span
+                  key={t}
+                  className="rounded-full bg-[#E6F4EA] px-2.5 py-1 text-sm font-semibold text-[#1E6B47]"
+                >
+                  ✓ {t}
+                </span>
+              ),
+            )}
           </div>
         )}
         {(x.options || []).length > 0 && (
@@ -1270,6 +1283,7 @@ export default function Market({
     list = [...list].sort(
       (a, b) =>
         !!a.external - !!b.external ||
+        isOld(a) - isOld(b) ||
         !(a.media || []).length - !(b.media || []).length ||
         (sub ? (homeDeal(a)[by] || 9e9) - (homeDeal(b)[by] || 9e9) : 0),
     );
