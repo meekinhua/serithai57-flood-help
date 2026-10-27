@@ -217,6 +217,13 @@ class LendCreate(Contact):
     options: list[MenuOption] = Field(default_factory=list, max_length=12)  # the menu / sizes, each with its price
 
 
+class LendImport(LendCreate):
+    """27 Oct: a listing the admin copied in from another site (เช่า·ขาย seed) — shown as "ยังไม่ยืนยัน" with a link back to it."""
+    source_url: str = Field(..., pattern=r"^https://", max_length=500)
+    source_name: str = Field("", max_length=40)  # "Interhome", "teedin108"
+    checked: str = Field("", max_length=20)  # when the admin last saw it on that site, "2026-10-27"
+
+
 class LendUpdate(BaseModel):
     status: Optional[LendStatus] = None
     lent_to: Optional[str] = Field(None, max_length=60)  # who has it now (name only)
@@ -236,6 +243,8 @@ class LendUpdate(BaseModel):
     media_ids: Optional[list[str]] = Field(None, max_length=8)  # the full new list, in order (kept + newly uploaded)
     lat: Optional[float] = Field(None, ge=13.5, le=14.1)
     lng: Optional[float] = Field(None, ge=100.4, le=101.0)
+    external: Optional[bool] = None  # admin only (27 Oct): false = the owner confirmed it, now a normal post
+    checked: Optional[str] = Field(None, max_length=20)  # admin only: seen again on the source site
 
 
 class QueueJoin(Contact):
@@ -609,6 +618,33 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         push.fire(push.on_lend, doc)
         return {**public_lend(doc), "edit_key": key}
 
+    @router.post("/admin/lend/import", status_code=201)
+    async def import_lend(body: LendImport, admin: dict = Depends(require_admin)):
+        """27 Oct: the admin brings in a listing seen on another site — no push, no LINE menu tile; the owner can claim it later."""
+        if body.kind != "sell" or body.category not in LEND_CATEGORIES:
+            raise HTTPException(422, "หมวดหมู่ไม่ถูกต้อง")
+        if await db.lend_items.find_one({"source_url": body.source_url, "status": {"$ne": "closed"}}):
+            raise HTTPException(409, "ประกาศนี้ลงไว้แล้ว")
+        key, item_id, t = secrets.token_urlsafe(18), str(uuid.uuid4()), now()
+        data = _clean(body.model_dump(exclude={"media_ids"}))
+        data.update(tags=clean_tags(data["tags"]), options=[], preorder=False, no_orders=True, notify_endpoint="", external=True)
+        doc = {
+            "id": item_id,
+            **data,
+            "media": await claim_media(body.media_ids, f"lend:{item_id}", {"image"}),
+            "status": "available",
+            "lent_to": "",
+            "until": "",
+            "queue": [],
+            "history": [log(admin["name"], "แอดนำเข้าจากเว็บอื่น")],
+            "created_at": t,
+            "updated_at": t,
+            "edit_key_hash": _hash(key),
+        }
+        await db.lend_items.insert_one(dict(doc))
+        await audit(admin, "lend_import", item_id, body.source_url[:200])
+        return {**public_lend(doc), "edit_key": key}
+
     @router.get("/lend/{item_id}/contact")
     async def lend_contact(item_id: str, request: Request):
         rate_limit(request, "contact", limit=40, window_s=600)
@@ -645,6 +681,10 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         sell_only = {"title", "price", "pickup", "when", "preorder", "no_orders", "youtube", "shop_name", "tags", "options", "media_ids", "lat", "lng"}
         if doc.get("kind") != "sell" and sell_only & changes.keys():
             raise HTTPException(422, "แก้ได้เฉพาะรายการในตลาด")
+        if {"external", "checked"} & changes.keys():
+            admin = await current_admin(request)
+            if not (admin and admin.get("role", "admin") == "admin"):
+                raise HTTPException(403, "เฉพาะแอดมิน")
         if changes.get("youtube") and not YOUTUBE.match(changes["youtube"]):
             raise HTTPException(422, "ลิงก์ YouTube ไม่ถูกต้อง (เช่น https://youtu.be/xxxx)")
         if "tags" in changes:

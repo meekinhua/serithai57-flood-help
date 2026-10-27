@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { api, load } from "../api";
 import {
   LEND_CATEGORIES,
@@ -55,6 +55,19 @@ export const LINE_SELL =
 
 export const marketOpen = (lend) =>
   lend.filter((x) => x.kind === "sell" && x.status !== "closed");
+
+// 27 Oct: เช่า·ขาย — "ขาย 3.9 ล้าน · เช่า 15,000/เดือน" → which deal and its price (to filter and sort the shelf)
+export const homeDeal = (x) => {
+  const t = `${x.price || ""} ${x.title || ""}`;
+  const sale = t.match(/ขาย\D{0,6}([\d.,]+)\s*(ล้าน)?/);
+  const rent = t.match(/เช่า\D{0,6}([\d,]{3,})/);
+  const num = (m, mul) => (m ? parseFloat(m[1].replace(/,/g, "")) * mul : 0);
+  return {
+    sale: sale ? num(sale, sale[2] ? 1e6 : 1) : 0,
+    rent: rent ? num(rent, 1) : 0,
+    want: /หาเช่า|ต้องการเช่า|อยากเช่า|หาซื้อ/.test(t),
+  };
+};
 
 const PICKS = [
   "วันนี้",
@@ -908,6 +921,7 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
   const [editing, setEditing] = useState(false);
   const [more, setMore] = useState(false);
   const isNew =
+    !x.external &&
     Date.now() - new Date(x.created_at).getTime() < 48 * 3600 * 1000;
   const who = x.shop_name || x.name;
   async function close() {
@@ -955,7 +969,8 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
           <div className="min-w-0 flex-1 leading-tight">
             <b className="block truncate">{who}</b>
             <span className="text-sm text-[#45504A]">
-              {emoji} {catText} · {timeAgo(x.created_at)}
+              {emoji} {catText} ·{" "}
+              {x.external ? "แอดรวบรวมจากเว็บ" : timeAgo(x.created_at)}
               {editKey && (
                 <span className="ml-1 rounded-full bg-[#FFE39A] px-2 font-bold text-[#15201A]">
                   ของฉัน
@@ -969,6 +984,17 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
         </h3>
         {x.price && (
           <p className="text-2xl font-black text-[#8F2A1C]">{x.price}</p>
+        )}
+        {x.external && (
+          <p className="rounded-xl bg-[#FFF8EC] p-2.5 text-[15px] leading-snug text-[#5C4A2E]">
+            <b className="block text-[#7A4300]">
+              🌐 จากเว็บ {x.source_name || "อื่น"} · ยังไม่ยืนยัน
+            </b>
+            แอดเห็นประกาศนี้
+            {x.checked &&
+              ` เมื่อ ${new Date(x.checked).toLocaleDateString("th-TH", { day: "numeric", month: "short" })}`}{" "}
+            ราคาและการว่างอาจเปลี่ยนแล้ว
+          </p>
         )}
         {(x.tags || []).length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -1094,14 +1120,26 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
                   🛒 สั่ง / จองไว้
                 </button>
               )}
+              {x.external && x.source_url && (
+                <a
+                  href={x.source_url}
+                  target="_blank"
+                  rel="noreferrer nofollow"
+                  className="flex min-h-[48px] items-center justify-center rounded-xl bg-[#1F4F8A] text-[17px] font-bold text-white"
+                >
+                  🔗 ดูประกาศต้นทาง
+                </a>
+              )}
               <ContactButton
                 path={`/lend/${x.id}/contact`}
                 text={
-                  takesOrders(x)
-                    ? "📞 หรือโทรหาผู้ขาย"
-                    : shelfOfItem(x) === "service"
-                      ? "📞 ติดต่อ"
-                      : "📞 ติดต่อผู้ขาย"
+                  x.category === "realestate"
+                    ? "📞 ดูเบอร์ / LINE ผู้ลงประกาศ"
+                    : takesOrders(x)
+                      ? "📞 หรือโทรหาผู้ขาย"
+                      : shelfOfItem(x) === "service"
+                        ? "📞 ติดต่อ"
+                        : "📞 ติดต่อผู้ขาย"
                 }
               />
             </div>
@@ -1113,6 +1151,16 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
         >
           📤 แชร์ให้เพื่อน (LINE ฯลฯ)
         </button>
+        {x.external && (
+          <a
+            href={`https://line.me/R/oaMessage/@004forpb/?${encodeURIComponent(`ยืนยัน/แก้ประกาศบ้าน: ${x.title}`)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="block min-h-[40px] text-center text-sm font-semibold text-[#45504A] underline"
+          >
+            เป็นเจ้าของ/นายหน้าหลังนี้? ทักแอดเพื่อยืนยัน แก้ราคา หรือเอาออก
+          </a>
+        )}
         {editKey && <SellerOrders item={x} editKey={editKey} />}
         {editKey && (
           <button
@@ -1208,7 +1256,24 @@ export default function Market({
           LEND_CATEGORIES[k] || ["📦", "อื่นๆ"],
         ])
       : [];
-  if (sub === "shops") list = [];
+  // 27 Oct: listings the admin copied from other sites live on the 🏠 shelf (and in search), not in the everything view
+  if (!shelf && !query) list = list.filter((x) => !x.external);
+  const homeSubs = [
+    ["", ["", "ทั้งหมด"]],
+    ["rent", ["🔑", "ให้เช่า"]],
+    ["sale", ["🏷️", "ขาย"]],
+  ];
+  if (shelf === "home") {
+    const by = sub === "rent" ? "rent" : "sale";
+    if (sub)
+      list = list.filter((x) => homeDeal(x)[sub] > 0 || homeDeal(x).want);
+    list = [...list].sort(
+      (a, b) =>
+        !!a.external - !!b.external ||
+        !(a.media || []).length - !(b.media || []).length ||
+        (sub ? (homeDeal(a)[by] || 9e9) - (homeDeal(b)[by] || 9e9) : 0),
+    );
+  } else if (sub === "shops") list = [];
   else if (sub) {
     list = list.filter((x) => x.category === sub);
     shopList = [];
@@ -1320,14 +1385,17 @@ export default function Market({
         </>
       )}
       <MarketBell />
-      {subs.length > 1 && (
+      {(shelf === "home" || subs.length > 1) && (
         <div className="-mx-3 overflow-x-auto px-3 pb-1">
           <div className="flex w-max gap-2">
-            {[
-              ["", ["", "ทั้งหมด"]],
-              ...subs,
-              ...(shopList.length ? [["shops", ["🏪", "ร้านประจำ"]]] : []),
-            ].map(([k, [e, t]]) => (
+            {(shelf === "home"
+              ? homeSubs
+              : [
+                  ["", ["", "ทั้งหมด"]],
+                  ...subs,
+                  ...(shopList.length ? [["shops", ["🏪", "ร้านประจำ"]]] : []),
+                ]
+            ).map(([k, [e, t]]) => (
               <button
                 key={k || "all"}
                 onClick={() => setSub(k)}
@@ -1373,16 +1441,30 @@ export default function Market({
       ) : (
         <>
           <ul className="grid gap-3 sm:grid-cols-2">
-            {list.map((x) => (
-              <MarketCard
-                key={x.id}
-                item={x}
-                editKey={keys[x.id]}
-                admin={admin}
-                onChanged={(y) =>
-                  setItems((p) => p.map((z) => (z.id === y.id ? y : z)))
-                }
-              />
+            {list.map((x, i) => (
+              <Fragment key={x.id}>
+                {x.external && !list[i - 1]?.external && (
+                  <li className="space-y-1 rounded-2xl border border-dashed border-[#C97A12] bg-[#FFF8EC] p-3 sm:col-span-2">
+                    <b className="block text-[17px]">
+                      🌐 ประกาศในหมู่บ้านจากเว็บอื่น (
+                      {list.filter((y) => y.external).length})
+                    </b>
+                    <span className="block text-sm text-[#5C4A2E]">
+                      แอดรวบรวมจากเว็บอสังหาฯ ให้ดูที่เดียว ·
+                      ยังไม่ได้ยืนยันว่ายังว่าง/ราคาล่าสุด · กดดูประกาศต้นทาง
+                      หรือโทรถามผู้ลงประกาศได้เลย
+                    </span>
+                  </li>
+                )}
+                <MarketCard
+                  item={x}
+                  editKey={keys[x.id]}
+                  admin={admin}
+                  onChanged={(y) =>
+                    setItems((p) => p.map((z) => (z.id === y.id ? y : z)))
+                  }
+                />
+              </Fragment>
             ))}
           </ul>
           {shopList.length > 0 && (

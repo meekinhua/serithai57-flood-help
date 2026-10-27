@@ -585,7 +585,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 break
             lost = lost or pick
         sale = None
-        async for d in db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}, "media.0": {"$exists": True}}, {"_id": 0, "id": 1, "title": 1, "media": 1}).sort("created_at", -1).limit(20):
+        async for d in db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}, "external": {"$ne": True}, "media.0": {"$exists": True}}, {"_id": 0, "id": 1, "title": 1, "media": 1}).sort("created_at", -1).limit(20):
             mid = next((x["id"] for x in d["media"] if x["id"] not in skip), None)
             if mid and d["id"] not in skip:
                 sale = {"item": d["id"], "title": d.get("title", ""), "media": mid}
@@ -900,6 +900,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 {"type": "text", "text": d.get("title", "")[:80] or "-", "weight": "bold", "size": "md", "wrap": True, "maxLines": 3}]
         if d.get("price"):
             body.append({"type": "text", "text": d["price"][:60], "weight": "bold", "size": "lg", "color": "#8F2A1C", "wrap": True})
+        if d.get("external"):  # 27 Oct: copied from another site by the admin
+            body.append({"type": "text", "text": "🌐 จากเว็บอื่น · ยังไม่ยืนยันว่าว่าง", "size": "xs", "color": "#8A5A20", "wrap": True})
         if d.get("tags"):  # 17 Oct: selling points
             body.append({"type": "text", "text": " · ".join(f"✓ {t}" for t in d["tags"][:3]), "size": "xs", "color": "#1E6B47", "weight": "bold", "wrap": True, "maxLines": 2})
         if d.get("options"):  # 17 Oct: the menu, first 3 rows
@@ -1031,7 +1033,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         seen = await db.line_market_seen.find_one({"user": user}) or {}
         since = max(x if x.tzinfo else x.replace(tzinfo=timezone.utc) for x in (seen.get("looked"), seen.get("told"), now() - timedelta(days=3)) if x)
         mine = [p["id"] async for p in db.line_posts.find({"user": user, "type": "market"}, {"id": 1})]
-        n = await db.lend_items.count_documents({"kind": "sell", "status": {"$ne": "closed"}, "created_at": {"$gt": since}, "id": {"$nin": mine}})
+        n = await db.lend_items.count_documents({"kind": "sell", "status": {"$ne": "closed"}, "external": {"$ne": True}, "created_at": {"$gt": since}, "id": {"$nin": mine}})
         n += await db.services.count_documents({"category": {"$in": list(SHOP_CATS)}, "created_at": {"$gt": since}})
         return n
 
@@ -1041,8 +1043,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             await db.line_market_seen.update_one({"user": user}, {"$set": {"user": user, "looked": now()}}, upsert=True)
         if shelf in ("food", "goods", "service", "home"):
             return await shelf_list(user, shelf)
-        items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}}, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}
-                                         ).sort("created_at", -1).to_list(10)
+        items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}, "external": {"$ne": True}}, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}
+                                         ).sort("created_at", -1).to_list(10)  # 27 Oct: listings the admin copied from other sites only on the 🏠 shelf
         seller = bool(user) and bool(await seller_items(user))  # 16 Oct: buyers tapped "ออเดอร์ของฉัน" — sellers only now
         chips = qr(("🛍️ ลงขายของ", "ลงขาย"), *([("📋 ออเดอร์ของฉัน", "ออเดอร์"), ("✅ ขายหมดแล้ว", "ขายหมดแล้ว")] if seller else []))
         shops = await db.services.find({"category": {"$in": list(SHOP_CATS)}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
@@ -1075,7 +1077,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             return [text(f"🙋 บริการจากเพื่อนบ้าน {len(docs)} ราย · ปัดดูได้ ➡️"), carousel("บริการ", [service_card(d) for d in docs[:12]], chips)]
         cats = list(FOOD_LEND) if shelf == "food" else list(HOME_LEND) if shelf == "home" else None
         q = {"kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": cats} if cats else {"$nin": list(FOOD_LEND) + list(SERVICE_LEND) + list(HOME_LEND)}}
-        items = await db.lend_items.find(q, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).sort("created_at", -1).to_list(10)
+        items = await db.lend_items.find(q, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).sort([("external", 1), ("created_at", -1)]).to_list(10)
         shops = [] if shelf == "home" else await db.services.find({"category": {"$in": ["food"] if shelf == "food" else ["shop", "supplies"]}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
                                        ).sort([("pinned", -1), ("updated_at", -1)]).to_list(6)
         bubbles = [market_card(d) for d in items] + [shop_card(d) for d in shops]
