@@ -16,6 +16,7 @@ import { ProsList, rememberCall } from "./Community";
 import { notify } from "../notify";
 import { openMedia } from "./MediaGallery";
 import { WantStrip } from "./Wants";
+import { RedFlagFold, RedFlagPanel, isFlagHidden } from "./RedFlag";
 import { Awning, SHELF_TONE, TileDots } from "./MarketDecor";
 import { getPass, passLink, pushAll } from "../sellerSync";
 import {
@@ -960,240 +961,255 @@ function MarketCard({ item: x, editKey, admin, onChanged }) {
       </li>
     );
   return (
-    <li data-item={x.id} className="card anim-row scroll-mt-36 overflow-hidden">
-      <Gallery x={x} media={media} emoji={emoji} isNew={isNew} />
-      <div className="space-y-2 p-3">
-        <div className="flex items-center gap-2">
-          <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1E6B47] text-base font-bold text-white"
-            aria-hidden="true"
-          >
-            {Array.from((who || "?").replace(/[^\p{L}\p{N}]/gu, "") || "?")[0]}
-          </span>
-          <div className="min-w-0 flex-1 leading-tight">
-            <b className="block truncate">{who}</b>
-            <span className="text-sm text-[#45504A]">
-              {emoji} {catText} ·{" "}
-              {x.external ? "แอดรวบรวมจากเว็บ" : timeAgo(x.created_at)}
-              {editKey && (
-                <span className="ml-1 rounded-full bg-[#FFE39A] px-2 font-bold text-[#15201A]">
-                  ของฉัน
-                </span>
-              )}
-            </span>
-          </div>
-        </div>
-        <h3 className="break-words text-xl font-bold leading-snug">
-          {x.title}
-        </h3>
-        {x.price && (
-          <p className="text-2xl font-black text-[#8F2A1C]">{x.price}</p>
-        )}
-        {x.external && (
-          <p className="rounded-xl bg-[#FFF8EC] p-2.5 text-[15px] leading-snug text-[#5C4A2E]">
-            <b className="block text-[#7A4300]">
-              🌐 จากเว็บ {x.source_name || "อื่น"} · ยังไม่ยืนยัน
-            </b>
-            แอดเห็นประกาศนี้
-            {x.checked &&
-              ` เมื่อ ${new Date(x.checked).toLocaleDateString("th-TH", { day: "numeric", month: "short" })}`}{" "}
-            ราคาและการว่างอาจเปลี่ยนแล้ว
-          </p>
-        )}
-        {(x.tags || []).length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {x.tags.map((t) =>
-              t === OLD_TAG ? (
-                <span
-                  key={t}
-                  className="rounded-full bg-[#FFE7B3] px-2.5 py-1 text-sm font-bold text-[#7A4300]"
-                >
-                  🕰️ {t} · อาจขาย/เช่าไปแล้ว
-                </span>
-              ) : (
-                <span
-                  key={t}
-                  className="rounded-full bg-[#E6F4EA] px-2.5 py-1 text-sm font-semibold text-[#1E6B47]"
-                >
-                  ✓ {t}
-                </span>
-              ),
-            )}
-          </div>
-        )}
-        {(x.options || []).length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-[#E4E0D4] bg-[#FFFBF0]">
-            <p className="px-3 pt-2 text-sm font-bold text-[#8F2A1C]">
-              📋 เมนู{takesOrders(x) && !editKey && " · แตะเพื่อสั่ง"}
-            </p>
-            <ul>
-              {x.options.map((o) => (
-                <li
-                  key={o.name}
-                  className="border-t border-[#EFE9DA] first:border-t-0"
-                >
-                  <button
-                    type="button"
-                    disabled={!!editKey || !takesOrders(x)}
-                    onClick={() => setOrdering(`1 × ${o.name}`)}
-                    className="flex min-h-[44px] w-full items-center gap-2 px-3 text-left enabled:active:bg-[#FFF1C9]"
-                  >
-                    <span className="min-w-0 flex-1 break-words text-[15px]">
-                      {o.name}
-                    </span>
-                    {o.price && (
-                      <b className="shrink-0 text-[#8F2A1C]">{o.price}</b>
-                    )}
-                    {takesOrders(x) && !editKey && (
-                      <span className="shrink-0 rounded-full bg-[#1E6B47] px-2 text-sm font-bold text-white">
-                        +
-                      </span>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {x.preorder && (
-          <p className="text-[15px] font-bold text-[#1E6B47]">
-            📝 รับสั่งล่วงหน้า · ทำตามออเดอร์
-          </p>
-        )}
-        {(x.soi || x.when) && (
-          <p className="text-[15px]">
-            {[x.soi && `📍 ซ.${x.soi}`, x.when && `🕒 ${x.when}`]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        )}
-        {x.pickup && <p className="text-[15px]">🛵 {x.pickup}</p>}
-        {mapLink(x) && (
-          <a
-            href={mapLink(x)}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-h-[44px] items-center text-[15px] font-semibold text-[#1F4F8A] underline"
-          >
-            🗺️ ดูแผนที่จุดรับของ
-          </a>
-        )}
-        {x.detail && (
-          <div>
-            <p
-              className={`whitespace-pre-wrap break-words text-[15px] text-[#33403A] ${more ? "" : "line-clamp-4"}`}
+    <RedFlagFold item={x} kind="lend" admin={admin} onChanged={onChanged}>
+      <li
+        data-item={x.id}
+        className="card anim-row scroll-mt-36 overflow-hidden"
+      >
+        <Gallery x={x} media={media} emoji={emoji} isNew={isNew} />
+        <div className="space-y-2 p-3">
+          <div className="flex items-center gap-2">
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1E6B47] text-base font-bold text-white"
+              aria-hidden="true"
             >
-              {x.detail}
-            </p>
-            {!more && x.detail.length > 160 && (
-              <button
-                onClick={() => setMore(true)}
-                className="min-h-[36px] text-sm font-semibold text-[#1F4F8A] underline"
-              >
-                อ่านต่อ
-              </button>
-            )}
-          </div>
-        )}
-        {(x.shop_name || (takesOrders(x) && x.queue_count > 0)) && (
-          <p className="text-[15px] text-[#45504A]">
-            {x.shop_name && `👤 ${x.name}`}
-            {takesOrders(x) && x.queue_count > 0 && (
-              <span className="ml-1 font-semibold text-[#1E6B47]">
-                · มีคนสั่งอยู่ {x.queue_count}
+              {
+                Array.from(
+                  (who || "?").replace(/[^\p{L}\p{N}]/gu, "") || "?",
+                )[0]
+              }
+            </span>
+            <div className="min-w-0 flex-1 leading-tight">
+              <b className="block truncate">{who}</b>
+              <span className="text-sm text-[#45504A]">
+                {emoji} {catText} ·{" "}
+                {x.external ? "แอดรวบรวมจากเว็บ" : timeAgo(x.created_at)}
+                {editKey && (
+                  <span className="ml-1 rounded-full bg-[#FFE39A] px-2 font-bold text-[#15201A]">
+                    ของฉัน
+                  </span>
+                )}
               </span>
-            )}
-          </p>
-        )}
-        {ordered && (
-          <p className="rounded-lg bg-emerald-50 p-2 text-[15px] font-semibold text-emerald-800">
-            ✅ ส่งออเดอร์แล้ว ผู้ขายจะโทรยืนยันกลับ
-          </p>
-        )}
-        {ordering !== null ? (
-          <OrderForm
-            key={ordering}
-            item={x}
-            preset={ordering}
-            onCancel={() => setOrdering(null)}
-            onDone={(y) => {
-              onChanged(y);
-              setOrdering(null);
-              setOrdered(true);
-            }}
-          />
-        ) : (
-          !editKey && (
-            <div className="grid gap-2 pt-1">
-              {takesOrders(x) && (
+            </div>
+          </div>
+          <h3 className="break-words text-xl font-bold leading-snug">
+            {x.title}
+          </h3>
+          {x.price && (
+            <p className="text-2xl font-black text-[#8F2A1C]">{x.price}</p>
+          )}
+          {x.external && (
+            <p className="rounded-xl bg-[#FFF8EC] p-2.5 text-[15px] leading-snug text-[#5C4A2E]">
+              <b className="block text-[#7A4300]">
+                🌐 จากเว็บ {x.source_name || "อื่น"} · ยังไม่ยืนยัน
+              </b>
+              แอดเห็นประกาศนี้
+              {x.checked &&
+                ` เมื่อ ${new Date(x.checked).toLocaleDateString("th-TH", { day: "numeric", month: "short" })}`}{" "}
+              ราคาและการว่างอาจเปลี่ยนแล้ว
+            </p>
+          )}
+          {(x.tags || []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {x.tags.map((t) =>
+                t === OLD_TAG ? (
+                  <span
+                    key={t}
+                    className="rounded-full bg-[#FFE7B3] px-2.5 py-1 text-sm font-bold text-[#7A4300]"
+                  >
+                    🕰️ {t} · อาจขาย/เช่าไปแล้ว
+                  </span>
+                ) : (
+                  <span
+                    key={t}
+                    className="rounded-full bg-[#E6F4EA] px-2.5 py-1 text-sm font-semibold text-[#1E6B47]"
+                  >
+                    ✓ {t}
+                  </span>
+                ),
+              )}
+            </div>
+          )}
+          {(x.options || []).length > 0 && (
+            <div className="overflow-hidden rounded-xl border border-[#E4E0D4] bg-[#FFFBF0]">
+              <p className="px-3 pt-2 text-sm font-bold text-[#8F2A1C]">
+                📋 เมนู{takesOrders(x) && !editKey && " · แตะเพื่อสั่ง"}
+              </p>
+              <ul>
+                {x.options.map((o) => (
+                  <li
+                    key={o.name}
+                    className="border-t border-[#EFE9DA] first:border-t-0"
+                  >
+                    <button
+                      type="button"
+                      disabled={!!editKey || !takesOrders(x)}
+                      onClick={() => setOrdering(`1 × ${o.name}`)}
+                      className="flex min-h-[44px] w-full items-center gap-2 px-3 text-left enabled:active:bg-[#FFF1C9]"
+                    >
+                      <span className="min-w-0 flex-1 break-words text-[15px]">
+                        {o.name}
+                      </span>
+                      {o.price && (
+                        <b className="shrink-0 text-[#8F2A1C]">{o.price}</b>
+                      )}
+                      {takesOrders(x) && !editKey && (
+                        <span className="shrink-0 rounded-full bg-[#1E6B47] px-2 text-sm font-bold text-white">
+                          +
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {x.preorder && (
+            <p className="text-[15px] font-bold text-[#1E6B47]">
+              📝 รับสั่งล่วงหน้า · ทำตามออเดอร์
+            </p>
+          )}
+          {(x.soi || x.when) && (
+            <p className="text-[15px]">
+              {[x.soi && `📍 ซ.${x.soi}`, x.when && `🕒 ${x.when}`]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
+          {x.pickup && <p className="text-[15px]">🛵 {x.pickup}</p>}
+          {mapLink(x) && (
+            <a
+              href={mapLink(x)}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-[44px] items-center text-[15px] font-semibold text-[#1F4F8A] underline"
+            >
+              🗺️ ดูแผนที่จุดรับของ
+            </a>
+          )}
+          {x.detail && (
+            <div>
+              <p
+                className={`whitespace-pre-wrap break-words text-[15px] text-[#33403A] ${more ? "" : "line-clamp-4"}`}
+              >
+                {x.detail}
+              </p>
+              {!more && x.detail.length > 160 && (
                 <button
-                  onClick={() => setOrdering("")}
-                  className="min-h-[52px] rounded-xl bg-[#1E6B47] text-lg font-bold text-white"
+                  onClick={() => setMore(true)}
+                  className="min-h-[36px] text-sm font-semibold text-[#1F4F8A] underline"
                 >
-                  🛒 สั่ง / จองไว้
+                  อ่านต่อ
                 </button>
               )}
-              {x.external && x.source_url && (
-                <a
-                  href={x.source_url}
-                  target="_blank"
-                  rel="noreferrer nofollow"
-                  className="flex min-h-[48px] items-center justify-center rounded-xl bg-[#1F4F8A] text-[17px] font-bold text-white"
-                >
-                  🔗 ดูประกาศต้นทาง
-                </a>
-              )}
-              <ContactButton
-                path={`/lend/${x.id}/contact`}
-                text={
-                  x.category === "realestate"
-                    ? "📞 ดูเบอร์ / LINE ผู้ลงประกาศ"
-                    : takesOrders(x)
-                      ? "📞 หรือโทรหาผู้ขาย"
-                      : shelfOfItem(x) === "service"
-                        ? "📞 ติดต่อ"
-                        : "📞 ติดต่อผู้ขาย"
-                }
-              />
             </div>
-          )
-        )}
-        <button
-          onClick={() => share(x)}
-          className="min-h-[44px] w-full rounded-xl border border-[#C9D1CB] text-[15px] font-semibold text-[#06A045]"
-        >
-          📤 แชร์ให้เพื่อน (LINE ฯลฯ)
-        </button>
-        {x.external && (
-          <a
-            href={`https://line.me/R/oaMessage/@004forpb/?${encodeURIComponent(`ยืนยัน/แก้ประกาศบ้าน: ${x.title}`)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="block min-h-[40px] text-center text-sm font-semibold text-[#45504A] underline"
-          >
-            เป็นเจ้าของ/นายหน้าหลังนี้? ทักแอดเพื่อยืนยัน แก้ราคา หรือเอาออก
-          </a>
-        )}
-        {editKey && <SellerOrders item={x} editKey={editKey} />}
-        {editKey && (
+          )}
+          {(x.shop_name || (takesOrders(x) && x.queue_count > 0)) && (
+            <p className="text-[15px] text-[#45504A]">
+              {x.shop_name && `👤 ${x.name}`}
+              {takesOrders(x) && x.queue_count > 0 && (
+                <span className="ml-1 font-semibold text-[#1E6B47]">
+                  · มีคนสั่งอยู่ {x.queue_count}
+                </span>
+              )}
+            </p>
+          )}
+          {ordered && (
+            <p className="rounded-lg bg-emerald-50 p-2 text-[15px] font-semibold text-emerald-800">
+              ✅ ส่งออเดอร์แล้ว ผู้ขายจะโทรยืนยันกลับ
+            </p>
+          )}
+          {ordering !== null ? (
+            <OrderForm
+              key={ordering}
+              item={x}
+              preset={ordering}
+              onCancel={() => setOrdering(null)}
+              onDone={(y) => {
+                onChanged(y);
+                setOrdering(null);
+                setOrdered(true);
+              }}
+            />
+          ) : (
+            !editKey && (
+              <div className="grid gap-2 pt-1">
+                {takesOrders(x) && (
+                  <button
+                    onClick={() => setOrdering("")}
+                    className="min-h-[52px] rounded-xl bg-[#1E6B47] text-lg font-bold text-white"
+                  >
+                    🛒 สั่ง / จองไว้
+                  </button>
+                )}
+                {x.external && x.source_url && (
+                  <a
+                    href={x.source_url}
+                    target="_blank"
+                    rel="noreferrer nofollow"
+                    className="flex min-h-[48px] items-center justify-center rounded-xl bg-[#1F4F8A] text-[17px] font-bold text-white"
+                  >
+                    🔗 ดูประกาศต้นทาง
+                  </a>
+                )}
+                <ContactButton
+                  path={`/lend/${x.id}/contact`}
+                  text={
+                    x.category === "realestate"
+                      ? "📞 ดูเบอร์ / LINE ผู้ลงประกาศ"
+                      : takesOrders(x)
+                        ? "📞 หรือโทรหาผู้ขาย"
+                        : shelfOfItem(x) === "service"
+                          ? "📞 ติดต่อ"
+                          : "📞 ติดต่อผู้ขาย"
+                  }
+                />
+              </div>
+            )
+          )}
           <button
-            onClick={() => setEditing(true)}
-            className="min-h-[48px] w-full rounded-xl bg-[#15201A] font-bold text-white"
+            onClick={() => share(x)}
+            className="min-h-[44px] w-full rounded-xl border border-[#C9D1CB] text-[15px] font-semibold text-[#06A045]"
           >
-            ✏️ แก้ไข · เพิ่มรูป · ใส่เมนู
+            📤 แชร์ให้เพื่อน (LINE ฯลฯ)
           </button>
-        )}
-        {(editKey || admin) && (
-          <button
-            disabled={busy}
-            onClick={close}
-            className="min-h-[48px] w-full rounded-xl border-2 border-[#15201A] font-bold disabled:opacity-60"
-          >
-            ✅ ขายหมด / ปิดร้าน
-          </button>
-        )}
-      </div>
-    </li>
+          <RedFlagPanel
+            item={x}
+            kind="lend"
+            admin={admin}
+            onChanged={onChanged}
+          />
+          {x.external && (
+            <a
+              href={`https://line.me/R/oaMessage/@004forpb/?${encodeURIComponent(`ยืนยัน/แก้ประกาศบ้าน: ${x.title}`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="block min-h-[40px] text-center text-sm font-semibold text-[#45504A] underline"
+            >
+              เป็นเจ้าของ/นายหน้าหลังนี้? ทักแอดเพื่อยืนยัน แก้ราคา หรือเอาออก
+            </a>
+          )}
+          {editKey && <SellerOrders item={x} editKey={editKey} />}
+          {editKey && (
+            <button
+              onClick={() => setEditing(true)}
+              className="min-h-[48px] w-full rounded-xl bg-[#15201A] font-bold text-white"
+            >
+              ✏️ แก้ไข · เพิ่มรูป · ใส่เมนู
+            </button>
+          )}
+          {(editKey || admin) && (
+            <button
+              disabled={busy}
+              onClick={close}
+              className="min-h-[48px] w-full rounded-xl border-2 border-[#15201A] font-bold disabled:opacity-60"
+            >
+              ✅ ขายหมด / ปิดร้าน
+            </button>
+          )}
+        </div>
+      </li>
+    </RedFlagFold>
   );
 }
 
@@ -1271,6 +1287,7 @@ export default function Market({
       : [];
   // 27 Oct: listings the admin copied from other sites live on the 🏠 shelf (and in search), not in the everything view
   if (!shelf && !query) list = list.filter((x) => !x.external);
+  list = [...list].sort((a, b) => isFlagHidden(a) - isFlagHidden(b)); // 28 Oct: 🚩 folded ones at the end
   const homeSubs = [
     ["", ["", "ทั้งหมด"]],
     ["rent", ["🔑", "ให้เช่า"]],
@@ -1440,6 +1457,7 @@ export default function Market({
             </ul>
           )}
           <ProsList
+            admin={admin}
             embedded
             services={services}
             setServices={setServices}

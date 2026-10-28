@@ -1187,6 +1187,7 @@ export default function RepairApp() {
               />
               {/* 7 Oct: everyone (admins too) gets the same list; neighbours looking for a tradesman sit quietly at its end */}
               <ProsList
+                admin={!!admin}
                 key={`${prosGroup}-${prosFocus}-${prosQuery}`}
                 query={prosQuery}
                 services={prosOnly}

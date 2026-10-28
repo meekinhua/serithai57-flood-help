@@ -585,7 +585,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
                 break
             lost = lost or pick
         sale = None
-        async for d in db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}, "external": {"$ne": True}, "media.0": {"$exists": True}}, {"_id": 0, "id": 1, "title": 1, "media": 1}).sort("created_at", -1).limit(20):
+        async for d in db.lend_items.find({"flag_level": {"$ne": "hidden"}, "kind": "sell", "status": {"$ne": "closed"}, "external": {"$ne": True}, "media.0": {"$exists": True}}, {"_id": 0, "id": 1, "title": 1, "media": 1}).sort("created_at", -1).limit(20):
             mid = next((x["id"] for x in d["media"] if x["id"] not in skip), None)
             if mid and d["id"] not in skip:
                 sale = {"item": d["id"], "title": d.get("title", ""), "media": mid}
@@ -999,7 +999,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         return out
 
     async def services_in(cats) -> list:
-        return await db.services.find({"category": {"$in": list(cats)}, "available": {"$ne": False}}, {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews": 0}
+        return await db.services.find({"flag_level": {"$ne": "hidden"}, "category": {"$in": list(cats)}, "available": {"$ne": False}}, {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews": 0}
                                       ).sort([("pinned", -1), ("verified", -1), ("good", -1), ("updated_at", -1)]).to_list(40)
 
     async def pros_list(user: str, group: int | None = None, words: str = "") -> list:
@@ -1023,8 +1023,8 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         rx = {"$regex": re.escape(words), "$options": "i"}
         svc_cats = [c for c, label in SVC_LABEL.items() if words in label]  # "ตัดผม" → beauty, "แอร์" → ac
         item_cats = [c for c, label in MKT_TH.items() if words in label]
-        svc = await db.services.find({"$or": [{"name": rx}, {"detail": rx}, {"category": {"$in": svc_cats}}], "available": {"$ne": False}}, {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews": 0}).to_list(10)
-        items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}, "$or": [{"title": rx}, {"detail": rx}, {"shop_name": rx}, {"tags": rx}, {"options.name": rx}, {"category": {"$in": item_cats}}]},
+        svc = await db.services.find({"flag_level": {"$ne": "hidden"}, "$or": [{"name": rx}, {"detail": rx}, {"category": {"$in": svc_cats}}], "available": {"$ne": False}}, {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews": 0}).to_list(10)
+        items = await db.lend_items.find({"flag_level": {"$ne": "hidden"}, "kind": "sell", "status": {"$ne": "closed"}, "$or": [{"title": rx}, {"detail": rx}, {"shop_name": rx}, {"tags": rx}, {"options.name": rx}, {"category": {"$in": item_cats}}]},
                                          {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).to_list(10)
         return [market_card(d) for d in items] + [service_card(d) for d in svc]
 
@@ -1043,11 +1043,11 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             await db.line_market_seen.update_one({"user": user}, {"$set": {"user": user, "looked": now()}}, upsert=True)
         if shelf in ("food", "goods", "service", "home"):
             return await shelf_list(user, shelf)
-        items = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}, "external": {"$ne": True}}, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}
+        items = await db.lend_items.find({"flag_level": {"$ne": "hidden"}, "kind": "sell", "status": {"$ne": "closed"}, "external": {"$ne": True}}, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}
                                          ).sort("created_at", -1).to_list(10)  # 27 Oct: listings the admin copied from other sites only on the 🏠 shelf
         seller = bool(user) and bool(await seller_items(user))  # 16 Oct: buyers tapped "ออเดอร์ของฉัน" — sellers only now
         chips = qr(("🛍️ ลงขายของ", "ลงขาย"), *([("📋 ออเดอร์ของฉัน", "ออเดอร์"), ("✅ ขายหมดแล้ว", "ขายหมดแล้ว")] if seller else []))
-        shops = await db.services.find({"category": {"$in": list(SHOP_CATS)}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
+        shops = await db.services.find({"flag_level": {"$ne": "hidden"}, "category": {"$in": list(SHOP_CATS)}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
                                        ).sort([("pinned", -1), ("verified", -1), ("updated_at", -1)]).to_list(11)
         if not items and shops:
             items = []
@@ -1067,7 +1067,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         chips = qr(*[(v, v) for k, v in SHELF_TH.items() if k != shelf], ("🛍️ ลงขาย / บริการ", "ลงขาย"))
         if shelf == "service":
             docs = await services_in(SERVICE_CATS)
-            posts = await db.lend_items.find({"kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": list(SERVICE_LEND)}},
+            posts = await db.lend_items.find({"flag_level": {"$ne": "hidden"}, "kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": list(SERVICE_LEND)}},
                                              {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).sort("created_at", -1).to_list(4)
             if posts:
                 return [text(f"🙋 บริการจากเพื่อนบ้าน {len(posts) + len(docs)} ราย · ปัดดูได้ ➡️"),
@@ -1078,7 +1078,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         cats = list(FOOD_LEND) if shelf == "food" else list(HOME_LEND) if shelf == "home" else None
         q = {"kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": cats} if cats else {"$nin": list(FOOD_LEND) + list(SERVICE_LEND) + list(HOME_LEND)}}
         items = await db.lend_items.find(q, {"_id": 0, "phone": 0, "edit_key_hash": 0, "queue": 0, "history": 0, "notify_endpoint": 0}).sort([("external", 1), ("created_at", -1)]).to_list(10)
-        shops = [] if shelf == "home" else await db.services.find({"category": {"$in": ["food"] if shelf == "food" else ["shop", "supplies"]}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
+        shops = [] if shelf == "home" else await db.services.find({"flag_level": {"$ne": "hidden"}, "category": {"$in": ["food"] if shelf == "food" else ["shop", "supplies"]}}, {"_id": 0, "name": 1, "category": 1, "area": 1, "price": 1, "phone": 1}
                                        ).sort([("pinned", -1), ("updated_at", -1)]).to_list(6)
         bubbles = [market_card(d) for d in items] + [shop_card(d) for d in shops]
         if not bubbles:

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { RedFlagFold, RedFlagPanel, isFlagHidden } from "./RedFlag";
 import { api, load, save } from "../api";
 import { MediaStrip } from "./MediaGallery";
 import { YouTubeThumb } from "./SellFields";
@@ -721,6 +722,7 @@ export function ProsList({
   groups = PRO_GROUPS,
   embedded = false,
   hireText = "🙋 ประกาศหาช่าง ให้ช่างในหมู่บ้านเห็น",
+  admin = false,
 }) {
   const [q, setQ] = useState(q0 || "");
   const [msg, setMsg] = useState("");
@@ -739,6 +741,7 @@ export function ProsList({
     )
     .sort(
       (a, b) =>
+        isFlagHidden(a) - isFlagHidden(b) ||
         (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) ||
         goodOf(b) - goodOf(a) ||
         (a.reports || 0) - (b.reports || 0),
@@ -832,83 +835,100 @@ export function ProsList({
       {shown.length ? (
         <ul className="space-y-2.5">
           {shown.map((s) => (
-            <li
+            <RedFlagFold
               key={s.id}
-              className="space-y-1.5 rounded-2xl border border-[#DCE2DD] bg-white p-3.5"
+              item={s}
+              kind="service"
+              admin={admin}
+              onChanged={(y) =>
+                setServices((list) => list.map((x) => (x.id === y.id ? y : x)))
+              }
             >
-              <p className="text-sm font-bold text-[#1F4F8A]">
-                {groupOf(s.category)?.label ||
-                  SERVICE_CATEGORIES[s.category]?.[1] ||
-                  "อื่นๆ"}
-                {isLocal(s) && (
-                  <span className="ml-1.5 rounded-full bg-[#E4F0E9] px-2 py-0.5 text-[#154D33]">
-                    🏠 ร้านเพื่อนบ้าน
-                  </span>
-                )}
-              </p>
-              <b className="block break-words text-lg leading-snug">
-                {s.name}
-                {/* 9 Oct: added in the last 5 days → a "ใหม่" tag right behind the name */}
-                {Date.now() - new Date(s.created_at || 0).getTime() <
-                  5 * 864e5 && (
-                  <span className="ml-1.5 inline-block -translate-y-0.5 rounded-full bg-[#B42318] px-2 py-0.5 align-middle text-xs font-bold text-white">
-                    ใหม่
-                  </span>
-                )}
-              </b>
-              <MediaStrip media={s.media || []} />
-              <YouTubeThumb url={s.youtube} />
-              {s.detail && <MoreText text={s.detail} />}
-              {(s.price || s.area) && (
-                <p className="text-sm text-[#45504A]">
-                  {[s.price, s.area].filter(Boolean).join(" · ")}
+              <li className="space-y-1.5 rounded-2xl border border-[#DCE2DD] bg-white p-3.5">
+                <p className="text-sm font-bold text-[#1F4F8A]">
+                  {groupOf(s.category)?.label ||
+                    SERVICE_CATEGORIES[s.category]?.[1] ||
+                    "อื่นๆ"}
+                  {isLocal(s) && (
+                    <span className="ml-1.5 rounded-full bg-[#E4F0E9] px-2 py-0.5 text-[#154D33]">
+                      🏠 ร้านเพื่อนบ้าน
+                    </span>
+                  )}
                 </p>
-              )}
-              {mapLink(s) && (
-                <a
-                  href={mapLink(s)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-[44px] items-center text-sm font-semibold text-[#1F4F8A] underline"
-                >
-                  🗺️ ดูแผนที่
-                </a>
-              )}
-              <Trust s={s} />
-              {s.reports > 0 && (
-                <p className="text-sm text-[#B42318]">
-                  มีคนแจ้งว่าโทรไม่ติด {s.reports} ครั้ง
-                </p>
-              )}
-              <div className="flex gap-2 pt-1">
-                <CallButton phone={s.phone} onCall={() => rememberCall(s)} />
-                {s.line_id && !/search|ค้นหา/i.test(s.line_id) && (
+                <b className="block break-words text-lg leading-snug">
+                  {s.name}
+                  {/* 9 Oct: added in the last 5 days → a "ใหม่" tag right behind the name */}
+                  {Date.now() - new Date(s.created_at || 0).getTime() <
+                    5 * 864e5 && (
+                    <span className="ml-1.5 inline-block -translate-y-0.5 rounded-full bg-[#B42318] px-2 py-0.5 align-middle text-xs font-bold text-white">
+                      ใหม่
+                    </span>
+                  )}
+                </b>
+                <MediaStrip media={s.media || []} />
+                <YouTubeThumb url={s.youtube} />
+                {s.detail && <MoreText text={s.detail} />}
+                {(s.price || s.area) && (
+                  <p className="text-sm text-[#45504A]">
+                    {[s.price, s.area].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+                {mapLink(s) && (
                   <a
-                    href={`https://line.me/R/ti/p/~${encodeURIComponent(s.line_id)}`}
+                    href={mapLink(s)}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex min-h-[50px] items-center rounded-xl bg-[#E4F6EA] px-3 font-bold text-[#0B6B33]"
+                    className="inline-flex min-h-[44px] items-center text-sm font-semibold text-[#1F4F8A] underline"
                   >
-                    LINE
+                    🗺️ ดูแผนที่
                   </a>
                 )}
-                <button
-                  onClick={() => good(s)}
-                  disabled={voted.includes(s.id)}
-                  className="min-h-[50px] shrink-0 rounded-xl border border-[#C9D1CB] px-3 text-sm font-bold leading-tight disabled:opacity-50"
-                >
-                  {voted.includes(s.id) ? (
-                    "บอกแล้ว"
-                  ) : (
-                    <>
-                      เคยใช้
-                      <br />
-                      ดี
-                    </>
+                <Trust s={s} />
+                {s.reports > 0 && (
+                  <p className="text-sm text-[#B42318]">
+                    มีคนแจ้งว่าโทรไม่ติด {s.reports} ครั้ง
+                  </p>
+                )}
+                <div className="flex gap-2 pt-1">
+                  <CallButton phone={s.phone} onCall={() => rememberCall(s)} />
+                  {s.line_id && !/search|ค้นหา/i.test(s.line_id) && (
+                    <a
+                      href={`https://line.me/R/ti/p/~${encodeURIComponent(s.line_id)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex min-h-[50px] items-center rounded-xl bg-[#E4F6EA] px-3 font-bold text-[#0B6B33]"
+                    >
+                      LINE
+                    </a>
                   )}
-                </button>
-              </div>
-            </li>
+                  <button
+                    onClick={() => good(s)}
+                    disabled={voted.includes(s.id)}
+                    className="min-h-[50px] shrink-0 rounded-xl border border-[#C9D1CB] px-3 text-sm font-bold leading-tight disabled:opacity-50"
+                  >
+                    {voted.includes(s.id) ? (
+                      "บอกแล้ว"
+                    ) : (
+                      <>
+                        เคยใช้
+                        <br />
+                        ดี
+                      </>
+                    )}
+                  </button>
+                </div>
+                <RedFlagPanel
+                  item={s}
+                  kind="service"
+                  admin={admin}
+                  onChanged={(y) =>
+                    setServices((list) =>
+                      list.map((x) => (x.id === y.id ? y : x)),
+                    )
+                  }
+                />
+              </li>
+            </RedFlagFold>
           ))}
         </ul>
       ) : (

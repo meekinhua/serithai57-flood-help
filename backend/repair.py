@@ -26,6 +26,7 @@ import secrets
 import uuid
 
 import push
+import redflag
 from datetime import datetime, timezone
 from typing import Dict, List, Literal, Optional
 
@@ -517,7 +518,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
         out.setdefault("shop_name", "")
         out.setdefault("tags", [])
         out.setdefault("options", [])
-        return out
+        return redflag.public(out)  # 28 Oct: 🚩 summary, never the reporters
 
     def owner_queue(d: dict) -> list:
         return [{k: v for k, v in q.items() if k != "line_user"} for q in d.get("queue", [])]  # the buyer's LINE id stays ours
@@ -990,7 +991,7 @@ def build_router(db, rate_limit, current_admin, require_admin, audit, client_ip,
             {"id": service_id},
             {"$set": {"reviews": reviews, "good": sum(r["good"] for r in reviews), "bad": sum(not r["good"] for r in reviews)}},
         )
-        return await db.services.find_one({"id": service_id}, {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews.who": 0})
+        return redflag.public(await db.services.find_one({"id": service_id}, {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews.who": 0}))
 
     # ---------------- waste: truck rounds + how to sort (admins edit it on the page) ----------------
     @router.get("/waste")

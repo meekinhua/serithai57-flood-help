@@ -27,6 +27,7 @@ SERVICE_CATEGORIES = [
     # 17 Oct: ตลาด › รับทำ·บริการ and the new ช่าง groups (frontend config.js SERVICE_GROUPS / REPAIR_GROUPS)
     "photo", "homehelp", "online", "errand", "doors", "net", "handyman",
 ]
+import redflag  # noqa: E402  28 Oct: 🚩 warnings from neighbours
 import catalog  # noqa: E402  18 Oct: new category keys come from the catalog (no deploy)
 
 
@@ -36,7 +37,7 @@ def _cats(doc):
 
 
 Pricing = Literal["paid", "free", "ask"]
-HIDDEN = {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews.who": 0}
+HIDDEN = {"_id": 0, "edit_key_hash": 0, "reporters": 0, "reviews.who": 0, "flags.who": 0}
 
 
 def _now():
@@ -101,7 +102,7 @@ def build_router(db, rate_limit, require_admin, audit, client_ip, claim_media=No
     async def list_services(category: Optional[str] = None):
         q = {"category": category} if category else {}
         cursor = db.services.find(q, HIDDEN).sort([("pinned", -1), ("verified", -1), ("available", -1), ("updated_at", -1)])
-        return await cursor.to_list(1000)
+        return [redflag.public(d) for d in await cursor.to_list(1000)]
 
     @router.post("/services", status_code=201)
     async def create_service(body: ServiceCreate, request: Request):
@@ -175,8 +176,8 @@ def build_router(db, rate_limit, require_admin, audit, client_ip, claim_media=No
             existing = await db.services.find_one({"id": service_id}, HIDDEN)
             if not existing:
                 raise HTTPException(404, "ไม่พบรายการ")
-            return existing  # already reported from here: no double count
-        return doc
+            return redflag.public(existing)  # already reported from here: no double count
+        return redflag.public(doc)
 
     @router.patch("/admin/services/{service_id}")
     async def admin_update_service(service_id: str, body: ServiceAdminUpdate, admin: dict = Depends(require_admin)):

@@ -34,7 +34,8 @@ import media  # noqa: E402
 import seller  # noqa: E402
 import catalog  # noqa: E402
 import digest as digest_mod  # noqa: E402
-import briefs  # noqa: E402
+import briefs
+import redflag  # noqa: E402
 import services  # noqa: E402
 import staff  # noqa: E402
 import trips  # noqa: E402
@@ -675,6 +676,7 @@ line_router = line_bot.build_router(db, require_admin, audit, claim_media, locat
 app.include_router(line_router)  # LINE OA @004forpb: หาย·เจอ by chat (replies only = free)
 app.include_router(digest_mod.build_router(db, require_admin, audit, line_router))  # 20 Oct: 🧠 สรุปรายวัน (written by a Claude Desktop scheduled task)
 app.include_router(briefs.build_router(db, require_admin, audit))  # 21 Oct: 🔒 team-only documents at a secret link
+app.include_router(redflag.build_router(db, rate_limit, client_ip, require_admin, audit))  # 28 Oct: 🚩 neighbours warn each other
 # Same-origin in production (ingress). Reflect the origin so the admin cookie also works cross-origin in dev.
 @app.middleware("http")
 async def flood_archive_guard(request: Request, call_next):
