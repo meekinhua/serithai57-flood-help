@@ -7,6 +7,20 @@ function expiryText(iso) {
   return new Date(iso).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+// 28 Oct: links in the text can be tapped ("serithai57.com/k4" or a full https:// link)
+const LINK = /(https?:\/\/[^\s]+|serithai57\.com\/[\w#/-]+)/g;
+function linkify(text) {
+  return text.split(LINK).map((part, i) =>
+    i % 2 ? (
+      <a key={i} href={part.startsWith("http") ? part : `https://${part}`} target="_blank" rel="noopener noreferrer" className="break-all underline">
+        {part}
+      </a>
+    ) : (
+      part
+    ),
+  );
+}
+
 // Admin announcements: big, high-contrast, not dismissible. Unseen ones get a "ใหม่" tag and a flash.
 const STALE_H = 6;
 
@@ -51,7 +65,7 @@ export default function Announcements({ items, preview = false }) {
                   {isNew && <span className="rounded bg-white px-1.5 py-0.5 text-black">ใหม่</span>}
                 </p>
                 <p className={`mt-1 whitespace-pre-wrap break-words font-bold leading-snug ${stale ? "text-base sm:text-lg" : "text-lg sm:text-2xl"} ${long && !open[a.id] ? "line-clamp-3" : ""}`}>
-                  {a.text}
+                  {linkify(a.text)}
                 </p>
                 {a.media?.length > 0 && (
                   <div className="mt-2">

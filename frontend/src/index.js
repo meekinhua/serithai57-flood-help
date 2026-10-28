@@ -33,6 +33,9 @@ function Home() {
 }
 
 const path = window.location.pathname.replace(/\/+$/, "");
+// 28 Oct: short links to the residents' copies of the Village 4 / co-op documents (backend briefs.py, public slugs)
+const SHORT = { "/k4": "k4-money", "/k4-full": "k4-info", "/k4-sim": "k4-sim" };
+if (SHORT[path]) window.location.replace(`${API}/b/${SHORT[path]}`);
 // 18 Oct: categories from the server (admin edits them without a deploy) — last copy first, fresh one before the first render
 try {
   applyCatalog(JSON.parse(localStorage.getItem("catalog") || "null"));

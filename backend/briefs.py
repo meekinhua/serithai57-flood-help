@@ -3,6 +3,8 @@ legal brief) that must NOT be public. The content lives only in the database —
 served as a standalone page at a secret link:
 
   GET    /api/b/{slug}/{key}                 → the page (anyone holding the link; wrong key = 404)
+  GET    /api/b/{slug}                       → 28 Oct: the page without a key, only when it was published `public`
+                                               (the residents' copies, short links serithai57.com/k4 … in the frontend)
   PUT    /api/admin/briefs/{slug}            {title, html}   (admin) — create / replace; keeps the existing key
   GET    /api/admin/briefs                   (admin) — list with their links
   POST   /api/admin/briefs/{slug}/rotate     (admin) — new key: the old link stops working at once
@@ -27,6 +29,7 @@ HEADERS = {"X-Robots-Tag": "noindex, nofollow, noarchive", "Cache-Control": "pri
 class BriefBody(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     html: str = Field(..., min_length=20, max_length=3_000_000)
+    public: bool = False  # 28 Oct: also served at /api/b/{slug} with no key
 
 
 def build_router(db, require_admin, audit) -> APIRouter:
@@ -42,9 +45,9 @@ def build_router(db, require_admin, audit) -> APIRouter:
         old = await db.briefs.find_one({"slug": slug}, {"_id": 0, "key": 1})
         key = (old or {}).get("key") or secrets.token_urlsafe(18)
         await db.briefs.update_one({"slug": slug}, {"$set": {"slug": slug, "title": body.title, "html": body.html, "key": key,
-                                                             "updated_at": datetime.now(timezone.utc), "by": admin.get("name")}}, upsert=True)
+                                                             "public": body.public, "updated_at": datetime.now(timezone.utc), "by": admin.get("name")}}, upsert=True)
         await audit(admin, "brief", slug, body.title)
-        return {"ok": True, "path": f"/api/b/{slug}/{key}", "new": not old}
+        return {"ok": True, "path": f"/api/b/{slug}" if body.public else f"/api/b/{slug}/{key}", "new": not old}
 
     @router.get("/admin/briefs")
     async def list_briefs(admin: dict = Depends(require_admin)):
@@ -65,6 +68,13 @@ def build_router(db, require_admin, audit) -> APIRouter:
         await db.briefs.delete_one({"slug": slug})
         await audit(admin, "brief_delete", slug, "")
         return {"ok": True}
+
+    @router.get("/b/{slug}", response_class=HTMLResponse)
+    async def view_public(slug: str):
+        doc = await db.briefs.find_one({"slug": slug, "public": True}, {"_id": 0, "html": 1}) if SLUG.match(slug) else None
+        if not doc:
+            raise HTTPException(404, "ไม่พบหน้านี้")
+        return HTMLResponse(doc["html"], headers={**HEADERS, "Cache-Control": "public, max-age=300"})
 
     @router.get("/b/{slug}/{key}", response_class=HTMLResponse)
     async def view(slug: str, key: str):
