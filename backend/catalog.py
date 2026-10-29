@@ -54,6 +54,15 @@ DEFAULT = {
     "line_service": [["🩺 สุขภาพ·กายภาพ", "health"], ["💇 ตัดผม·แต่งหน้า·นวด", "beauty"], ["📸 ถ่ายรูป·สตูดิโอ", "photo"], ["📚 สอน·ติว", "tutor"],
                      ["🏠 แม่บ้าน·ซักรีด", "homehelp"], ["🧹 ทำความสะอาด", "cleaning"], ["🐾 สัตว์เลี้ยง", "pets"], ["🚗 รับส่ง·รถเช่า", "rental"],
                      ["💪 ขนของ·ย้ายบ้าน", "porter"], ["💻 ออนไลน์·เอกสาร", "online"], ["🙋 รับจ้างทั่วไป", "errand"]],
+    # 29 Oct — LINE chips without a deploy: the first chips under ตลาด / ช่าง / every shelf ([label ≤20, text sent])
+    "line_top": [["🏠 เช่า·ขาย บ้าน", "🏠 เช่า·ขาย"], ["🍲 ของกิน", "🍲 ของกิน"], ["🙋 บริการ", "🙋 บริการ"]],
+    # LINE "ช่าง": the repair groups in chip order (only groups with someone listed get a chip); cats = service directory keys
+    "repair_groups": [
+        {"label": "⚡ ไฟฟ้า", "cats": ["electrician"]}, {"label": "🚿 ประปา·ปั๊ม", "cats": ["plumber"]},
+        {"label": "❄️ แอร์·เครื่องใช้", "cats": ["ac", "appliance", "repair"]}, {"label": "🪚 ต่อเติม·ทาสี", "cats": ["carpenter", "painter", "roof", "doors"]},
+        {"label": "📶 เน็ต·กล้อง", "cats": ["net"]}, {"label": "🔨 งานจุกจิก", "cats": ["handyman"]}, {"label": "🧹 ล้างบ้าน", "cats": ["cleaning"]},
+        {"label": "🚛 ขนขยะ", "cats": ["junk"]}, {"label": "🐜 ปลวก·แมลง", "cats": ["pest"]}, {"label": "🚗 ซ่อมรถ·ซักพรม", "cats": ["vehicle"]},
+    ],
     # words people type instead of tapping a button → key (LINE; also used to guess the shelf). Regex, Thai.
     "words": {
         # 20 Oct: ช่าง first — "ช่างเทพื้นปูน", "หาคนซ่อมแอร์" — then services, then things
@@ -148,6 +157,10 @@ def _check(doc: dict):
     for name in ("line_sell", "line_service"):
         if len(doc[name]) > 12:
             raise HTTPException(422, f"{name}: LINE ใส่ปุ่มได้ไม่เกิน 12 (รวมยกเลิก 13)")
+    if len(doc["line_top"]) > 6 or any(not (isinstance(x, list) and len(x) == 2 and all(isinstance(y, str) and y for y in x)) for x in doc["line_top"]):
+        raise HTTPException(422, "line_top: ไม่เกิน 6 ปุ่ม แต่ละปุ่ม [ชื่อปุ่ม, ข้อความที่ส่ง]")
+    if any(not ({"label", "cats"} <= set(g) and g["cats"]) for g in doc["repair_groups"]):
+        raise HTTPException(422, "repair_groups ต้องมี label, cats")
     for k, rx in doc["words"].items():
         try:
             re.compile(rx)

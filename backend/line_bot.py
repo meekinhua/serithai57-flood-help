@@ -136,7 +136,7 @@ REPAIR_GROUPS = [("⚡ ไฟฟ้า", ("electrician",)), ("🚿 ประป�
 SERVICE_CATS = [c for _, cs in SERVICE_GROUPS for c in cs]
 REPAIR_CATS = [c for _, cs in REPAIR_GROUPS for c in cs]
 SERVICE_LEND = ["health"]  # market posts shown on the 🙋 บริการ shelf (catalog "shelves.service")
-TOP_CHIPS = (("🏠 เช่า·ขาย บ้าน", "🏠 เช่า·ขาย"), ("🍲 ของกิน", "🍲 ของกิน"), ("🙋 บริการ", "🙋 บริการ"))  # 29 Oct: first chips under ตลาด / ช่าง
+TOP_CHIPS = [("🏠 เช่า·ขาย บ้าน", "🏠 เช่า·ขาย"), ("🍲 ของกิน", "🍲 ของกิน"), ("🙋 บริการ", "🙋 บริการ")]  # 29 Oct: first chips under ตลาด / ช่าง (catalog "line_top")
 HOME_LEND = ["realestate"]  # 🏠 เช่า·ขาย shelf (catalog "shelves.home", 19 Oct)
 REPAIR_WORDS = {"ช่าง", "หาช่าง", "🔧 ช่าง", "ช่างซ่อมบ้าน", "ซ่อม", "ซ่อมบ้าน", "ช่าง บริการ", "ช่าง·บริการ", "ช่างทั้งหมด"}
 # a word in what they typed → the ช่าง group ("หาช่างซ่อมเครื่องซักผ้า" → แอร์·เครื่องใช้)
@@ -172,6 +172,10 @@ def _catalog(doc):
     SHELF_CATS["food"] = list(doc["shelves"]["food"])
     SHELF_CATS["goods"] = [c for c in doc["shelves"]["goods"] if c in {k for _, k in MKT_CATS}] or SHELF_CATS["goods"]
     SERVICE_LEND[:] = list(doc["shelves"].get("service", []))
+    TOP_CHIPS[:] = [tuple(x) for x in doc.get("line_top", TOP_CHIPS)]  # 29 Oct: chip order / names and the ช่าง groups — no deploy
+    if doc.get("repair_groups"):
+        REPAIR_GROUPS[:] = [(g["label"], tuple(g["cats"])) for g in doc["repair_groups"]]
+        REPAIR_CATS[:] = [c for _, cs in REPAIR_GROUPS for c in cs]
     HOME_LEND[:] = list(doc["shelves"].get("home", HOME_LEND))
     for k, (e, name) in doc["lend_labels"].items():
         MKT_TH[k] = name
