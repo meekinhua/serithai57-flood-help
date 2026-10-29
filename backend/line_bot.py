@@ -136,6 +136,7 @@ REPAIR_GROUPS = [("⚡ ไฟฟ้า", ("electrician",)), ("🚿 ประป�
 SERVICE_CATS = [c for _, cs in SERVICE_GROUPS for c in cs]
 REPAIR_CATS = [c for _, cs in REPAIR_GROUPS for c in cs]
 SERVICE_LEND = ["health"]  # market posts shown on the 🙋 บริการ shelf (catalog "shelves.service")
+TOP_CHIPS = (("🏠 เช่า·ขาย บ้าน", "🏠 เช่า·ขาย"), ("🍲 ของกิน", "🍲 ของกิน"), ("🙋 บริการ", "🙋 บริการ"))  # 29 Oct: first chips under ตลาด / ช่าง
 HOME_LEND = ["realestate"]  # 🏠 เช่า·ขาย shelf (catalog "shelves.home", 19 Oct)
 REPAIR_WORDS = {"ช่าง", "หาช่าง", "🔧 ช่าง", "ช่างซ่อมบ้าน", "ซ่อม", "ซ่อมบ้าน", "ช่าง บริการ", "ช่าง·บริการ", "ช่างทั้งหมด"}
 # a word in what they typed → the ช่าง group ("หาช่างซ่อมเครื่องซักผ้า" → แอร์·เครื่องใช้)
@@ -1015,8 +1016,9 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         """17 Oct: "ช่าง" → cards of the home-repair people (one group, or all), chips for the groups that have someone."""
         cats = REPAIR_GROUPS[group][1] if group is not None else REPAIR_CATS
         docs = await services_in(cats)
-        have = [(i, g) for i, (g, cs) in enumerate(REPAIR_GROUPS) if await db.services.count_documents({"category": {"$in": list(cs)}})]
-        chips = qr(*[(g, g) for i, g in have if i != group][:9], ("📢 ประกาศหาช่าง", "ประกาศหาช่าง"), ("🛍️ ตลาด", "ตลาด"))
+        have = [(i, g) for i, (g, cs) in enumerate(REPAIR_GROUPS) if await db.services.count_documents({"flag_level": {"$ne": "hidden"}, "category": {"$in": list(cs)}})]
+        # 29 Oct (admin): the main doors first — เช่า·ขาย บ้าน · ของกิน · บริการ · ช่าง — then only the repair groups that have someone
+        chips = qr(*TOP_CHIPS, *([("🔧 ช่างทั้งหมด", "ช่างทั้งหมด")] if group is not None else []), *[(g, g) for i, g in have if i != group], ("📢 ประกาศหาช่าง", "ประกาศหาช่าง"))
         if not docs:
             return [text(f"ยังไม่มีช่าง{REPAIR_GROUPS[group][0].split(' ', 1)[1] if group is not None else ''}ในหมู่บ้านครับ 🙏\nรู้จักช่างดีๆ แนะนำได้ที่ {SITE}/#pros"
                          "\nหรือประกาศหาช่าง ให้ช่างในหมู่บ้านเห็น: " + f"{SITE}/#jobs", chips)]
@@ -1069,11 +1071,12 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             {"type": "button", "style": "secondary", "action": {"type": "uri", "label": "ดูทั้งหมด", "uri": f"{SITE}/#market"}}]}})
         head = (f"🛍️ ตลาดเพื่อนบ้าน · ของขาย {len(items)} · ร้าน {len(shops)} · บริการ {n_svc} · ปัดดูได้ ➡️\n"
                 + ("ของทำเองกด 🛒 สั่ง/จองไว้ได้ · ร้านกดโทรได้เลย · ระบบไม่รับเงิน" if ORDERS_ON else "กดดูรายละเอียด แล้วโทร/ทักผู้ขายได้เลย · ระบบไม่รับเงิน"))
-        chips = qr(("🍲 ของกิน", "🍲 ของกิน"), ("🧺 ของใช้", "🧺 ของใช้"), ("🙋 บริการ", "🙋 บริการ"), ("🏠 เช่า·ขาย", "🏠 เช่า·ขาย"), ("📢 ประกาศหา", "ประกาศหา"), *chips["items"] and [(i["action"]["label"], i["action"]["text"]) for i in chips["items"]])
+        chips = qr(*TOP_CHIPS, ("🔧 ช่าง", "ช่าง"), ("🧺 ของใช้", "🧺 ของใช้"), ("📢 ประกาศหา", "ประกาศหา"), *chips["items"] and [(i["action"]["label"], i["action"]["text"]) for i in chips["items"]])
         return [text(head), {"type": "flex", "altText": "ตลาดเพื่อนบ้าน", "contents": {"type": "carousel", "contents": bubbles}, "quickReply": chips}]
 
     async def shelf_list(user: str, shelf: str) -> list:
-        chips = qr(*[(v, v) for k, v in SHELF_TH.items() if k != shelf], ("🛍️ ลงขาย / บริการ", "ลงขาย"))
+        here = {"home": "🏠 เช่า·ขาย", "food": "🍲 ของกิน", "service": "🙋 บริการ"}.get(shelf)
+        chips = qr(*[c for c in TOP_CHIPS if c[1] != here], ("🔧 ช่าง", "ช่าง"), *([("🧺 ของใช้", "🧺 ของใช้")] if shelf != "goods" else []), ("🛍️ ลงขาย / บริการ", "ลงขาย"))
         if shelf == "service":
             docs = await services_in(SERVICE_CATS)
             posts = await db.lend_items.find({"flag_level": {"$ne": "hidden"}, "kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": list(SERVICE_LEND)}},
