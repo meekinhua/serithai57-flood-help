@@ -125,7 +125,7 @@ FOOD_LEND = ("homemade", "dessert", "drinks", "preserved", "catering", "food")
 SHELF_CATS = {"food": ["homemade", "dessert", "drinks", "preserved", "catering"],
               "goods": ["handmade", "plants", "clothes", "cosmetics", "petgoods", "other"]}
 SHELF_TH = {"food": "🍲 ของกิน", "goods": "🧺 ของใช้", "service": "🙋 บริการ", "home": "🏠 เช่า·ขาย"}  # 18 Oct: รับทำ → บริการ (catalog shelf_labels)
-SHELF_WORDS = {"เช่า·ขาย": "home", "🏠 เช่า·ขาย": "home", "บ้านเช่า": "home", "บ้านขาย": "home", "ของกิน": "food", "🍲 ของกิน": "food", "ของใช้": "goods", "🧺 ของใช้": "goods",
+SHELF_WORDS = {"เช่า·ขาย": "home", "🏠 เช่า·ขาย": "home", "บ้านเช่า": "home", "บ้านขาย": "home", "ซื้อบ้าน": "home", "เช่าบ้าน": "home", "บ้านเช่า·ขาย": "home", "🏠 บ้านเช่า·ขาย": "home", "ของกิน": "food", "🍲 ของกิน": "food", "ของใช้": "goods", "🧺 ของใช้": "goods",
                "รับทำ": "service", "🙋 รับทำ": "service", "🙋 บริการ": "service", "บริการ": "service", "รับจ้าง": "service", "รับทำ·บริการ": "service", "🆕 ใหม่ล่าสุด": "new"}
 SERVICE_GROUPS = [("💇 สวยงาม·สุขภาพ", ("beauty",)), ("📸 ถ่ายรูป·อีเวนต์", ("photo",)), ("📚 สอน·ติว", ("tutor",)),
                   ("🏠 ช่วยงานบ้าน", ("homehelp", "cleaning")), ("🐾 สัตว์เลี้ยง", ("pets",)), ("🚗 รับส่ง·ขนย้าย", ("rental", "porter", "truck", "boat")),
@@ -202,7 +202,7 @@ def split_house(raw: str):
 # ---------- per-house rich menu: the village menu + a strip on top "🏠 4/917 · ซอย 16 · รถขยะ จ.·พฤ." ----------
 # Text pieces are pre-rendered (tools/line_menu_assets.py) because the server has no Thai font; we only paste them.
 MENU_DIR = Path(__file__).parent / "data" / "line_menu"
-MENU_VER = "v6"  # 18 Oct v6: ตลาด tile says บริการ (was รับทำ) · 17 Oct v4: menus open by default (selected True). Bump when base.png / the tiles change, so every house gets a freshly drawn menu
+MENU_VER = "v7"  # 29 Oct v7: 7 tiles — bottom row of 4 with 🏠 บ้านเช่า·ขาย · 18 Oct v6: ตลาด tile says บริการ (was รับทำ) · 17 Oct v4: menus open by default (selected True). Bump when base.png / the tiles change, so every house gets a freshly drawn menu
 DAY_ABBR = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]
 _glyphs = {}
 
@@ -254,11 +254,13 @@ def menu_image(house: str, soi: str, days: str | None, thai_days: list, photos: 
 
 
 def _tile_box(i: int, strip: int):
-    """(x0, y0, x1, y1) of tile i (0..5, 3 per row) under a top strip of `strip` px."""
-    w, h = [833, 833, 834], (1686 - strip) // 2
-    r, c = divmod(i, 3)
-    x0, y0 = sum(w[:c]), strip + r * h
-    return x0, y0, x0 + w[c], (1686 if r else y0 + h)
+    """(x0, y0, x1, y1) of tile i under a top strip of `strip` px: 0..2 on the top row, 3..6 on the bottom row (29 Oct: 4 there)."""
+    h = (1686 - strip) // 2
+    if i < 3:
+        w = [833, 833, 834]
+        x0 = sum(w[:i])
+        return x0, strip, x0 + w[i], strip + h
+    return (i - 3) * 625, strip + h, (i - 2) * 625, 1686
 
 
 def photo_tile(base, box, photo: bytes, label: str):
@@ -278,7 +280,7 @@ def photo_tile(base, box, photo: bytes, label: str):
     base.paste(im, (x0, y0))
 
 
-PHOTO_TILES = (("lost", 3), ("market", 5))
+PHOTO_TILES = (("lost", 3), ("market", 5), ("home", 6))
 
 
 def default_menu_image(photos: dict) -> bytes:
@@ -296,7 +298,7 @@ def default_menu_image(photos: dict) -> bytes:
 
 def default_areas() -> list:
     acts = [{"type": "message", "text": "เบอร์ฉุกเฉิน"}, {"type": "uri", "uri": f"{SITE}/#issues"}, {"type": "message", "text": "ช่าง"},
-            {"type": "message", "text": "หาย"}, {"type": "message", "text": "ขยะ"}, {"type": "message", "text": "ตลาด"}]
+            {"type": "message", "text": "หาย"}, {"type": "message", "text": "ขยะ"}, {"type": "message", "text": "ตลาด"}, {"type": "message", "text": "🏠 เช่า·ขาย"}]
     out = []
     for i, a in enumerate(acts):
         x0, y0, x1, y1 = _tile_box(i, 0)
@@ -310,14 +312,14 @@ def home_url(house: str, hash_: str = "") -> str:
 
 
 def menu_areas(house: str) -> list:
-    """Tap areas: the strip → บ้านฉัน; the 6 tiles as on the village menu (OA Manager menu 20408889); 15 Oct: tile 6 → ตลาด."""
-    strip, w, h = 230, [833, 833, 834], (1686 - 230) // 2
+    """Tap areas: the strip → บ้านฉัน; the 7 tiles as on the default menu (15 Oct: tile 6 → ตลาด · 29 Oct: tile 7 → 🏠 เช่า·ขาย)."""
+    strip = 230
     acts = [{"type": "message", "text": "เบอร์ฉุกเฉิน"}, {"type": "uri", "uri": home_url(house, "issues")}, {"type": "message", "text": "ช่าง"},
-            {"type": "message", "text": "หาย"}, {"type": "message", "text": "ขยะ"}, {"type": "message", "text": "ตลาด"}]
+            {"type": "message", "text": "หาย"}, {"type": "message", "text": "ขยะ"}, {"type": "message", "text": "ตลาด"}, {"type": "message", "text": "🏠 เช่า·ขาย"}]
     areas = [{"bounds": {"x": 0, "y": 0, "width": 2500, "height": strip}, "action": {"type": "message", "text": "บ้านฉัน"}}]
     for i, a in enumerate(acts):
-        r, c = divmod(i, 3)
-        areas.append({"bounds": {"x": sum(w[:c]), "y": strip + r * h, "width": w[c], "height": h if r == 0 else 1686 - strip - h}, "action": a})
+        x0, y0, x1, y1 = _tile_box(i, strip)
+        areas.append({"bounds": {"x": x0, "y": y0, "width": x1 - x0, "height": y1 - y0}, "action": a})
     return areas
 
 
@@ -590,18 +592,25 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
             if mid and d["id"] not in skip:
                 sale = {"item": d["id"], "title": d.get("title", ""), "media": mid}
                 break
-        return {"lost": lost, "market": sale, "skip": sorted(skip)}
+        home = None  # 29 Oct: newest บ้านเช่า·ขาย photo (listings the admin copied from other sites count here too)
+        async for d in db.lend_items.find({"flag_level": {"$ne": "hidden"}, "kind": "sell", "status": {"$ne": "closed"}, "category": {"$in": HOME_LEND}, "media.type": "image"},
+                                          {"_id": 0, "id": 1, "title": 1, "media": 1}).sort([("external", 1), ("created_at", -1)]).limit(20):
+            mid = next((x["id"] for x in d["media"] if x.get("type") == "image" and x["id"] not in skip), None)
+            if mid and d["id"] not in skip:
+                home = {"item": d["id"], "title": d.get("title", ""), "media": mid}
+                break
+        return {"lost": lost, "market": sale, "home": home, "skip": sorted(skip)}
 
     async def latest_photos() -> dict:
         p = await photo_picks()
-        return {k: (p[k] or {}).get("media") for k in ("lost", "market")}
+        return {k: (p[k] or {}).get("media") for k in ("lost", "market", "home")}
 
     async def menu_key(house: str, soi: str):
         _, days, _ = await next_waste(soi)
         if days and await waste_off():
             days = "IRREGULAR"  # 18 Oct: the strip says รถขยะ ไม่ตรงวัน (and the key change redraws every menu)
         ids = await latest_photos()
-        return f"{MENU_VER}|{house}|{soi}|{days or ''}|{ids['lost'] or ''}|{ids['market'] or ''}", days, ids
+        return f"{MENU_VER}|{house}|{soi}|{days or ''}|{ids['lost'] or ''}|{ids['market'] or ''}|{ids['home'] or ''}", days, ids
 
     async def refresh_default_menu():
         """16 Oct: the LINE default menu (everyone without a house) is drawn here with the live photo tiles, and
@@ -613,7 +622,7 @@ def build_router(db, require_admin, audit, claim_media, locate_house, norm_house
         if st.get("off"):
             return
         ids = await latest_photos()
-        key = f"{MENU_VER}|default|{ids['lost'] or ''}|{ids['market'] or ''}"
+        key = f"{MENU_VER}|default|{ids['lost'] or ''}|{ids['market'] or ''}|{ids['home'] or ''}"
         if st.get("key") == key:
             return
         photos = {k: await media_bytes(v) for k, v in ids.items() if v}
